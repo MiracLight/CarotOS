@@ -38,15 +38,27 @@ anlatılmış.**
 
 <div align="center">
 
-<img src="docs/screenshots/desktop.png" alt="CarotOS masaüstü" width="720">
+<img src="docs/screenshots/desktop.png" alt="CarotOS masaüstü" width="760">
 
 *XFCE masaüstü — iki panelli düzen, Türkçe arayüz*
 
-<br>
+<br><br>
 
-<img src="docs/screenshots/panel.png" alt="CarotOS Güvenlik Paneli" width="720">
+<img src="docs/screenshots/health.png" alt="CarotOS Sistem Sağlığı" width="760">
+
+*Sistem Sağlığı — yirmi denetim, sağlık puanı ve tek tıkla düzeltme*
+
+<br><br>
+
+<img src="docs/screenshots/panel.png" alt="CarotOS Güvenlik Paneli" width="760">
 
 *Güvenlik Paneli — her araç için form, açıklama ve canlı çıktı*
+
+<br><br>
+
+<img src="docs/screenshots/welcome.png" alt="CarotOS Karşılama Sihirbazı" width="760">
+
+*Karşılama Sihirbazı — ilk açılışta çıkan iki dilli tanıtım*
 
 </div>
 
