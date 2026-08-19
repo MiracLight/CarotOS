@@ -34,6 +34,22 @@ anlatılmış.**
 - Wi-Fi, ses ve grafik firmware'leri dahil — gerçek dizüstülerde çalışır
 - Boşta yaklaşık **517 MB** bellek kullanımı
 
+## Ekran görüntüleri
+
+<div align="center">
+
+<img src="docs/screenshots/desktop.png" alt="CarotOS masaüstü" width="720">
+
+*XFCE masaüstü — iki panelli düzen, Türkçe arayüz*
+
+<br>
+
+<img src="docs/screenshots/panel.png" alt="CarotOS Güvenlik Paneli" width="720">
+
+*Güvenlik Paneli — her araç için form, açıklama ve canlı çıktı*
+
+</div>
+
 ## Uygulamalar
 
 ### CarotOS Güvenlik Paneli
