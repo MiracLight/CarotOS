@@ -1,0 +1,10 @@
+PRETTY_NAME="CarotOS 1.0 (Eggshell)"
+NAME="CarotOS"
+VERSION_ID="1.0"
+VERSION="1.0 (Eggshell)"
+VERSION_CODENAME=trixie
+ID=carotos
+ID_LIKE=debian
+HOME_URL="https://www.carotos.org/"
+SUPPORT_URL="https://www.carotos.org/support"
+BUG_REPORT_URL="https://bugs.carotos.org/"

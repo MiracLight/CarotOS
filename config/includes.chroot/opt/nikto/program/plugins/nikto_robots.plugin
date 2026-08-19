@@ -1,0 +1,146 @@
+###############################################################################
+# SPDX-License-Identifier: GPL-3.0-only
+# PURPOSE: Check out the robots.txt file
+###############################################################################
+sub nikto_robots_init {
+    my $id = {
+        name        => "robots",
+        full_name   => "Robots",
+        author      => "Sullo",
+        description =>
+          "Checks whether there's anything within the robots.txt file and analyses it for other paths to pass to other scripts.",
+        hooks => { recon => { method => \&nikto_robots,
+                              weight => 49,
+                              },
+                     },
+        copyright => "2008 Chris Sullo",
+        options   => { nocheck => "Flag to disable checking entries in robots file.", }
+        };
+    return $id;
+}
+
+sub nikto_robots {
+    my ($mark, $parameters) = @_;
+    return if $mark->{'terminate'};
+
+    my ($code, $content, $errors, $request, $response) =
+      nfetch($mark, "/robots.txt", "GET", "", "", "", "robots");
+    my $has_non_root_entries = 1;
+
+    # Validate content-type: should be text/* or not present
+    if (defined($response->{'content-type'})) {
+        if (   $response->{'content-type'} !~ /^text\//i
+            || $response->{'content-type'} =~ /^text\/html/i) {
+            return;    # Not a text type, or is HTML - skip processing
+        }
+    }
+
+    # Accept any 2xx success code (except 204 No Content) or custom "okay" response
+    if ($code =~ /^2\d\d$/) {
+        if (is_404($mark, "/robots.txt", $response)) {
+            return;
+        }
+
+        my (%DIRS, %RFILES);
+        my $DISCTR           = 0;
+        my $positive_hits    = 0;
+        my $positive_hit_cap = 25;
+        my $capped_positives = 0;
+        my @DOC              = split(/\n/, $content);
+        my %tocheck;
+        foreach my $line (@DOC) {
+            $line =~ s/(?:^\s+|\s+$)//g;
+            if ($line =~ /allow/i) {
+                chomp($line);
+
+                # Report if Allow
+                $has_non_root_entries = 0 if ($line =~ /^allow/i);
+                $line =~ s/\#.*$//;
+                $line =~ s/\s+/ /g;
+                $line =~ s/\t/ /g;
+                $line =~ s/^(?:dis)?allow\s*:?\s*//i;
+                $line =~ s/\/+/\//g;
+                $line =~ s/\\//g;
+
+                if ($line eq "") { next; }
+
+                # try to figure out file vs dir... just guess...
+                if (($line !~ /\./) && ($line !~ /\/$/)) { $line .= "/"; }
+
+                $line = LW2::uri_normalize($line);
+
+                # figure out dirs/files...
+                my $realdir  = validate_and_fix_regex(LW2::uri_get_dir($line));
+                my $realfile = validate_and_fix_regex($line);
+                $realfile =~ s/^$realdir//;
+
+                nprint("- robots.txt entry dir:$realdir -- file:$realfile",
+                       "d", "robots", ($mark->{'hostname'}, $mark->{'ip'}, $mark->{'displayname'}));
+                if (($realdir ne "") && ($realdir ne "/")) {
+                    $realdir =~ s/\\//g;
+                    $DIRS{$realdir} = 1;
+                }
+                if (($realfile ne "") && ($realfile ne "/")) {
+                    $realfile =~ s/\\//g;
+                    $RFILES{$realfile} = 1;
+                }
+                $DISCTR++;
+
+                if (($realdir ne "") && ($realdir ne "/")) { $has_non_root_entries = 0; }
+                next
+                  if (   ($realdir eq "/" && $realfile eq "")
+                      || ($realfile eq "/" && $realdir eq ""));
+                next if ($line =~ /\*/);    # Wildcards
+                $line = "/$line" unless $line =~ /^\//;
+                $tocheck{$line} = 1;
+            }    # end if $line =~ allow
+        }    # end foreach my $line (@DOC)
+
+        # Check for allowed paths
+        foreach my $line (keys %tocheck) {
+            return if $mark->{'terminate'};
+            if (!defined($parameters->{'nocheck'})) {
+                my ($res, $content, $error, $request, $response) =
+                  nfetch($mark, $line, "GET", "", "", "", "Robots: Check for URI");
+                if (   !is_404($mark, $line, $response)
+                    && ($res !~ /^40[346]$/)
+                    && ($res !~ /^30[21]$/)) {
+                    add_vulnerability(
+                        $mark,
+                        "/robots.txt: Entry '$line' is returned a non-forbidden or redirect HTTP code ($res)",
+                        "999997",
+                        "https://portswigger.net/kb/issues/00600600_robots-txt-file",
+                        "GET",
+                        "$line",
+                        $request,
+                        $response
+                        );
+                    $positive_hits++;
+                    if ($positive_hits >= $positive_hit_cap) {
+                        $capped_positives = 1;
+                        last;
+                    }
+                }
+            }
+        }
+
+        # Use shared path matching logic
+        path_matcher(\%RFILES, \%DIRS, undef);
+
+        my $msg =
+            ($DISCTR == 1) ? "contains 1 entry which should be manually viewed."
+          : ($DISCTR > 1)  ? "contains $DISCTR entries which should be manually viewed."
+          :                  "retrieved but it does not contain any Allow/Disallow entries...";
+        if ($capped_positives) {
+            $msg .= " Capped at 25 positive results.";
+        }
+
+        if ($has_non_root_entries == 0) {
+            add_vulnerability($mark, "/robots.txt: $msg",
+                           "999996", "https://developer.mozilla.org/en-US/docs/Glossary/Robots.txt",
+                           "GET",    "/robots.txt", $request, $response);
+        }
+    }
+}
+
+1;

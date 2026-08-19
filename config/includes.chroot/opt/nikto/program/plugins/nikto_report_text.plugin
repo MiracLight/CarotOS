@@ -1,0 +1,83 @@
+###############################################################################
+# SPDX-License-Identifier: GPL-3.0-only
+# PURPOSE: Text Reporting
+###############################################################################
+sub nikto_report_text_init {
+    my $id = { name              => "report_text",
+               full_name         => "Text reports",
+               author            => "Tautology",
+               description       => "Produces a text report.",
+               report_head       => \&text_open,
+               report_host_start => \&text_host,
+               report_item       => \&text_item,
+               report_ssl_info   => \&text_ssl_info,
+               report_format     => 'txt',
+               copyright         => "2008 Chris Sullo"
+               };
+    return $id;
+}
+
+sub text_open {
+    my ($file) = @_;
+    if ($file eq '') {
+        die "+ ERROR: Output file not specified.\n";
+    }
+
+    # Open file with lexical handle and produce header
+    my $fh;
+    open($fh, ">>", $file) || die "+ ERROR: Unable to open '$file' for write: $!\n";
+
+    # Enable autoflush
+    $fh->autoflush(1);
+
+    # Write header
+    print $fh "- $VARIABLES{'name'} v$VARIABLES{'version'}/$VARIABLES{'core_version'}\n";
+
+    return $fh;
+}
+
+sub text_host {
+    my ($handle, $mark) = @_;
+    my $hostname = $mark->{'vhost'} ? $mark->{'vhost'} : $mark->{'hostname'};
+    print $handle "+ Target Host: $hostname\n";
+    print $handle "+ Target Port: $mark->{port}\n";
+}
+
+sub text_ssl_info {
+    my ($handle, $mark) = @_;
+    print $handle "+ SSL Info:           Subject:  $mark->{'ssl_cert_subject'}\n";
+
+    # Extract and display CN separately
+    my $cn = '';
+    if (defined $mark->{'ssl_cert_subject'} && $mark->{'ssl_cert_subject'} =~ /CN=([^$ \/]+)/) {
+        $cn = $1;
+        print $handle "                      CN:       $cn\n";
+    }
+
+    # Display SAN if present
+    if (defined $mark->{'ssl_cert_altnames'} && $mark->{'ssl_cert_altnames'} ne '') {
+        print $handle "                      SAN:      $mark->{'ssl_cert_altnames'}\n";
+    }
+
+    print $handle "                      Ciphers:  $mark->{'ssl_cipher'}\n";
+    print $handle "                      Issuer:   $mark->{'ssl_cert_issuer'}\n";
+}
+
+sub text_item {
+    my ($handle, $mark, $item) = @_;
+
+    foreach my $uri (split(' ', $item->{uri})) {
+        my $line = "+ ";
+        if ($item->{method}) { $line .= $item->{method} . " " }
+        if (($uri ne '') && ($uri !~ /^$mark->{'root'}/)) {
+            $line .= $mark->{'root'} . $uri . ": ";
+        }
+        $line .= $item->{message};
+        if (defined $item->{refs} && $item->{refs} ne "") {
+            $line .= " See: " . $item->{refs} . ": ";
+        }
+        print $handle "$line\n";
+    }
+}
+
+1;

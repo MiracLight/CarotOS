@@ -1,0 +1,19 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Exec=exo-open --launch WebBrowser %u
+Icon=firefox-esr
+StartupNotify=true
+Terminal=false
+Categories=Network;X-XFCE;X-Xfce-Toplevel;
+Keywords[tr]=internet;web;browser;surf;explore;xfce;
+Keywords=internet;web;browser;surf;explore;xfce;
+OnlyShowIn=XFCE;
+X-XFCE-MimeType=x-scheme-handler/http;x-scheme-handler/https;
+X-AppStream-Ignore=True
+Name[tr]=Firefox
+Name=Firefox
+Comment[tr]=İnternette gezin
+Comment=Browse the web with Firefox
+X-XFCE-Source=file:///usr/share/applications/xfce4-web-browser.desktop
+Path=

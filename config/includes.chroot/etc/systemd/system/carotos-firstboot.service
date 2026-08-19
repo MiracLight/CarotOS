@@ -1,0 +1,12 @@
+[Unit]
+Description=CarotOS ilk acilis ayarlari
+After=multi-user.target
+ConditionPathExists=!/var/lib/carotos/firstboot.done
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/carotos-firstboot.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

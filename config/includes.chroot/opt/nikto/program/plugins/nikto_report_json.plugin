@@ -1,0 +1,147 @@
+###############################################################################
+# SPDX-License-Identifier: GPL-3.0-only
+# PURPOSE: JSON Reporting - Multi-host support
+###############################################################################
+our $JSONRPT_ALL  = [];       # Arrayref to hold all hosts' reports
+our $JSONRPT_CURR = undef;    # Scalarref to current host's report
+
+use JSON::PP;
+use Time::Piece;
+use Time::Seconds;
+
+###############################################################################
+sub nikto_report_json_init {
+
+    my $id = { name              => "report_json",
+               full_name         => "JSON reports",
+               author            => "Sullo",
+               description       => "Produces a JSON report.",
+               report_head       => \&json_open,
+               report_host_start => \&json_host_start,
+               report_host_end   => \&json_host_end,
+               report_close      => \&json_close,
+               report_item       => \&json_item,
+               report_ssl_info   => \&json_ssl_info,
+               report_format     => 'json',
+               copyright         => "2025 Chris Sullo"
+               };
+    return $id;
+}
+
+###############################################################################
+# open output file
+sub json_open {
+    my ($file) = @_;
+    if ($file eq '') {
+        print STDERR "+ ERROR: Output file not specified.\n";
+        exit;
+    }
+
+    # Open file with lexical handle (read-write mode for JSON)
+    my $fh;
+    open($fh, "+>", $file) || die "+ ERROR: Unable to open '$file' for write: $!\n";
+
+    # Enable autoflush
+    $fh->autoflush(1);
+
+    return $fh;
+}
+
+###############################################################################
+# start output for a host
+sub json_host_start {
+    my ($handle, $mark) = @_;
+
+    # Get current time with timezone
+    my $current_time = localtime;
+    my $start_time   = $mark->{'start_time'} ? localtime($mark->{'start_time'}) : $current_time;
+
+    $JSONRPT_CURR = { host            => $mark->{'vhost'} ? $mark->{'vhost'} : $mark->{'hostname'},
+                      ip              => $mark->{'ip'},
+                      port            => $mark->{'port'},
+                      server_banner   => $mark->{'banner'},
+                      start_time      => $start_time->strftime('%Y-%m-%d %H:%M:%S %z'),
+                      vulnerabilities => []
+                      };
+
+    # Add current host report to the array of all hosts
+    push @$JSONRPT_ALL, $JSONRPT_CURR;
+    return;
+}
+
+###############################################################################
+# write SSL info
+sub json_ssl_info {
+    my ($handle, $mark) = @_;
+
+    # Update the current host report with SSL info
+    return unless defined $JSONRPT_CURR;
+
+    # Extract CN from subject
+    my $cn = '';
+    if (defined $mark->{'ssl_cert_subject'} && $mark->{'ssl_cert_subject'} =~ /CN=([^$ \/]+)/) {
+        $cn = $1;
+    }
+
+    $JSONRPT_CURR->{'ssl_info'} = { ciphers  => $mark->{'ssl_cipher'}       || '',
+                                    issuer   => $mark->{'ssl_cert_issuer'}  || '',
+                                    subject  => $mark->{'ssl_cert_subject'} || '',
+                                    cn       => $cn,
+                                    altnames => $mark->{'ssl_cert_altnames'} || ''
+                                    };
+}
+
+###############################################################################
+# end output for a host
+sub json_host_end {
+    my ($handle, $mark) = @_;
+    my $end_time;
+
+    if ($mark->{'end_time'} eq '') {
+        $end_time = localtime;
+    }
+    else {
+        $end_time = localtime($mark->{'end_time'});
+    }
+
+    $JSONRPT_CURR->{'end_time'} = $end_time->strftime('%Y-%m-%d %H:%M:%S %z');
+    return;
+}
+
+###############################################################################
+# close output file
+sub json_close {
+    my ($handle, $mark) = @_;
+    my $json_encoder = JSON::PP->new->utf8->canonical->pretty->convert_blessed;
+    my $json_output  = $json_encoder->encode($JSONRPT_ALL);
+    print $handle $json_output;
+    close($handle);
+    return;
+}
+
+###############################################################################
+# print an item
+sub json_item {
+    my ($handle, $mark, $item) = @_;
+
+    my $uri = $item->{'uri'};
+    if (($uri ne '') && ($mark->{'root'} ne '') && ($uri !~ /^$mark->{'root'}/)) {
+        $uri = $mark->{'root'} . $uri;
+    }
+
+    my $msg  = $item->{'message'};
+    my $uri2 = quotemeta($uri);
+    my $root = quotemeta($mark->{'root'});
+    $msg =~ s/^$uri2:\s//;
+    $msg =~ s/^$root$uri2:\s//;
+
+    push @{ $JSONRPT_CURR->{'vulnerabilities'} },
+      { id         => $item->{'nikto_id'},
+        references => $item->{'refs'},
+        method     => $item->{'method'},
+        url        => $uri,
+        msg        => $msg
+        };
+}
+
+1;

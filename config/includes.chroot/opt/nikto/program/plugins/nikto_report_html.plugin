@@ -1,0 +1,481 @@
+###############################################################################
+# SPDX-License-Identifier: GPL-3.0-only
+# PURPOSE: HTML Reporting
+###############################################################################
+sub nikto_report_html_init {
+    my $id = { name              => "report_html",
+               full_name         => "Report as HTML",
+               author            => "Sullo/Jabra",
+               description       => "Produces an HTML report.",
+               report_head       => \&html_head,
+               report_summary    => \&html_summary,
+               report_host_start => \&html_host_start,
+               report_host_end   => \&html_host_end,
+               report_item       => \&html_item,
+               report_close      => \&html_close,
+               report_ssl_info   => \&html_ssl_info,
+               report_format     => 'htm',
+               copyright         => "2008 Chris Sullo"
+               };
+
+    # load up the templates now
+    html_open_templates();
+    return $id;
+}
+###############################################################################
+sub html_head {
+    my ($file) = @_;
+    if ($file eq '') {
+        print STDERR "+ ERROR: Output file not specified.\n";
+        exit;
+    }
+
+    # Write header for html file, return file handle
+    my $fh;
+    open($fh, ">>", $file) || die "+ ERROR: Unable to open '$file' for write: $!\n";
+
+    # Enable autoflush
+    $fh->autoflush(1);
+
+    my $html = process_template($TEMPLATES{'htm_start'}, {});
+    print $fh "$html";
+
+    return $fh;
+}
+###############################################################################
+sub html_close {
+    my ($handle, $mark) = @_;
+    my $html = process_template($TEMPLATES{'htm_close'}, $mark);
+    print $handle "$html\n";
+
+    close($handle);
+    return;
+}
+###############################################################################
+sub html_summary {
+    my ($handle, $mark) = @_;
+    my $html = process_template($TEMPLATES{'htm_summary'}, $mark);
+    print $handle $html;
+
+    return;
+}
+###############################################################################
+# Store host header HTML until SSL info is available
+our $HTML_HOST_HEADER = undef;
+our $HTML_HOST_HANDLE = undef;
+our $HTML_HOST_MARK   = undef;
+
+sub html_host_start {
+    my ($handle, $mark) = @_;
+
+    # Clear any state left over from a target that aborted before host_end,
+    # otherwise this host's header could be written to the previous handle.
+    $HTML_HOST_HEADER = undef;
+    $HTML_HOST_HANDLE = undef;
+    $HTML_HOST_MARK   = undef;
+
+    # Store handle and mark for later use when SSL info is available
+    $HTML_HOST_HANDLE = $handle;
+    $HTML_HOST_MARK   = $mark;
+
+    # Don't write yet - wait for SSL info to be available
+    # The template will be written by html_ssl_info() or html_host_end()
+
+    return;
+}
+###############################################################################
+sub html_ssl_info {
+    my ($handle, $mark) = @_;
+
+    # If host header hasn't been written yet, write it now with SSL info
+    if (defined $HTML_HOST_HANDLE) {
+        my $html = process_template($TEMPLATES{'htm_host_head'}, $mark);
+        print $handle "$html\n";
+
+        # Clear stored values
+        $HTML_HOST_HEADER = undef;
+        $HTML_HOST_HANDLE = undef;
+        $HTML_HOST_MARK   = undef;
+    }
+
+    # If header was already written by html_item, we can't update it
+    # This is acceptable - SSL info will be missing but header is in correct position
+
+    return;
+}
+###############################################################################
+sub html_host_end {
+    my ($handle, $mark) = @_;
+
+    # If host header wasn't written yet (no SSL), write it now without SSL info.
+    # Always write to the handle we were passed, consistent with html_item()
+    # and html_ssl_info(); the stored handle may be stale.
+    if (defined $HTML_HOST_HANDLE) {
+        my $html = process_template($TEMPLATES{'htm_host_head'}, $HTML_HOST_MARK || $mark);
+        print $handle "$html\n";
+
+        # Clear stored values
+        $HTML_HOST_HEADER = undef;
+        $HTML_HOST_HANDLE = undef;
+        $HTML_HOST_MARK   = undef;
+    }
+
+    my $html = process_template($TEMPLATES{'htm_end'}, $mark);
+    print $handle "$html\n";
+
+    return;
+}
+###############################################################################
+sub html_item {
+    my ($handle, $mark, $item) = @_;
+
+    # If host header hasn't been written yet, write it now (without SSL info)
+    # This ensures the header appears before any items
+    if (defined $HTML_HOST_HANDLE) {
+
+        # Use the stored mark which has the initial host info
+        my $html = process_template($TEMPLATES{'htm_host_head'}, $HTML_HOST_MARK);
+        print $handle "$html\n";
+
+        # Clear stored values
+        $HTML_HOST_HEADER = undef;
+        $HTML_HOST_HANDLE = undef;
+        $HTML_HOST_MARK   = undef;
+    }
+
+    my $html = process_template($TEMPLATES{'htm_host_item'}, $mark, $item);
+    print $handle "$html\n";
+
+    return;
+}
+###############################################################################
+sub html_open_templates {
+    foreach my $template_name (dirlist($CONFIGFILE{'TEMPLATEDIR'}, "htm.*")) {
+        my $fh;
+        open($fh, '<', "$CONFIGFILE{'TEMPLATEDIR'}/$template_name")
+          || die "+ ERROR: Unable to open '$CONFIGFILE{'TEMPLATEDIR'}/$template_name': $!\n";
+        my @TEMPLATE = <$fh>;
+        close($fh);
+        my $template_content = join("", @TEMPLATE);
+        $template_name =~ s/\.[^.]*$//;
+        $TEMPLATES{$template_name} = $template_content;
+    }
+
+    return;
+}
+###############################################################################
+# Bracket IPv6 literals for use in URLs (http://[::1]:80/)
+sub html_url_host {
+    my ($host) = @_;
+    return '' unless defined $host && $host ne '';
+    $host =~ s/^\[//;
+    $host =~ s/\]$//;
+    if ($host =~ /^$LW2::IPv6_re_inc_zoneid$/ || $host =~ /:/) {
+        return '[' . $host . ']';
+    }
+    return $host;
+}
+###############################################################################
+sub process_template {
+    my ($template, $mark, $item) = @_;
+    $mark = {} unless ref($mark) eq 'HASH';
+    $item = {} unless ref($item) eq 'HASH';
+
+    my %variables;
+    my $protocol = "http";
+    if ($mark->{'ssl'}) { $protocol .= "s"; }
+    my $hostname = $mark->{'vhost'} ? $mark->{'vhost'} : ($mark->{'hostname'} // '');
+    $hostname = '' unless defined $hostname;
+
+    $variables{"#TEMPL_HCTR#"}               = $VARIABLES{'TEMPL_HCTR'} // '';
+    $variables{"#TEMPL_END#"}                = date_disp($mark->{'end_time'});
+    $variables{"#TEMPL_HOSTNAME#"}           = simple_enc($hostname);
+    $variables{"#TEMPL_IP#"}                 = simple_enc($mark->{'ip'});
+    $variables{"#TEMPL_ITEMS_TESTED#"}       = $COUNTERS{'total_checks'} // '';
+    $variables{"#TEMPL_PORT#"}               = $mark->{'port'}           // '';
+    $variables{"#TEMPL_NIKTO_VER#"}          = $VARIABLES{'version'}     // '';
+    $variables{"#TEMPL_BANNER#"}             = simple_enc($mark->{'banner'});
+    $variables{"#TEMPL_NIKTO_CLI#"}          = simple_enc($CLI{'all_options'});
+    $variables{"#TEMPL_CTR#"}                = $COUNTERS{'total_checks'}    // '';
+    $variables{"#TEMPL_NIKTO_HOSTS_TESTED#"} = $COUNTERS{'hosts_completed'} // '';
+
+    # Create base URL once - prefer hostname (vhost if set), fall back to IP if hostname empty
+    my $base_host = ($hostname ne '') ? $hostname : ($mark->{'ip'} // '');
+    my $root      = $mark->{'root'} // '';
+    my $port      = $mark->{'port'} // '';
+    my $base_url =
+      $protocol . '://' . simple_enc(html_url_host($base_host)) . ':' . $port . simple_enc($root);
+
+    # IP-specific link (for host header template)
+    my $link_ip =
+        $protocol . '://'
+      . simple_enc(html_url_host($mark->{'ip'})) . ':'
+      . $port
+      . simple_enc($root);
+    if ($link_ip !~ /\/$/) { $link_ip .= '/'; }
+    $variables{"#TEMPL_LINK_IP#"} = $link_ip;
+
+    # Standalone link needs a trailing slash (item links append a URI to
+    # $base_url instead, so $base_url itself is left unterminated)
+    my $link_name = $base_url;
+    if ($link_name !~ /\/$/) { $link_name .= '/'; }
+    $variables{"#TEMPL_LINK_NAME#"}    = $link_name;
+    $variables{"#TEMPL_ITEMS_FOUND#"}  = $mark->{'total_vulns'} // '';
+    $variables{"#TEMPL_SCAN_START#"}   = localtime($COUNTERS{'scan_start'} || 0);
+    $variables{"#TEMPL_SCAN_END#"}     = localtime($COUNTERS{'scan_end'}   || 0);
+    $variables{"#TEMPL_SCAN_ELAPSED#"} = ($COUNTERS{'scan_elapsed'} // 0) . " seconds";
+    $variables{"#TEMPL_STATISTICS#"} =
+        ($COUNTERS{'totalrequests'} // 0)
+      . " requests, "
+      . ($mark->{'total_errors'} // 0)
+      . " errors, "
+      . ($mark->{'total_vulns'} // 0)
+      . " findings";
+    $variables{"#TEMPL_START#"} = date_disp($mark->{'start_time'});
+    $variables{"#TEMPL_ELAPSED#"} =
+        (defined $mark->{'end_time'} && defined $mark->{'start_time'})
+      ? ($mark->{'end_time'} - $mark->{'start_time'})
+      : 0;
+    my $references = linkify_refs($item->{'refs'}) || '';
+    $variables{"#TEMPL_REFERENCES#"} = $references;
+
+    # Process References row - extract row HTML from template and conditionally show/hide
+    if ($template =~ /#TEMPL_REFERENCES#/) {
+        my $host_item_template = $TEMPLATES{'htm_host_item'} || '';
+        my ($references_row_tmpl) =
+          $host_item_template =~ /#TEMPL_REFERENCES_ROW#\s*(<tr>.*?<\/tr>)/s;
+
+        if ($references_row_tmpl && $references ne '') {
+            my $row = $references_row_tmpl;
+            $row =~ s/#TEMPL_REFERENCES#/$references/g;
+            $variables{"#TEMPL_REFERENCES_ROW_REPLACE#"} = $row;
+        }
+        else {
+            $variables{"#TEMPL_REFERENCES_ROW_REPLACE#"} = "";
+        }
+        $variables{"#TEMPL_REFERENCES_ROW#"} = "";
+    }
+    else {
+        $variables{"#TEMPL_REFERENCES_ROW_REPLACE#"} = "";
+        $variables{"#TEMPL_REFERENCES_ROW#"}         = "";
+    }
+
+    # SSL Info template variables - populate if SSL info is available
+    if ($mark->{'ssl'} && defined $mark->{'ssl_cipher'}) {
+        my $ssl_subject  = simple_enc($mark->{'ssl_cert_subject'}  || '');
+        my $ssl_issuer   = simple_enc($mark->{'ssl_cert_issuer'}   || '');
+        my $ssl_ciphers  = simple_enc($mark->{'ssl_cipher'}        || '');
+        my $ssl_altnames = simple_enc($mark->{'ssl_cert_altnames'} || '');
+        my $ssl_cn       = '';
+
+        if (defined $mark->{'ssl_cert_subject'}
+            && $mark->{'ssl_cert_subject'} =~ /CN=([^$ \/]+)/) {
+            $ssl_cn = simple_enc($1);
+        }
+
+        $variables{"#TEMPL_SSL_SUBJECT#"} = $ssl_subject;
+        $variables{"#TEMPL_SSL_CN#"}      = $ssl_cn;
+        $variables{"#TEMPL_SSL_SAN#"}     = $ssl_altnames;
+        $variables{"#TEMPL_SSL_CIPHERS#"} = $ssl_ciphers;
+        $variables{"#TEMPL_SSL_ISSUER#"}  = $ssl_issuer;
+
+        my $host_head_template = $TEMPLATES{'htm_host_head'} || '';
+        my ($ssl_subject_row_tmpl) =
+          $host_head_template =~ /#TEMPL_SSL_SUBJECT_ROW#\s*(<tr>.*?<\/tr>)/s;
+        my ($ssl_cn_row_tmpl)  = $host_head_template =~ /#TEMPL_SSL_CN_ROW#\s*(<tr>.*?<\/tr>)/s;
+        my ($ssl_san_row_tmpl) = $host_head_template =~ /#TEMPL_SSL_SAN_ROW#\s*(<tr>.*?<\/tr>)/s;
+        my ($ssl_ciphers_row_tmpl) =
+          $host_head_template =~ /#TEMPL_SSL_CIPHERS_ROW#\s*(<tr>.*?<\/tr>)/s;
+        my ($ssl_issuer_row_tmpl) =
+          $host_head_template =~ /#TEMPL_SSL_ISSUER_ROW#\s*(<tr>.*?<\/tr>)/s;
+
+        if ($ssl_subject_row_tmpl) {
+            my $row = $ssl_subject_row_tmpl;
+            $row =~ s/#TEMPL_SSL_SUBJECT#/$ssl_subject/g;
+            $variables{"#TEMPL_SSL_SUBJECT_ROW_REPLACE#"} = $row;
+        }
+        else {
+            $variables{"#TEMPL_SSL_SUBJECT_ROW_REPLACE#"} = "";
+        }
+
+        if ($ssl_cn_row_tmpl && $ssl_cn ne '') {
+            my $row = $ssl_cn_row_tmpl;
+            $row =~ s/#TEMPL_SSL_CN#/$ssl_cn/g;
+            $variables{"#TEMPL_SSL_CN_ROW_REPLACE#"} = $row;
+        }
+        else {
+            $variables{"#TEMPL_SSL_CN_ROW_REPLACE#"} = "";
+        }
+
+        if ($ssl_san_row_tmpl && $ssl_altnames ne '') {
+            my $row = $ssl_san_row_tmpl;
+            $row =~ s/#TEMPL_SSL_SAN#/$ssl_altnames/g;
+            $variables{"#TEMPL_SSL_SAN_ROW_REPLACE#"} = $row;
+        }
+        else {
+            $variables{"#TEMPL_SSL_SAN_ROW_REPLACE#"} = "";
+        }
+
+        if ($ssl_ciphers_row_tmpl) {
+            my $row = $ssl_ciphers_row_tmpl;
+            $row =~ s/#TEMPL_SSL_CIPHERS#/$ssl_ciphers/g;
+            $variables{"#TEMPL_SSL_CIPHERS_ROW_REPLACE#"} = $row;
+        }
+        else {
+            $variables{"#TEMPL_SSL_CIPHERS_ROW_REPLACE#"} = "";
+        }
+
+        if ($ssl_issuer_row_tmpl) {
+            my $row = $ssl_issuer_row_tmpl;
+            $row =~ s/#TEMPL_SSL_ISSUER#/$ssl_issuer/g;
+            $variables{"#TEMPL_SSL_ISSUER_ROW_REPLACE#"} = $row;
+        }
+        else {
+            $variables{"#TEMPL_SSL_ISSUER_ROW_REPLACE#"} = "";
+        }
+
+        $variables{"#TEMPL_SSL_SUBJECT_ROW#"} = "";
+        $variables{"#TEMPL_SSL_CN_ROW#"}      = "";
+        $variables{"#TEMPL_SSL_SAN_ROW#"}     = "";
+        $variables{"#TEMPL_SSL_CIPHERS_ROW#"} = "";
+        $variables{"#TEMPL_SSL_ISSUER_ROW#"}  = "";
+    }
+    else {
+        $variables{"#TEMPL_SSL_SUBJECT_ROW_REPLACE#"} = "";
+        $variables{"#TEMPL_SSL_CN_ROW_REPLACE#"}      = "";
+        $variables{"#TEMPL_SSL_SAN_ROW_REPLACE#"}     = "";
+        $variables{"#TEMPL_SSL_CIPHERS_ROW_REPLACE#"} = "";
+        $variables{"#TEMPL_SSL_ISSUER_ROW_REPLACE#"}  = "";
+
+        $variables{"#TEMPL_SSL_SUBJECT_ROW#"} = "";
+        $variables{"#TEMPL_SSL_CN_ROW#"}      = "";
+        $variables{"#TEMPL_SSL_SAN_ROW#"}     = "";
+        $variables{"#TEMPL_SSL_CIPHERS_ROW#"} = "";
+        $variables{"#TEMPL_SSL_ISSUER_ROW#"}  = "";
+    }
+
+    $variables{"#ID#"}          = $item->{'nikto_id'} // '';
+    $variables{"#TEMPL_SMMSG#"} = simple_enc($item->{'message'});
+
+    # Positives Handling
+    if ($template =~ /\#TEMPL_MSG#/) {
+        my $msg = simple_enc($item->{'message'});
+
+        # 740000 = multiple index files -- linkify file names
+        if (defined $item->{'nikto_id'} && $item->{'nikto_id'} == 740000) {
+            my $message = $item->{'message'} // '';
+            if ($message =~ /^(.*: )(.*)$/) {
+                $msg = simple_enc($1);
+                my @links;
+                my $link_host = html_url_host($mark->{'displayname'} || $base_host);
+                foreach my $f (parse_csv($2)) {
+                    $f =~ s/\s//g;
+                    next if $f eq '';
+                    my $escaped_f = simple_enc($f);
+                    my $path      = $root;
+                    $path =~ s{/$}{};
+                    $path .= '/' . $f;
+                    $path =~ s{//+}{/}g;
+                    push(@links,
+                             "<a href=\""
+                           . $protocol . "://"
+                           . simple_enc($link_host) . ":"
+                           . $port
+                           . simple_enc($path)
+                           . "\">$escaped_f</a>");
+                }
+                $msg .= join(", ", @links);
+            }
+        }
+
+        my $uri = $item->{'uri'} // '';
+        if ($uri ne '' && $root ne '' && $uri !~ /^\Q$root\E(?:\/|$)/) {
+            $uri = $root . $uri;
+        }
+        $variables{"#TEMPL_URI#"}         = simple_enc($uri);
+        $variables{"#TEMPL_MSG#"}         = $msg;
+        $variables{"#TEMPL_HTTP_METHOD#"} = simple_enc($item->{'method'});
+
+        $variables{"#TEMPL_ITEM_NAME_LINK#"} =
+            $protocol . '://'
+          . simple_enc(html_url_host($base_host)) . ':'
+          . $port
+          . $variables{"#TEMPL_URI#"};
+    }
+
+    # Replace marker + next <tr>...</tr> with processed row (flexible; not hardcoded cell HTML)
+    $template =~ s/#TEMPL_SSL_SUBJECT_ROW#\s*<tr>.*?<\/tr>/#TEMPL_SSL_SUBJECT_ROW_REPLACE#/s;
+    $template =~ s/#TEMPL_SSL_CN_ROW#\s*<tr>.*?<\/tr>/#TEMPL_SSL_CN_ROW_REPLACE#/s;
+    $template =~ s/#TEMPL_SSL_SAN_ROW#\s*<tr>.*?<\/tr>/#TEMPL_SSL_SAN_ROW_REPLACE#/s;
+    $template =~ s/#TEMPL_SSL_CIPHERS_ROW#\s*<tr>.*?<\/tr>/#TEMPL_SSL_CIPHERS_ROW_REPLACE#/s;
+    $template =~ s/#TEMPL_SSL_ISSUER_ROW#\s*<tr>.*?<\/tr>/#TEMPL_SSL_ISSUER_ROW_REPLACE#/s;
+
+    if ($template =~ /#TEMPL_REFERENCES_ROW#/) {
+        $template =~ s/#TEMPL_REFERENCES_ROW#\s*<tr>.*?<\/tr>/#TEMPL_REFERENCES_ROW_REPLACE#/s;
+    }
+
+    # Substitute variables in a SINGLE pass. A loop over keys %variables would
+    # re-scan text it had already substituted, so a value containing a marker
+    # name (banners, messages and cert fields are attacker-controlled, and
+    # simple_enc() does not escape '#') could expand into another variable's
+    # raw HTML -- and only on the runs where hash order happened to cooperate.
+    # The TEMPL_/ID prefix keeps CSS hex colours in the templates from matching.
+    $template =~ s/(#(?:TEMPL_[A-Z0-9_]+|ID)#)/exists $variables{$1} ? $variables{$1} : $1/ge;
+
+    return $template;
+}
+###############################################################################
+sub linkify_refs {
+    my $refs = $_[0];
+    return '' unless defined $refs && $refs ne '';
+
+    my @rs = split(/ /, $refs);
+    for (my $i = 0 ; $i <= $#rs ; $i++) {
+        my $r         = $rs[$i];
+        my $escaped_r = simple_enc($r);
+        if ($r =~ /^OSVDB-(\d+)$/) {
+            my $id = $1;
+            $r = "<a href='https://vulners.com/osvdb/OSVDB:$id'>$escaped_r</a>";
+        }
+        elsif ($r =~ /^CVE-\d{4}-\d{4,}/) {
+            my $escaped_url_r = simple_enc($r);
+            $r =
+              "<a href='https://cve.mitre.org/cgi-bin/cvename.cgi?name=$escaped_url_r'>$escaped_r</a>";
+        }
+        elsif ($r =~ /^MS-\d+-\d+/i) {
+            my $escaped_url_r = simple_enc($r);
+            $r =
+              "<a href='https://technet.microsoft.com/en-us/library/security/$escaped_url_r.aspx'>$escaped_r</a>";
+        }
+        elsif ($r =~ /^(CA-\d{4}-\d{2})/) {
+            my $escaped_ca = simple_enc($1);
+            $r =
+              "<a href='https://www.cert.org/historical/advisories/$escaped_ca.cfm'>$escaped_r</a>";
+        }
+        elsif ($r =~ /^CWE-(\d+)/) {
+            my $id = $1;
+            $r = "<a href='https://cwe.mitre.org/data/definitions/$id.html'>$escaped_r</a>";
+        }
+        elsif ($r =~ /^https?:\/\//i) {
+            my $escaped_url_r = simple_enc($r);
+            $r = "<a href='$escaped_url_r'>$escaped_r</a>";
+        }
+        $rs[$i] = $r;
+    }
+    return join("<br>", @rs);
+}
+
+###############################################################################
+sub simple_enc {
+    my ($var) = @_;
+    return '' unless defined $var;
+    $var = "$var";
+    $var =~ s/&/&amp;/g;
+    $var =~ s/</&lt;/g;
+    $var =~ s/>/&gt;/g;
+    $var =~ s/"/&quot;/g;
+    $var =~ s/'/&#x27;/g;
+    return $var;
+}
+
+1;

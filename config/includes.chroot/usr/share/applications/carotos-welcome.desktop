@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Welcome to CarotOS
+Name[tr]=CarotOS'a Hoş Geldiniz
+Comment=Introduction to CarotOS and the basics of Linux
+Comment[tr]=CarotOS ve Linux temellerine giriş
+Exec=/opt/carotos/welcome/carotos-welcome.py
+Icon=carotos-welcome
+Terminal=false
+Categories=System;Documentation;
+Keywords=welcome;help;guide;carotos;
+Keywords[tr]=karşılama;yardım;rehber;carotos;

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=CarotOS Security Panel
+Name[tr]=CarotOS Güvenlik Paneli
+Comment=Guided interface for common security tools
+Comment[tr]=Güvenlik araçları için rehberli arayüz
+Exec=python3 /opt/carotos/security-panel/carotos-security-panel.py
+Icon=carotos-security-panel
+Terminal=false
+Categories=System;Security;Network;
+Keywords=security;nmap;firewall;scan;

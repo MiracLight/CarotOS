@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=CarotOS USB Check
+Name[tr]=CarotOS USB Denetimi
+Comment=Check removable devices for suspicious files
+Comment[tr]=Çıkarılabilir aygıtları şüpheli dosyalara karşı denetler
+Exec=/opt/carotos/usb/carotos-usb-check.py
+Icon=drive-removable-media
+Terminal=false
+Categories=System;Security;
+Keywords=usb;scan;check;security;malware;
+Keywords[tr]=usb;tarama;denetim;güvenlik;zararlı;

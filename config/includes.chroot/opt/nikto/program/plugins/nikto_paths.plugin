@@ -1,0 +1,81 @@
+###############################################################################
+# SPDX-License-Identifier: GPL-3.0-only
+# PURPOSE: Look at paths to help populate variables
+###############################################################################
+sub nikto_paths_init {
+    my $id = { name        => "paths",
+               full_name   => "Path Search",
+               author      => "Sullo",
+               description => "Look at link paths to help populate variables",
+               hooks       => {
+                          recon => { method => \&nikto_paths,
+                                     weight => 20,
+                                     },
+                            },
+               copyright => "2012 Chris Sullo"
+               };
+    return $id;
+}
+
+sub nikto_paths {
+    my ($mark) = @_;
+    return if $mark->{'terminate'};
+    my (%DIRS, %FILES);
+
+    # Follow redirects by temporarily by setting $CLI{'followredirects'} to 1
+    # Request the root path to follow redirects if needed
+    my $followredirects = $CLI{'followredirects'};
+    $CLI{'followredirects'} = 1;
+    my ($res, $content) = nfetch($mark, "/", "GET", "", "", "", "Paths");
+    $CLI{'followredirects'} = $followredirects;
+
+    if (defined $content && length $content) {
+
+        # get links
+        my @links = LW2::html_link_extractor($content);
+        my %FULL_LINKS;
+        my %valid_hosts =
+          map { $_ => 1 } ($mark->{'hostname'}, $mark->{'ip'}, $mark->{'vhost'}, $mark->{'ident'});
+        foreach my $link (@links) {
+
+            # if not relative
+            if (($link !~ /^\//) && ($link =~ /https?:/i)) {
+
+                # check host
+                my @uri = LW2::uri_split($link);
+                if (exists $valid_hosts{ $uri[2] }) {
+                    $link = $uri[0];
+                }
+                else {
+                    next;
+                }
+            }
+
+            # normalize
+            $link = LW2::uri_normalize($link);
+            $FULL_LINKS{$link} = 1;
+
+            # split dirs / files
+            my $dir = LW2::uri_get_dir($link);
+            $dir = validate_and_fix_regex($dir);
+            my $file = $link;
+            $file =~ s/^$dir//;
+
+            if ($file ne '') {
+                $file =~ s/\\//g;
+                $FILES{$file} = 1;
+            }
+
+            if (($dir ne '') && ($dir ne '/')) {
+                $dir =~ s/\\//g;
+                $DIRS{$dir} = 1;
+            }
+        }
+
+        # Use shared path matching logic
+        path_matcher(\%FILES, \%DIRS, \%FULL_LINKS);
+
+    }
+}
+
+1;

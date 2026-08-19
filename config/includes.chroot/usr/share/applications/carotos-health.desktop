@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=CarotOS System Health
+Name[tr]=CarotOS Sistem Sağlığı
+Comment=Audit the security and maintenance state of your system
+Comment[tr]=Sisteminizin güvenlik ve bakım durumunu denetler
+Exec=/opt/carotos/health/carotos-health.py
+Icon=utilities-system-monitor
+Terminal=false
+Categories=System;Security;Settings;
+Keywords=health;audit;security;firewall;updates;
+Keywords[tr]=sağlık;denetim;güvenlik;duvar;güncelleme;

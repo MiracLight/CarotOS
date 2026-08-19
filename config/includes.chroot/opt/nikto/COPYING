@@ -1,0 +1,24 @@
+##########################################################################################
+# Copyright (C) 2001–2026 Chris Sullo. All rights reserved.
+#
+# This license notice applies to: Nikto's code only
+#
+# See COPYING.libwhisker for LibWhisker licensing information.
+#
+# Database files are NOT licensed under the GPL and may only be distributed as part of
+# the official Nikto package or installer, for use exclusively with Nikto.
+#
+# For full licensing terms and commercial use policies, visit:
+# https://cirt.net/Nikto-Licensing
+##########################################################################################
+
+This program is free software: you can redistribute it and/or modify  
+it under the terms of the GNU General Public License version 3,  
+as published by the Free Software Foundation.
+
+This program is distributed in the hope that it will be useful,  
+but WITHOUT ANY WARRANTY; without even the implied warranty of  
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the  
+GNU General Public License for more details.
+
+The full license text is available at: https://www.gnu.org/licenses/gpl-3.0.txt

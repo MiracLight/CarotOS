@@ -1,0 +1,65 @@
+#!/bin/sh
+set -e
+
+echo "CarotOS kurulum betiği çalışıyor..."
+
+# İzinleri düzelt
+chmod 755 /opt/carotos/security-panel/carotos-security-panel.py
+chmod 755 /usr/local/bin/nikto
+chmod 644 /usr/share/backgrounds/carotos/carotbackground.png
+chmod 644 /usr/share/backgrounds/login.png
+chmod 644 /usr/share/icons/carotos/security-panel-icon.png
+chmod 644 /usr/share/carotos/carotos_ascii.txt
+chmod 644 /usr/share/applications/carotos-security-panel.desktop
+
+# GRUB'ı güncelle (CarotOS adının menüde görünmesi için)
+
+
+# Firefox'u varsayılan tarayıcı yap
+update-alternatives --set www-browser /usr/bin/firefox-esr || true
+update-alternatives --set x-www-browser /usr/bin/firefox-esr || true
+
+# fail2ban'ı açılışta otomatik başlat
+systemctl enable fail2ban
+
+# İlk kullanıcıyı otomatik sudo yetkili yap
+if [ -n "$(getent group sudo)" ]; then
+    for u in $(awk -F: '$3 >= 1000 && $3 < 65534 {print $1}' /etc/passwd); do
+        usermod -aG sudo "$u" || true
+    done
+fi
+
+echo "CarotOS kurulum betiği tamamlandı."
+
+# İlk açılış servisi (kurulum sonrası sudo düzeltmesi)
+chmod 755 /usr/local/sbin/carotos-firstboot.sh || true
+chmod 644 /etc/systemd/system/carotos-firstboot.service || true
+systemctl enable carotos-firstboot.service || true
+echo "CarotOS: firstboot servisi etkinlestirildi."
+
+# Karşılama sihirbazı
+chmod 755 /opt/carotos/welcome/carotos-welcome.py || true
+chmod 644 /usr/share/applications/carotos-welcome.desktop || true
+chmod 644 /etc/skel/.config/autostart/carotos-welcome-autostart.desktop || true
+echo "CarotOS: karsilama sihirbazi yerlestirildi."
+
+# Sistem Sağlığı uygulaması
+chmod 755 /opt/carotos/health/carotos-health.py || true
+chmod 644 /usr/share/applications/carotos-health.desktop || true
+echo "CarotOS: sistem sagligi yerlestirildi."
+
+# Yerel ayarlar (Türkçe varsayılan, İngilizce de mevcut)
+if [ -x /usr/sbin/locale-gen ]; then
+    /usr/sbin/locale-gen || true
+    echo "CarotOS: yerel ayarlar uretildi."
+fi
+
+# Simge önbelleğini tazele
+gtk-update-icon-cache -f /usr/share/icons/hicolor 2>/dev/null || true
+echo "CarotOS: simge onbellegi tazelendi."
+
+# USB Denetimi
+chmod 755 /opt/carotos/usb/carotos-usb-check.py || true
+chmod 644 /usr/share/applications/carotos-usb-check.desktop || true
+chmod 644 /etc/skel/.config/autostart/carotos-usb-monitor.desktop || true
+echo "CarotOS: usb denetimi yerlestirildi."

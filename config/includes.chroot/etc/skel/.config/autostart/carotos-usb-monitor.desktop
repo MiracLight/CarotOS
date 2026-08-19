@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=CarotOS USB Monitor
+Name[tr]=CarotOS USB İzleyici
+Comment=Checks removable devices when they are plugged in
+Comment[tr]=Takılan çıkarılabilir aygıtları denetler
+Exec=/opt/carotos/usb/carotos-usb-check.py --monitor
+Icon=drive-removable-media
+Terminal=false
+Categories=System;
+StartupNotify=false
+X-GNOME-Autostart-enabled=true

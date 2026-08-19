@@ -1,0 +1,38 @@
+#!/bin/sh
+# CarotOS: replace the bootloader splash image with our own.
+# Binary-stage hook: runs after the splash has been prepared and
+# before the ISO is packed, so our image is the one that ships.
+set -e
+
+echo "CarotOS: splash gorseli degistiriliyor..."
+
+# Find our source image, trying the locations a binary hook may see.
+SRC=""
+for _CANDIDATE in \
+    ../config/carotos-splash.png \
+    config/carotos-splash.png \
+    /usr/share/carotos/splash.png
+do
+    if [ -f "${_CANDIDATE}" ]; then
+        SRC="${_CANDIDATE}"
+        break
+    fi
+done
+
+if [ -z "${SRC}" ]; then
+    echo "CarotOS: UYARI - splash kaynagi bulunamadi, varsayilan kaliyor."
+    exit 0
+fi
+
+echo "CarotOS: kaynak bulundu -> ${SRC}"
+
+# Overwrite every splash the bootloaders might use.
+for _DIR in isolinux boot/grub ../binary/isolinux ../binary/boot/grub; do
+    if [ -d "${_DIR}" ]; then
+        cp "${SRC}" "${_DIR}/splash.png"
+        rm -f "${_DIR}/splash.svg"
+        echo "CarotOS: ${_DIR}/splash.png guncellendi."
+    fi
+done
+
+echo "CarotOS: splash islemi tamam."

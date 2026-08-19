@@ -1,0 +1,35 @@
+# --- live-build üretim çıktıları ---
+# Bu klasörler derleme sırasında oluşur, birkaç gigabayt tutarlar ve
+# sürüm denetimine girmezler. ISO'yu yeniden üretmek için gereken tek
+# şey config/ klasörüdür.
+chroot/
+binary/
+cache/
+.build/
+local/
+auto/
+
+# --- üretilen dosyalar (kök dizinde) ---
+/*.iso
+/*.img
+/*.sha256
+/*.packages
+/*.files
+/*.contents
+/build*.log
+/wget-log*
+/.lock
+/chroot.*
+/live-image-*
+
+# --- geçici dosyalar ---
+*~
+*.swp
+*.tmp
+.DS_Store
+__pycache__/
+*.pyc
+
+# config/ klasörü her zaman dahil edilir — projenin asıl kaynağı orasıdır
+!config/**
+/binary.modified_timestamps

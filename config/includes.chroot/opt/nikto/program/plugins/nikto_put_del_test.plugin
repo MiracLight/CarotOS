@@ -1,0 +1,69 @@
+###############################################################################
+# SPDX-License-Identifier: GPL-3.0-only
+# PURPOSE: Try put and then delete a file
+###############################################################################
+sub nikto_put_del_test_init {
+    my $id = { name        => "put_del_test",
+               full_name   => "Put/Delete test",
+               author      => "Sullo",
+               description =>
+                 "Attempts to upload and delete files through the PUT and DELETE HTTP methods.",
+               hooks     => { scan => { method => \&nikto_put_del_test, }, },
+               copyright => "2008 Chris Sullo"
+               };
+    return $id;
+}
+
+sub nikto_put_del_test {
+    my ($mark) = @_;
+    return if $mark->{'terminate'};
+    my $msg;
+
+    # PUT a page
+    my $uri = "/nikto-test-" . LW2::utils_randstr(8) . ".html";
+    my ($res, $content, $error, $request, $response) =
+      nfetch($mark, $uri, "PUT", "This was a Nikto test.", "", "", "put_del_test: PUT");
+
+    # Request it back (PUT may return 200 OK, 201 Created, or 204 No Content)
+    if ($res == 200 || $res == 201 || $res == 204) {
+        ($res, $content, $error, $request, $response) =
+          nfetch($mark, $uri, "GET", "", "", "", "put_del_test: GET");
+        if ($content =~ /This was a Nikto test/) {
+            add_vulnerability(
+                          $mark,
+                          "$uri: HTTP method 'PUT' allows clients to save files on the web server.",
+                          "999995",
+                          "https://portswigger.net/kb/issues/00100900_http-put-method-is-enabled",
+                          "PUT",
+                          $uri,
+                          $request,
+                          $response
+                          );
+
+            # we were able to put it there--can we delete it?
+            ($res, $content, $error, $request, $response) =
+              nfetch($mark, $uri, "DELETE", "", "", "", "put_del_test: DELETE");
+
+            # DELETE often returns 200 OK or 204 No Content
+            if ($res == 200 || $res == 204) {
+                ($res, $content, $error, $request, $response) =
+                  nfetch($mark, $uri, "GET", "", "", "", "put_del_test: GET");
+                if ($content !~ /This was a Nikto test/)    # gone now
+                {
+                    add_vulnerability(
+                        $mark,
+                        "$uri: HTTP method 'DELETE' allows clients to delete files on the web server.",
+                        "999994",
+                        "https://cwe.mitre.org/data/definitions/650.html",
+                        "DELETE",
+                        $uri,
+                        $request,
+                        $response
+                        );
+                }
+            }
+        }
+    }
+}
+
+1;

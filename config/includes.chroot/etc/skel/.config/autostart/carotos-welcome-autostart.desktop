@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Welcome to CarotOS
+Name[tr]=CarotOS'a Hoş Geldiniz
+Comment=Shown once after installation
+Comment[tr]=Kurulumdan sonra bir kez gösterilir
+Exec=/opt/carotos/welcome/carotos-welcome.py --autostart
+Icon=carotos-welcome
+Terminal=false
+Categories=System;
+X-GNOME-Autostart-enabled=true

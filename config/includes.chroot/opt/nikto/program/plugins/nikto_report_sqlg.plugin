@@ -1,0 +1,179 @@
+###############################################################################
+# SPDX-License-Identifier: GPL-3.0-only
+# PURPOSE: SQL Reporting
+###############################################################################
+# Sample table create (mysql):
+#	create table nikto_table (id int(11) not null auto_increment primary key,
+#	scanid varchar(32), testid varchar(6) not null, ip varchar(15),
+#	hostname text, port int(5), tls tinyint(1), refs text, httpmethod text,
+#	uri text, message text, request blob, response mediumblob);
+# See documentation/nikto_schema_mysql.sql and nikto_schema_postgresql.sql for complete schemas
+###############################################################################
+sub nikto_report_sqlg_init {
+    my $id = { name              => "report_sqlg",
+               full_name         => "Generic SQL reports",
+               author            => "Sullo",
+               description       => "Produces SQL inserts into a generic database.",
+               report_head       => \&sqlg_open,
+               report_host_start => \&sqlg_host_start,
+               report_item       => \&sqlg_item,
+               report_ssl_info   => \&sqlg_ssl_info,
+               report_format     => 'sql',
+               copyright         => "2013 Chris Sullo"
+               };
+    return $id;
+}
+
+###############################################################################
+# open output file
+sub sqlg_open {
+    my ($file) = @_;
+    if ($file eq '') {
+        print STDERR "+ ERROR: Output file not specified.\n";
+        exit;
+    }
+
+    # Open file with lexical handle and produce header
+    my $fh;
+    open($fh, ">>", $file) || die "+ ERROR: Unable to open '$file' for write: $!\n";
+
+    # Enable autoflush
+    $fh->autoflush(1);
+
+    # Write header
+    my $opt = sql_quote($CLI{'all_options'});
+    print $fh "# $VARIABLES{'name'} - v$VARIABLES{'version'}/$VARIABLES{'core_version'}\n";
+    print $fh "# Options:       $opt\n";
+    print $fh "# Start Time:    " . localtime($COUNTERS{'scan_start'}) . "\n";
+    print $fh "# End Time:      " . localtime($COUNTERS{'scan_end'}) . "\n";
+    print $fh "\n";
+
+    return $fh;
+}
+
+###############################################################################
+sub sql_quote {
+    my $v = shift;
+    return '' unless defined $v;
+    $v =~ s/\x00//g;
+    $v =~ s/\\/\\\\/g;
+    $v =~ s/'/''/g;
+    return $v;
+}
+
+###############################################################################
+# start output
+sub sqlg_host_start {
+    my ($handle, $mark) = @_;
+    my $banner = $mark->{'banner'} || '';
+    my $ssl    = 0;
+    if (defined $mark->{'ssl_cipher'}) { $ssl = 1; }
+    my $hostname = $mark->{'vhost'} ? $mark->{'vhost'} : $mark->{'hostname'};
+
+    my $scanid = sql_quote($mark->{'scanid'} || '');
+    my $msg    = sql_quote($banner ne '' ? "Server banner: $banner" : "Host scan started");
+    my $ip     = sql_quote($mark->{'ip'});
+    $hostname = sql_quote($hostname);
+    my $port = sql_quote($mark->{'port'});
+
+    my $sql =
+      "insert into nikto_table (scanid, testid, ip, hostname, port, tls, refs, httpmethod, uri, message) values(";
+    $sql .= "'$scanid','999958','$ip','$hostname','$port','$ssl','0','GET','/','$msg');\n";
+    print $handle $sql;
+
+    return;
+}
+
+###############################################################################
+# write SSL info
+sub sqlg_ssl_info {
+    my ($handle, $mark) = @_;
+
+    my $hostname     = $mark->{'vhost'} ? $mark->{'vhost'} : $mark->{'hostname'};
+    my $ssl_cipher   = $mark->{'ssl_cipher'}        || '';
+    my $ssl_subject  = $mark->{'ssl_cert_subject'}  || '';
+    my $ssl_issuer   = $mark->{'ssl_cert_issuer'}   || '';
+    my $ssl_altnames = $mark->{'ssl_cert_altnames'} || '';
+    my $ssl          = defined $mark->{'ssl_cipher'} ? 1 : 0;
+
+    # Extract CN from subject
+    my $ssl_cn = '';
+    if ($ssl_subject =~ /CN=([^$ \/]+)/) {
+        $ssl_cn = $1;
+    }
+
+    # Build combined SSL info message
+    my $ssl_message = "SSL/TLS Information - ";
+    $ssl_message .= "Subject: $ssl_subject"  if $ssl_subject ne '';
+    $ssl_message .= "; CN: $ssl_cn"          if $ssl_cn ne '';
+    $ssl_message .= "; SAN: $ssl_altnames"   if $ssl_altnames ne '';
+    $ssl_message .= "; Ciphers: $ssl_cipher" if $ssl_cipher ne '';
+    $ssl_message .= "; Issuer: $ssl_issuer"  if $ssl_issuer ne '';
+    my $scanid = sql_quote($mark->{'scanid'} || '');
+    my $ip     = sql_quote($mark->{'ip'}     || '');
+    my $port   = sql_quote($mark->{'port'}   || '');
+    $hostname    = sql_quote($hostname || '');
+    $ssl_message = sql_quote($ssl_message);
+
+    # Single INSERT statement with all SSL info
+    my $sql =
+      "insert into nikto_table (scanid, testid, ip, hostname, port, tls, refs, httpmethod, uri, message) values(";
+    $sql .= "'$scanid','000137','$ip','$hostname','$port','$ssl','0','GET','/','$ssl_message');\n";
+    print $handle $sql;
+}
+
+###############################################################################
+# print an item
+sub sqlg_item {
+    my ($handle, $mark, $item) = @_;
+    foreach my $uri (split(' ', $item->{'uri'})) {
+        my $hostname   = $mark->{'vhost'} ? $mark->{'vhost'} : $mark->{'hostname'};
+        my $httpmethod = $item->{'method'}  || '';
+        my $msg        = $item->{'message'} || '';
+        my $root       = $mark->{'root'}    || '';
+        my $rootq      = quotemeta($root);                # temporary, just for regex
+        my $uriq       = quotemeta($uri);
+        my $ssl        = $mark->{'ssl_cipher'} ? 1 : 0;
+
+        # Get scanid (generated by core in report_host_start)
+        my $scanid   = $item->{'mark'}->{'scanid'} || '';
+        my $ip       = $item->{'mark'}->{'ip'}     || '';
+        my $port     = $item->{'mark'}->{'port'}   || '';
+        my $refs     = $item->{'refs'}             || '';
+        my $nikto_id = $item->{'nikto_id'}         || '';
+
+        my $sql =
+          "insert into nikto_table (scanid, testid, ip, hostname, port, tls, refs, httpmethod, uri, message, request, response) values(";
+        $sql .=
+            "'"
+          . sql_quote($scanid) . "','"
+          . sql_quote($nikto_id) . "','"
+          . sql_quote($ip) . "','"
+          . sql_quote($hostname) . "','"
+          . sql_quote($port)
+          . "','$ssl',";
+        $sql .= "'" . sql_quote($refs) . "','" . sql_quote($httpmethod) . "',";
+
+        if (($uri ne '') && ($root ne '') && ($uri !~ /^$rootq/)) {
+            $sql .= "'" . sql_quote($root . $uri) . "',";
+        }
+        else {
+            $sql .= "'" . sql_quote($uri) . "',";
+        }
+
+        $msg =~ s/^$uriq:\s//;
+        $msg =~ s/^$rootq$uriq:\s//;
+        $sql .= "'" . sql_quote($msg) . "',";
+
+        # Rebuild the request from the hash -- no need to escape as it's base64 encoded
+        my $req = rebuild_request($item->{'request'}, 1, 48000);
+        $sql .= "'" . LW2::encode_base64($req, '') . "',";
+
+        # response content
+        my $response = rebuild_response($$item{'response'}, 1, 12000000);
+        $sql .= "'" . LW2::encode_base64($response, '') . "');";
+        print $handle "$sql\n";
+    }
+}
+
+1;

@@ -1,0 +1,35 @@
+{
+  "logo": {
+    "type": "file",
+    "source": "/usr/share/carotos/carotos_ascii.txt",
+    "color": {
+      "1": "cyan"
+    }
+  },
+  "display": {
+    "color": {
+      "keys": "cyan",
+      "title": "cyan"
+    }
+  },
+  "modules": [
+    "title",
+    "separator",
+    "os",
+    "host",
+    "kernel",
+    "uptime",
+    "packages",
+    "shell",
+    "de",
+    "wm",
+    "terminal",
+    "cpu",
+    "gpu",
+    "memory",
+    "disk",
+    "localip",
+    "break",
+    "colors"
+  ]
+}
