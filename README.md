@@ -183,12 +183,14 @@ Derleme için en az 4 GB bellek ve 10 GB boş disk alanı gerekir.
 - Sistem Sağlığı'na gizlilik sekmesi (IP, VPN/Tor durumu, DNS sızıntısı)
 - Rehberli öğrenme modülleri
 
-## Katkı
+## İletişim
 
-Hata bildirimi ve öneriler için
-[Issues](https://github.com/MiracLight/CarotOS/issues) bölümünü
-kullanabilirsiniz. Hata bildirirken sürüm numarasını, kullandığınız donanımı
-ve sorunu yeniden üretme adımlarını yazmanız çözümü hızlandırır.
+- **E-posta:** carotosproject@gmail.com
+- **Hata bildirimi ve öneriler:**
+  [Issues](https://github.com/MiracLight/CarotOS/issues)
+
+Hata bildirirken sürüm numarasını, kullandığınız donanımı ve sorunu yeniden
+üretme adımlarını yazmanız çözümü hızlandırır.
 
 ## Lisans
 
