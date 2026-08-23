@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=CarotOS Desktop Setup
+Name[tr]=CarotOS Masaüstü Kurulumu
+Comment=Applies the wallpaper to this machine's monitor on first login
+Comment[tr]=Duvar kâğıdını ilk oturumda bu makinenin monitörüne uygular
+Exec=/usr/local/bin/carotos-desktop-init
+Icon=preferences-desktop-wallpaper
+Terminal=false
+Categories=System;
+NoDisplay=true
+StartupNotify=false
+X-GNOME-Autostart-enabled=true
+X-XFCE-Autostart-Override=true

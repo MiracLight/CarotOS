@@ -1,0 +1,113 @@
+#!/bin/sh
+# CarotOS — ilk oturum masaustu ayarlari
+#
+# NEDEN VAR:
+# xfdesktop duvar kagidi yolunu monitorun baglanti adina gore sakliyor:
+#   /backdrop/screen0/monitorLVDS-1/workspace0/last-image
+# Bu ad makineden makineye degisiyor (VirtualBox'ta Virtual-1, dizustunde
+# LVDS-1 veya eDP-1, masaustunde HDMI-1...). Dahasi adlandirma KURALI da
+# tutarli degil: bazi xfdesktop surumleri tireyi koruyor (monitorLVDS-1),
+# bazilari siliyor (monitorLVDS1).
+#
+# Bu yuzden /etc/skel icine sabit bir monitor adi yazmak SADECE o adin
+# yakalandigi makinede calisir. Gercek donanimda duvar kagidi kayboluyor,
+# ayarlar penceresi ise eski bicimli degeri okudugu icin secili gosteriyor.
+#
+# Cozum: sabit deger yazmak yerine, ilk oturumda makinede gercekten hangi
+# monitor varsa onun icin ayari olusturmak. Iki adlandirma bicimi de
+# deneniyor; fazladan yazilan ozellik zararsiz, xfdesktop tanimadigini
+# yok sayiyor.
+#
+# BIR KEZ calisir. Damga dosyasi birakir, boylece kullanici duvar kagidini
+# sonradan degistirirse bir daha ustune yazilmaz.
+
+WALL=/usr/share/backgrounds/carotos/carotbackground.png
+CFG="${XDG_CONFIG_HOME:-$HOME/.config}"
+STAMP="$CFG/carotos/wallpaper.done"
+
+# Zaten calistiysa cik
+[ -f "$STAMP" ] && exit 0
+
+# Duvar kagidi yoksa yapacak bir sey yok
+[ -f "$WALL" ] || exit 0
+
+# xfconfd hazir olana kadar bekle (en fazla 15 saniye)
+i=0
+while [ "$i" -lt 15 ]; do
+    xfconf-query -c xfce4-desktop -l >/dev/null 2>&1 && break
+    i=$((i + 1))
+    sleep 1
+done
+
+# Ozellik yoksa olustur, varsa guncelle.
+# --create var olan ozellikte de calisiyor; tip uyusmazliginda ikinci
+# deneme devreye giriyor.
+ayarla() {
+    yol=$1
+    tip=$2
+    deger=$3
+    xfconf-query -c "$KANAL" -p "$yol" -n -t "$tip" -s "$deger" 2>/dev/null && return 0
+    xfconf-query -c "$KANAL" -p "$yol" -s "$deger" 2>/dev/null && return 0
+    # Tip uyusmazligi: ozelligi sifirlayip yeniden olustur
+    xfconf-query -c "$KANAL" -p "$yol" -r 2>/dev/null
+    xfconf-query -c "$KANAL" -p "$yol" -n -t "$tip" -s "$deger" 2>/dev/null
+}
+
+# ---------------------------------------------------------------
+# 1) Halihazirda var olan butun last-image ozelliklerini guncelle
+# ---------------------------------------------------------------
+KANAL=xfce4-desktop
+xfconf-query -c xfce4-desktop -l 2>/dev/null | grep '/last-image$' | while read -r p; do
+    xfconf-query -c xfce4-desktop -p "$p" -s "$WALL" 2>/dev/null
+done
+
+# ---------------------------------------------------------------
+# 2) xrandr'in bildirdigi her bagli cikis icin ayari olustur
+#    Iki adlandirma bicimi de yaziliyor: tireli ve tiresiz.
+# ---------------------------------------------------------------
+CALISMA=$(xfconf-query -c xfwm4 -p /general/workspace_count 2>/dev/null)
+case "$CALISMA" in
+    '' | *[!0-9]*) CALISMA=4 ;;
+esac
+
+CIKISLAR=$(xrandr --query 2>/dev/null | awk '/ connected/ {print $1}')
+
+# xrandr yoksa veya cikti vermezse en azindan bilinen genel adlari dene
+[ -z "$CIKISLAR" ] && CIKISLAR="0 default"
+
+for cikis in $CIKISLAR; do
+    tiresiz=$(printf '%s' "$cikis" | tr -d '-')
+    for ad in "$cikis" "$tiresiz"; do
+        n=0
+        while [ "$n" -lt "$CALISMA" ]; do
+            ayarla "/backdrop/screen0/monitor$ad/workspace$n/last-image" string "$WALL"
+            ayarla "/backdrop/screen0/monitor$ad/workspace$n/image-style" int 5
+            n=$((n + 1))
+        done
+    done
+done
+
+# Tum calisma alanlarinda ayni duvar kagidi
+ayarla "/backdrop/single-workspace-mode" bool true
+
+# ---------------------------------------------------------------
+# 3) Panel dizin menusu: gercek ev dizinini kullan
+#    (/etc/skel icinde sabit yol tutulamaz, kullanici adi degisiyor)
+# ---------------------------------------------------------------
+KANAL=xfce4-panel
+for eklenti in $(xfconf-query -c xfce4-panel -l 2>/dev/null \
+    | grep -oE '/plugins/plugin-[0-9]+' | sort -u); do
+    tur=$(xfconf-query -c xfce4-panel -p "$eklenti" 2>/dev/null)
+    [ "$tur" = "directorymenu" ] || continue
+    ayarla "$eklenti/base-directory" string "$HOME"
+done
+
+# ---------------------------------------------------------------
+# Uygula ve damgayi birak
+# ---------------------------------------------------------------
+xfdesktop --reload >/dev/null 2>&1
+
+mkdir -p "$(dirname "$STAMP")"
+date > "$STAMP"
+
+exit 0
