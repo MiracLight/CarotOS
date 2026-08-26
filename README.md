@@ -26,13 +26,12 @@ anlatılmış.**
 
 ## Öne çıkanlar
 
-- **Dört özgün uygulama** — Python ve GTK3 ile sıfırdan yazıldı, başka
-  dağıtımlarda bulunmaz
+- **Dört özgün uygulama** — Python ve GTK3 ile sıfırdan yazıldı
 - **Türkçe arayüz** (İngilizce seçeneğiyle), kurulumdan masaüstüne kadar
 - **On güvenlik aracı**, rehberli bir panelden kullanılabilir
 - **BIOS ve UEFI** desteği, imzalı önyükleyici (Secure Boot)
 - Wi-Fi, ses ve grafik firmware'leri dahil — gerçek dizüstülerde çalışır
-- Boşta yaklaşık **517 MB** bellek kullanımı
+- Boşta yaklaşık **500 MB** bellek kullanımı
 
 ## Ekran görüntüleri
 
