@@ -59,6 +59,18 @@ anlatılmış.**
 
 *Karşılama Sihirbazı — ilk açılışta çıkan iki dilli tanıtım*
 
+<br><br>
+
+<img src="docs/screenshots/poligon-ogrenci.png" alt="CarotOS Poligon öğrenci uygulaması" width="420">
+
+*CarotOS Poligon — öğrenci uygulaması, bireysel pratik ve sınıfa katılma*
+
+<br><br>
+
+<img src="docs/screenshots/poligon-ogretmen.png" alt="CarotOS Poligon öğretmen uygulaması" width="420">
+
+*CarotOS Poligon — öğretmen uygulaması, oda kodu ve öğrenci listesi*
+
 </div>
 
 ## Uygulamalar
@@ -84,6 +96,18 @@ Takılan çıkarılabilir aygıtları kendiliğinden denetler. Dosya içerikleri
 taramaz; dosya adlarına, uzantılarına ve konumlarına bakar. `autorun.inf`,
 çift uzantılı dosyalar, gizlenmiş uzantılar ve klasör yerine konmuş kısayollar
 gibi bilinen yayılma yöntemlerini yakalar — bir saniyeden kısa sürede.
+
+### CarotOS Poligon
+Öğrenci uygulaması. İzole bir ortamda hydra, nmap, john, sqlmap ve tshark ile
+gerçek görevler çözülür; ufw ve fail2ban ile savunma pratiği de yapılır.
+Bireysel modda ilerleme kalıcı olarak saklanır; sınıf modunda öğretmenin
+açtığı bir odaya katılınır. Kaynak kodu ayrı bir depoda tutulur:
+[CarotOS-Poligon](https://github.com/MiracLight/CarotOS-Poligon).
+
+### CarotOS Poligon Öğretmen
+Öğretmen uygulaması. Tek tıkla bir sınıf odası açar, öğrencilerin
+ilerlemesini gösterir, sınıfı bir sonraki göreve yönlendirir ve ihtiyacı
+olan öğrenciye özel ipucu gönderir.
 
 ## Güvenlik araçları
 
