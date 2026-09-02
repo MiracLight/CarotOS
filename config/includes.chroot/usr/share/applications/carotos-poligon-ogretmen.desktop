@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=CarotOS Poligon (Teacher)
+Name[tr]=CarotOS Poligon (Öğretmen)
+Comment=Open a classroom room and direct students' practice tasks
+Comment[tr]=Bir sınıf odası aç, öğrencilerin görevlerini yönlendir
+Exec=python3 /opt/carotos/poligon/ogretmen_uygulama.py
+Icon=carotos-poligon-ogretmen
+Terminal=false
+Categories=System;Security;Education;
+Keywords=poligon;pentest;sinif;ogretmen;arena;
+Keywords[tr]=poligon;sızma;sınıf;öğretmen;arena;

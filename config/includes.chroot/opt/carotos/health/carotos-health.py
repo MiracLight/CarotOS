@@ -18,7 +18,7 @@ import subprocess
 import sys
 import time
 
-APP_VERSION = "1.0"
+APP_VERSION = "1.1"
 
 # --- durum kodlari ---------------------------------------------------------
 OK = "ok"          # sorun yok

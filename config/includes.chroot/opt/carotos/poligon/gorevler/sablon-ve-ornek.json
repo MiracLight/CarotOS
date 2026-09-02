@@ -1,0 +1,52 @@
+{
+  "$aciklama": "CarotOS Poligon — görev tanım şeması. Her görev bu kalıpta bir JSON dosyası. Poligon motoru bu dosyayı okur, hedef servisi ayağa kaldırır, flag üretir, doğrulamayı yapar.",
+
+  "id": "hydra-01",
+  "arac": "hydra",
+  "seviye": "baslangic",
+
+  "baslik": {
+    "tr": "Zayıf Parolayı Bul",
+    "en": "Find the Weak Password"
+  },
+
+  "senaryo": {
+    "tr": "127.0.0.1:2222 adresinde bir SSH benzeri giriş servisi çalışıyor. Kullanıcı adı 'ogrenci'. Hydra ile yaygın parola listesini deneyerek doğru parolayı bul.",
+    "en": "An SSH-like login service is running on 127.0.0.1:2222. The username is 'ogrenci'. Use hydra with a common password list to find the correct password."
+  },
+
+  "ipucu": {
+    "tr": "hydra -l ogrenci -P /usr/share/wordlists/rockyou-mini.txt -s 2222 127.0.0.1 ssh",
+    "en": "hydra -l ogrenci -P /usr/share/wordlists/rockyou-mini.txt -s 2222 127.0.0.1 ssh"
+  },
+
+  "hedef": {
+    "tur": "canli_servis",
+    "servis_modulu": "servisler.sahte_giris.SahteGirisServisi",
+    "port": 2222,
+    "bind_adres": "127.0.0.1",
+    "sabit_kullanici": "ogrenci",
+    "_kural": "bind_adres HER ZAMAN 127.0.0.1 olmak zorunda. Motor bunu zorunlu kılar, senaryo dosyası bunu değiştiremez. Ayrıca SahteGirisServisi sınıfının kendisi de yapıcısında (constructor) bu kuralı tekrar zorunlu kılar -- iki bağımsız kontrol noktası."
+  },
+
+  "flag_uretimi": {
+    "yontem": "parola_uret",
+    "modul": "flag_uretici",
+    "on_ek": null,
+    "son_ek": null,
+    "_not": "Oda açılırken bir kez üretilir (flag_uretici.parola_uret()), o odanın ömrü boyunca sabit kalır. Örnek çıktı: 'firewall6773'. secrets modülüyle üretildiği için tahmin edilemez."
+  },
+
+  "dogrulama": {
+    "tur": "kullanici_girdisi",
+    "karsilastirma": "birebir_ve_kucuk_harf_duyarsiz",
+    "deneme_siniri": null,
+    "_not": "deneme_siniri null ise sınırsız deneme hakkı var. Sayı verilirse (örn. 5) o kadar yanlış denemeden sonra görev kilitlenir, öğretmen açar."
+  },
+
+  "puan": 100,
+  "sure_siniri_dk": null,
+
+  "savunma_gorevi_id": "ufw-01",
+  "_not_savunma": "Bu alan doluysa, bu saldırı görevi çözüldükten sonra öğretmen panelinde otomatik olarak eşleşen savunma görevi öneri olarak çıkar. Zorunlu değil, öğretmen isterse atlar."
+}

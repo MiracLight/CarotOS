@@ -1,0 +1,45 @@
+{
+  "id": "nmap-01",
+  "arac": "nmap",
+  "seviye": "baslangic",
+
+  "baslik": {
+    "tr": "Gizli Portu Bul",
+    "en": "Find the Hidden Port"
+  },
+
+  "senaryo": {
+    "tr": "127.0.0.1 üzerinde birkaç yaygın servis (ftp, smtp, pop3, imap, mysql) ve bir de standart dışı, gizli bir servis çalışıyor. nmap ile 20000-20999 aralığını tarayarak gizli portu bul.",
+    "en": "A few common services (ftp, smtp, pop3, imap, mysql) are running on 127.0.0.1, along with one non-standard hidden service. Scan the 20000-20999 range with nmap to find the hidden port."
+  },
+
+  "ipucu": {
+    "tr": "nmap -p 20000-20999 127.0.0.1",
+    "en": "nmap -p 20000-20999 127.0.0.1"
+  },
+
+  "hedef": {
+    "tur": "canli_servis",
+    "servis_modulu": "servisler.sahte_ag.SahteAgOrtami",
+    "bind_adres": "127.0.0.1",
+    "coklu_port": true,
+    "_kural": "bind_adres HER ZAMAN 127.0.0.1. SahteAgOrtami kendi yapıcısında da bunu zorunlu kılıyor. Sabit tek port yok, o yüzden coklu_port: true."
+  },
+
+  "flag_uretimi": {
+    "yontem": "gizli_port",
+    "modul": "servisler.sahte_ag",
+    "_not": "Flag, SahteAgOrtami.gizli_port değeridir (20000-20999 arası rastgele). Öğrenci bu port numarasını metin olarak yazar."
+  },
+
+  "dogrulama": {
+    "tur": "kullanici_girdisi",
+    "karsilastirma": "birebir_sayisal",
+    "deneme_siniri": null
+  },
+
+  "puan": 100,
+  "sure_siniri_dk": null,
+
+  "savunma_gorevi_id": "ufw-01"
+}

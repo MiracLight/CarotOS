@@ -19,7 +19,7 @@ import subprocess
 import os
 import sys
 
-APP_VERSION = "1.0"
+APP_VERSION = "1.1"
 APP_CODENAME = "Eggshell"
 
 CONFIG_DIR = os.path.join(GLib.get_user_config_dir(), "carotos-welcome")
