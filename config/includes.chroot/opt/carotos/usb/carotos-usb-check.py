@@ -21,7 +21,7 @@ import sys
 import threading
 import time
 
-APP_VERSION = "1.0"
+APP_VERSION = "1.1"
 
 # Tarama sinirlari — cok buyuk aygitlarda takilmamak icin
 MAX_FILES = 60000
@@ -442,17 +442,67 @@ if __name__ == "__main__" and "--audit-json" in sys.argv:
 # ===========================================================================
 # Arayuz
 # ===========================================================================
+#
+# BELLEK NOTU: Gtk/Gdk/Notify ice aktarmalari BILEREK burada degil,
+# _gtk_araclari() icinde yapiliyor. --monitor modu cogu zaman hicbir
+# pencere acmadan bekler; GLib disinda GTK'nin tamami (widget, tema,
+# CSS motoru) onceden yuklenirse bosuna ~15-45 MB tutulur. Pencere
+# GERCEKTEN acilacagi an GTK yuklenir, once degil.
+#
+# GLib ayri: monitor donguisu (GLib.MainLoop, GLib.timeout_add) icin
+# gerekli ve Gtk'ye gore cok daha hafif, o yuzden ust seviyede kaliyor.
 
 import gi  # noqa: E402
-gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk, Gdk, GLib  # noqa: E402
+gi.require_version("GLib", "2.0")
+from gi.repository import GLib  # noqa: E402
 
-try:
-    gi.require_version("Notify", "0.7")
-    from gi.repository import Notify
-    HAVE_NOTIFY = True
-except (ValueError, ImportError):
-    HAVE_NOTIFY = False
+Gtk = None
+Gdk = None
+Notify = None
+HAVE_NOTIFY = False
+_notify_denendi = False
+_ResultWindowClass = None
+
+
+def _notify_araclari():
+    """libnotify'i ilk gercek ihtiyacta yukler.
+
+    Gtk'den BAGIMSIZ: bildirim gondermek per gorev cok daha sik olan
+    yoldur (temiz aygit bildirimi, tehdit bildirimi + eylem dugmesi)
+    ve pencere acmayi GEREKTIRMEZ. libnotify D-Bus uzerinden calisir,
+    Gtk widget/tema motorunu ice aktarmaz — bu yuzden ayrildi.
+    """
+    global Notify, HAVE_NOTIFY, _notify_denendi
+    if _notify_denendi:
+        return HAVE_NOTIFY
+    _notify_denendi = True
+    try:
+        gi.require_version("Notify", "0.7")
+        from gi.repository import Notify as _Notify
+        Notify = _Notify
+        HAVE_NOTIFY = True
+    except (ValueError, ImportError):
+        HAVE_NOTIFY = False
+    return HAVE_NOTIFY
+
+
+def _gtk_araclari():
+    """Gtk/Gdk'yi ilk gercek pencere ihtiyacinda yukler ve ResultWindow
+    sinifini dondurur. Ikinci cagrida tekrar yuklemez.
+
+    Notify BURADA YUKLENMEZ; ayri ve daha hafif olan _notify_araclari
+    kullanir, cunku bildirim gondermek pencere acmaktan cok daha sik."""
+    global Gtk, Gdk, _ResultWindowClass
+    if _ResultWindowClass is not None:
+        return _ResultWindowClass
+
+    gi.require_version("Gtk", "3.0")
+    from gi.repository import Gtk as _Gtk, Gdk as _Gdk
+    Gtk, Gdk = _Gtk, _Gdk
+
+    _ResultWindowClass = _tanimla_result_window(Gtk, Gdk)
+    return _ResultWindowClass
+
 
 CONFIG_DIR = os.path.join(GLib.get_user_config_dir(), "carotos-usb")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "settings.json")
@@ -574,425 +624,429 @@ def build_report(result, lang):
     return "\n".join(lines)
 
 
-class ResultWindow(Gtk.Window):
-    """Bulgu penceresi.
+def _tanimla_result_window(Gtk, Gdk):
+    """ResultWindow sinifini Gtk/Gdk hazir olduktan sonra tanimlar."""
+    class ResultWindow(Gtk.Window):
+        """Bulgu penceresi.
 
-    Icerik `self.body` icinde yeniden kurulabilir; yeniden tarama yeni bir
-    pencere acmaz, ayni pencereyi tazeler. (Eski surumde yeni pencere acilip
-    eskisi kapatiliyordu ve kapanma olayi uygulamayi sonlandiriyordu.)
-    """
-
-    def __init__(self, result, settings, on_destroy=None):
-        self.settings = settings
-        self.lang = settings["lang"]
-        self.theme = settings["theme"]
-        self.result = result
-        self.on_destroy_cb = on_destroy
-        self.scan_thread = None
-        self.cancel = None
-
-        super().__init__(title=UI["app_title"][self.lang])
-        self.set_default_size(780, 580)
-        self.set_size_request(660, 460)
-        self.set_position(Gtk.WindowPosition.CENTER)
-        self.connect("destroy", self._destroyed)
-        self.connect("key-press-event", self._on_key)
-
-        self.provider = Gtk.CssProvider()
-        Gtk.StyleContext.add_provider_for_screen(
-            Gdk.Screen.get_default(), self.provider,
-            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-        self.apply_theme()
-
-        root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        self.add(root)
-
-        self.header_holder = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        self.header_holder.get_style_context().add_class("header")
-        root.pack_start(self.header_holder, False, False, 0)
-        root.pack_start(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL),
-                        False, False, 0)
-
-        scroller = Gtk.ScrolledWindow()
-        scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        root.pack_start(scroller, True, True, 0)
-        self.body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
-        self.body.set_margin_top(22); self.body.set_margin_bottom(22)
-        self.body.set_margin_start(24); self.body.set_margin_end(24)
-        scroller.add(self.body)
-
-        root.pack_start(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL),
-                        False, False, 0)
-        root.pack_start(self._build_footer(), False, False, 0)
-
-        self.refresh()
-
-    # -- yapim ------------------------------------------------------------
-
-    def _build_footer(self):
-        footer = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=9)
-        footer.set_border_width(13)
-
-        self.open_btn = Gtk.Button(label=UI["open_device"][self.lang])
-        self.open_btn.connect("clicked", self.on_open_device)
-        footer.pack_start(self.open_btn, False, False, 0)
-
-        self.rescan_btn = Gtk.Button(label=UI["rescan"][self.lang])
-        self.rescan_btn.connect("clicked", self.on_rescan)
-        footer.pack_start(self.rescan_btn, False, False, 0)
-
-        self.save_btn = Gtk.Button(label=UI["save_report"][self.lang])
-        self.save_btn.connect("clicked", self.on_save)
-        footer.pack_start(self.save_btn, False, False, 0)
-
-        self.status = Gtk.Label(xalign=0.0)
-        self.status.get_style_context().add_class("sub-text")
-        self.status.set_ellipsize(3)  # PANGO_ELLIPSIZE_END
-        footer.pack_start(self.status, True, True, 6)
-
-        self.spinner = Gtk.Spinner()
-        footer.pack_end(self.spinner, False, False, 0)
-
-        close = Gtk.Button(label=UI["close"][self.lang])
-        close.get_style_context().add_class("suggested-action")
-        close.connect("clicked", lambda *_: self.destroy())
-        footer.pack_end(close, False, False, 0)
-        return footer
-
-    def _clear(self, container):
-        for child in container.get_children():
-            container.remove(child)
-
-    def refresh(self):
-        """Basligi ve bulgu listesini mevcut sonuca gore yeniden kurar."""
-        self._clear(self.header_holder)
-        self._clear(self.body)
-        self.header_holder.pack_start(self._build_header(), True, True, 0)
-
-        findings = self.result["findings"]
-        if not findings:
-            self.body.pack_start(self._build_clean_card(), False, False, 0)
-        for finding in findings:
-            self.body.pack_start(self._build_card(finding), False, False, 0)
-        self.body.pack_start(self._build_note(), False, False, 0)
-
-        self.header_holder.show_all()
-        self.body.show_all()
-
-    def _build_header(self):
-        findings = self.result["findings"]
-        stats = self.result["stats"]
-
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        box.set_margin_top(20); box.set_margin_bottom(20)
-        box.set_margin_start(24); box.set_margin_end(24)
-
-        worst = worst_level(findings)
-        if worst is None:
-            heading = UI["summary_clean"][self.lang]
-            title_css, band_css = "title-ok", "band-ok"
-        else:
-            heading = UI["summary_found"][self.lang].format(n=len(findings))
-            title_css = {HIGH: "title-high", MEDIUM: "title-med",
-                         LOW: "title-low"}[worst]
-            band_css = {HIGH: "band-high", MEDIUM: "band-med",
-                        LOW: "band-low"}[worst]
-
-        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=14)
-        stripe = Gtk.Box()
-        stripe.set_size_request(4, -1)
-        stripe.get_style_context().add_class(band_css)
-        row.pack_start(stripe, False, False, 0)
-
-        col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        title = Gtk.Label(label=heading, xalign=0.0)
-        title.get_style_context().add_class("big-title")
-        title.get_style_context().add_class(title_css)
-        title.set_line_wrap(True)
-        col.pack_start(title, False, False, 0)
-
-        pieces = [self.result.get("label") or "?"]
-        if self.result.get("device"):
-            pieces.append(self.result["device"])
-        if self.result.get("fstype"):
-            pieces.append(self.result["fstype"])
-        device = Gtk.Label(label="  ·  ".join(pieces), xalign=0.0)
-        device.get_style_context().add_class("sub-text")
-        device.set_line_wrap(True)
-        col.pack_start(device, False, False, 0)
-        row.pack_start(col, True, True, 0)
-        box.pack_start(row, False, False, 0)
-
-        counts = {level: sum(1 for f in findings if f["level"] == level)
-                  for level in (HIGH, MEDIUM, LOW)}
-        if findings:
-            pills = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=9)
-            pills.set_margin_start(18)
-            for level, key, css in ((HIGH, "count_high", "pill-high"),
-                                    (MEDIUM, "count_medium", "pill-med"),
-                                    (LOW, "count_low", "pill-low")):
-                if counts[level]:
-                    pill = Gtk.Label(label=f"{counts[level]} {UI[key][self.lang]}")
-                    pill.get_style_context().add_class("pill")
-                    pill.get_style_context().add_class(css)
-                    pills.pack_start(pill, False, False, 0)
-            box.pack_start(pills, False, False, 0)
-
-        info = Gtk.Label(
-            label=UI["files_dirs"][self.lang].format(
-                files=stats["files"], dirs=stats["dirs"],
-                size=human_size(stats["size"])) + "  ·  " +
-                  UI["duration"][self.lang].format(seconds=stats["seconds"]),
-            xalign=0.0)
-        info.get_style_context().add_class("sub-text")
-        info.set_margin_start(18)
-        info.set_line_wrap(True)
-        box.pack_start(info, False, False, 0)
-
-        if stats.get("truncated"):
-            warn = Gtk.Label(label=UI["truncated"][self.lang], xalign=0.0)
-            warn.get_style_context().add_class("warn-text")
-            warn.set_margin_start(18)
-            warn.set_line_wrap(True)
-            warn.set_max_width_chars(80)
-            box.pack_start(warn, False, False, 0)
-
-        return box
-
-    def _card_shell(self):
-        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        card.get_style_context().add_class("card")
-        inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        inner.set_margin_top(18); inner.set_margin_bottom(18)
-        inner.set_margin_start(22); inner.set_margin_end(22)
-        card.pack_start(inner, True, True, 0)
-        return card, inner
-
-    def _build_clean_card(self):
-        card, inner = self._card_shell()
-        text = (UI["empty_device"][self.lang]
-                if self.result["stats"].get("empty")
-                else UI["clean_detail"][self.lang])
-        label = Gtk.Label(label=text, xalign=0.0)
-        label.set_line_wrap(True)
-        label.set_max_width_chars(84)
-        inner.pack_start(label, False, False, 0)
-        return card
-
-    def _build_card(self, finding):
-        level = finding["level"]
-        badge_css = {HIGH: "badge-high", MEDIUM: "badge-med",
-                     LOW: "badge-low"}[level]
-        badge_text = {HIGH: UI["level_high"], MEDIUM: UI["level_medium"],
-                      LOW: UI["level_low"]}[level][self.lang]
-
-        card, inner = self._card_shell()
-
-        top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=11)
-        badge = Gtk.Label(label=badge_text)
-        badge.get_style_context().add_class("badge")
-        badge.get_style_context().add_class(badge_css)
-        badge.set_valign(Gtk.Align.CENTER)
-        top.pack_start(badge, False, False, 0)
-
-        title = Gtk.Label(label=finding["title"], xalign=0.0)
-        title.get_style_context().add_class("card-title")
-        title.set_line_wrap(True)
-        title.set_valign(Gtk.Align.CENTER)
-        top.pack_start(title, True, True, 0)
-
-        if finding.get("path"):
-            btn = Gtk.Button(label=UI["open_location"][self.lang])
-            btn.set_valign(Gtk.Align.CENTER)
-            btn.connect("clicked", self.on_open_path, finding["path"])
-            top.pack_end(btn, False, False, 0)
-        inner.pack_start(top, False, False, 0)
-
-        detail = Gtk.Label(label=finding["detail"], xalign=0.0)
-        detail.set_line_wrap(True)
-        detail.set_max_width_chars(84)
-        inner.pack_start(detail, False, False, 0)
-
-        if finding.get("path"):
-            path = Gtk.Label(label=finding["path"], xalign=0.0)
-            path.set_selectable(True)
-            path.set_line_wrap(True)
-            path.set_max_width_chars(84)
-            path.get_style_context().add_class("path-text")
-            inner.pack_start(path, False, False, 0)
-
-        return card
-
-    def _build_note(self):
-        note = Gtk.Label(label=UI["note"][self.lang], xalign=0.0)
-        note.set_line_wrap(True)
-        note.set_max_width_chars(86)
-        note.get_style_context().add_class("sub-text")
-        inner = Gtk.Box()
-        inner.set_margin_top(15); inner.set_margin_bottom(15)
-        inner.set_margin_start(20); inner.set_margin_end(20)
-        inner.pack_start(note, True, True, 0)
-        box = Gtk.Box()
-        box.get_style_context().add_class("note-box")
-        box.pack_start(inner, True, True, 0)
-        return box
-
-    # -- olaylar -----------------------------------------------------------
-
-    def _on_key(self, _widget, event):
-        if event.keyval == Gdk.KEY_Escape:
-            self.destroy()
-            return True
-        return False
-
-    def _destroyed(self, _widget):
-        if self.cancel is not None:
-            self.cancel.set()
-        if self.on_destroy_cb:
-            self.on_destroy_cb(self)
-
-    def _device_present(self):
-        """Taranan konum hala erisilebilir mi?
-
-        Yalnizca dizinin var olup olmadigina bakilir. Daha once burada
-        /proc/mounts'ta bir baglama noktasi araniyordu; bu, --scan ile
-        verilen siradan klasorleri ve baglama noktasi adi farkli yazilmis
-        aygitlari yanlislikla "bagli degil" saydigi icin kaldirildi.
+        Icerik `self.body` icinde yeniden kurulabilir; yeniden tarama yeni bir
+        pencere acmaz, ayni pencereyi tazeler. (Eski surumde yeni pencere acilip
+        eskisi kapatiliyordu ve kapanma olayi uygulamayi sonlandiriyordu.)
         """
-        root = self.result.get("root")
-        return bool(root) and os.path.isdir(root)
 
-    def on_open_device(self, _button):
-        root = self.result.get("root")
-        if not self._device_present():
-            self.status.set_text(UI["gone"][self.lang])
-            return
-        try:
-            subprocess.Popen(["xdg-open", root])
-        except OSError:
-            pass
+        def __init__(self, result, settings, on_destroy=None):
+            self.settings = settings
+            self.lang = settings["lang"]
+            self.theme = settings["theme"]
+            self.result = result
+            self.on_destroy_cb = on_destroy
+            self.scan_thread = None
+            self.cancel = None
 
-    def on_open_path(self, _button, path):
-        folder = path if os.path.isdir(path) else os.path.dirname(path)
-        if not os.path.isdir(folder):
-            self.status.set_text(UI["gone"][self.lang])
-            return
-        try:
-            subprocess.Popen(["xdg-open", folder])
-        except OSError:
-            pass
+            super().__init__(title=UI["app_title"][self.lang])
+            self.set_default_size(780, 580)
+            self.set_size_request(660, 460)
+            self.set_position(Gtk.WindowPosition.CENTER)
+            self.connect("destroy", self._destroyed)
+            self.connect("key-press-event", self._on_key)
 
-    def on_rescan(self, _button):
-        """Ayni pencerede yeniden tarar; yeni pencere ACMAZ."""
-        if self.scan_thread and self.scan_thread.is_alive():
-            return
-        root = self.result.get("root")
-        if not self._device_present():
-            self.status.set_text(UI["gone"][self.lang])
-            return
+            self.provider = Gtk.CssProvider()
+            Gtk.StyleContext.add_provider_for_screen(
+                Gdk.Screen.get_default(), self.provider,
+                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+            self.apply_theme()
 
-        self.cancel = threading.Event()
-        self.rescan_btn.set_sensitive(False)
-        self.save_btn.set_sensitive(False)
-        self.status.set_text(UI["scanning"][self.lang])
-        self.spinner.start()
+            root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            self.add(root)
 
-        def worker():
-            fresh = enrich(scan_path(root, self.cancel), root)
-            GLib.idle_add(self._scan_done, fresh)
+            self.header_holder = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            self.header_holder.get_style_context().add_class("header")
+            root.pack_start(self.header_holder, False, False, 0)
+            root.pack_start(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL),
+                            False, False, 0)
 
-        self.scan_thread = threading.Thread(target=worker, daemon=True)
-        self.scan_thread.start()
+            scroller = Gtk.ScrolledWindow()
+            scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+            root.pack_start(scroller, True, True, 0)
+            self.body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+            self.body.set_margin_top(22); self.body.set_margin_bottom(22)
+            self.body.set_margin_start(24); self.body.set_margin_end(24)
+            scroller.add(self.body)
 
-    def _scan_done(self, fresh):
-        self.spinner.stop()
-        self.rescan_btn.set_sensitive(True)
-        self.save_btn.set_sensitive(True)
-        self.status.set_text("")
-        if not fresh["stats"].get("cancelled"):
-            self.result = fresh
+            root.pack_start(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL),
+                            False, False, 0)
+            root.pack_start(self._build_footer(), False, False, 0)
+
             self.refresh()
-        return False
 
-    def on_save(self, _button):
-        path = os.path.join(
-            GLib.get_home_dir(),
-            time.strftime("carotos-usb-%Y%m%d-%H%M.txt"))
-        try:
-            with open(path, "w", encoding="utf-8") as fh:
-                fh.write(build_report(self.result, self.lang))
-            self.status.set_text(UI["saved"][self.lang].format(path=path))
-        except OSError:
-            self.status.set_text(UI["save_failed"][self.lang])
+        # -- yapim ------------------------------------------------------------
 
-    # -- tema --------------------------------------------------------------
+        def _build_footer(self):
+            footer = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=9)
+            footer.set_border_width(13)
 
-    def apply_theme(self):
-        if self.theme == "dark":
-            bg = "#1f2325"; head = "#2b2f31"; fg = "#e6e6e6"; sub = "#9aa4a8"
-            card = "#282d2f"; border = "#363c3e"; note = "#2c3134"
-            btn = "#343a3c"; btn_h = "#3f4649"; bd = "#454b4e"; mono = "#8fd6c4"
-        else:
-            bg = "#f2f4f5"; head = "#e4e7e9"; fg = "#1f2325"; sub = "#5c666a"
-            card = "#ffffff"; border = "#dde2e4"; note = "#eef1f2"
-            btn = "#ffffff"; btn_h = "#eef0f1"; bd = "#c3c8ca"; mono = "#1f5f52"
+            self.open_btn = Gtk.Button(label=UI["open_device"][self.lang])
+            self.open_btn.connect("clicked", self.on_open_device)
+            footer.pack_start(self.open_btn, False, False, 0)
 
-        Gtk.Settings.get_default().set_property(
-            "gtk-application-prefer-dark-theme", self.theme == "dark")
+            self.rescan_btn = Gtk.Button(label=UI["rescan"][self.lang])
+            self.rescan_btn.connect("clicked", self.on_rescan)
+            footer.pack_start(self.rescan_btn, False, False, 0)
 
-        css = f"""
-        window {{ background-color: {bg}; color: {fg}; }}
-        label {{ color: {fg}; }}
-        .header {{ background-color: {head}; }}
-        .big-title {{ font-size: 142%; font-weight: bold; }}
-        .title-ok {{ color: {C_OK}; }}
-        .title-high {{ color: {C_HIGH}; }}
-        .title-med {{ color: {C_MED}; }}
-        .title-low {{ color: {sub}; }}
-        .sub-text {{ color: {sub}; font-size: 92%; }}
-        .warn-text {{ color: {C_MED}; font-size: 92%; }}
-        .path-text {{ font-family: monospace; font-size: 88%; color: {mono}; }}
-        .card {{
-            background-color: {card}; border: 1px solid {border};
-            border-radius: 8px;
-        }}
-        .card-title {{ font-weight: bold; font-size: 106%; }}
-        .badge {{
-            color: #ffffff; font-size: 78%; font-weight: bold;
-            border-radius: 4px; padding: 3px 8px;
-        }}
-        .badge-high {{ background-color: {C_HIGH}; }}
-        .badge-med {{ background-color: {C_MED}; }}
-        .badge-low {{ background-color: {C_LOW}; }}
-        .band-ok {{ background-color: {C_OK}; border-radius: 2px; }}
-        .band-high {{ background-color: {C_HIGH}; border-radius: 2px; }}
-        .band-med {{ background-color: {C_MED}; border-radius: 2px; }}
-        .band-low {{ background-color: {C_LOW}; border-radius: 2px; }}
-        .pill {{
-            border-radius: 999px; padding: 3px 13px;
-            font-size: 88%; color: #ffffff;
-        }}
-        .pill-high {{ background-color: {C_HIGH}; }}
-        .pill-med {{ background-color: {C_MED}; }}
-        .pill-low {{ background-color: {C_LOW}; }}
-        .note-box {{
-            background-color: {note}; border: 1px solid {border};
-            border-left: 3px solid {ACCENT}; border-radius: 8px;
-        }}
-        button {{
-            background-image: none; background-color: {btn}; color: {fg};
-            border: 1px solid {bd}; border-radius: 6px; padding: 4px 14px;
-        }}
-        button label {{ color: {fg}; }}
-        button:hover {{ background-color: {btn_h}; }}
-        button:disabled label {{ color: {sub}; }}
-        button.suggested-action {{
-            background-color: {ACCENT}; border-color: {ACCENT}; color: #ffffff;
-        }}
-        button.suggested-action label {{ color: #ffffff; }}
-        separator {{ background-color: {bd}; }}
-        """
-        self.provider.load_from_data(css.encode())
+            self.save_btn = Gtk.Button(label=UI["save_report"][self.lang])
+            self.save_btn.connect("clicked", self.on_save)
+            footer.pack_start(self.save_btn, False, False, 0)
+
+            self.status = Gtk.Label(xalign=0.0)
+            self.status.get_style_context().add_class("sub-text")
+            self.status.set_ellipsize(3)  # PANGO_ELLIPSIZE_END
+            footer.pack_start(self.status, True, True, 6)
+
+            self.spinner = Gtk.Spinner()
+            footer.pack_end(self.spinner, False, False, 0)
+
+            close = Gtk.Button(label=UI["close"][self.lang])
+            close.get_style_context().add_class("suggested-action")
+            close.connect("clicked", lambda *_: self.destroy())
+            footer.pack_end(close, False, False, 0)
+            return footer
+
+        def _clear(self, container):
+            for child in container.get_children():
+                container.remove(child)
+
+        def refresh(self):
+            """Basligi ve bulgu listesini mevcut sonuca gore yeniden kurar."""
+            self._clear(self.header_holder)
+            self._clear(self.body)
+            self.header_holder.pack_start(self._build_header(), True, True, 0)
+
+            findings = self.result["findings"]
+            if not findings:
+                self.body.pack_start(self._build_clean_card(), False, False, 0)
+            for finding in findings:
+                self.body.pack_start(self._build_card(finding), False, False, 0)
+            self.body.pack_start(self._build_note(), False, False, 0)
+
+            self.header_holder.show_all()
+            self.body.show_all()
+
+        def _build_header(self):
+            findings = self.result["findings"]
+            stats = self.result["stats"]
+
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+            box.set_margin_top(20); box.set_margin_bottom(20)
+            box.set_margin_start(24); box.set_margin_end(24)
+
+            worst = worst_level(findings)
+            if worst is None:
+                heading = UI["summary_clean"][self.lang]
+                title_css, band_css = "title-ok", "band-ok"
+            else:
+                heading = UI["summary_found"][self.lang].format(n=len(findings))
+                title_css = {HIGH: "title-high", MEDIUM: "title-med",
+                             LOW: "title-low"}[worst]
+                band_css = {HIGH: "band-high", MEDIUM: "band-med",
+                            LOW: "band-low"}[worst]
+
+            row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=14)
+            stripe = Gtk.Box()
+            stripe.set_size_request(4, -1)
+            stripe.get_style_context().add_class(band_css)
+            row.pack_start(stripe, False, False, 0)
+
+            col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+            title = Gtk.Label(label=heading, xalign=0.0)
+            title.get_style_context().add_class("big-title")
+            title.get_style_context().add_class(title_css)
+            title.set_line_wrap(True)
+            col.pack_start(title, False, False, 0)
+
+            pieces = [self.result.get("label") or "?"]
+            if self.result.get("device"):
+                pieces.append(self.result["device"])
+            if self.result.get("fstype"):
+                pieces.append(self.result["fstype"])
+            device = Gtk.Label(label="  ·  ".join(pieces), xalign=0.0)
+            device.get_style_context().add_class("sub-text")
+            device.set_line_wrap(True)
+            col.pack_start(device, False, False, 0)
+            row.pack_start(col, True, True, 0)
+            box.pack_start(row, False, False, 0)
+
+            counts = {level: sum(1 for f in findings if f["level"] == level)
+                      for level in (HIGH, MEDIUM, LOW)}
+            if findings:
+                pills = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=9)
+                pills.set_margin_start(18)
+                for level, key, css in ((HIGH, "count_high", "pill-high"),
+                                        (MEDIUM, "count_medium", "pill-med"),
+                                        (LOW, "count_low", "pill-low")):
+                    if counts[level]:
+                        pill = Gtk.Label(label=f"{counts[level]} {UI[key][self.lang]}")
+                        pill.get_style_context().add_class("pill")
+                        pill.get_style_context().add_class(css)
+                        pills.pack_start(pill, False, False, 0)
+                box.pack_start(pills, False, False, 0)
+
+            info = Gtk.Label(
+                label=UI["files_dirs"][self.lang].format(
+                    files=stats["files"], dirs=stats["dirs"],
+                    size=human_size(stats["size"])) + "  ·  " +
+                      UI["duration"][self.lang].format(seconds=stats["seconds"]),
+                xalign=0.0)
+            info.get_style_context().add_class("sub-text")
+            info.set_margin_start(18)
+            info.set_line_wrap(True)
+            box.pack_start(info, False, False, 0)
+
+            if stats.get("truncated"):
+                warn = Gtk.Label(label=UI["truncated"][self.lang], xalign=0.0)
+                warn.get_style_context().add_class("warn-text")
+                warn.set_margin_start(18)
+                warn.set_line_wrap(True)
+                warn.set_max_width_chars(80)
+                box.pack_start(warn, False, False, 0)
+
+            return box
+
+        def _card_shell(self):
+            card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            card.get_style_context().add_class("card")
+            inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+            inner.set_margin_top(18); inner.set_margin_bottom(18)
+            inner.set_margin_start(22); inner.set_margin_end(22)
+            card.pack_start(inner, True, True, 0)
+            return card, inner
+
+        def _build_clean_card(self):
+            card, inner = self._card_shell()
+            text = (UI["empty_device"][self.lang]
+                    if self.result["stats"].get("empty")
+                    else UI["clean_detail"][self.lang])
+            label = Gtk.Label(label=text, xalign=0.0)
+            label.set_line_wrap(True)
+            label.set_max_width_chars(84)
+            inner.pack_start(label, False, False, 0)
+            return card
+
+        def _build_card(self, finding):
+            level = finding["level"]
+            badge_css = {HIGH: "badge-high", MEDIUM: "badge-med",
+                         LOW: "badge-low"}[level]
+            badge_text = {HIGH: UI["level_high"], MEDIUM: UI["level_medium"],
+                          LOW: UI["level_low"]}[level][self.lang]
+
+            card, inner = self._card_shell()
+
+            top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=11)
+            badge = Gtk.Label(label=badge_text)
+            badge.get_style_context().add_class("badge")
+            badge.get_style_context().add_class(badge_css)
+            badge.set_valign(Gtk.Align.CENTER)
+            top.pack_start(badge, False, False, 0)
+
+            title = Gtk.Label(label=finding["title"], xalign=0.0)
+            title.get_style_context().add_class("card-title")
+            title.set_line_wrap(True)
+            title.set_valign(Gtk.Align.CENTER)
+            top.pack_start(title, True, True, 0)
+
+            if finding.get("path"):
+                btn = Gtk.Button(label=UI["open_location"][self.lang])
+                btn.set_valign(Gtk.Align.CENTER)
+                btn.connect("clicked", self.on_open_path, finding["path"])
+                top.pack_end(btn, False, False, 0)
+            inner.pack_start(top, False, False, 0)
+
+            detail = Gtk.Label(label=finding["detail"], xalign=0.0)
+            detail.set_line_wrap(True)
+            detail.set_max_width_chars(84)
+            inner.pack_start(detail, False, False, 0)
+
+            if finding.get("path"):
+                path = Gtk.Label(label=finding["path"], xalign=0.0)
+                path.set_selectable(True)
+                path.set_line_wrap(True)
+                path.set_max_width_chars(84)
+                path.get_style_context().add_class("path-text")
+                inner.pack_start(path, False, False, 0)
+
+            return card
+
+        def _build_note(self):
+            note = Gtk.Label(label=UI["note"][self.lang], xalign=0.0)
+            note.set_line_wrap(True)
+            note.set_max_width_chars(86)
+            note.get_style_context().add_class("sub-text")
+            inner = Gtk.Box()
+            inner.set_margin_top(15); inner.set_margin_bottom(15)
+            inner.set_margin_start(20); inner.set_margin_end(20)
+            inner.pack_start(note, True, True, 0)
+            box = Gtk.Box()
+            box.get_style_context().add_class("note-box")
+            box.pack_start(inner, True, True, 0)
+            return box
+
+        # -- olaylar -----------------------------------------------------------
+
+        def _on_key(self, _widget, event):
+            if event.keyval == Gdk.KEY_Escape:
+                self.destroy()
+                return True
+            return False
+
+        def _destroyed(self, _widget):
+            if self.cancel is not None:
+                self.cancel.set()
+            if self.on_destroy_cb:
+                self.on_destroy_cb(self)
+
+        def _device_present(self):
+            """Taranan konum hala erisilebilir mi?
+
+            Yalnizca dizinin var olup olmadigina bakilir. Daha once burada
+            /proc/mounts'ta bir baglama noktasi araniyordu; bu, --scan ile
+            verilen siradan klasorleri ve baglama noktasi adi farkli yazilmis
+            aygitlari yanlislikla "bagli degil" saydigi icin kaldirildi.
+            """
+            root = self.result.get("root")
+            return bool(root) and os.path.isdir(root)
+
+        def on_open_device(self, _button):
+            root = self.result.get("root")
+            if not self._device_present():
+                self.status.set_text(UI["gone"][self.lang])
+                return
+            try:
+                subprocess.Popen(["xdg-open", root])
+            except OSError:
+                pass
+
+        def on_open_path(self, _button, path):
+            folder = path if os.path.isdir(path) else os.path.dirname(path)
+            if not os.path.isdir(folder):
+                self.status.set_text(UI["gone"][self.lang])
+                return
+            try:
+                subprocess.Popen(["xdg-open", folder])
+            except OSError:
+                pass
+
+        def on_rescan(self, _button):
+            """Ayni pencerede yeniden tarar; yeni pencere ACMAZ."""
+            if self.scan_thread and self.scan_thread.is_alive():
+                return
+            root = self.result.get("root")
+            if not self._device_present():
+                self.status.set_text(UI["gone"][self.lang])
+                return
+
+            self.cancel = threading.Event()
+            self.rescan_btn.set_sensitive(False)
+            self.save_btn.set_sensitive(False)
+            self.status.set_text(UI["scanning"][self.lang])
+            self.spinner.start()
+
+            def worker():
+                fresh = enrich(scan_path(root, self.cancel), root)
+                GLib.idle_add(self._scan_done, fresh)
+
+            self.scan_thread = threading.Thread(target=worker, daemon=True)
+            self.scan_thread.start()
+
+        def _scan_done(self, fresh):
+            self.spinner.stop()
+            self.rescan_btn.set_sensitive(True)
+            self.save_btn.set_sensitive(True)
+            self.status.set_text("")
+            if not fresh["stats"].get("cancelled"):
+                self.result = fresh
+                self.refresh()
+            return False
+
+        def on_save(self, _button):
+            path = os.path.join(
+                GLib.get_home_dir(),
+                time.strftime("carotos-usb-%Y%m%d-%H%M.txt"))
+            try:
+                with open(path, "w", encoding="utf-8") as fh:
+                    fh.write(build_report(self.result, self.lang))
+                self.status.set_text(UI["saved"][self.lang].format(path=path))
+            except OSError:
+                self.status.set_text(UI["save_failed"][self.lang])
+
+        # -- tema --------------------------------------------------------------
+
+        def apply_theme(self):
+            if self.theme == "dark":
+                bg = "#1f2325"; head = "#2b2f31"; fg = "#e6e6e6"; sub = "#9aa4a8"
+                card = "#282d2f"; border = "#363c3e"; note = "#2c3134"
+                btn = "#343a3c"; btn_h = "#3f4649"; bd = "#454b4e"; mono = "#8fd6c4"
+            else:
+                bg = "#f2f4f5"; head = "#e4e7e9"; fg = "#1f2325"; sub = "#5c666a"
+                card = "#ffffff"; border = "#dde2e4"; note = "#eef1f2"
+                btn = "#ffffff"; btn_h = "#eef0f1"; bd = "#c3c8ca"; mono = "#1f5f52"
+
+            Gtk.Settings.get_default().set_property(
+                "gtk-application-prefer-dark-theme", self.theme == "dark")
+
+            css = f"""
+            window {{ background-color: {bg}; color: {fg}; }}
+            label {{ color: {fg}; }}
+            .header {{ background-color: {head}; }}
+            .big-title {{ font-size: 142%; font-weight: bold; }}
+            .title-ok {{ color: {C_OK}; }}
+            .title-high {{ color: {C_HIGH}; }}
+            .title-med {{ color: {C_MED}; }}
+            .title-low {{ color: {sub}; }}
+            .sub-text {{ color: {sub}; font-size: 92%; }}
+            .warn-text {{ color: {C_MED}; font-size: 92%; }}
+            .path-text {{ font-family: monospace; font-size: 88%; color: {mono}; }}
+            .card {{
+                background-color: {card}; border: 1px solid {border};
+                border-radius: 8px;
+            }}
+            .card-title {{ font-weight: bold; font-size: 106%; }}
+            .badge {{
+                color: #ffffff; font-size: 78%; font-weight: bold;
+                border-radius: 4px; padding: 3px 8px;
+            }}
+            .badge-high {{ background-color: {C_HIGH}; }}
+            .badge-med {{ background-color: {C_MED}; }}
+            .badge-low {{ background-color: {C_LOW}; }}
+            .band-ok {{ background-color: {C_OK}; border-radius: 2px; }}
+            .band-high {{ background-color: {C_HIGH}; border-radius: 2px; }}
+            .band-med {{ background-color: {C_MED}; border-radius: 2px; }}
+            .band-low {{ background-color: {C_LOW}; border-radius: 2px; }}
+            .pill {{
+                border-radius: 999px; padding: 3px 13px;
+                font-size: 88%; color: #ffffff;
+            }}
+            .pill-high {{ background-color: {C_HIGH}; }}
+            .pill-med {{ background-color: {C_MED}; }}
+            .pill-low {{ background-color: {C_LOW}; }}
+            .note-box {{
+                background-color: {note}; border: 1px solid {border};
+                border-left: 3px solid {ACCENT}; border-radius: 8px;
+            }}
+            button {{
+                background-image: none; background-color: {btn}; color: {fg};
+                border: 1px solid {bd}; border-radius: 6px; padding: 4px 14px;
+            }}
+            button label {{ color: {fg}; }}
+            button:hover {{ background-color: {btn_h}; }}
+            button:disabled label {{ color: {sub}; }}
+            button.suggested-action {{
+                background-color: {ACCENT}; border-color: {ACCENT}; color: #ffffff;
+            }}
+            button.suggested-action label {{ color: #ffffff; }}
+            separator {{ background-color: {bd}; }}
+            """
+            self.provider.load_from_data(css.encode())
+
+    return ResultWindow
 
 
 # ===========================================================================
@@ -1006,7 +1060,7 @@ def server_supports_actions():
     "Ayrintilar" dugmesine basar. Desteklemiyorsa pencereyi acmak
     zorundayiz, yoksa uyari ulasilamaz kalir.
     """
-    if not HAVE_NOTIFY:
+    if not _notify_araclari():
         return False
     try:
         if not Notify.is_initted():
@@ -1048,7 +1102,7 @@ def send_notification(result, settings, on_details=None):
         urgency = 1
         timeout = 12000
 
-    if HAVE_NOTIFY:
+    if _notify_araclari():
         try:
             if not Notify.is_initted():
                 Notify.init("CarotOS USB")
@@ -1221,7 +1275,7 @@ class Monitor:
         if existing is not None:
             existing.present()
             return
-        window = ResultWindow(result, self.settings, on_destroy=self._forget)
+        window = _gtk_araclari()(result, self.settings, on_destroy=self._forget)
         self.windows[mount] = window
         window.show_all()
         window.present()
@@ -1262,8 +1316,9 @@ def run_windows(results, settings):
         if not open_windows:
             Gtk.main_quit()
 
+    RW = _gtk_araclari()
     for result in results:
-        window = ResultWindow(result, settings, on_destroy=forget)
+        window = RW(result, settings, on_destroy=forget)
         open_windows.append(window)
         window.show_all()
 

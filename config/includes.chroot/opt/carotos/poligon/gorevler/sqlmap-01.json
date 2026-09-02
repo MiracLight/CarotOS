@@ -1,0 +1,45 @@
+{
+  "id": "sqlmap-01",
+  "arac": "sqlmap",
+  "seviye": "orta",
+
+  "baslik": {
+    "tr": "Gizli Tabloyu Çıkar",
+    "en": "Extract the Hidden Table"
+  },
+
+  "senaryo": {
+    "tr": "127.0.0.1:8899/urun?id=1 adresindeki ürün sayfası SQL enjeksiyonuna açık. Bu sayfanın gösterdiği tablonun dışında, 'gizli' adında ayrı bir tablo daha var. sqlmap ile enjeksiyonu bulup 'gizli' tablosundaki 'deger' sütununu çıkar.",
+    "en": "The product page at 127.0.0.1:8899/urun?id=1 is vulnerable to SQL injection. Beyond the table this page shows, there is a separate table called 'gizli'. Use sqlmap to find the injection and dump the 'deger' column from the 'gizli' table."
+  },
+
+  "ipucu": {
+    "tr": "sqlmap -u \"http://127.0.0.1:8899/urun?id=1\" --batch --flush-session --dump -D main -T gizli -C deger",
+    "en": "sqlmap -u \"http://127.0.0.1:8899/urun?id=1\" --batch --flush-session --dump -D main -T gizli -C deger"
+  },
+
+  "hedef": {
+    "tur": "canli_servis",
+    "servis_modulu": "servisler.sahte_web.SahteWebServisi",
+    "port": 8899,
+    "bind_adres": "127.0.0.1",
+    "_kural": "bind_adres HER ZAMAN 127.0.0.1. SahteWebServisi kendi yapıcısında da bunu zorunlu kılıyor."
+  },
+
+  "flag_uretimi": {
+    "yontem": "sql_flag",
+    "modul": "servisler.sahte_web",
+    "_not": "Rastgele değer üretilir (parola_uret()), 'gizli' tablosuna yazılır. Öğrenci sqlmap ile çıkardığı değeri yazar."
+  },
+
+  "dogrulama": {
+    "tur": "kullanici_girdisi",
+    "karsilastirma": "birebir_ve_kucuk_harf_duyarsiz",
+    "deneme_siniri": null
+  },
+
+  "puan": 150,
+  "sure_siniri_dk": null,
+
+  "savunma_gorevi_id": null
+}

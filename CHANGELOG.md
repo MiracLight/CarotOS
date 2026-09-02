@@ -1,6 +1,6 @@
 # CarotOS Sürüm Geçmişi (Changelog)
 
-CarotOS 1.0 "Eggshell" geliştirme sürecinde üretilen ISO sürümlerinin kaydı.
+CarotOS ISO sürümlerinin kaydı.
 Her satır, bir `lb build` çıktısıyla üretilmiş ve sanal makinede kurularak
 doğrulanmış bir alt sürümü temsil eder.
 

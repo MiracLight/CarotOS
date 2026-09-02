@@ -1,0 +1,48 @@
+{
+  "$aciklama": "CarotOS Poligon — savunma görevi. Burada bir şey saldırılmaz ya da bloklanmaz; amaç fail2ban'in ZATEN yaptığı işi okuyup yorumlayabilmek. Özel bir jail/filtre yazılmaz -- sistemde tanımlı olan jail'in durumu okunur.",
+
+  "id": "fail2ban-01",
+  "arac": "fail2ban",
+  "seviye": "orta",
+
+  "baslik": {
+    "tr": "Bekçiyi Dinle",
+    "en": "Listen to the Watchdog"
+  },
+
+  "senaryo": {
+    "tr": "fail2ban, tekrarlayan başarısız giriş denemelerini otomatik olarak fark edip o adresi geçici olarak engelleyen bir servis. Sistemde 'sshd' jail'i tanımlı. Görevin: onun durumunu okuyup ekrandaki 'Kontrol Et' düğmesiyle doğrulamak. Hiçbir kural yazmayacaksın, sadece okuyacaksın.",
+    "en": "fail2ban automatically notices repeated failed login attempts and temporarily blocks that address. The 'sshd' jail is already configured on this system. Your task: read its status and confirm it with the 'Check' button here. You won't write any rules, only read."
+  },
+
+  "ipucu": {
+    "tr": "Bir terminalde şunu dene: sudo fail2ban-client status sshd\nÇıktıda 'Status for the jail' başlığını, kaç adresin şu an banlı olduğunu ve toplam ban sayısını göreceksin. Sonra buradaki 'Kontrol Et' düğmesine bas.",
+    "en": "Try this in a terminal: sudo fail2ban-client status sshd\nYou'll see a 'Status for the jail' header, how many addresses are currently banned, and the total ban count. Then press 'Check' here."
+  },
+
+  "hedef": {
+    "tur": "sistem_araci",
+    "arac_komutu": ["fail2ban-client", "status"],
+    "jail": "sshd",
+    "_not": "Yerel sahte servis YOK. 'jail' alanı, sistemde zaten var olduğu varsayılan gerçek fail2ban jail adıdır -- öğretmen farklı bir dağıtımda farklı bir jail adı (örn. 'sshd' yerine başka biri) kullanmak isterse burayı değiştirebilir."
+  },
+
+  "flag_uretimi": {
+    "yontem": "sistem_kontrolu",
+    "modul": null,
+    "on_ek": null,
+    "son_ek": null,
+    "_not": "Üretilecek bir flag yok, çözülecek bir hedef yok. Tek iş fail2ban_durumunu_dogrula() ile gerçek sistem durumunu okumak."
+  },
+
+  "dogrulama": {
+    "tur": "fail2ban_durumu",
+    "_not": "'Kontrol Et' düğmesi sudo parolası ister, 'sudo fail2ban-client status sshd' çalıştırır. Komut başarıyla dönüp çıktıda 'Status for the jail' geçiyorsa tamamlandı sayılır."
+  },
+
+  "puan": 100,
+  "sure_siniri_dk": null,
+
+  "savunma_gorevi_id": null,
+  "_not_savunma": "Bu görevin kendisi zaten bir savunma görevi."
+}

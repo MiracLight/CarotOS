@@ -55,7 +55,7 @@ LB_MODE="debian"
 LB_SYSTEM="live"
 
 # Set base name of the image
-LB_IMAGE_NAME="carotos-1.0"
+LB_IMAGE_NAME="carotos-1.1"
 
 # Set options to use with apt
 APT_OPTIONS="--yes -o Acquire::Retries=5"

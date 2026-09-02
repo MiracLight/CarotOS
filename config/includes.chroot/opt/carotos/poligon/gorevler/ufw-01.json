@@ -1,0 +1,49 @@
+{
+  "$aciklama": "CarotOS Poligon — savunma görevi. Saldırı görevlerinin tersine buradaki 'başarı' bir flag bulmak değil, hedefi gerçekten savunmaktır.",
+
+  "id": "ufw-01",
+  "arac": "ufw",
+  "seviye": "orta",
+
+  "baslik": {
+    "tr": "Portu Kapat",
+    "en": "Close the Port"
+  },
+
+  "senaryo": {
+    "tr": "127.0.0.1:9001 adresinde açık, korumasız bir servis dinliyor -- tıpkı az önce saldırdığın hedefler gibi. Bu sefer sen savunma tarafındasın: ufw ile bu portu erişime kapat. Kapattığında ekrandaki 'Kontrol Et' düğmesine bas; uygulama gerçek kuralın eklendiğini doğrulayacak.",
+    "en": "An open, unprotected service is listening on 127.0.0.1:9001 -- just like the targets you just attacked. This time you're on defense: use ufw to close this port. When you're done, press 'Check' -- the app will verify the rule was really added."
+  },
+
+  "ipucu": {
+    "tr": "Bir terminal aç ve şunu çalıştır: sudo ufw deny 9001\nSonra buradaki 'Kontrol Et' düğmesine bas (sudo parolanı bir kez daha, sadece durumu okumak için soracak).",
+    "en": "Open a terminal and run: sudo ufw deny 9001\nThen press 'Check' here (it will ask for your sudo password once more, just to read the status)."
+  },
+
+  "hedef": {
+    "tur": "canli_servis",
+    "servis_modulu": "servisler.sahte_savunma_hedefi.BasitDinleyici",
+    "port": 9001,
+    "bind_adres": "127.0.0.1",
+    "_kural": "bind_adres HER ZAMAN 127.0.0.1 olmak zorunda. Bu görevde servisin kendisi savunulacak hedeftir, saldırı hedefi değildir -- ama aynı ağ-izolasyonu kuralı yine de geçerli: dev/test makinesi dışına asla açılmaz."
+  },
+
+  "flag_uretimi": {
+    "yontem": "savunma_hedefi",
+    "modul": null,
+    "on_ek": null,
+    "son_ek": null,
+    "_not": "Bu görevde bulunacak bir 'flag' yok. Yerel dinleyici sadece ufw'nin deneyeceği bir hedef olarak var. Doğrulama tamamen ufw_kuralini_dogrula() ile yapılır."
+  },
+
+  "dogrulama": {
+    "tur": "ufw_engeli",
+    "_not": "'Kontrol Et' düğmesi sudo parolası ister, 'sudo ufw status' çalıştırır ve çıktıda hedef port için DENY/REJECT satırı arar. Gerçek loopback bağlantısının kesilip kesilmediğine BAKILMAZ -- bu davranış sisteme göre değişebiliyor (bkz. devir belgesi), kuralın var olması yeterli kabul edilir."
+  },
+
+  "puan": 120,
+  "sure_siniri_dk": null,
+
+  "savunma_gorevi_id": null,
+  "_not_savunma": "Bu görevin kendisi zaten bir savunma görevi, zincirleme başka bir savunma görevi önerilmiyor."
+}

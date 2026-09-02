@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=CarotOS Poligon (Student)
+Name[tr]=CarotOS Poligon (Öğrenci)
+Comment=Practice pentest tasks in an isolated local range
+Comment[tr]=İzole yerel bir poligonda sızma testi görevleriyle pratik yap
+Exec=python3 /opt/carotos/poligon/ogrenci_uygulama.py
+Icon=carotos-poligon-ogrenci
+Terminal=false
+Categories=System;Security;Education;
+Keywords=poligon;pentest;hydra;nmap;egitim;arena;
+Keywords[tr]=poligon;sızma;hydra;nmap;eğitim;arena;

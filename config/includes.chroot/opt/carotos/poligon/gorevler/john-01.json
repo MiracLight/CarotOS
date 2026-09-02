@@ -1,0 +1,44 @@
+{
+  "id": "john-01",
+  "arac": "john",
+  "seviye": "baslangic",
+
+  "baslik": {
+    "tr": "Hash'i Kır",
+    "en": "Crack the Hash"
+  },
+
+  "senaryo": {
+    "tr": "Yerel bir hash dosyasında kullanıcının parolası md5crypt biçiminde saklanıyor. john ile yaygın parola listesini deneyerek gerçek parolayı bul. Dosya yolu: aşağıda gösteriliyor.",
+    "en": "A local hash file stores the user's password in md5crypt format. Use john with a common password list to find the real password. The file path is shown below."
+  },
+
+  "ipucu": {
+    "tr": "john --format=md5crypt --wordlist=/usr/share/wordlists/rockyou-mini.txt <dosya_yolu>",
+    "en": "john --format=md5crypt --wordlist=/usr/share/wordlists/rockyou-mini.txt <file_path>"
+  },
+
+  "hedef": {
+    "tur": "statik_dosya",
+    "servis_modulu": "servisler.sahte_hash.SahteHashDosyasi",
+    "sabit_kullanici": "ogrenci",
+    "_not": "Ağ bağlantısı yok, bind_adres kuralı bu görev için geçerli değil -- sadece yerel dosya."
+  },
+
+  "flag_uretimi": {
+    "yontem": "hash_uret",
+    "modul": "servisler.sahte_hash",
+    "_not": "Rastgele parola üretilir (parola_uret()), openssl ile md5crypt formatında hash'lenip dosyaya yazılır. Öğrenci john ile kırdığı düz metni yazar."
+  },
+
+  "dogrulama": {
+    "tur": "kullanici_girdisi",
+    "karsilastirma": "birebir_ve_kucuk_harf_duyarsiz",
+    "deneme_siniri": null
+  },
+
+  "puan": 100,
+  "sure_siniri_dk": null,
+
+  "savunma_gorevi_id": null
+}
