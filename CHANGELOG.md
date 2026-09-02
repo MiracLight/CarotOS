@@ -10,6 +10,21 @@ sayılmamıştır.
 
 ---
 
+## Sürüm 10 — 1.1 "Eggshell": CarotOS Poligon
+**Durum:** Yayınlandı (GitHub Release v1.1, carotos.org).
+- **CarotOS Poligon** eklendi: öğrenci ve öğretmen uygulamalarından oluşan,
+  izole bir ortamda hydra, nmap, john, sqlmap ve tshark ile sızma testi
+  pratiği yapılmasını sağlayan yeni bir modül. ufw ve fail2ban ile savunma
+  görevleri de içeriyor. Masaüstü panelinde ayrı kısayollarla erişilebiliyor.
+- tshark artık normal kullanıcı hesabında "Erişim engellendi" hatası
+  vermeden çalışıyor (ilk açılışta wireshark grubuna otomatik ekleniyor).
+- "Dene" (Try Live) modunda oturum açan kullanıcının adı artık
+  "Debian Live User" yerine "CarotOS Live User" olarak görünüyor.
+- Sürüm etiketi 1.0'dan 1.1'e yükseltildi (`/etc/os-release`, `/etc/issue`,
+  README, BUILD.md).
+
+---
+
 ## Sürüm 9 — Kozmetik olarak en sağlam, donanıma portlanmaya hazır
 **Durum:** Referans sürüm. Gerçek UEFI veya BIOS donanımında kart hatası
 vermeden kurulması hedeflenen aday. Sürüm etiketi 1.09V olarak güncellenecek.
