@@ -23,6 +23,20 @@ sayılmamıştır.
 - Sürüm etiketi 1.0'dan 1.1'e yükseltildi (`/etc/os-release`, `/etc/issue`,
   README, BUILD.md).
 
+**Yayın sonrası düzeltmeler (aynı "1.1" etiketi altında, ISO indirme
+bağlantısındaki dosya üç kez güncellendi — sha256 her seferinde
+değişti):**
+- **Kritik:** İlk yayınlanan 1.1 ISO'su hiç açılmıyordu —
+  `--bootappend-live` parametresi verilirken çekirdeğin kök dosya
+  sistemini bulması için zorunlu olan `boot=live components` değeri
+  yanlışlıkla silinmişti. Düzeltildi, gerçek donanımda yeniden
+  doğrulandı.
+- CarotOS Poligon, aynı fiziksel makine dışında (öğretmen ve öğrenci
+  farklı bilgisayarlarda) çalışmıyordu — öğrenci uygulaması sabit
+  olarak `127.0.0.1`'e bağlanıyordu. Öğrenci uygulamasına "Öğretmen
+  Adresi" alanı eklendi, ağ üzerinden farklı makineler arası bağlantı
+  doğrulandı.
+
 ---
 
 ## Sürüm 9 — Kozmetik olarak en sağlam, donanıma portlanmaya hazır
