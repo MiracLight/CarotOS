@@ -320,6 +320,41 @@ PAGES = [
         ],
     },
     {
+        "id": "poligon",
+        "title": {"tr": "CarotOS Poligon", "en": "CarotOS Poligon"},
+        "subtitle": {
+            "tr": "Öğrendiğiniz araçları güvenli bir ortamda pratik edin",
+            "en": "Practice what you've learned in a safe environment",
+        },
+        "image": "poligon.png",
+        "body": [
+            ("p", {
+                "tr": "Poligon, izole bir ortamda gerçek görevlerle pratik yapmanızı "
+                      "sağlayan bir öğrenci ve öğretmen uygulaması çiftidir. Hiçbir "
+                      "görev internete ya da başka bir sisteme erişim gerektirmez; "
+                      "her şey kendi bilgisayarınızda kalır.",
+                "en": "Poligon is a student/teacher application pair for practicing "
+                      "with real tasks in an isolated environment. No task requires "
+                      "access to the internet or another system; everything stays "
+                      "on your own machine.",
+            }),
+            ("bullets", [
+                {"tr": "Bireysel pratik: öğretmene gerek yok, rastgele bir görevle "
+                       "hemen başlayıp kendi hızınızda ilerlersiniz.",
+                 "en": "Individual practice: no teacher needed, start with a "
+                       "random task right away and go at your own pace."},
+                {"tr": "Sınıf modu: öğretmenin verdiği oda kodu ve şifreyle "
+                       "katılırsınız, sınıfla birlikte ilerlersiniz.",
+                 "en": "Class mode: join with the room code and password your "
+                       "teacher gives you, and progress along with the class."},
+                {"tr": "hydra, nmap, john, sqlmap ve tshark ile saldırı; ufw ve "
+                       "fail2ban ile savunma görevleri bulunur.",
+                 "en": "Offense tasks with hydra, nmap, john, sqlmap and tshark; "
+                       "defense tasks with ufw and fail2ban."},
+            ]),
+        ],
+    },
+    {
         "id": "terminal",
         "title": {"tr": "Terminale ilk adım", "en": "First steps in the terminal"},
         "subtitle": {
