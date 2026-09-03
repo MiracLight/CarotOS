@@ -15,6 +15,8 @@ nesnesinin durumunu okuyor (oda.anlik_goruntu()).
 from __future__ import annotations
 
 import json
+import os
+import socket
 import subprocess
 import sys
 import threading
@@ -28,11 +30,38 @@ from gi.repository import GLib, Gtk  # noqa: E402
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from ogretmen_sunucu import OdaDurumu, oda_kodu_uret, oda_sifresi_uret, sunucu_baslat  # noqa: E402
 
+
+def _yerel_ip_adresini_bul() -> str:
+    """Bu makinenin yerel agdaki gercek IP adresini bulur. UDP soketiyle
+    sahte bir baglanti kurulur; gercekten paket gonderilmez, sadece
+    isletim sisteminin hangi ag arayuzunu sececegi ogrenilir -- bu
+    yuzden internet baglantisi olmasa bile calisir. Belirlenemezse
+    127.0.0.1 doner."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        return s.getsockname()[0]
+    except OSError:
+        return "127.0.0.1"
+    finally:
+        s.close()
+
+
+def _sistem_dilini_belirle() -> str:
+    """ogrenci_uygulama.py::_sistem_dilini_belirle ile AYNI mantık --
+    sistem dili Türkçe ise 'tr', değilse 'en'. Bkz. oradaki docstring."""
+    for degisken in ("LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE"):
+        if os.environ.get(degisken, "").lower().startswith("tr"):
+            return "tr"
+    return "en"
+
+
 METIN = {
     "tr": {
         "baslik": "CarotOS Poligon — Öğretmen",
         "oda_kodu": "Oda Kodu",
         "oda_sifre": "Oda Şifresi",
+        "ip_adresi": "IP Adresi",
         "ogrenciler_basligi": "Öğrenciler",
         "hic_ogrenci_yok": "Henüz kimse katılmadı",
         "durum_basladi": "Başladı",
@@ -59,6 +88,7 @@ METIN = {
         "baslik": "CarotOS Poligon — Teacher",
         "oda_kodu": "Room Code",
         "oda_sifre": "Room Password",
+        "ip_adresi": "IP Address",
         "ogrenciler_basligi": "Students",
         "hic_ogrenci_yok": "No one has joined yet",
         "durum_basladi": "Started",
@@ -131,10 +161,34 @@ def _tum_gorevleri_yukle() -> list[dict]:
     return gorevler
 
 
+def _ip_gorunurlugu_degistir_metodu(self, _dugme):
+    """IP adresini goster/gizle. Varsayilan gizli secildi cunku sinifta
+    projeksiyon veya ekran paylasimi acikken bu bilginin yanlislikla
+    herkese gorunmesi istenmez; ogretmen bilerek acar."""
+    self._ip_gorunur = not self._ip_gorunur
+    if self._ip_gorunur:
+        self.ip_deger_etiketi.set_text(self._gercek_ip)
+        ikon_adi = "view-conceal-symbolic"
+    else:
+        self.ip_deger_etiketi.set_text("\u2022" * 10)
+        ikon_adi = "view-reveal-symbolic"
+    self.ip_goz_dugmesi.get_child().destroy()
+    self.ip_goz_dugmesi.add(Gtk.Image.new_from_icon_name(ikon_adi, Gtk.IconSize.BUTTON))
+    self.ip_goz_dugmesi.show_all()
+
+
 class OgretmenPenceresi(Gtk.Window):
+    _ip_gorunurlugu_degistir = _ip_gorunurlugu_degistir_metodu
+
     def __init__(self, gorev_id: str = "hydra-01"):
         super().__init__(title="CarotOS Poligon — Öğretmen")
-        self.dil = "tr"
+        try:
+            self.set_icon_from_file(
+                "/usr/share/icons/hicolor/256x256/apps/carotos-poligon-ogretmen.png"
+            )
+        except GLib.Error:
+            pass  # ISO disinda (bagimsiz depodan) calistirilirsa ikon bulunamayabilir
+        self.dil = _sistem_dilini_belirle()
         self._css_saglayici = None
         self._geri_metin_rengi = "#a8c6e0"
         self.secili_ogrenci: str | None = None
@@ -146,6 +200,8 @@ class OgretmenPenceresi(Gtk.Window):
         sifre = oda_sifresi_uret()
         self.oda = OdaDurumu(kod, sifre)
         self.oda.gorev_ac(gorev_id)
+        self._gercek_ip = _yerel_ip_adresini_bul()
+        self._ip_gorunur = False
         self.sunucu = sunucu_baslat(self.oda, "0.0.0.0", 8642)
 
         self.set_default_size(520, 560)
@@ -259,7 +315,23 @@ class OgretmenPenceresi(Gtk.Window):
         sifre_kutu.pack_start(self.sifre_baslik_etiketi, False, False, 0)
         sifre_kutu.pack_start(self.sifre_deger_etiketi, False, False, 0)
         kod_satiri.pack_start(sifre_kutu, False, False, 0)
-
+        ip_kutu = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.ip_baslik_etiketi = Gtk.Label(xalign=0)
+        self.ip_baslik_etiketi.get_style_context().add_class("etiket")
+        ip_deger_satiri = Gtk.Box(spacing=6)
+        self.ip_deger_etiketi = Gtk.Label(xalign=0, label="\u2022" * 10)
+        self.ip_deger_etiketi.get_style_context().add_class("kod-buyuk")
+        self.ip_goz_dugmesi = Gtk.Button()
+        self.ip_goz_dugmesi.set_relief(Gtk.ReliefStyle.NONE)
+        self.ip_goz_dugmesi.add(Gtk.Image.new_from_icon_name(
+            "view-reveal-symbolic", Gtk.IconSize.BUTTON
+        ))
+        self.ip_goz_dugmesi.connect("clicked", self._ip_gorunurlugu_degistir)
+        ip_deger_satiri.pack_start(self.ip_deger_etiketi, False, False, 0)
+        ip_deger_satiri.pack_start(self.ip_goz_dugmesi, False, False, 0)
+        ip_kutu.pack_start(self.ip_baslik_etiketi, False, False, 0)
+        ip_kutu.pack_start(ip_deger_satiri, False, False, 0)
+        kod_satiri.pack_start(ip_kutu, False, False, 0)
         oda_kart.pack_start(kod_satiri, False, False, 0)
         disKutu.pack_start(oda_kart, False, False, 0)
 
@@ -451,6 +523,7 @@ class OgretmenPenceresi(Gtk.Window):
         self.dil_dugmesi.set_label("TR" if self.dil == "en" else "EN")
         self.kod_baslik_etiketi.set_text(m["oda_kodu"])
         self.sifre_baslik_etiketi.set_text(m["oda_sifre"])
+        self.ip_baslik_etiketi.set_text(m["ip_adresi"])
         self.ogrenciler_baslik_etiketi.set_text(m["ogrenciler_basligi"])
         self.ipucu_girisi.set_placeholder_text(m["ipucu_yer_tut"])
         self.tum_sinif_aciklama_etiketi.set_label(m["tum_sinif_aciklama"])
@@ -652,6 +725,12 @@ class OgretmenGirisPenceresi(Gtk.Window):
 
     def __init__(self, gorev_id: str):
         super().__init__(title="CarotOS Poligon — Öğretmen Girişi")
+        try:
+            self.set_icon_from_file(
+                "/usr/share/icons/hicolor/256x256/apps/carotos-poligon-ogretmen.png"
+            )
+        except GLib.Error:
+            pass  # ISO disinda (bagimsiz depodan) calistirilirsa ikon bulunamayabilir
         self.gorev_id = gorev_id
         self.set_default_size(380, 240)
 

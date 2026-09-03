@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import sys
 import json
+import os
 import threading
 from pathlib import Path
 
@@ -47,10 +48,24 @@ def _bireysel_havuz() -> list:
         if g.stem != "sablon-ve-ornek" and not _gorev_sudo_gerektirir_mi(g.stem)
     ]
 
+def _sistem_dilini_belirle() -> str:
+    """Uygulama ilk açıldığında hangi dille başlayacağını belirler:
+    sistem dili Türkçe ise 'tr', başka HERHANGİ bir dilse (ya da hiç
+    belirlenemiyorsa) 'en'. LC_ALL/LC_MESSAGES/LANG/LANGUAGE ortam
+    değişkenlerine bakılıyor -- GTK/gettext'in de kullandığı standart
+    öncelik sırası bu. Kullanıcı yine de sağ üstteki dil düğmesiyle
+    istediği an değiştirebiliyor, bu sadece AÇILIŞ varsayılanı."""
+    for degisken in ("LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE"):
+        if os.environ.get(degisken, "").lower().startswith("tr"):
+            return "tr"
+    return "en"
+
+
 METIN = {
     "tr": {
         "baslik": "CarotOS Poligon",
         "baglan_sekme": "Odaya Katıl",
+        "ogretmen_adres": "Öğretmen Adresi (IP)",
         "oda_kodu": "Oda Kodu",
         "oda_sifre": "Oda Şifresi",
         "ad": "Adın",
@@ -101,6 +116,7 @@ METIN = {
     "en": {
         "baslik": "CarotOS Poligon",
         "baglan_sekme": "Join Room",
+        "ogretmen_adres": "Teacher Address (IP)",
         "oda_kodu": "Room Code",
         "oda_sifre": "Room Password",
         "ad": "Your Name",
@@ -160,7 +176,13 @@ KIRMIZI = "#c0546a"
 class PoligonPenceresi(Gtk.Window):
     def __init__(self):
         super().__init__(title="CarotOS Poligon")
-        self.dil = "tr"
+        try:
+            self.set_icon_from_file(
+                "/usr/share/icons/hicolor/256x256/apps/carotos-poligon-ogrenci.png"
+            )
+        except GLib.Error:
+            pass  # ISO disinda (bagimsiz depodan) calistirilirsa ikon bulunamayabilir
+        self.dil = _sistem_dilini_belirle()
         self._css_saglayici = None
         self._ikincil_metin_rengi = "#eaf4fc"
         self._geri_metin_rengi = "#a8c6e0"
@@ -295,6 +317,7 @@ class PoligonPenceresi(Gtk.Window):
         self.bireysel_bilgi_etiketi.set_text(m["bireysel_bilgi"])
         self._gecmis_ozetini_yenile()
         self._dugme_metni_ayarla(self.teste_basla_dugmesi, m["teste_basla"], "white")
+        self.adres_girisi.set_placeholder_text(m["ogretmen_adres"])
         self.kod_girisi.set_placeholder_text(m["oda_kodu"])
         self.sifre_girisi.set_placeholder_text(m["oda_sifre"])
         self.ad_girisi.set_placeholder_text(m["ad"])
@@ -394,10 +417,12 @@ class PoligonPenceresi(Gtk.Window):
         kart = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         kart.get_style_context().add_class("kart")
 
+        self.adres_girisi = Gtk.Entry()
+        self.adres_girisi.set_text("127.0.0.1")
         self.kod_girisi = Gtk.Entry()
         self.sifre_girisi = Gtk.Entry()
         self.ad_girisi = Gtk.Entry()
-        for e in (self.kod_girisi, self.sifre_girisi, self.ad_girisi):
+        for e in (self.adres_girisi, self.kod_girisi, self.sifre_girisi, self.ad_girisi):
             kart.pack_start(e, False, False, 0)
 
         self.katil_dugmesi = Gtk.Button()
@@ -458,10 +483,12 @@ class PoligonPenceresi(Gtk.Window):
 
     def _odaya_katil(self, _düğme):
         m = METIN[self.dil]
+        adres = self.adres_girisi.get_text().strip()
+        adres = adres.replace("http://", "").replace("https://", "").rstrip("/")
         kod = self.kod_girisi.get_text().strip()
         sifre = self.sifre_girisi.get_text().strip()
         ad = self.ad_girisi.get_text().strip()
-        if not (kod and sifre and ad):
+        if not (adres and kod and sifre and ad):
             self.baglanti_durum_etiketi.set_text(m["hata_alan"])
             return
 
@@ -471,7 +498,7 @@ class PoligonPenceresi(Gtk.Window):
         def arka_planda():
             try:
                 istemci = PoligonIstemci(
-                    "http://127.0.0.1:8642", kod, sifre, ad
+                    f"http://{adres}:8642", kod, sifre, ad
                 )
                 basarili, hata_mesaji = istemci.katil()
                 if not basarili:
@@ -493,7 +520,14 @@ class PoligonPenceresi(Gtk.Window):
         threading.Thread(target=arka_planda, daemon=True).start()
 
     def _katilma_reddedildi(self, hata_mesaji: str):
-        """Sunucu katılmayı reddetti -- yanlış şifre veya isim çakışması."""
+        """Sunucu katılmayı reddetti -- yanlış şifre veya isim çakışması --
+        YA DA sunucuya hiç ulaşılamadı (bkz. ogrenci_istemci.py::katil()
+        içindeki "__BAGLANTI_HATASI__" işaret kodu). İşaret kodu görülürse
+        arayüz kendi dilinde gösterir; sunucudan gelen gerçek bir reddetme
+        mesajı ise (yanlış şifre vb.) olduğu gibi gösterilir -- o mesaj
+        öğretmenin kendi sunucusundan geliyor, ayrı bir konu."""
+        if hata_mesaji == "__BAGLANTI_HATASI__":
+            hata_mesaji = METIN[self.dil]["hata_baglanti"]
         self.baglanti_durum_etiketi.set_text(hata_mesaji)
         self.katil_dugmesi.set_sensitive(True)
 

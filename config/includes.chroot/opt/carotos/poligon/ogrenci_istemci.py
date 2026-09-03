@@ -340,7 +340,11 @@ class PoligonIstemci:
                 "sifre": self.oda_sifre,
             })
         except BaglantiHatasi:
-            return False, "Öğretmen sunucusuna ulaşılamıyor"
+            # Sabit Türkçe metin yerine bir isaret kodu donduruyoruz --
+            # arayuz katmani (ogrenci_uygulama.py) bunu kendi dilinde
+            # gosterir. Bu istemci sinifi GTK'dan bagimsiz, hangi dilde
+            # calisildigini bilmiyor.
+            return False, "__BAGLANTI_HATASI__"
 
         if durum == 200:
             return True, ""
