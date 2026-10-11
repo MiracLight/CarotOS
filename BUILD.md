@@ -21,7 +21,7 @@ lb config \
   --architectures amd64 \
   --debian-installer live \
   --archive-areas "main contrib non-free non-free-firmware" \
-  --image-name "carotos-1.1" \
+  --image-name "carotos-1.2" \
   --uefi-secure-boot enable \
   --firmware-chroot true
 sudo lb build 2>&1 | tee build.log
@@ -73,7 +73,7 @@ göstermez).
 Ayrıca şu **boş dönmelidir**:
 
 ```
-grep -E "^(shim-signed|grub-efi-amd64-signed)" carotos-1.1-amd64.packages
+grep -E "^(shim-signed|grub-efi-amd64-signed)" carotos-1.2-amd64.packages
 ```
 
 Gerekçesi için "Secure Boot" bölümüne bakın.
@@ -81,7 +81,7 @@ Gerekçesi için "Secure Boot" bölümüne bakın.
 ISO'nun yazıldığı dizin yapılandırmaya göre değişir:
 
 ```
-sudo find / -iname "carotos-1.1*" 2>/dev/null
+sudo find / -iname "carotos-1.2*" 2>/dev/null
 ```
 
 ## Dizin yapısı
@@ -263,7 +263,7 @@ engeller ve kurulum önyükleyicisiz kalır.
 
 `--uefi-secure-boot enable` parametresi tek başına yeterlidir: live-build o
 paketleri derleme sırasında geçici olarak kullanır, kurulan sisteme geçirmez.
-Bu yüzden doğrulamada `carotos-1.1-amd64.packages` içinde bu iki paket
+Bu yüzden doğrulamada `carotos-1.2-amd64.packages` içinde bu iki paket
 **bulunmamalıdır**.
 
 ## Uygulama simgeleri
