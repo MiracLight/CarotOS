@@ -132,11 +132,11 @@ olan öğrenciye özel ipucu gönderir.
 
 1. ISO dosyasını indirin ve sağlamasını doğrulayın:
    ```
-   sha256sum -c carotos-1.1-amd64.iso.sha256
+   sha256sum -c carotos-1.2-amd64.iso.sha256
    ```
 2. USB belleğe yazın (Linux'ta):
    ```
-   sudo dd if=carotos-1.1-amd64.iso of=/dev/sdX bs=4M status=progress oflag=sync
+   sudo dd if=carotos-1.2-amd64.iso of=/dev/sdX bs=4M status=progress oflag=sync
    ```
    Windows'ta [Rufus](https://rufus.ie) veya
    [balenaEtcher](https://etcher.balena.io) kullanabilirsiniz.
@@ -193,7 +193,7 @@ cd CarotOS
 sudo lb clean --purge
 lb config --distribution trixie --architectures amd64 --debian-installer live \
   --archive-areas "main contrib non-free non-free-firmware" \
-  --image-name "carotos-1.1" --uefi-secure-boot enable --firmware-chroot true
+  --image-name "carotos-1.2" --uefi-secure-boot enable --firmware-chroot true
 sudo lb build 2>&1 | tee build.log
 ```
 
@@ -229,6 +229,6 @@ dahil edilmiştir ve kendi lisans koşullarına tabidir.
 
 <div align="center">
 
-**CarotOS 1.1 "Eggshell"**
+**CarotOS 1.2 "Eggshell"**
 
 </div>

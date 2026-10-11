@@ -10,6 +10,33 @@ sayılmamıştır.
 
 ---
 
+## Sürüm 11 — 1.2 "Eggshell": CarotOS Mağaza ve yeni masaüstü
+**Durum:** Yayınlandı (GitHub Release v1.2, carotos.org).
+- **CarotOS Mağaza** eklendi: yedi kategoride 51 uygulama sunan grafik
+  mağaza. Kurulum ve kaldırma `apt` üzerinden yürütülür, yetki `pkexec` ile
+  istenir. Açık ve koyu tema, Türkçe ve İngilizce arayüz.
+- **Karşılama Sihirbazı** 15 sayfaya çıkarıldı: üç seçenekli masaüstü arka
+  planı sayfası, USB Denetimi ve CarotOS Mağaza tanıtım sayfaları eklendi.
+  Seçilen arka plan sihirbazdan çıkışta masaüstüne uygulanır.
+- **USB Denetimi** oturum açılışında arka planda başlar.
+- **CarotOS Poligon:** misafir, kullanıcı oluşturma ve kullanıcı girişi
+  seçenekleri eklendi.
+- **Masaüstü teması** yenilendi: Arc GTK teması, Papirus simge teması ve
+  Breeze imleç teması. Açık veya koyu seçimi karşılama sihirbazında yapılır;
+  sihirbaz tema, simge ve imleci seçime göre birlikte değiştirir. Varsayılan
+  koyudur.
+- Yeni CarotOS arka planları: oturum açma ekranı (LightDM) için bir görsel,
+  masaüstü için üç görsel. Yeni kurulumda varsayılan masaüstü arka planı
+  `carotosbackgroundwallpaper1`'dir.
+- **Oturum açılış perdesi:** LightDM girişinden sonra masaüstü hazır olana
+  kadar siyah ekran yerine animasyonlu bir perde gösterilir
+  (`/usr/local/bin/carotos-oturum-acilis`, `/etc/X11/Xsession.d/05carotos-acilis`).
+- Terminal isteminde `kullanıcı@bilgisayar` kısmı yeşilden cyan renge
+  çevrildi.
+- Açılış (splash) görselinde sürüm 1.2 olarak güncellendi.
+- Sürüm etiketi 1.1'den 1.2'ye yükseltildi (`/etc/os-release`, `/etc/issue`,
+  karşılama sihirbazı, README, BUILD.md, `LB_IMAGE_NAME`).
+
 ## Sürüm 10 — 1.1 "Eggshell": CarotOS Poligon
 **Durum:** Yayınlandı (GitHub Release v1.1, carotos.org).
 - **CarotOS Poligon** eklendi: öğrenci ve öğretmen uygulamalarından oluşan,
