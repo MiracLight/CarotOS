@@ -19,19 +19,22 @@ import subprocess
 import os
 import sys
 
-APP_VERSION = "1.1"
+APP_VERSION = "1.2"
 APP_CODENAME = "Eggshell"
 
 CONFIG_DIR = os.path.join(GLib.get_user_config_dir(), "carotos-welcome")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "settings.json")
 
-IMG_DIR = "/usr/share/carotos/welcome"
+IMG_DIR = os.environ.get("CAROTOS_IMG_DIR") or "/usr/share/carotos/welcome"
 
-# Logo icin sirayla denenecek yollar (ilk bulunan kullanilir)
+# Logo icin sirayla denenecek yollar (ilk bulunan kullanilir).
+# NOT: Guvenlik Paneli ikonu yedek olarak KULLANILMAZ; aksi halde logo.png
+# yoksa karsilama ekraninda yanlis marka (kalkan) gozukuyordu. Her zaman
+# CarotOS logosu (logo.png) kullanilir.
 LOGO_CANDIDATES = [
     os.path.join(IMG_DIR, "logo.png"),
-    "/usr/share/icons/carotos/security-panel-icon.png",
-    "/usr/share/carotos/login.png",
+    "/usr/share/carotos/welcome/logo.png",
+    "/usr/share/carotos/logo.png",
 ]
 
 
@@ -102,6 +105,15 @@ PAGES = [
         "subtitle": {
             "tr": "Sisteminizin görünümünü ve dilini seçin",
             "en": "Choose how your system looks and which language it uses",
+        },
+    },
+    {
+        "id": "wallpaper",
+        "custom": "wallpaper",
+        "title": {"tr": "Masaüstü arka planı", "en": "Desktop wallpaper"},
+        "subtitle": {
+            "tr": "Masaüstünüz için bir arka plan seçin",
+            "en": "Choose a background for your desktop",
         },
     },
     {
@@ -246,6 +258,42 @@ PAGES = [
         ],
     },
     {
+        "id": "magaza",
+        "title": {"tr": "CarotOS Mağaza", "en": "CarotOS Store"},
+        "subtitle": {
+            "tr": "Uygulamaları tek tıkla, terminale gerek kalmadan kurun",
+            "en": "Install applications with a single click, without the terminal",
+        },
+        "image": "magaza.png",
+        "body": [
+            ("p", {
+                "tr": "CarotOS Mağaza, seçilmiş uygulamaları apt üzerinden kuran "
+                      "grafik bir mağazadır. Kategorilere ayrılmış uygulamaları "
+                      "gezebilir, arama yapabilir ve her birini tek bir düğmeyle "
+                      "kurabilir ya da kaldırabilirsiniz.",
+                "en": "CarotOS Store is a graphical store that installs curated "
+                      "applications through apt. You can browse apps by category, "
+                      "search, and install or remove each one with a single button.",
+            }),
+            ("bullets", [
+                {"tr": "Grafik, Ofis, İnternet, Medya, Geliştirme, Sistem ve "
+                       "Güvenlik kategorileri bulunur.",
+                 "en": "Categories for Graphics, Office, Internet, Media, "
+                       "Development, System and Security."},
+                {"tr": "Kurulum ve kaldırma, yönetici parolası sorularak güvenli "
+                       "biçimde yapılır.",
+                 "en": "Installing and removing is done securely, prompting for "
+                       "the administrator password."},
+                {"tr": "Kurulu uygulamalar bir rozetle işaretlenir; depo listesi "
+                       "tek düğmeyle yenilenir.",
+                 "en": "Installed apps are marked with a badge; the repository "
+                       "list refreshes with a single button."},
+                {"tr": "Arayüz, sistemin diline ve temasına uyum sağlar.",
+                 "en": "The interface follows the system language and theme."},
+            ]),
+        ],
+    },
+    {
         "id": "panel",
         "title": {"tr": "CarotOS Güvenlik Paneli", "en": "CarotOS Security Panel"},
         "subtitle": {
@@ -317,6 +365,40 @@ PAGES = [
                       "systems you have permission to test. Unauthorised scanning "
                       "is a criminal offence in many countries.",
             }),
+        ],
+    },
+    {
+        "id": "usb",
+        "title": {"tr": "CarotOS USB Denetimi", "en": "CarotOS USB Check"},
+        "subtitle": {
+            "tr": "Takılan USB belleklerini otomatik güvenlik taraması",
+            "en": "Automatic security scan of inserted USB drives",
+        },
+        "image": "usb.png",
+        "body": [
+            ("p", {
+                "tr": "CarotOS USB Denetimi, bir USB bellek takıldığında arka "
+                      "planda çalışır ve belleği şüpheli dosyalara karşı tarar. "
+                      "Dosyaların içeriğini okumaz; yalnızca ad, uzantı ve biçim "
+                      "gibi ipuçlarına bakarak USB solucanı belirtilerini tespit "
+                      "eder.",
+                "en": "CarotOS USB Check runs in the background when a USB drive "
+                      "is inserted and scans it for suspicious files. It does not "
+                      "read file contents; it detects signs of USB worms using "
+                      "only clues such as names, extensions and format.",
+            }),
+            ("bullets", [
+                {"tr": "Otomatik çalıştırma dosyaları, çift uzantılar ve sahte "
+                       "kısayollar gibi bilinen bulaşma yöntemlerini yakalar.",
+                 "en": "Catches known infection methods such as autorun files, "
+                       "double extensions and fake shortcuts."},
+                {"tr": "Bulgular düşük, orta ve yüksek olarak derecelendirilir; "
+                       "her biri sade bir dille açıklanır.",
+                 "en": "Findings are rated low, medium and high, each explained "
+                       "in plain language."},
+                {"tr": "Tarama tamamen yereldir; hiçbir veri dışarı gönderilmez.",
+                 "en": "The scan is entirely local; no data is sent anywhere."},
+            ]),
         ],
     },
     {
@@ -403,12 +485,6 @@ PAGES = [
                  {"tr": "Ağ taramanın kaynak kitabı, ücretsiz okunabilir.",
                   "en": "The reference book on network scanning, free to read."}),
             ]),
-            ("pairs", [
-                ("man komut", {"tr": "Her komutun kendi kılavuzu sistemde kuruludur. "
-                                     "Çıkmak için q tuşuna basın.",
-                               "en": "Every command ships its own manual on the "
-                                     "system. Press q to exit."}),
-            ]),
             ("p", {
                 "tr": "CarotOS açık kaynaklıdır. Hata bildirebilir, öneride "
                       "bulunabilir veya katkı verebilirsiniz.",
@@ -430,7 +506,8 @@ PAGES = [
 # Ayarlar
 # ---------------------------------------------------------------------------
 
-DEFAULTS = {"lang": "tr", "theme": "dark", "show_on_startup": True}
+DEFAULTS = {"lang": "tr", "theme": "dark", "show_on_startup": True,
+            "wallpaper": ""}
 
 # Sihirbaz ust bandindaki secicilerin yaninda gosterilen aciklama
 PICK_TEXTS = {
@@ -444,6 +521,19 @@ PICK_TEXTS = {
         "en": "Your choices are applied when you press “Finish” at the end of "
               "this tour. A language change takes effect after you log out and "
               "back in.",
+    },
+    "wp_heading": {"tr": "Arka planlar", "en": "Wallpapers"},
+    "wp_none": {
+        "tr": "Henüz arka plan bulunamadı. Arka plan dosyaları sisteme "
+              "eklendiğinde burada görünür.",
+        "en": "No wallpapers found yet. They appear here once wallpaper files "
+              "are added to the system.",
+    },
+    "wp_note": {
+        "tr": "Seçtiğiniz arka plan, “Bitir” düğmesine bastığınızda masaüstüne "
+              "uygulanır.",
+        "en": "The wallpaper you pick is applied to the desktop when you press "
+              "“Finish”.",
     },
 }
 
@@ -502,11 +592,83 @@ SIBLING_CONFIGS = [
 ]
 
 # Koyu ve acik tema adaylari — sistemde bulunan ilki kullanilir.
-DARK_THEMES = ["Adwaita-dark", "Greybird-dark", "Materia-dark",
-               "Arc-Dark", "Numix-Dark", "Adwaita"]
-LIGHT_THEMES = ["Adwaita", "Greybird", "Arc", "Default"]
+DARK_THEMES = ["Arc-Dark", "Materia-dark", "Greybird-dark",
+               "Adwaita-dark", "Numix-Dark", "Adwaita"]
+LIGHT_THEMES = ["Arc", "Materia", "Greybird", "Adwaita", "Default"]
+
+# Simge temasi adaylari (CarotOS 1.2: Papirus). Sistemde bulunan ilki kullanilir.
+DARK_ICON_THEMES = ["Papirus-Dark", "Papirus", "gnome"]
+LIGHT_ICON_THEMES = ["Papirus-Light", "Papirus", "gnome"]
+
+# Fare imleci: koyu temada acik (Breeze_Snow), acik temada koyu imlec.
+DARK_CURSOR_THEMES = ["Breeze_Light", "Breeze_Snow", "DMZ-White", "Adwaita"]
+LIGHT_CURSOR_THEMES = ["breeze_cursors", "DMZ-Black", "Adwaita"]
 
 LOCALE_FOR_LANG = {"tr": "tr_TR.UTF-8", "en": "en_US.UTF-8"}
+
+# Duvar kagitlarinin arandigi dizinler (ilk dolu olan kullanilir).
+# CAROTOS_WP_DIR ile test/ozel dizin one alinabilir.
+WALLPAPER_DIRS = [
+    os.environ.get("CAROTOS_WP_DIR", ""),
+    "/usr/share/backgrounds/carotos",
+]
+# Varsayilan olarak secili gelecek dosyanin adi (uzantisiz on ek olarak eslenir).
+DEFAULT_WALLPAPER = "carotosbackgroundwallpaper1"
+WALLPAPER_EXTS = (".png", ".jpg", ".jpeg", ".webp", ".bmp")
+# Masaustu listesine YALNIZCA bu on ekle baslayan dosyalar girer. Boylece
+# klasorde baska gorseller (lightdm, splash, ekran goruntuleri) olsa bile
+# listede sadece masaustu duvar kagitlari gorunur.
+WALLPAPER_PREFIX = "carotosbackgroundwallpaper"
+
+
+def list_wallpapers():
+    """(ad, tam_yol) listesi dondurur. Yalnizca 'carotosbackgroundwallpaper*'
+    adli masaustu duvar kagitlari; varsayilan olan basa alinir."""
+    bulunan = {}
+    for d in WALLPAPER_DIRS:
+        if d and os.path.isdir(d):
+            for ad in os.listdir(d):
+                low = ad.lower()
+                if low.startswith(WALLPAPER_PREFIX) and low.endswith(WALLPAPER_EXTS):
+                    bulunan.setdefault(ad, os.path.join(d, ad))
+            if bulunan:
+                break
+    ogeler = list(bulunan.items())
+    ogeler.sort(key=lambda kv: (
+        not kv[0].lower().startswith(DEFAULT_WALLPAPER), kv[0].lower()))
+    return ogeler
+
+
+def apply_wallpaper(path):
+    """Secili arka plani tum monitor/workspace'lere uygular (Xfce).
+
+    Kullanici duzeyinde calisir, root gerektirmez. Xfce disinda ya da
+    xfconf yoksa sessizce gecer."""
+    if not path or not os.path.isfile(path) or not shutil.which("xfconf-query"):
+        return False
+    props = []
+    try:
+        r = subprocess.run(["xfconf-query", "-c", "xfce4-desktop", "-l"],
+                           capture_output=True, text=True, timeout=8)
+        props = [ln.strip() for ln in r.stdout.splitlines()
+                 if ln.strip().endswith("/last-image")]
+    except (OSError, subprocess.SubprocessError):
+        props = []
+    if not props:
+        props = ["/backdrop/screen0/monitor0/workspace0/last-image"]
+    ok = False
+    for p in props:
+        if xfconf("xfce4-desktop", p, path):
+            ok = True
+        # Goruntu stili: 5 = ekrana yayilmis (zoomed). Varsa guncellenir.
+        xfconf("xfce4-desktop", p.rsplit("/", 1)[0] + "/image-style", "5")
+    try:
+        subprocess.run(["xfdesktop", "--reload"],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                       timeout=8)
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return ok
 
 
 def available_theme(candidates):
@@ -516,6 +678,30 @@ def available_theme(candidates):
     for name in candidates:
         for root in roots:
             if os.path.isdir(os.path.join(root, name)):
+                return name
+    return None
+
+
+def available_icon_theme(candidates):
+    """Sistemde kurulu ilk simge temasini dondurur."""
+    roots = ["/usr/share/icons",
+             os.path.join(GLib.get_home_dir(), ".icons"),
+             os.path.join(GLib.get_user_data_dir(), "icons")]
+    for name in candidates:
+        for root in roots:
+            if os.path.isfile(os.path.join(root, name, "index.theme")):
+                return name
+    return None
+
+
+def available_cursor_theme(candidates):
+    """Sistemde kurulu ilk imlec temasini dondurur (cursors/ klasoru olan)."""
+    roots = ["/usr/share/icons",
+             os.path.join(GLib.get_home_dir(), ".icons"),
+             os.path.join(GLib.get_user_data_dir(), "icons")]
+    for name in candidates:
+        for root in roots:
+            if os.path.isdir(os.path.join(root, name, "cursors")):
                 return name
     return None
 
@@ -553,6 +739,18 @@ def apply_desktop_theme(theme):
     if not name:
         return False
     ok = xfconf("xsettings", "/Net/ThemeName", name)
+
+    # Simge temasi: kosea gore Papirus-Dark / Papirus-Light (varsa).
+    icons = available_icon_theme(
+        DARK_ICON_THEMES if theme == "dark" else LIGHT_ICON_THEMES)
+    if icons:
+        xfconf("xsettings", "/Net/IconThemeName", icons)
+
+    # Imlec temasi: tema ile uyumlu acik/koyu imlec (varsa).
+    cursor = available_cursor_theme(
+        DARK_CURSOR_THEMES if theme == "dark" else LIGHT_CURSOR_THEMES)
+    if cursor:
+        xfconf("xsettings", "/Gtk/CursorThemeName", cursor)
 
     # Pencere temasi ayri bir bilesendir; yalnizca varsa degistirilir.
     if has_xfwm_variant(name):
@@ -719,6 +917,8 @@ class WelcomeWindow(Gtk.Window):
         self.settings = settings
         self.lang = settings["lang"]
         self.theme = settings["theme"]
+        self.wallpaper = settings.get("wallpaper", "") or ""
+        self.wp_cards = {}
         self.index = 0
 
         self.set_default_size(940, 660)
@@ -831,6 +1031,8 @@ class WelcomeWindow(Gtk.Window):
     def build_page(self, page):
         if page.get("custom") == "appearance":
             return self.build_appearance_page(page)
+        if page.get("custom") == "wallpaper":
+            return self.build_wallpaper_page(page)
         return self.build_standard_page(page)
 
     # -- gorunum ve dil sayfasi --------------------------------------------
@@ -1035,6 +1237,142 @@ class WelcomeWindow(Gtk.Window):
         self.rebuild()
         return True
 
+    # -- masaustu arka plani sayfasi ---------------------------------------
+
+    def build_wallpaper_page(self, page):
+        """Kurulu duvar kagitlarini kucuk onizlemelerle listeler. Secim
+        ANINDA uygulanmaz; sihirbazin sonundaki 'Bitir' dugmesinde uygulanir."""
+        scroller = Gtk.ScrolledWindow()
+        scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scroller.set_shadow_type(Gtk.ShadowType.NONE)
+
+        centerer = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        centerer.set_halign(Gtk.Align.CENTER)
+        scroller.add(centerer)
+
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        outer.set_border_width(32)
+        outer.set_size_request(718, -1)
+        centerer.pack_start(outer, False, False, 0)
+
+        title = Gtk.Label(label=page["title"][self.lang])
+        title.get_style_context().add_class("page-title")
+        title.set_justify(Gtk.Justification.CENTER)
+        title.set_line_wrap(True)
+        outer.pack_start(title, False, False, 0)
+
+        rule = Gtk.Box()
+        rule.get_style_context().add_class("title-rule")
+        rule.set_size_request(54, 3)
+        rule.set_halign(Gtk.Align.CENTER)
+        rule.set_margin_top(11)
+        outer.pack_start(rule, False, False, 0)
+
+        subtitle = Gtk.Label(label=page["subtitle"][self.lang])
+        subtitle.get_style_context().add_class("page-subtitle")
+        subtitle.set_justify(Gtk.Justification.CENTER)
+        subtitle.set_line_wrap(True)
+        subtitle.set_margin_top(13)
+        outer.pack_start(subtitle, False, False, 0)
+
+        wallpapers = list_wallpapers()
+
+        # Varsayilan secim: kayitli secim yoksa DEFAULT_WALLPAPER, o da yoksa
+        # listedeki ilk arka plan.
+        if not self.wallpaper or not os.path.isfile(self.wallpaper):
+            if wallpapers:
+                varsayilan = next(
+                    (p for ad, p in wallpapers
+                     if ad.lower().startswith(DEFAULT_WALLPAPER)),
+                    wallpapers[0][1])
+                self.wallpaper = varsayilan
+
+        self.wp_cards = {}
+
+        if not wallpapers:
+            bos = Gtk.Label(label=UI["wp_none"][self.lang])
+            bos.get_style_context().add_class("page-subtitle")
+            bos.set_line_wrap(True)
+            bos.set_justify(Gtk.Justification.CENTER)
+            bos.set_margin_top(40)
+            outer.pack_start(bos, False, False, 0)
+            return scroller
+
+        grid = Gtk.Grid()
+        grid.set_column_spacing(16)
+        grid.set_row_spacing(16)
+        grid.set_column_homogeneous(True)
+        grid.set_halign(Gtk.Align.CENTER)
+        grid.set_margin_top(26)
+        outer.pack_start(grid, False, False, 0)
+
+        for i, (ad, path) in enumerate(wallpapers):
+            card = self._wallpaper_card(ad, path)
+            self.wp_cards[path] = card
+            grid.attach(card["event"], i % 3, i // 3, 1, 1)
+
+        note = Gtk.Label(label=UI["wp_note"][self.lang], xalign=0.0)
+        note.get_style_context().add_class("body-text")
+        note.set_line_wrap(True)
+        note.set_justify(Gtk.Justification.CENTER)
+        note.set_halign(Gtk.Align.CENTER)
+        inner = Gtk.Box()
+        inner.set_margin_top(14); inner.set_margin_bottom(14)
+        inner.set_margin_start(20); inner.set_margin_end(20)
+        inner.pack_start(note, True, True, 0)
+        note_box = Gtk.Box()
+        note_box.get_style_context().add_class("note-box")
+        note_box.set_margin_top(28)
+        note_box.set_halign(Gtk.Align.CENTER)
+        note_box.set_size_request(self.CARD_WIDTH, -1)
+        note_box.pack_start(inner, True, True, 0)
+        outer.pack_start(note_box, False, False, 0)
+
+        self._sync_wallpaper_selection()
+        return scroller
+
+    def _wallpaper_card(self, name, path):
+        event = Gtk.EventBox()
+        event.connect("button-press-event", self._on_wallpaper_pick, path)
+
+        frame = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        frame.get_style_context().add_class("pick-card")
+        # Ic bosluk: onizleme gorseli kartin yuvarlak kenarina yapismasin,
+        # kosesinden tasmasin.
+        frame.set_border_width(10)
+        event.add(frame)
+
+        try:
+            pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(path, 188, 106, False)
+            img = Gtk.Image.new_from_pixbuf(pb)
+        except GLib.Error:
+            img = Gtk.Image.new_from_icon_name("image-x-generic",
+                                               Gtk.IconSize.DIALOG)
+            img.set_pixel_size(88)
+        img.get_style_context().add_class("wp-thumb")
+        img.set_halign(Gtk.Align.CENTER)
+        img.set_valign(Gtk.Align.CENTER)
+        frame.pack_start(img, False, False, 0)
+
+        return {"event": event, "frame": frame}
+
+    def _sync_wallpaper_selection(self):
+        for path, card in getattr(self, "wp_cards", {}).items():
+            ctx = card["frame"].get_style_context()
+            if path == self.wallpaper:
+                ctx.add_class("pick-selected")
+            else:
+                ctx.remove_class("pick-selected")
+
+    def _on_wallpaper_pick(self, _widget, _event, path):
+        if path == self.wallpaper:
+            return True
+        self.wallpaper = path
+        self.settings["wallpaper"] = path
+        save_settings(self.settings)
+        self._sync_wallpaper_selection()
+        return True
+
     def build_standard_page(self, page):
         scroller = Gtk.ScrolledWindow()
         scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
@@ -1087,6 +1425,8 @@ class WelcomeWindow(Gtk.Window):
         outer.pack_start(subtitle, False, False, 0)
 
         # --- govde ---
+        # Metin kartlari, baslik hizasindan biraz iceride dursun diye govdeye
+        # yan bosluk verilir (adalarin sag/sol gap'i).
         body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
         body.set_margin_top(24)
         outer.pack_start(body, False, False, 0)
@@ -1101,12 +1441,19 @@ class WelcomeWindow(Gtk.Window):
 
         return scroller
 
-    @staticmethod
-    def card(child, style="card"):
-        """Icerigi hafif acik zeminli bir kutuya yerlestirir."""
+    # Metin kartlarinin sabit genisligi. Sutundan dar olmasi, kartlarin iki
+    # yaninda belirgin bir bosluk (ada gap'i) birakir.
+    CARD_WIDTH = 600
+
+    @classmethod
+    def card(cls, child, style="card"):
+        """Icerigi hafif acik zeminli, sabit genislikte ortalanmis bir kutuya
+        yerlestirir (iki yaninda bosluk kalir)."""
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         box.get_style_context().add_class(style)
         box.set_border_width(20)
+        box.set_halign(Gtk.Align.CENTER)
+        box.set_size_request(cls.CARD_WIDTH, -1)
         box.pack_start(child, True, True, 0)
         return box
 
@@ -1129,7 +1476,7 @@ class WelcomeWindow(Gtk.Window):
         if kind == "p":
             label = Gtk.Label(label=payload[self.lang], xalign=0.0)
             label.set_line_wrap(True)
-            label.set_max_width_chars(70)
+            label.set_max_width_chars(58)
             label.get_style_context().add_class("body-text")
             return self.card(label)
 
@@ -1141,12 +1488,14 @@ class WelcomeWindow(Gtk.Window):
             inner.pack_start(mark, False, False, 0)
             label = Gtk.Label(label=payload[self.lang], xalign=0.0)
             label.set_line_wrap(True)
-            label.set_max_width_chars(66)
+            label.set_max_width_chars(54)
             label.get_style_context().add_class("note-text")
             inner.pack_start(label, True, True, 0)
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
             box.get_style_context().add_class("note-box")
             box.set_border_width(16)
+            box.set_halign(Gtk.Align.CENTER)
+            box.set_size_request(self.CARD_WIDTH, -1)
             box.pack_start(inner, True, True, 0)
             return box
 
@@ -1157,6 +1506,8 @@ class WelcomeWindow(Gtk.Window):
             box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
             box.get_style_context().add_class("code-box")
             box.set_border_width(11)
+            box.set_halign(Gtk.Align.CENTER)
+            box.set_size_request(self.CARD_WIDTH, -1)
             box.pack_start(label, True, True, 0)
             return box
 
@@ -1170,7 +1521,7 @@ class WelcomeWindow(Gtk.Window):
                 row.pack_start(marker, False, False, 0)
                 text = Gtk.Label(label=item[self.lang], xalign=0.0)
                 text.set_line_wrap(True)
-                text.set_max_width_chars(66)
+                text.set_max_width_chars(54)
                 text.get_style_context().add_class("body-text")
                 row.pack_start(text, True, True, 0)
                 inner.pack_start(row, False, False, 0)
@@ -1194,7 +1545,7 @@ class WelcomeWindow(Gtk.Window):
 
                 value_label = Gtk.Label(label=value[self.lang], xalign=0.0)
                 value_label.set_line_wrap(True)
-                value_label.set_max_width_chars(54)
+                value_label.set_max_width_chars(46)
                 value_label.get_style_context().add_class("body-text")
                 row.pack_start(value_label, True, True, 0)
                 inner.pack_start(row, False, False, 0)
@@ -1223,7 +1574,7 @@ class WelcomeWindow(Gtk.Window):
 
                 value_label = Gtk.Label(label=value[self.lang], xalign=0.0)
                 value_label.set_line_wrap(True)
-                value_label.set_max_width_chars(54)
+                value_label.set_max_width_chars(46)
                 value_label.get_style_context().add_class("body-text")
                 row.pack_start(value_label, True, True, 0)
                 inner.pack_start(row, False, False, 0)
@@ -1235,6 +1586,8 @@ class WelcomeWindow(Gtk.Window):
             grid.set_column_spacing(12)
             grid.set_row_spacing(12)
             grid.set_column_homogeneous(True)
+            grid.set_halign(Gtk.Align.CENTER)
+            grid.set_size_request(self.CARD_WIDTH, -1)
             for i, (key, value) in enumerate(payload):
                 cell = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
                 cell.get_style_context().add_class("tile")
@@ -1324,6 +1677,7 @@ class WelcomeWindow(Gtk.Window):
         apply_desktop_theme(self.theme)
         apply_sibling_settings(self.lang, self.theme)
         apply_session_language(self.lang)
+        apply_wallpaper(self.wallpaper)
 
     def on_back(self, _button):
         if self.index > 0:
@@ -1453,6 +1807,7 @@ class WelcomeWindow(Gtk.Window):
         .pick-title {{ font-size: 108%; font-weight: bold; }}
         .pick-sub {{ color: {sub}; font-size: 85%; }}
         .section-title {{ font-size: 106%; font-weight: bold; }}
+        .wp-thumb {{ border-radius: 5px; }}
 
         .preview-light {{
             background-color: #f4f5f6; border: 1px solid #d4d9db;

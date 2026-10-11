@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=CarotOS USB Check (Monitor)
+Name[tr]=CarotOS USB Denetimi (İzleme)
+Comment=Watch removable devices in the background and warn about suspicious files
+Comment[tr]=Çıkarılabilir aygıtları arka planda izler ve şüpheli dosyalara karşı uyarır
+Exec=/opt/carotos/usb/carotos-usb-check.py --monitor
+Icon=drive-removable-media
+Terminal=false
+Categories=System;Security;
+Keywords=usb;scan;check;security;malware;monitor;
+Keywords[tr]=usb;tarama;denetim;güvenlik;zararlı;izleme;
+X-GNOME-Autostart-enabled=true
+X-XFCE-Autostart-enabled=true

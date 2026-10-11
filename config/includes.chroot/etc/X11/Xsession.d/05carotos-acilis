@@ -1,0 +1,7 @@
+# CarotOS: oturum acilisinda siyah ekran yerine animasyonlu perde.
+# LightDM girisinden hemen sonra, masaustu bilesenlerinden once baslar;
+# panel ve masaustu hazir olunca kendini kapatir. Devre disi birakmak icin
+# CAROTOS_ACILIS_KAPALI=1 tanimlanabilir.
+if [ -x /usr/local/bin/carotos-oturum-acilis ] && [ -z "$CAROTOS_ACILIS_KAPALI" ]; then
+    /usr/local/bin/carotos-oturum-acilis >/dev/null 2>&1 &
+fi

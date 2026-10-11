@@ -21,7 +21,7 @@
 # BIR KEZ calisir. Damga dosyasi birakir, boylece kullanici duvar kagidini
 # sonradan degistirirse bir daha ustune yazilmaz.
 
-WALL=/usr/share/backgrounds/carotos/carotbackground.png
+WALL=/usr/share/backgrounds/carotos/carotosbackgroundwallpaper1.png
 CFG="${XDG_CONFIG_HOME:-$HOME/.config}"
 STAMP="$CFG/carotos/wallpaper.done"
 

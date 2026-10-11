@@ -28,6 +28,7 @@ MAX_FILES = 60000
 MAX_SECONDS = 8.0
 MAX_DEPTH = 6
 COOLDOWN_SECONDS = 15
+MONITOR_POLL_SECONDS = 1   # baglama tablosu bu araliklarla yoklanir
 
 # Bulgu onem dereceleri
 HIGH = "high"
@@ -900,6 +901,13 @@ def _tanimla_result_window(Gtk, Gdk):
         def _destroyed(self, _widget):
             if self.cancel is not None:
                 self.cancel.set()
+            # Pencereye ozel CSS saglayicisini ekrandan kaldir; izleme modunda
+            # her takista yeni pencere acildigi icin saglayicilar birikmesin.
+            try:
+                Gtk.StyleContext.remove_provider_for_screen(
+                    Gdk.Screen.get_default(), self.provider)
+            except Exception:  # noqa: BLE001
+                pass
             if self.on_destroy_cb:
                 self.on_destroy_cb(self)
 
@@ -1142,69 +1150,40 @@ class Monitor:
         self.windows = {}        # mount -> ResultWindow
         self.notifications = []  # cop toplayiciya karsi tutulur
         self.pending = None      # debounce zamanlayici kimligi
-        self.fd = None
         self.snapshot = set()    # bagli aygitlarin son goruntusu
 
     # -- baslatma ---------------------------------------------------------
 
     def start(self):
-        """Iki mekanizma birlikte kullanilir.
+        """Bagli aygit degisikliklerini DUZENLI YOKLAMA ile izler.
 
-        1) /proc/mounts uzerinde olay izleme — anlik tepki verir.
-           DIKKAT: Linux'ta bu dosya, baglama tablosu degistiginde POLLERR
-           sinyali gonderir. Bu bir HATA DEGIL, degisiklik haberidir. Ayrica
-           sinyalin tekrar gelmesi icin dosyanin yeniden okunmasi gerekir.
-        2) Duzenli kontrol — olay izleme cekirdek surumune gore
-           calismayabildigi icin yedek olarak her saniye bakilir.
-           Maliyeti ihmal edilebilir (kucuk bir dosya okumasi).
+        Eski surum /proc/mounts'u GLib.IOChannel ile olay-tabanli izliyordu;
+        bu desen bazi cekirdek/PyGObject surumlerinde ya hic tetiklenmez ya da
+        POLLERR yuzunden bosa dongu yapip islemciyi mesgul eder — kararsizligin
+        ana nedeni buydu. Kucuk bir dosyayi saniyede bir okumanin maliyeti
+        ihmal edilebilir ve bu yontem her cekirdekte guvenilir calisir.
         """
-        try:
-            self.fd = os.open("/proc/mounts", os.O_RDONLY)
-        except OSError as exc:
-            print(f"/proc/mounts okunamadi: {exc}", file=sys.stderr)
-            self.fd = None
-        else:
-            self._drain()
-            channel = GLib.IOChannel.unix_new(self.fd)
-            channel.set_encoding(None)
-            channel.set_buffered(False)
-            GLib.io_add_watch(
-                channel, GLib.PRIORITY_DEFAULT,
-                GLib.IOCondition.PRI | GLib.IOCondition.ERR |
-                GLib.IOCondition.HUP,
-                self._on_change)
-
         self.snapshot = self._snapshot()
-        GLib.timeout_add_seconds(1, self._poll)
+        GLib.timeout_add_seconds(MONITOR_POLL_SECONDS, self._poll)
         return True
-
-    def _drain(self):
-        """Bildirimin tekrar tetiklenebilmesi icin dosyayi bastan okur."""
-        if self.fd is None:
-            return
-        try:
-            os.lseek(self.fd, 0, os.SEEK_SET)
-            while os.read(self.fd, 65536):
-                pass
-        except OSError:
-            pass
 
     def _snapshot(self):
-        return {(e["device"], e["mount"]) for e in mount_entries()}
-
-    def _on_change(self, _channel, _condition):
-        # POLLERR burada bir hata degil, degisiklik haberidir.
-        self._drain()
-        self._schedule()
-        return True
+        try:
+            return {(e["device"], e["mount"]) for e in mount_entries()}
+        except Exception:  # noqa: BLE001 -- gecici okuma hatasi izleyiciyi dusurmesin
+            return self.snapshot
 
     def _poll(self):
-        """Olay izleme calismazsa devreye giren yedek yol."""
-        current = self._snapshot()
-        if current != self.snapshot:
-            self.snapshot = current
-            self._schedule()
-        return True
+        """Baglama tablosu degistiyse degerlendirmeyi tetikler. Tek bir hata
+        bile izleyiciyi durdurmasin diye bastan sona korumali."""
+        try:
+            current = self._snapshot()
+            if current != self.snapshot:
+                self.snapshot = current
+                self._schedule()
+        except Exception as exc:  # noqa: BLE001
+            print(f"[usb-check] izleme hatasi: {exc}", file=sys.stderr)
+        return True  # yoklama surekli devam etsin
 
     def _schedule(self):
         # Bir baglama islemi birden cok olay uretebilir; son olaydan
@@ -1215,20 +1194,23 @@ class Monitor:
 
     def _settled(self):
         self.pending = None
-        self.snapshot = self._snapshot()
-        current = removable_mounts()
-        points = {e["mount"] for e in current}
+        try:
+            self.snapshot = self._snapshot()
+            current = removable_mounts()
+            points = {e["mount"] for e in current}
 
-        # Cikarilan aygitlarin penceresi kapanmaz ama kaydi temizlenir
-        for mount in list(self.windows):
-            if mount not in points:
-                self.windows.pop(mount, None)
+            # Cikarilan aygitlarin penceresi kapanmaz ama kaydi temizlenir
+            for mount in list(self.windows):
+                if mount not in points:
+                    self.windows.pop(mount, None)
 
-        for entry in current:
-            if entry["mount"] not in self.known:
-                self._handle(entry)
+            for entry in current:
+                if entry["mount"] not in self.known:
+                    self._handle(entry)
 
-        self.known = points
+            self.known = points
+        except Exception as exc:  # noqa: BLE001 -- degerlendirme izleyiciyi dusurmesin
+            print(f"[usb-check] degerlendirme hatasi: {exc}", file=sys.stderr)
         return False
 
     # -- tarama -----------------------------------------------------------
@@ -1239,13 +1221,19 @@ class Monitor:
         if now - self.recent.get(uuid, 0) < COOLDOWN_SECONDS:
             return
         self.recent[uuid] = now
+        # Uzun calismada sinirsiz buyumesin: cok eski kayitlari at.
+        cutoff = now - COOLDOWN_SECONDS * 40
+        self.recent = {k: v for k, v in self.recent.items() if v > cutoff}
 
         mount = entry["mount"]
 
         # Tarama ayri is parcaciginda; masaustu donmasin.
         def worker():
-            result = enrich(scan_path(mount), mount)
-            GLib.idle_add(self._scan_done, result)
+            try:
+                result = enrich(scan_path(mount), mount)
+                GLib.idle_add(self._scan_done, result)
+            except Exception as exc:  # noqa: BLE001 -- tarama hatasi izleyiciyi dusurmesin
+                print(f"[usb-check] tarama hatasi ({mount}): {exc}", file=sys.stderr)
 
         threading.Thread(target=worker, daemon=True).start()
 
