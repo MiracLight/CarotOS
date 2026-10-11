@@ -1,0 +1,827 @@
+{
+  "surum": "1.0",
+  "kategoriler": [
+    {
+      "id": "grafik",
+      "ad": {
+        "tr": "Grafik ve Tasarım",
+        "en": "Graphics & Design"
+      }
+    },
+    {
+      "id": "guvenlik",
+      "ad": {
+        "tr": "Güvenlik",
+        "en": "Security"
+      }
+    },
+    {
+      "id": "ofis",
+      "ad": {
+        "tr": "Ofis",
+        "en": "Office"
+      }
+    },
+    {
+      "id": "internet",
+      "ad": {
+        "tr": "İnternet",
+        "en": "Internet"
+      }
+    },
+    {
+      "id": "medya",
+      "ad": {
+        "tr": "Medya",
+        "en": "Media"
+      }
+    },
+    {
+      "id": "gelistirme",
+      "ad": {
+        "tr": "Geliştirme",
+        "en": "Development"
+      }
+    },
+    {
+      "id": "sistem",
+      "ad": {
+        "tr": "Sistem",
+        "en": "System"
+      }
+    }
+  ],
+  "uygulamalar": [
+    {
+      "paket": "gimp",
+      "ad": "GIMP",
+      "kategori": "grafik",
+      "ikon": "gimp",
+      "ozet": {
+        "tr": "Katman, maske ve geniş filtre desteğiyle profesyonel fotoğraf düzenleme ve dijital görüntü işleme uygulaması.",
+        "en": "Professional photo editing and digital imaging, with layers, masks and extensive filters."
+      },
+      "aciklama": {
+        "tr": "Katmanlar, maskeler, filtreler ve geniş araç setiyle fotoğraf rötuşlama ve dijital resim.",
+        "en": "Photo retouching and digital painting with layers, masks, filters and a wide toolset."
+      },
+      "boyut": "~110 MB"
+    },
+    {
+      "paket": "inkscape",
+      "ad": "Inkscape",
+      "kategori": "grafik",
+      "ikon": "inkscape",
+      "ozet": {
+        "tr": "Logo, simge ve illüstrasyon tasarımı için ölçeklenebilir vektör (SVG) çizim uygulaması.",
+        "en": "Scalable vector (SVG) drawing application for logos, icons and illustrations."
+      },
+      "aciklama": {
+        "tr": "Logo, ikon ve illüstrasyon için ölçeklenebilir vektör grafikleri.",
+        "en": "Scalable vector graphics for logos, icons and illustrations."
+      },
+      "boyut": "~90 MB"
+    },
+    {
+      "paket": "krita",
+      "ad": "Krita",
+      "kategori": "grafik",
+      "ikon": "krita",
+      "ozet": {
+        "tr": "Dijital ressamlar için gelişmiş fırça motorları ve animasyon araçları sunan boyama uygulaması.",
+        "en": "Painting application with advanced brush engines and animation tools for digital artists."
+      },
+      "aciklama": {
+        "tr": "Fırça motorları, animasyon ve konsept sanat araçlarıyla dijital resim.",
+        "en": "Digital painting with brush engines, animation and concept-art tools."
+      },
+      "boyut": "~230 MB"
+    },
+    {
+      "paket": "blender",
+      "ad": "Blender",
+      "kategori": "grafik",
+      "ikon": "blender",
+      "ozet": {
+        "tr": "Modelleme, heykel, animasyon, simülasyon ve video kurgusunu bir arada sunan 3B üretim paketi.",
+        "en": "3D production suite covering modeling, sculpting, animation, simulation and video editing."
+      },
+      "aciklama": {
+        "tr": "Modelleme, heykel, animasyon, simülasyon ve video kurgu için eksiksiz 3B paketi.",
+        "en": "Complete 3D suite for modeling, sculpting, animation, simulation and video editing."
+      },
+      "boyut": "~250 MB"
+    },
+    {
+      "paket": "librecad",
+      "ad": "LibreCAD",
+      "kategori": "grafik",
+      "ikon": "librecad",
+      "ozet": {
+        "tr": "Mimari ve mühendislik çizimleri için DXF tabanlı 2B bilgisayar destekli tasarım (CAD) uygulaması.",
+        "en": "DXF-based 2D computer-aided design (CAD) for architecture and engineering drawings."
+      },
+      "aciklama": {
+        "tr": "Mimari ve mühendislik için DXF tabanlı 2B bilgisayar destekli tasarım.",
+        "en": "DXF-based 2D computer-aided design for architecture and engineering."
+      },
+      "boyut": "~45 MB"
+    },
+    {
+      "paket": "freecad",
+      "ad": "FreeCAD",
+      "kategori": "grafik",
+      "ikon": "freecad",
+      "ozet": {
+        "tr": "Mekanik parça ve ürün tasarımı için parametrik 3B modelleme uygulaması.",
+        "en": "Parametric 3D modeling application for mechanical parts and product design."
+      },
+      "aciklama": {
+        "tr": "Mekanik parça ve ürün tasarımı için parametrik 3B modelleme.",
+        "en": "Parametric 3D modeling for mechanical parts and product design."
+      },
+      "boyut": "~300 MB"
+    },
+    {
+      "paket": "darktable",
+      "ad": "darktable",
+      "kategori": "grafik",
+      "ikon": "darktable",
+      "ozet": {
+        "tr": "Fotoğrafçılar için tahribatsız RAW geliştirme ve ışık masası uygulaması.",
+        "en": "Non-destructive RAW development and light-table application for photographers."
+      },
+      "aciklama": {
+        "tr": "Fotoğrafçılar için tahribatsız RAW düzenleme ve ışık masası.",
+        "en": "Non-destructive RAW editing and light table for photographers."
+      },
+      "boyut": "~85 MB"
+    },
+    {
+      "paket": "gthumb",
+      "ad": "gThumb",
+      "kategori": "grafik",
+      "ikon": "gthumb",
+      "ozet": {
+        "tr": "Görüntüleme, temel düzenleme ve toplu işlemleri destekleyen hafif fotoğraf yöneticisi.",
+        "en": "Lightweight image viewer and organizer with basic editing and batch operations."
+      },
+      "aciklama": {
+        "tr": "Görüntüleme, temel düzenleme ve toplu işlemler için hafif galeri.",
+        "en": "Lightweight gallery for viewing, basic editing and batch operations."
+      },
+      "boyut": "~12 MB"
+    },
+    {
+      "paket": "ristretto",
+      "ad": "Ristretto",
+      "kategori": "grafik",
+      "ikon": "ristretto",
+      "ozet": {
+        "tr": "XFCE masaüstü için hızlı ve sade bir resim görüntüleyici.",
+        "en": "Fast, minimal image viewer for the XFCE desktop."
+      },
+      "aciklama": {
+        "tr": "Hızlı açılan, sade resim görüntüleyici — klasörleri gezmek için ideal.",
+        "en": "Fast, minimal image viewer — ideal for browsing folders."
+      },
+      "boyut": "~2 MB"
+    },
+    {
+      "paket": "shotwell",
+      "ad": "Shotwell",
+      "kategori": "grafik",
+      "ikon": "shotwell",
+      "ozet": {
+        "tr": "Fotoğrafları içe aktarma, etiketleme ve düzenleme için fotoğraf yöneticisi.",
+        "en": "Photo manager for importing, tagging and editing your pictures."
+      },
+      "aciklama": {
+        "tr": "Fotoğrafları içe aktarma, etiketleme ve basit düzenleme.",
+        "en": "Import, tag and lightly edit your photos."
+      },
+      "boyut": "~20 MB"
+    },
+    {
+      "paket": "wireshark",
+      "ad": "Wireshark",
+      "kategori": "guvenlik",
+      "ikon": "wireshark",
+      "ozet": {
+        "tr": "Ağ trafiğini paket düzeyinde yakalayıp çözümleyen ağ analiz uygulaması.",
+        "en": "Network analysis application that captures and inspects traffic at packet level."
+      },
+      "aciklama": {
+        "tr": "Canlı ağ trafiğini yakalayıp protokol düzeyinde inceleme. Eğitim ve teşhis için standart araç.",
+        "en": "Capture live network traffic and inspect it at protocol level. The standard tool for teaching and diagnosis."
+      },
+      "boyut": "~90 MB"
+    },
+    {
+      "paket": "nmap",
+      "ad": "Nmap",
+      "kategori": "guvenlik",
+      "ikon": "nmap",
+      "ozet": {
+        "tr": "Ağdaki cihazları, açık portları ve çalışan servisleri keşfeden tarama aracı.",
+        "en": "Scanning tool that discovers hosts, open ports and running services on a network."
+      },
+      "aciklama": {
+        "tr": "Ağdaki cihazları, açık portları ve servisleri keşfetmek için endüstri standardı tarayıcı.",
+        "en": "Industry-standard scanner for discovering hosts, open ports and services on a network."
+      },
+      "boyut": "~25 MB"
+    },
+    {
+      "paket": "aircrack-ng",
+      "ad": "Aircrack-ng",
+      "kategori": "guvenlik",
+      "ikon": "network-wireless",
+      "ozet": {
+        "tr": "Kablosuz ağ güvenliğini izleme ve test etme araç takımı.",
+        "en": "Toolkit for monitoring and testing the security of wireless networks."
+      },
+      "aciklama": {
+        "tr": "Wi-Fi güvenliğini izleme, test etme ve değerlendirme araçları.",
+        "en": "Tools to monitor, test and assess Wi-Fi security."
+      },
+      "boyut": "~8 MB"
+    },
+    {
+      "paket": "john",
+      "ad": "John the Ripper",
+      "kategori": "guvenlik",
+      "ikon": "dialog-password",
+      "ozet": {
+        "tr": "Parola karmalarının gücünü değerlendirmek için kullanılan parola denetim aracı.",
+        "en": "Password auditing tool used to assess the strength of password hashes."
+      },
+      "aciklama": {
+        "tr": "Parola karmalarının gücünü test etmek için kullanılan klasik denetim aracı.",
+        "en": "Classic auditing tool for testing the strength of password hashes."
+      },
+      "boyut": "~6 MB"
+    },
+    {
+      "paket": "hydra",
+      "ad": "Hydra",
+      "kategori": "guvenlik",
+      "ikon": "dialog-password",
+      "ozet": {
+        "tr": "Çok sayıda protokolde oturum açma güvenliğini test eden ağ denetim aracı.",
+        "en": "Network auditing tool that tests login security across many protocols."
+      },
+      "aciklama": {
+        "tr": "Birçok protokolde oturum açma güvenliğini test eden hızlı denetim aracı.",
+        "en": "Fast auditor for testing login security across many protocols."
+      },
+      "boyut": "~3 MB"
+    },
+    {
+      "paket": "hashcat",
+      "ad": "Hashcat",
+      "kategori": "guvenlik",
+      "ikon": "dialog-password",
+      "ozet": {
+        "tr": "GPU hızlandırmalı karma (hash) çözümleme ve parola politikası değerlendirme aracı.",
+        "en": "GPU-accelerated hash analysis tool for evaluating password policies."
+      },
+      "aciklama": {
+        "tr": "GPU hızlandırmalı karma analizi; parola politikalarını değerlendirmek için.",
+        "en": "GPU-accelerated hash analysis for evaluating password policies."
+      },
+      "boyut": "~7 MB"
+    },
+    {
+      "paket": "nikto",
+      "ad": "Nikto",
+      "kategori": "guvenlik",
+      "ikon": "applications-internet",
+      "ozet": {
+        "tr": "Web sunucularındaki bilinen zafiyet ve yanlış yapılandırmaları tarayan güvenlik aracı.",
+        "en": "Security tool that scans web servers for known vulnerabilities and misconfigurations."
+      },
+      "aciklama": {
+        "tr": "Web sunucularında bilinen zafiyet ve yanlış yapılandırmaları tarar.",
+        "en": "Scans web servers for known vulnerabilities and misconfigurations."
+      },
+      "boyut": "~2 MB"
+    },
+    {
+      "paket": "sqlmap",
+      "ad": "sqlmap",
+      "kategori": "guvenlik",
+      "ikon": "applications-internet",
+      "ozet": {
+        "tr": "Web uygulamalarındaki SQL enjeksiyon zafiyetlerini otomatik tespit eden test aracı.",
+        "en": "Testing tool that automatically detects SQL injection vulnerabilities in web applications."
+      },
+      "aciklama": {
+        "tr": "Web uygulamalarında SQL enjeksiyon zafiyetlerini otomatik tespit eder.",
+        "en": "Automatically detects SQL injection vulnerabilities in web applications."
+      },
+      "boyut": "~15 MB"
+    },
+    {
+      "paket": "tcpdump",
+      "ad": "tcpdump",
+      "kategori": "guvenlik",
+      "ikon": "utilities-terminal",
+      "ozet": {
+        "tr": "Komut satırından ağ trafiğini yakalayıp filtreleyen hafif paket çözümleyici.",
+        "en": "Lightweight command-line packet analyzer for capturing and filtering network traffic."
+      },
+      "aciklama": {
+        "tr": "Terminalden ağ trafiğini yakalayıp filtrelemek için hafif araç.",
+        "en": "Lightweight tool to capture and filter network traffic from the terminal."
+      },
+      "boyut": "~2 MB"
+    },
+    {
+      "paket": "clamav",
+      "ad": "ClamAV",
+      "kategori": "guvenlik",
+      "ikon": "security-high",
+      "ozet": {
+        "tr": "Dosya ve dizinleri zararlı yazılıma karşı tarayan açık kaynak antivirüs motoru.",
+        "en": "Open-source antivirus engine that scans files and directories for malware."
+      },
+      "aciklama": {
+        "tr": "Dosya ve dizinleri zararlı yazılıma karşı tarayan antivirüs motoru.",
+        "en": "Antivirus engine that scans files and directories for malware."
+      },
+      "boyut": "~30 MB"
+    },
+    {
+      "paket": "keepassxc",
+      "ad": "KeePassXC",
+      "kategori": "guvenlik",
+      "ikon": "keepassxc",
+      "ozet": {
+        "tr": "Parolaları yerel ve şifreli bir kasada saklayan çevrimdışı parola yöneticisi.",
+        "en": "Offline password manager that stores credentials in a local, encrypted vault."
+      },
+      "aciklama": {
+        "tr": "Parolaları yerel, şifreli bir kasada güvenle saklar.",
+        "en": "Stores passwords securely in a local, encrypted vault."
+      },
+      "boyut": "~40 MB"
+    },
+    {
+      "paket": "gufw",
+      "ad": "Firewall (gufw)",
+      "kategori": "guvenlik",
+      "ikon": "security-medium",
+      "ozet": {
+        "tr": "UFW güvenlik duvarını kolayca yapılandırmak için grafik arayüz.",
+        "en": "Graphical front-end for easily configuring the UFW firewall."
+      },
+      "aciklama": {
+        "tr": "UFW güvenlik duvarını kolayca yönetmek için grafik arayüz.",
+        "en": "Graphical front-end to easily manage the UFW firewall."
+      },
+      "boyut": "~3 MB"
+    },
+    {
+      "paket": "libreoffice",
+      "ad": "LibreOffice",
+      "kategori": "ofis",
+      "ikon": "libreoffice-startcenter",
+      "ozet": {
+        "tr": "Kelime işlemci, hesap tablosu ve sunum araçlarını içeren tam donanımlı ofis paketi.",
+        "en": "Full-featured office suite with word processor, spreadsheet and presentation tools."
+      },
+      "aciklama": {
+        "tr": "Writer, Calc, Impress ve daha fazlasını içeren ücretsiz ofis paketi; Microsoft Office biçimleriyle uyumlu.",
+        "en": "Free office suite with Writer, Calc, Impress and more; compatible with Microsoft Office formats."
+      },
+      "boyut": "~350 MB"
+    },
+    {
+      "paket": "evince",
+      "ad": {
+        "tr": "Belge Görüntüleyici",
+        "en": "Document Viewer"
+      },
+      "kategori": "ofis",
+      "ikon": "evince",
+      "ozet": {
+        "tr": "PDF ve diğer belge biçimlerini açmak için hafif belge görüntüleyici.",
+        "en": "Lightweight document viewer for PDF and other document formats."
+      },
+      "aciklama": {
+        "tr": "PDF, PostScript ve diğer belgeleri açmak için hafif görüntüleyici.",
+        "en": "Lightweight viewer for PDF, PostScript and other documents."
+      },
+      "boyut": "~8 MB"
+    },
+    {
+      "paket": "calibre",
+      "ad": "Calibre",
+      "kategori": "ofis",
+      "ikon": "calibre",
+      "ozet": {
+        "tr": "E-kitap kütüphanesini düzenleme, okuma ve biçimler arası dönüştürme uygulaması.",
+        "en": "Application for organizing, reading and converting your e-book library."
+      },
+      "aciklama": {
+        "tr": "E-kitap kütüphanesini düzenleme, okuma ve biçimler arası dönüştürme.",
+        "en": "Organize, read and convert your e-book library across formats."
+      },
+      "boyut": "~180 MB"
+    },
+    {
+      "paket": "gnucash",
+      "ad": "GnuCash",
+      "kategori": "ofis",
+      "ikon": "gnucash-icon",
+      "ozet": {
+        "tr": "Çift girişli defter mantığıyla kişisel ve küçük işletme muhasebesi uygulaması.",
+        "en": "Personal and small-business accounting with double-entry bookkeeping."
+      },
+      "aciklama": {
+        "tr": "Çift girişli defter mantığıyla gelir, gider ve hesap takibi.",
+        "en": "Track income, expenses and accounts with double-entry bookkeeping."
+      },
+      "boyut": "~70 MB"
+    },
+    {
+      "paket": "gnumeric",
+      "ad": "Gnumeric",
+      "kategori": "ofis",
+      "ikon": "gnumeric",
+      "ozet": {
+        "tr": "Düşük kaynak kullanan, güçlü hesaplama özellikli hafif hesap tablosu uygulaması.",
+        "en": "Lightweight spreadsheet with strong calculation features and a small footprint."
+      },
+      "aciklama": {
+        "tr": "Düşük kaynak tüketen, güçlü hesaplama özellikli hesap tablosu.",
+        "en": "Low-footprint spreadsheet with strong calculation features."
+      },
+      "boyut": "~15 MB"
+    },
+    {
+      "paket": "firefox-esr",
+      "ad": "Firefox",
+      "kategori": "internet",
+      "ikon": "firefox-esr",
+      "ozet": {
+        "tr": "Gizliliğe önem veren, Mozilla'nın kararlı sürüm (ESR) açık kaynak web tarayıcısı.",
+        "en": "Mozilla's privacy-respecting, extended-support (ESR) open-source web browser."
+      },
+      "aciklama": {
+        "tr": "Mozilla'nın açık kaynak, kararlı sürüm (ESR) web tarayıcısı.",
+        "en": "Mozilla's open-source extended-support (ESR) web browser."
+      },
+      "boyut": "~230 MB"
+    },
+    {
+      "paket": "thunderbird",
+      "ad": "Thunderbird",
+      "kategori": "internet",
+      "ikon": "thunderbird",
+      "ozet": {
+        "tr": "Birden çok hesabı yöneten açık kaynak e-posta ve takvim istemcisi.",
+        "en": "Open-source email and calendar client that manages multiple accounts."
+      },
+      "aciklama": {
+        "tr": "Birden fazla hesabı yöneten, açık kaynak e-posta istemcisi.",
+        "en": "Open-source email client that manages multiple accounts."
+      },
+      "boyut": "~200 MB"
+    },
+    {
+      "paket": "chromium",
+      "ad": "Chromium",
+      "kategori": "internet",
+      "ikon": "chromium",
+      "ozet": {
+        "tr": "Google Chrome'un üzerine kurulduğu açık kaynak web tarayıcısı.",
+        "en": "The open-source web browser that Google Chrome is built upon."
+      },
+      "aciklama": {
+        "tr": "Google Chrome'un üzerine kurulduğu açık kaynak tarayıcı.",
+        "en": "The open-source browser that Google Chrome is built on."
+      },
+      "boyut": "~250 MB"
+    },
+    {
+      "paket": "filezilla",
+      "ad": "FileZilla",
+      "kategori": "internet",
+      "ikon": "filezilla",
+      "ozet": {
+        "tr": "FTP ve SFTP üzerinden güvenli dosya aktarımı için grafik istemci.",
+        "en": "Graphical client for secure file transfer over FTP and SFTP."
+      },
+      "aciklama": {
+        "tr": "Sunucularla güvenli dosya aktarımı için grafik FTP istemcisi.",
+        "en": "Graphical FTP client for secure file transfer with servers."
+      },
+      "boyut": "~25 MB"
+    },
+    {
+      "paket": "transmission-gtk",
+      "ad": "Transmission",
+      "kategori": "internet",
+      "ikon": "transmission",
+      "ozet": {
+        "tr": "Sade ve kaynak dostu bir BitTorrent indirme istemcisi.",
+        "en": "A simple, resource-friendly BitTorrent download client."
+      },
+      "aciklama": {
+        "tr": "Sade ve kaynak dostu torrent indirme istemcisi.",
+        "en": "Simple, resource-friendly torrent download client."
+      },
+      "boyut": "~6 MB"
+    },
+    {
+      "paket": "remmina",
+      "ad": "Remmina",
+      "kategori": "internet",
+      "ikon": "remmina",
+      "ozet": {
+        "tr": "RDP, VNC ve SSH ile uzak masaüstü bağlantısı kuran istemci.",
+        "en": "Client for connecting to remote desktops over RDP, VNC and SSH."
+      },
+      "aciklama": {
+        "tr": "RDP, VNC ve SSH ile uzak makinelere bağlanma.",
+        "en": "Connect to remote machines over RDP, VNC and SSH."
+      },
+      "boyut": "~10 MB"
+    },
+    {
+      "paket": "vlc",
+      "ad": "VLC",
+      "kategori": "medya",
+      "ikon": "vlc",
+      "ozet": {
+        "tr": "Neredeyse tüm video ve ses biçimlerini oynatan çok yönlü medya oynatıcı.",
+        "en": "Versatile media player that handles nearly all video and audio formats."
+      },
+      "aciklama": {
+        "tr": "Neredeyse tüm video ve ses biçimlerini oynatan güçlü oynatıcı.",
+        "en": "Powerful player that handles nearly every video and audio format."
+      },
+      "boyut": "~95 MB"
+    },
+    {
+      "paket": "mpv",
+      "ad": "mpv",
+      "kategori": "medya",
+      "ikon": "mpv",
+      "ozet": {
+        "tr": "Klavye odaklı, hafif ve yüksek kaliteli video oynatıcı.",
+        "en": "Keyboard-driven, lightweight, high-quality video player."
+      },
+      "aciklama": {
+        "tr": "Klavye odaklı, çok hafif ve yüksek kaliteli video oynatıcı.",
+        "en": "Keyboard-driven, very light, high-quality video player."
+      },
+      "boyut": "~35 MB"
+    },
+    {
+      "paket": "audacity",
+      "ad": "Audacity",
+      "kategori": "medya",
+      "ikon": "audacity",
+      "ozet": {
+        "tr": "Çok kanallı ses kaydı, düzenleme ve efekt uygulama programı.",
+        "en": "Application for multi-track audio recording, editing and effects."
+      },
+      "aciklama": {
+        "tr": "Ses kaydı, kırpma ve efekt uygulama için açık kaynak editör.",
+        "en": "Open-source editor for recording, trimming and applying effects to audio."
+      },
+      "boyut": "~40 MB"
+    },
+    {
+      "paket": "obs-studio",
+      "ad": "OBS Studio",
+      "kategori": "medya",
+      "ikon": "com.obsproject.Studio",
+      "ozet": {
+        "tr": "Sahne ve kaynak yönetimiyle ekran kaydı ve canlı yayın stüdyosu.",
+        "en": "Screen recording and live-streaming studio with scene and source management."
+      },
+      "aciklama": {
+        "tr": "Sahne ve kaynaklarla profesyonel ekran kaydı ve yayın stüdyosu.",
+        "en": "Professional screen capture and streaming studio with scenes and sources."
+      },
+      "boyut": "~120 MB"
+    },
+    {
+      "paket": "kdenlive",
+      "ad": "Kdenlive",
+      "kategori": "medya",
+      "ikon": "kdenlive",
+      "ozet": {
+        "tr": "Çok izli zaman çizelgesi sunan doğrusal olmayan video kurgu uygulaması.",
+        "en": "Non-linear video editor with a multi-track timeline."
+      },
+      "aciklama": {
+        "tr": "Çok izli zaman çizelgesiyle güçlü, ücretsiz video kurgu.",
+        "en": "Powerful, free video editing with a multi-track timeline."
+      },
+      "boyut": "~200 MB"
+    },
+    {
+      "paket": "rhythmbox",
+      "ad": "Rhythmbox",
+      "kategori": "medya",
+      "ikon": "rhythmbox",
+      "ozet": {
+        "tr": "Müzik kitaplığı yönetimi ve podcast takibi için müzik çalar.",
+        "en": "Music player for managing your library and following podcasts."
+      },
+      "aciklama": {
+        "tr": "Müzik koleksiyonunu düzenleme, çalma ve podcast dinleme.",
+        "en": "Organize and play your music collection and listen to podcasts."
+      },
+      "boyut": "~20 MB"
+    },
+    {
+      "paket": "geany",
+      "ad": "Geany",
+      "kategori": "gelistirme",
+      "ikon": "geany",
+      "ozet": {
+        "tr": "Çok sayıda dili destekleyen hafif kod düzenleyici ve küçük geliştirme ortamı.",
+        "en": "Lightweight code editor and small IDE supporting many languages."
+      },
+      "aciklama": {
+        "tr": "Birçok dili destekleyen, hızlı açılan sade geliştirme ortamı.",
+        "en": "A fast, simple development environment supporting many languages."
+      },
+      "boyut": "~12 MB"
+    },
+    {
+      "paket": "git",
+      "ad": "Git",
+      "kategori": "gelistirme",
+      "ikon": "git",
+      "ozet": {
+        "tr": "Kaynak kodun sürümlerini izleyen dağıtık sürüm kontrol sistemi.",
+        "en": "Distributed version control system for tracking source-code history."
+      },
+      "aciklama": {
+        "tr": "Kaynak kodun sürümlerini izlemek için standart araç.",
+        "en": "The standard tool for tracking versions of source code."
+      },
+      "boyut": "~25 MB"
+    },
+    {
+      "paket": "meld",
+      "ad": "Meld",
+      "kategori": "gelistirme",
+      "ikon": "meld",
+      "ozet": {
+        "tr": "Dosya ve klasörleri karşılaştırıp birleştiren görsel karşılaştırma aracı.",
+        "en": "Visual diff tool for comparing and merging files and folders."
+      },
+      "aciklama": {
+        "tr": "Dosya ve klasörleri yan yana karşılaştırıp birleştirme.",
+        "en": "Compare and merge files and folders side by side."
+      },
+      "boyut": "~6 MB"
+    },
+    {
+      "paket": "codeblocks",
+      "ad": "Code::Blocks",
+      "kategori": "gelistirme",
+      "ikon": "codeblocks",
+      "ozet": {
+        "tr": "C ve C++ geliştirme için derleyici entegrasyonlu açık kaynak IDE.",
+        "en": "Open-source IDE with compiler integration for C and C++ development."
+      },
+      "aciklama": {
+        "tr": "C ve C++ geliştirme için derleyici entegrasyonlu IDE.",
+        "en": "IDE with compiler integration for C and C++ development."
+      },
+      "boyut": "~40 MB"
+    },
+    {
+      "paket": "vim-gtk3",
+      "ad": "Vim (GTK)",
+      "kategori": "gelistirme",
+      "ikon": "vim",
+      "ozet": {
+        "tr": "Klavye odaklı ve yüksek oranda özelleştirilebilir metin düzenleyicinin grafik sürümü.",
+        "en": "Graphical build of the keyboard-driven, highly customizable text editor."
+      },
+      "aciklama": {
+        "tr": "Klavye odaklı, son derece özelleştirilebilir editörün grafik sürümü.",
+        "en": "Graphical build of the keyboard-driven, highly customizable editor."
+      },
+      "boyut": "~35 MB"
+    },
+    {
+      "paket": "gitg",
+      "ad": "gitg",
+      "kategori": "gelistirme",
+      "ikon": "gitg",
+      "ozet": {
+        "tr": "Commit geçmişini görselleştiren, Git için grafik arayüz.",
+        "en": "Graphical front-end for Git that visualizes commit history."
+      },
+      "aciklama": {
+        "tr": "Commit geçmişini görselleştirme ve değişiklikleri yönetme.",
+        "en": "Visualize commit history and manage changes."
+      },
+      "boyut": "~8 MB"
+    },
+    {
+      "paket": "gparted",
+      "ad": "GParted",
+      "kategori": "sistem",
+      "ikon": "gparted",
+      "ozet": {
+        "tr": "Disk bölümlerini oluşturma, boyutlandırma ve biçimlendirme aracı.",
+        "en": "Tool for creating, resizing and formatting disk partitions."
+      },
+      "aciklama": {
+        "tr": "Disk bölümlerini oluşturma, boyutlandırma ve biçimlendirme.",
+        "en": "Create, resize and format disk partitions."
+      },
+      "boyut": "~5 MB"
+    },
+    {
+      "paket": "synaptic",
+      "ad": "Synaptic",
+      "kategori": "sistem",
+      "ikon": "synaptic",
+      "ozet": {
+        "tr": "apt paketlerini ayrıntılı biçimde arama, kurma ve kaldırma arayüzü.",
+        "en": "Detailed interface for searching, installing and removing apt packages."
+      },
+      "aciklama": {
+        "tr": "apt paketlerini ayrıntılı biçimde arama, kurma ve kaldırma arayüzü.",
+        "en": "Detailed interface to search, install and remove apt packages."
+      },
+      "boyut": "~10 MB"
+    },
+    {
+      "paket": "gnome-disk-utility",
+      "ad": {
+        "tr": "Diskler",
+        "en": "Disks"
+      },
+      "kategori": "sistem",
+      "ikon": "gnome-disks",
+      "ozet": {
+        "tr": "Sürücüleri biçimlendirme, bağlama ve SMART sağlık durumunu görüntüleme uygulaması.",
+        "en": "Application for formatting and mounting drives and viewing SMART health."
+      },
+      "aciklama": {
+        "tr": "Sürücüleri biçimlendirme, bağlama ve SMART sağlık durumunu görme.",
+        "en": "Format and mount drives and view SMART health."
+      },
+      "boyut": "~6 MB"
+    },
+    {
+      "paket": "timeshift",
+      "ad": "Timeshift",
+      "kategori": "sistem",
+      "ikon": "timeshift",
+      "ozet": {
+        "tr": "Sistemi önceki çalışan duruma döndürmek için anlık yedek (snapshot) uygulaması.",
+        "en": "Snapshot application for restoring the system to a previous working state."
+      },
+      "aciklama": {
+        "tr": "Sistemi bir önceki çalışan duruma geri almak için anlık yedekler.",
+        "en": "Take snapshots to roll the system back to a previous working state."
+      },
+      "boyut": "~15 MB"
+    },
+    {
+      "paket": "bleachbit",
+      "ad": "BleachBit",
+      "kategori": "sistem",
+      "ikon": "bleachbit",
+      "ozet": {
+        "tr": "Önbellek, geçici dosya ve izleri temizleyerek disk alanı açan bakım aracı.",
+        "en": "Maintenance tool that frees disk space by clearing caches, temporary files and traces."
+      },
+      "aciklama": {
+        "tr": "Önbellek, geçici dosya ve izleri temizleyerek yer açar.",
+        "en": "Frees space by clearing caches, temporary files and traces."
+      },
+      "boyut": "~5 MB"
+    },
+    {
+      "paket": "htop",
+      "ad": "htop",
+      "kategori": "sistem",
+      "ikon": "utilities-system-monitor",
+      "ozet": {
+        "tr": "CPU, bellek ve süreçleri canlı izleyen etkileşimli sistem izleyici.",
+        "en": "Interactive system monitor that tracks CPU, memory and processes in real time."
+      },
+      "aciklama": {
+        "tr": "CPU, bellek ve süreçleri canlı izleyen renkli terminal aracı.",
+        "en": "Colorful terminal tool that monitors CPU, memory and processes live."
+      },
+      "boyut": "~1 MB"
+    }
+  ]
+}

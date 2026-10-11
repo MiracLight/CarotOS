@@ -6,7 +6,7 @@ echo "CarotOS kurulum betiği çalışıyor..."
 # İzinleri düzelt
 chmod 755 /opt/carotos/security-panel/carotos-security-panel.py
 chmod 755 /usr/local/bin/nikto
-chmod 644 /usr/share/backgrounds/carotos/carotbackground.png
+chmod 644 /usr/share/backgrounds/carotos/*.png /usr/share/backgrounds/login.png
 chmod 644 /usr/share/backgrounds/login.png
 chmod 644 /usr/share/icons/carotos/security-panel-icon.png
 chmod 644 /usr/share/carotos/carotos_ascii.txt

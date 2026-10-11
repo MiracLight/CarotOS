@@ -1,0 +1,182 @@
+#!/usr/bin/env python3
+"""CarotOS oturum acilis perdesi.
+
+LightDM girisinden sonra masaustu hazir olana kadar gecen sure boyunca
+siyah ekran yerine, giris ekraniyla ayni renklerde animasyonlu bir perde
+gosterir. Panel ve masaustu (xfdesktop) calismaya basladiktan sonra kendini
+yumusakca kapatir. Her turlu hatada sessizce cikar; oturumu asla engellemez.
+
+Ortam degiskenleri:
+  CAROTOS_ACILIS_KAPALI=1   perdeyi hic gosterme
+"""
+import math
+import os
+import subprocess
+import sys
+import time
+
+LOGO_ADAYLARI = [
+    "/usr/share/carotos/welcome/logo.png",
+    "/usr/share/carotos/logo.png",
+]
+SURE_EN_AZ = 2.2      # saniye: perde en az bu kadar gorunur (titreme olmasin)
+SURE_EN_COK = 15.0    # saniye: masaustu gelmese bile bu surede kapanir
+HAZIR_SONRASI = 1.0   # panel/masaustu goruldukten sonra beklenecek sure
+SOLMA_SURESI = 0.5    # kapanis solma suresi
+
+# Giris ekrani arka planindan (login.png) alinan renkler: ustten alta.
+RENKLER = [(0.0, (0x3f, 0x91, 0xba)),
+           (0.45, (0xb0, 0xd5, 0xeb)),
+           (1.0, (0xf0, 0xfa, 0xf8))]
+VURGU = (0x18, 0x5f, 0xa5)
+
+
+def calisiyor(ad):
+    try:
+        return subprocess.run(["pgrep", "-x", ad], stdout=subprocess.DEVNULL,
+                              stderr=subprocess.DEVNULL, timeout=3
+                              ).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def main():
+    if os.environ.get("CAROTOS_ACILIS_KAPALI") == "1":
+        return 0
+    if not os.environ.get("DISPLAY"):
+        return 0
+    try:
+        import gi
+        gi.require_version("Gtk", "3.0")
+        gi.require_version("Gdk", "3.0")
+        from gi.repository import Gdk, GdkPixbuf, GLib, Gtk
+    except Exception:
+        return 0
+
+    test = os.environ.get("CAROTOS_ACILIS_TEST")          # test: sabit sure
+    goruntu = os.environ.get("CAROTOS_ACILIS_GORUNTU")    # test: ekran kaydi
+    logo = None
+    for yol in LOGO_ADAYLARI:
+        if os.path.isfile(yol):
+            try:
+                logo = GdkPixbuf.Pixbuf.new_from_file_at_size(yol, 150, 150)
+                break
+            except GLib.Error:
+                continue
+
+    # Not: cairo/draw sinyali kullanilmaz (python3-gi-cairo gerektirir);
+    # perde yalnizca standart Gtk bilesenleri ve CSS ile cizilir.
+    css = (
+        "window.acilis { background-image: linear-gradient(to bottom, "
+        "#3f91ba, #b0d5eb 45%, #f0faf8); }"
+        ".acilis-yazi { color: #185fa5; font-size: 30px; font-weight: bold;"
+        " letter-spacing: 2px; }"
+        "progressbar.acilis-cubuk trough { min-width: 220px; min-height: 4px;"
+        " background-color: rgba(24,95,165,0.18); border: none;"
+        " border-radius: 2px; }"
+        "progressbar.acilis-cubuk progress { min-height: 4px;"
+        " background-color: #185fa5; background-image: none; border: none;"
+        " border-radius: 2px; }"
+    )
+    saglayici = Gtk.CssProvider()
+    saglayici.load_from_data(css.encode())
+    ekran = Gdk.Screen.get_default()
+    Gtk.StyleContext.add_provider_for_screen(
+        ekran, saglayici, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
+    pencere = Gtk.Window(type=Gtk.WindowType.TOPLEVEL)
+    pencere.get_style_context().add_class("acilis")
+    pencere.set_decorated(False)
+    pencere.set_skip_taskbar_hint(True)
+    pencere.set_skip_pager_hint(True)
+    pencere.set_keep_above(True)
+    pencere.set_type_hint(Gdk.WindowTypeHint.SPLASHSCREEN)
+    pencere.set_default_size(ekran.get_width(), ekran.get_height())
+    pencere.move(0, 0)
+    pencere.fullscreen()
+
+    kutu = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
+    kutu.set_halign(Gtk.Align.CENTER)
+    kutu.set_valign(Gtk.Align.CENTER)
+    kutu.set_margin_bottom(60)
+    if logo is not None:
+        resim = Gtk.Image.new_from_pixbuf(logo)
+        kutu.pack_start(resim, False, False, 0)
+    else:
+        resim = None
+    yazi = Gtk.Label(label="CarotOS")
+    yazi.get_style_context().add_class("acilis-yazi")
+    kutu.pack_start(yazi, False, False, 0)
+    cubuk = Gtk.ProgressBar()
+    cubuk.get_style_context().add_class("acilis-cubuk")
+    cubuk.set_pulse_step(0.06)
+    cubuk.set_halign(Gtk.Align.CENTER)
+    kutu.pack_start(cubuk, False, False, 8)
+    pencere.add(kutu)
+
+    baslangic = time.monotonic()
+    durum = {"hazir_an": None, "solma_an": None, "goruntu": False}
+
+    def kapat():
+        Gtk.main_quit()
+        return False
+
+    def adim():
+        t = time.monotonic() - baslangic
+        # Yumusak giris ve nefes alma animasyonu.
+        giris = min(1.0, t / 0.6)
+        nefes = 0.5 + 0.5 * math.sin(t * 2.6)
+        if resim is not None:
+            resim.set_opacity(giris * (0.85 + 0.15 * nefes))
+        yazi.set_opacity(giris)
+        cubuk.set_opacity(giris)
+        cubuk.pulse()
+
+        if durum["solma_an"] is not None:
+            oran = (time.monotonic() - durum["solma_an"]) / SOLMA_SURESI
+            if oran >= 1.0:
+                return kapat()
+            try:
+                pencere.set_opacity(max(0.0, 1.0 - oran))
+            except Exception:
+                return kapat()
+            return True
+
+        if goruntu and not durum["goruntu"] and t > 1.6:
+            durum["goruntu"] = True
+            try:
+                pb = Gdk.pixbuf_get_from_window(
+                    pencere.get_window(), 0, 0,
+                    pencere.get_allocated_width(),
+                    pencere.get_allocated_height())
+                if pb is not None:
+                    pb.savev(goruntu, "png", [], [])
+            except Exception:
+                pass
+
+        sure_doldu = t >= (float(test) if test else SURE_EN_AZ)
+        if test:
+            gecti = sure_doldu
+        else:
+            masaustu_hazir = calisiyor("xfdesktop") and calisiyor("xfce4-panel")
+            if masaustu_hazir and durum["hazir_an"] is None:
+                durum["hazir_an"] = time.monotonic()
+            gecti = (sure_doldu and durum["hazir_an"] is not None
+                     and time.monotonic() - durum["hazir_an"] >= HAZIR_SONRASI)
+            if t >= SURE_EN_COK:
+                gecti = True
+        if gecti:
+            durum["solma_an"] = time.monotonic()
+        return True
+
+    GLib.timeout_add(33, adim)
+    pencere.show_all()
+    Gtk.main()
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception:
+        sys.exit(0)
