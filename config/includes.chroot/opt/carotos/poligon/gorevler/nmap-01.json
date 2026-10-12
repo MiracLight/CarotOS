@@ -2,44 +2,63 @@
   "id": "nmap-01",
   "arac": "nmap",
   "seviye": "baslangic",
-
   "baslik": {
     "tr": "Gizli Portu Bul",
     "en": "Find the Hidden Port"
   },
-
   "senaryo": {
-    "tr": "127.0.0.1 üzerinde birkaç yaygın servis (ftp, smtp, pop3, imap, mysql) ve bir de standart dışı, gizli bir servis çalışıyor. nmap ile 20000-20999 aralığını tarayarak gizli portu bul.",
-    "en": "A few common services (ftp, smtp, pop3, imap, mysql) are running on 127.0.0.1, along with one non-standard hidden service. Scan the 20000-20999 range with nmap to find the hidden port."
+    "tr": "127.0.0.1 üzerinde birkaç yaygın servis ve bir de standart dışı, gizli bir servis çalışıyor. nmap ile {aralik} aralığını tarayarak gizli portu bul.",
+    "en": "A few common services are running on 127.0.0.1, along with one non-standard hidden service. Scan the {aralik} range with nmap to find the hidden port."
   },
-
   "ipucu": {
-    "tr": "nmap -p 20000-20999 127.0.0.1",
-    "en": "nmap -p 20000-20999 127.0.0.1"
+    "tr": "nmap -p {aralik} 127.0.0.1",
+    "en": "nmap -p {aralik} 127.0.0.1"
   },
-
   "hedef": {
     "tur": "canli_servis",
     "servis_modulu": "servisler.sahte_ag.SahteAgOrtami",
     "bind_adres": "127.0.0.1",
     "coklu_port": true,
-    "_kural": "bind_adres HER ZAMAN 127.0.0.1. SahteAgOrtami kendi yapıcısında da bunu zorunlu kılıyor. Sabit tek port yok, o yüzden coklu_port: true."
+    "_kural": "bind_adres HER ZAMAN 127.0.0.1. SahteAgOrtami kendi yapıcısında da bunu zorunlu kılıyor."
   },
-
   "flag_uretimi": {
     "yontem": "gizli_port",
     "modul": "servisler.sahte_ag",
-    "_not": "Flag, SahteAgOrtami.gizli_port değeridir (20000-20999 arası rastgele). Öğrenci bu port numarasını metin olarak yazar."
+    "_not": "Flag, SahteAgOrtami.gizli_port (zorluğa göre aralıktan rastgele). Öğrenci port numarasını yazar."
   },
-
   "dogrulama": {
     "tur": "kullanici_girdisi",
     "karsilastirma": "birebir_sayisal",
     "deneme_siniri": null
   },
-
-  "puan": 100,
+  "zorluklar": {
+    "kolay": {
+      "gizli_port_araligi": [
+        20000,
+        20099
+      ],
+      "gurultu_sayisi": 3
+    },
+    "orta": {
+      "gizli_port_araligi": [
+        20000,
+        20999
+      ],
+      "gurultu_sayisi": 5
+    },
+    "zor": {
+      "gizli_port_araligi": [
+        20000,
+        29999
+      ],
+      "gurultu_sayisi": 9
+    }
+  },
+  "puan": {
+    "kolay": 50,
+    "orta": 100,
+    "zor": 200
+  },
   "sure_siniri_dk": null,
-
   "savunma_gorevi_id": "ufw-01"
 }

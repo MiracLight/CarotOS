@@ -10,6 +10,31 @@ sayılmamıştır.
 
 ---
 
+## Sürüm 12 — 1.2.1 "Eggshell": bellek, açılış ve Poligon güncellemesi
+**Durum:** Yayınlandı (ISO adı 1.2 olarak kaldı; `carotos-1.2-amd64.iso`
+dosyası güncellendi, carotos.org ve GitHub Release metni yeni sha256 ile
+düzeltildi).
+- **Bellek kullanımı düşürüldü:** Papirus simge temalarının önbelleği
+  (`icon-theme.cache`) ISO'da üretilmiyordu; her GTK süreci (panel, `nm-applet`,
+  `xfdesktop`, `xfwm4`) simgeleri tek tek tarayıp yüzlerce MB fazla bellek
+  tutuyordu. Önbellek artık derleme sırasında üretiliyor
+  (`config/hooks/live/9998-carotos-ikon-onbellek.hook.chroot`). Boşta bellek
+  kullanımı yaklaşık 980 MB'tan yaklaşık 600 MB'a indi.
+- **Masaüstü arka planları** 2560 piksel genişliğe küçültüldü (`wallpaper1`
+  46 MB'tan 5,7 MB'a). ISO yaklaşık 44 MB küçüldü ve masaüstü daha hızlı
+  çiziliyor.
+- **USB izleyici** iki kez başlıyordu (`/etc/xdg/autostart` ve `/etc/skel`
+  girdileri); yinelenen başlangıç girdisi kaldırıldı.
+- **Oturum açılış perdesi** yeniden yazıldı: yeni CarotOS logosu, pencere
+  yöneticisinden bağımsız tam ekran, saniyede onlarca süreç başlatan hazırlık
+  denetiminin yerine `/proc` okuması, zaman aşımı koruması
+  (`05carotos-acilis` içinde `timeout`).
+- **Üst panel:** CarotOS Mağaza başlatıcısı kendi logosuyla eklendi.
+- **CarotOS Poligon:** ISO'ya yanlışlıkla Eylül başındaki eski sürüm
+  girmişti. Güncel sürümle değiştirildi; misafir, kullanıcı oluşturma ve
+  kullanıcı girişi seçenekleri ile yeni görev ve soru dosyaları artık gerçekten
+  ISO'da.
+
 ## Sürüm 11 — 1.2 "Eggshell": CarotOS Mağaza ve yeni masaüstü
 **Durum:** Yayınlandı (GitHub Release v1.2, carotos.org).
 - **CarotOS Mağaza** eklendi: yedi kategoride 51 uygulama sunan grafik

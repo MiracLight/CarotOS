@@ -26,6 +26,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from flag_uretici import parola_uret  # noqa: E402
+from ag_guvenlik import loopback_adres_mi  # noqa: E402
+
+# Ipucu kullanilan soruda puanin NE KADARI kesilir (0.5 = yari puan).
+IPUCU_CEZASI_ORANI = 0.5
 from servisler.sahte_giris import SahteGirisServisi  # noqa: E402
 from servisler.sahte_ag import SahteAgOrtami
 from servisler.sahte_hash import SahteHashDosyasi
@@ -117,10 +121,76 @@ class PoligonIstemci:
         # Bireysel mod: öğretmen adresi boşsa hiçbir ağ isteği YAPILMAZ.
         # Bireysel pratik hiçbir zaman öğretmen sunucusuna bağımlı olmamalı.
         self.bireysel_mod = not self.ogretmen_adres
+        # Secili zorluk (kolay/orta/zor). Gorev 'zorluklar' icermiyorsa
+        # etkisizdir -- servis kendi varsayilanlarini kullanir.
+        self.zorluk = "orta"
+        # Sinif modunda ogretmenin her acik goreve atadigi zorluk;
+        # acik_gorevleri_getir() her cagrildiginda tazelenir.
+        self._acik_zorluklar: dict[str, str] = {}
+        # "Soru Olustur" ozel parametreleri: gorev_id -> param sozlugu (onbellek).
+        self._acik_ozel: dict[str, dict] = {}
+        # Aktif gorevin ozel parametreleri (None ise isimli zorluk kullanilir).
+        self.ozel_parametreler = None
+        # "IP ve Adres": ogretmenin sinifa uyguladigi hedef loopback adresi
+        # (yoksa None -> gorevin kendi 127.0.0.1'i kullanilir).
+        self.sinif_hedef_adres = None
+        self.gercek_bind_adres = "127.0.0.1"
+        # Ayar surumu (hedef adres vb.). Degisince mevcut soru yeniden yuklenir.
+        self.ayar_surumu = 0
+        self._yuklu_ayar_surumu = 0
+        # Ogretmenin atadigi guncel soru sira numarasi (0 = henuz yok).
+        self.aktif_soru_no = 0
+        # Su an YUKLU olan sorunun numarasi -- yeni soru algilamasinda kullanilir.
+        self._yuklu_soru_no = 0
 
     # ------------------------------------------------------------------
     # Görev yükleme ve yerel servis başlatma
     # ------------------------------------------------------------------
+    def _zorluk_parametreleri(self) -> dict:
+        """Secili zorluk icin parametre on-ayarini doner. Gorevde
+        'zorluklar' yoksa (henuz parametrik yapilmamis arac) bos sozluk
+        doner -> servis kendi varsayilanlarini kullanir (eski davranis)."""
+        # Ogretmen "Soru Olustur" ile ozel parametre atadiysa dogrudan onu
+        # kullan (isimli zorluk on-ayarini atla). '_' ile baslayan ic
+        # anahtarlar (orn. _etiket) servise gecmez.
+        if self.ozel_parametreler:
+            return {k: v for k, v in self.ozel_parametreler.items()
+                    if not str(k).startswith("_")}
+        if not self.gorev:
+            return {}
+        zorluklar = self.gorev.get("zorluklar")
+        if not isinstance(zorluklar, dict) or not zorluklar:
+            return {}
+        return zorluklar.get(self.zorluk) or zorluklar.get("orta") or {}
+
+    def aktif_puan(self) -> int:
+        """Gorevin puani; zorluga gore degisebilir. puan int ise dogrudan,
+        sozluk ise secili zorlugun puani doner."""
+        if not self.gorev:
+            return 0
+        puan = self.gorev.get("puan", 0)
+        if isinstance(puan, dict):
+            return int(puan.get(self.zorluk) or puan.get("orta") or 0)
+        return int(puan or 0)
+
+    def aralik_metni(self) -> str:
+        """Senaryo/ipucu metnindeki {aralik} yer tutucusu icin secili
+        zorlugun port araligini 'lo-hi' olarak doner (nmap gibi gorevler).
+        Uygun degilse bos string."""
+        ar = self._zorluk_parametreleri().get("gizli_port_araligi")
+        if ar and len(ar) == 2:
+            return f"{ar[0]}-{ar[1]}"
+        return ""
+
+    def aktif_ipucu(self, dil: str) -> str | None:
+        """Zorluğa özgü ipucu metni (varsa). sqlmap gibi görevlerde zorluk
+        arttıkça ipucu daha az şey ele verir. Görevde/zorlukta tanımlı
+        değilse None döner -> arayüz görevin temel ipucunu kullanır."""
+        ip = self._zorluk_parametreleri().get("ipucu")
+        if isinstance(ip, dict):
+            return ip.get(dil) or ip.get("tr")
+        return None
+
     def gorevi_yukle(self, gorev_id: str) -> dict:
         yol = GOREVLER_DIZINI / f"{gorev_id}.json"
         if not yol.exists():
@@ -141,8 +211,17 @@ class PoligonIstemci:
         if self.gorev is None:
             raise RuntimeError("önce gorevi_yukle() çağrılmalı")
 
-        hedef = self.gorev["hedef"]
+        hedef = dict(self.gorev["hedef"])  # kopya -- orijinal gorev bozulmasin
         yontem = self.gorev["flag_uretimi"]["yontem"]
+        # Ogretmen "IP ve Adres" ile sinif hedef adresi belirlediyse (loopback
+        # 127.x.x.x), butun servisler bu adrese baglanir; degilse gorevin kendi
+        # bind_adres'i (127.0.0.1). Her halukarda loopback -- makineyi terk etmez.
+        _sinif_adres = getattr(self, "sinif_hedef_adres", None)
+        self.gercek_bind_adres = (
+            _sinif_adres if (_sinif_adres and loopback_adres_mi(_sinif_adres))
+            else hedef.get("bind_adres", "127.0.0.1")
+        )
+        hedef["bind_adres"] = self.gercek_bind_adres
 
         if yontem == "parola_uret":
             self.hedef_parola = parola_uret()
@@ -157,13 +236,21 @@ class PoligonIstemci:
             self._dogru_cevap = self.hedef_parola
 
         elif yontem == "gizli_port":
-            self._servis = SahteAgOrtami(bind_adres=hedef["bind_adres"])
+            p = self._zorluk_parametreleri()
+            kw = {}
+            if p.get("gizli_port_araligi"):
+                kw["gizli_port_araligi"] = tuple(p["gizli_port_araligi"])
+            if p.get("gurultu_sayisi") is not None:
+                kw["gurultu_sayisi"] = p["gurultu_sayisi"]
+            self._servis = SahteAgOrtami(bind_adres=hedef["bind_adres"], **kw)
             self._servis.baslat()
             self._servis.bekle_hazir()  # tüm portlar bağlanana kadar bekle
             self._dogru_cevap = str(self._servis.gizli_port)
 
         elif yontem == "hash_uret":
-            self.hedef_parola = parola_uret()
+            p = self._zorluk_parametreleri()
+            basamak = p.get("basamak", 4)  # zorluk tanimli degilse eski davranis
+            self.hedef_parola = parola_uret(basamak=basamak)
             self._servis = SahteHashDosyasi(
                 kullanici=hedef.get("sabit_kullanici", "ogrenci"),
                 parola=self.hedef_parola,
@@ -173,22 +260,34 @@ class PoligonIstemci:
             self.dosya_yolu = self._servis.dosya_yolu  # öğrenciye gösterilecek gerçek yol
 
         elif yontem == "sql_flag":
+            p = self._zorluk_parametreleri()
             self._dogru_cevap = parola_uret()
             self.gercek_port = _bos_port_bul(hedef["port"])
+            kw = {}
+            if p.get("tuzak_tablolar") is not None:
+                kw["tuzak_tablolar"] = p["tuzak_tablolar"]
             self._servis = SahteWebServisi(
                 gizli_deger=self._dogru_cevap,
                 port=self.gercek_port,
                 bind_adres=hedef["bind_adres"],
+                **kw,
             )
             self._servis.baslat()
 
         elif yontem == "trafik_flag":
+            p = self._zorluk_parametreleri()
             self._dogru_cevap = parola_uret()
             self.gercek_port = _bos_port_bul(hedef["port"])
+            kw = {}
+            if p.get("gurultu") is not None:
+                kw["gurultu"] = p["gurultu"]
+            if p.get("kodlama"):
+                kw["kodlama"] = p["kodlama"]
             self._servis = SahteTrafik(
                 flag=self._dogru_cevap,
                 port=self.gercek_port,
                 bind_adres=hedef["bind_adres"],
+                **kw,
             )
             self._servis.baslat()
             self._servis.bekle_hazir()
@@ -224,10 +323,16 @@ class PoligonIstemci:
     # ------------------------------------------------------------------
     # Cevap doğrulama — YEREL, ağa doğru cevap gitmez
     # ------------------------------------------------------------------
-    def cevabi_kontrol_et(self, girilen_cevap: str) -> bool:
+    def cevabi_kontrol_et(self, girilen_cevap: str, ipucu_kullanildi: bool = False) -> bool:
         dogru = girilen_cevap.strip() == str(self._dogru_cevap).strip()
         gecen_sure = int(time.time() - (self._baslangic_zamani or time.time()))
-        self._bildir("tamamlandi" if dogru else "yanlis_denedi", gecen_sure)
+        kazanilan = 0
+        if dogru:
+            kazanilan = self.aktif_puan()
+            if ipucu_kullanildi:  # ipucu aciksa yari puan
+                kazanilan = int(round(kazanilan * (1 - IPUCU_CEZASI_ORANI)))
+        self._bildir("tamamlandi" if dogru else "yanlis_denedi", gecen_sure,
+                     cevap=girilen_cevap.strip(), puan=kazanilan)
         return dogru
 
     # ------------------------------------------------------------------
@@ -303,7 +408,8 @@ class PoligonIstemci:
                 ) from e
             raise BaglantiHatasi(f"öğretmen sunucusuna ulaşılamıyor: {e}") from e
 
-    def _bildir(self, durum: str, sure_sn: float = 0) -> None:
+    def _bildir(self, durum: str, sure_sn: float = 0, cevap: str | None = None,
+                puan: int | None = None) -> None:
         if self.bireysel_mod:
             # Bireysel modda öğretmen sunucusu yok, ama ilerleme
             # kaybolmasın diye kalıcı yerel deftere yazılır (bkz.
@@ -316,17 +422,26 @@ class PoligonIstemci:
                     arac=self.gorev.get("arac", "?"),
                     durum=durum,
                     sure_sn=sure_sn,
-                    puan=self.gorev.get("puan", 0) if durum == "tamamlandi" else 0,
+                    puan=(puan if puan is not None
+                          else (self.aktif_puan() if durum == "tamamlandi" else 0)),
                 )
             return
         try:
-            self._istek("/ilerleme", {
+            yuk = {
                 "ogrenci": self.ogrenci_adi,
                 "sifre": self.oda_sifre,
                 "gorev_id": self.gorev["id"] if self.gorev else "?",
                 "durum": durum,
                 "sure_sn": sure_sn,
-            })
+            }
+            # Gerçek bir cevap denemesiyse öğretmenin "Verdiği Cevaplar"
+            # penceresi için cevabı ve yüklü sorunun numarasını da gönder.
+            if cevap is not None:
+                yuk["cevap"] = cevap
+                yuk["soru_no"] = self._yuklu_soru_no
+            if puan is not None:
+                yuk["puan"] = puan
+            self._istek("/ilerleme", yuk)
         except BaglantiHatasi:
             pass  # ağ sorunu görevi engellemez, sadece skor gecikir
 
@@ -357,7 +472,25 @@ class PoligonIstemci:
         öğrenci katılmadan önce bunu bilmesi gerekiyor.
         """
         _, cevap = self._istek("/gorevler", {}, "GET")
+        self._acik_zorluklar = cevap.get("zorluklar", {}) or {}
+        self._acik_ozel = cevap.get("parametreler", {}) or {}
+        self.sinif_hedef_adres = cevap.get("hedef_adres") or None
+        self.ayar_surumu = int(cevap.get("ayar_surumu", 0) or 0)
+        self.aktif_soru_no = int(cevap.get("aktif_soru_no", 0) or 0)
         return cevap.get("acik_gorevler", [])
+
+    def atanan_zorluk(self, gorev_id: str) -> str:
+        """Ogretmenin bu goreve atadigi zorlugu doner. acik_gorevleri_getir()
+        en son cagrildiginda alinan bilgiye dayanir; bilinmiyorsa 'orta'."""
+        z = self._acik_zorluklar.get(gorev_id, "orta")
+        return z if z in ("kolay", "orta", "zor") else "orta"
+
+    def atanan_parametreler(self, gorev_id: str):
+        """Ogretmenin bu goreve 'Soru Olustur' ile atadigi OZEL parametreler.
+        Yoksa None -> isimli zorluk on-ayari kullanilir. acik_gorevleri_getir()
+        en son cagrildiginda alinan bilgiye dayanir."""
+        p = self._acik_ozel.get(gorev_id)
+        return dict(p) if isinstance(p, dict) and p else None
 
     def sinif_baglanti_durumu(self) -> str:
         """Öğretmenle bağlantının durumunu tek bir sözcükle döner --
@@ -395,15 +528,19 @@ class PoligonIstemci:
         if self.bireysel_mod or self.gorev is None:
             return None
         try:
-            acik = self.acik_gorevleri_getir()
+            acik = self.acik_gorevleri_getir()  # self.aktif_soru_no'yu tazeler
         except BaglantiHatasi:
             return None
-        mevcut = self.gorev["id"]
-        if mevcut in acik:
-            return None  # hâlâ aynı görev açık, değişiklik yok
-        if acik:
-            return acik[0]  # öğretmen başka bir göreve geçti
-        return None  # öğretmen her şeyi kapattı, mevcut görevde kalınır
+        # Yeni bir soru atandi mi? Sira numarasi yukledigim sorudan farkliysa
+        # ogretmen yeni soru atamistir: baska gorev, ayni gorev farkli zorluk,
+        # ya da "Soru Olustur" ozel parametresi -- hepsi numarayi artirir.
+        # Yeni soru (numara) YA DA mevcut sorunun ayarlari (hedef adres
+        # vb.) degistiyse yeniden yukle. Ikincisinde soru numarasi ayni kalir
+        # ama ayar_surumu artmistir.
+        if acik and (self.aktif_soru_no != self._yuklu_soru_no
+                     or self.ayar_surumu != self._yuklu_ayar_surumu):
+            return acik[0]
+        return None
 
     def gorevi_degistir(self, yeni_gorev_id: str) -> dict:
         """Mevcut yerel servisi durdurur, yeni görevi yükleyip başlatır.
@@ -411,6 +548,8 @@ class PoligonIstemci:
         self.gorevi_durdur()
         gorev = self.gorevi_yukle(yeni_gorev_id)
         self.gorevi_baslat()
+        self._yuklu_soru_no = self.aktif_soru_no  # bu soruyu yukledim
+        self._yuklu_ayar_surumu = self.ayar_surumu
         return gorev
 
     def yeni_mesajlari_getir(self) -> list:

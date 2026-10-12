@@ -17,6 +17,8 @@ SADECE 127.0.0.1: guvenlik kurali burada da kod seviyesinde zorunlu.
 
 from __future__ import annotations
 
+from ag_guvenlik import loopback_adres_mi  # noqa: E402
+
 import sqlite3
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -24,15 +26,33 @@ from urllib.parse import urlparse, parse_qs
 
 
 class SahteWebServisi:
-    def __init__(self, gizli_deger: str, port: int, bind_adres: str = "127.0.0.1"):
-        if bind_adres != "127.0.0.1":
+    # Zorluk arttikca semaya eklenen "tuzak" (decoy) tablolar: ogrenci
+    # --tables ile bunlari gorur, dogru tabloyu (gizli) ayirt etmek
+    # zorlasir. gizli tablosu ve zafiyet HER ZAMAN ayni kalir.
+    TUZAK_TABLOLAR = [
+        ("oturumlar", "token",
+         [("a1b2c3",), ("d4e5f6",)]),
+        ("loglar", "mesaj",
+         [("giris yapildi",), ("cikis yapildi",)]),
+        ("ayarlar", "deger",
+         [("tema=koyu",), ("dil=tr",)]),
+        ("musteriler", "eposta",
+         [("ali@example.com",), ("ayse@example.com",)]),
+    ]
+
+    def __init__(self, gizli_deger: str, port: int, bind_adres: str = "127.0.0.1",
+                 tuzak_tablolar: int = 0):
+        if not loopback_adres_mi(bind_adres):
             raise ValueError(
-                f"GUVENLIK IHLALI: bind_adres '{bind_adres}' -- sadece "
-                "127.0.0.1 kabul edilir."
+                f"GUVENLIK IHLALI: bind_adres '{bind_adres}' -- sadece loopback "
+                "(127.0.0.0/8) kabul edilir."
             )
         self.bind_adres = bind_adres
         self.port = port
         self.gizli_deger = gizli_deger
+        # Kac tuzak tablo olusturulacak (0 -> eski davranis: sadece
+        # urunler + gizli). Havuzdaki tablo sayisiyla sinirlanir.
+        self.tuzak_tablolar = max(0, min(int(tuzak_tablolar), len(self.TUZAK_TABLOLAR)))
         self._sunucu: ThreadingHTTPServer | None = None
         self._thread: threading.Thread | None = None
         self._db_kilit = threading.Lock()
@@ -53,6 +73,10 @@ class SahteWebServisi:
         ])
         c.execute("CREATE TABLE gizli (deger TEXT)")
         c.execute("INSERT INTO gizli VALUES (?)", (self.gizli_deger,))
+        # Zorluga gore tuzak tablolar (gizli'yi ayirt etmeyi zorlastirir).
+        for ad, sutun, satirlar in self.TUZAK_TABLOLAR[:self.tuzak_tablolar]:
+            c.execute(f"CREATE TABLE {ad} ({sutun} TEXT)")
+            c.executemany(f"INSERT INTO {ad} VALUES (?)", satirlar)
         self._baglanti_tutucu.commit()
 
     def baslat(self) -> None:

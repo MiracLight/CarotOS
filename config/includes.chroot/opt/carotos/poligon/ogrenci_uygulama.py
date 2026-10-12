@@ -18,11 +18,13 @@ from pathlib import Path
 import gi
 
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk, GLib  # noqa: E402
+gi.require_version("GdkPixbuf", "2.0")
+from gi.repository import Gtk, GLib, GdkPixbuf  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from ogrenci_istemci import BaglantiHatasi, GOREVLER_DIZINI, PoligonIstemci  # noqa: E402
 import gecmis_defteri  # noqa: E402
+import kullanici_defteri  # noqa: E402
 
 
 def _gorev_sudo_gerektirir_mi(gorev_id: str) -> bool:
@@ -74,8 +76,32 @@ METIN = {
         "hata_alan": "Tüm alanları doldur",
         "hata_baglanti": "Öğretmen sunucusuna ulaşılamıyor",
         "gorev_yuklendi": "Görev yüklendi, hedef hazırlanıyor…",
+        "guvenlik_paneli_ac": "Güvenlik Paneline Git",
+        "guvenlik_paneli_yok": "Güvenlik Paneli bu sistemde bulunamadı. CarotOS üzerinde çalıştığından emin ol.",
+        "soru_bekleniyor_baslik": "Öğretmenden soru bekleniyor…",
+        "soru_bekleniyor_aciklama": "Öğretmen bir görev atadığında burada otomatik olarak açılacak. Bu ekranda beklemen yeterli.",
+        "giris_secim_basligi": "Nasıl devam etmek istersin?",
+        "misafir_dugme": "Misafir olarak devam et",
+        "misafir_aciklama": "Hesap oluşturmadan hemen başla. İlerlemen kaydedilmez.",
+        "kullanici_olustur_dugme": "Kullanıcı Oluştur",
+        "kullanici_giris_dugme": "Kullanıcı Girişi",
+        "olustur_baslik": "Yeni kullanıcı oluştur",
+        "olustur_ad_yer_tut": "Adın (en fazla 20 karakter)",
+        "okul_no_yer_tut": "Okul No. / Şifre (en fazla 6 hane)",
+        "olustur_buton": "Oluştur",
+        "kullanici_giris_baslik": "Kullanıcı girişi",
+        "giris_ad_yer_tut": "Adını seç ya da yaz",
+        "kullanici_giris_buton": "Giriş Yap",
+        "kullanici_olusturuldu": "Kullanıcı oluşturuldu. Şimdi giriş yapabilirsin.",
+        "isim_alindi": "Bu isim alındı, başka bir isim seç.",
+        "ad_gecersiz": "Ad boş olamaz ve en fazla 20 karakter olabilir.",
+        "sifre_gecersiz": "Okul No. yalnızca rakam ve en fazla 6 hane olmalı.",
+        "giris_basarisiz": "Ad veya Okul No. hatalı.",
+        "kullanici_degistir": "← Kullanıcı değiştir",
+        "hos_geldin": "Hoş geldin, {ad}",
         "senaryo_basligi": "Senaryo",
         "ipucu_goster": "İpucunu Göster",
+        "ipucu_puan_notu": "İpucu kullanırsan bu sorudan yarı puan alırsın.",
         "cevap_yer_tut": "Bulduğun parolayı buraya yaz",
         "gonder": "Gönder",
         "dogru": "✓ Doğru! Görev tamamlandı.",
@@ -87,6 +113,9 @@ METIN = {
         "sohbet_gonder": "Yolla",
         "sohbet_bos": "Henüz not yok. Öğretmenin gönderdiği ipuçları burada birikir.",
         "yeni_gorev_bildirimi": "Öğretmen yeni bir göreve geçti:",
+        "soru_basligi_bicimi": "{n}. soru — {b}",
+        "zorluk_degisti_bildirimi": "Öğretmen bu görevin zorluğunu değiştirdi:",
+        "ayar_degisti_bildirimi": "Mevcut soru ayarları öğretmen tarafından değiştirildi, tekrar kontrol ediniz.",
         "atildin_basligi": "Sınıftan çıkarıldın",
         "atildin_mesaji": "Öğretmen seni sınıf listesinden çıkardı. Tekrar katılmak istersen oda kodunu ve şifresini tekrar gir.",
         "oda_kapandi_basligi": "Sınıf sona erdi",
@@ -102,6 +131,10 @@ METIN = {
         "geri": "← Geri",
         "bireysel_bilgi": "Rastgele bir görev seçilecek. Hazır olduğunda başla.",
         "teste_basla": "Teste Başla",
+        "zorluk_secimi": "Zorluk",
+        "zorluk_kolay": "Kolay",
+        "zorluk_orta": "Orta",
+        "zorluk_zor": "Zor",
         "gecmis_ozet": "Bugüne kadar {sayi} görev tamamladın · toplam {puan} puan.",
         "gecmis_yok": "Henüz tamamlanmış bir görevin yok — ilk görevin seni bekliyor.",
         "atla_dugmesi": "↻ Bu görevi atla, farklı bir tane getir",
@@ -125,8 +158,32 @@ METIN = {
         "hata_alan": "Fill in all fields",
         "hata_baglanti": "Cannot reach the teacher's server",
         "gorev_yuklendi": "Task loaded, preparing target…",
+        "guvenlik_paneli_ac": "Open Security Panel",
+        "guvenlik_paneli_yok": "The Security Panel was not found on this system. Make sure you are running on CarotOS.",
+        "soru_bekleniyor_baslik": "Waiting for a task from the teacher…",
+        "soru_bekleniyor_aciklama": "When the teacher assigns a task, it will open here automatically. Just wait on this screen.",
+        "giris_secim_basligi": "How would you like to continue?",
+        "misafir_dugme": "Continue as guest",
+        "misafir_aciklama": "Start right away without an account. Your progress won't be saved.",
+        "kullanici_olustur_dugme": "Create User",
+        "kullanici_giris_dugme": "User Login",
+        "olustur_baslik": "Create a new user",
+        "olustur_ad_yer_tut": "Your name (max 20 characters)",
+        "okul_no_yer_tut": "Student No. / Password (max 6 digits)",
+        "olustur_buton": "Create",
+        "kullanici_giris_baslik": "User login",
+        "giris_ad_yer_tut": "Pick or type your name",
+        "kullanici_giris_buton": "Log In",
+        "kullanici_olusturuldu": "User created. You can log in now.",
+        "isim_alindi": "This name is taken, choose another.",
+        "ad_gecersiz": "Name can't be empty and must be at most 20 characters.",
+        "sifre_gecersiz": "Student No. must be digits only, up to 6.",
+        "giris_basarisiz": "Name or Student No. is incorrect.",
+        "kullanici_degistir": "← Switch user",
+        "hos_geldin": "Welcome, {ad}",
         "senaryo_basligi": "Scenario",
         "ipucu_goster": "Show Hint",
+        "ipucu_puan_notu": "Using the hint gives you half points for this question.",
         "cevap_yer_tut": "Type the password you found here",
         "gonder": "Submit",
         "dogru": "✓ Correct! Task completed.",
@@ -138,6 +195,9 @@ METIN = {
         "sohbet_gonder": "Send",
         "sohbet_bos": "No notes yet. Hints from the teacher will collect here.",
         "yeni_gorev_bildirimi": "The teacher moved the class to a new task:",
+        "soru_basligi_bicimi": "Question {n} — {b}",
+        "zorluk_degisti_bildirimi": "The teacher changed the difficulty of this task:",
+        "ayar_degisti_bildirimi": "The teacher changed the settings of this question; please check again.",
         "atildin_basligi": "Removed from class",
         "atildin_mesaji": "The teacher removed you from the class list. Enter the room code and password again if you'd like to rejoin.",
         "oda_kapandi_basligi": "Class has ended",
@@ -153,6 +213,10 @@ METIN = {
         "geri": "← Back",
         "bireysel_bilgi": "A random task will be chosen. Start when you're ready.",
         "teste_basla": "Start Task",
+        "zorluk_secimi": "Difficulty",
+        "zorluk_kolay": "Easy",
+        "zorluk_orta": "Medium",
+        "zorluk_zor": "Hard",
         "gecmis_ozet": "You've completed {sayi} tasks so far · {puan} points total.",
         "gecmis_yok": "You haven't completed any tasks yet — your first one is waiting.",
         "atla_dugmesi": "↻ Skip this task, give me another",
@@ -189,6 +253,7 @@ class PoligonPenceresi(Gtk.Window):
         self.istemci: PoligonIstemci | None = None
         self._ipucu_izleyici_id = None
         self.bireysel_mod = False  # True ise öğretmen sunucusuna hiç bağlanılmaz
+        self.aktif_kullanici = None  # giriş yapan kullanıcının adı (misafirde None)
 
         self.set_default_size(560, 480)
         self._css_uygula()
@@ -196,9 +261,13 @@ class PoligonPenceresi(Gtk.Window):
         self.yigin = Gtk.Stack()
         self.yigin.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT_RIGHT)
 
+        self._giris_sayfasi_olustur()
+        self._kullanici_olustur_sayfasi_olustur()
+        self._kullanici_giris_sayfasi_olustur()
         self._mod_secim_sayfasi_olustur()
         self._baglanti_sayfasi_olustur()
         self._gorev_sayfasi_olustur()
+        self._bekleme_sayfasi_olustur()
 
         ana = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         ana.pack_start(self._ust_cubuk_olustur(), False, False, 0)
@@ -206,7 +275,7 @@ class PoligonPenceresi(Gtk.Window):
         self.add(ana)
 
         self._metinleri_uygula()
-        self.yigin.set_visible_child_name("mod_secimi")
+        self.yigin.set_visible_child_name("giris")
 
     # ------------------------------------------------------------------
     def _css_uygula(self):
@@ -317,6 +386,10 @@ class PoligonPenceresi(Gtk.Window):
         self.bireysel_bilgi_etiketi.set_text(m["bireysel_bilgi"])
         self._gecmis_ozetini_yenile()
         self._dugme_metni_ayarla(self.teste_basla_dugmesi, m["teste_basla"], "white")
+        self.zorluk_baslik_etiketi.set_text(m["zorluk_secimi"])
+        self.zorluk_kolay_radio.set_label(m["zorluk_kolay"])
+        self.zorluk_orta_radio.set_label(m["zorluk_orta"])
+        self.zorluk_zor_radio.set_label(m["zorluk_zor"])
         self.adres_girisi.set_placeholder_text(m["ogretmen_adres"])
         self.kod_girisi.set_placeholder_text(m["oda_kodu"])
         self.sifre_girisi.set_placeholder_text(m["oda_sifre"])
@@ -324,10 +397,35 @@ class PoligonPenceresi(Gtk.Window):
         self.katil_dugmesi.set_label(m["baglan"])
         self.senaryo_baslik_etiketi.set_text(m["senaryo_basligi"])
         self.ipucu_dugmesi.set_label(m["ipucu_goster"])
+        self.ipucu_not_etiketi.set_text(m["ipucu_puan_notu"])
         self.cevap_girisi.set_placeholder_text(m["cevap_yer_tut"])
         self.gonder_dugmesi.set_label(m["gonder"])
         self.kontrol_dugmesi.set_label(m["kontrol_et"])
         self.atla_dugmesi.set_label(m["atla_dugmesi"])
+        self.guvenlik_paneli_dugmesi.set_tooltip_text(m["guvenlik_paneli_ac"])
+        self.bekleme_baslik_etiketi.set_text(m["soru_bekleniyor_baslik"])
+        self.bekleme_aciklama_etiketi.set_text(m["soru_bekleniyor_aciklama"])
+        # Giriş sistemi ekranları
+        self.giris_baslik_etiketi.set_text(m["giris_secim_basligi"])
+        self._dugme_metni_ayarla(self.misafir_dugmesi, m["misafir_dugme"], "white")
+        self.misafir_aciklama_etiketi.set_text(m["misafir_aciklama"])
+        self._dugme_metni_ayarla(self.kullanici_olustur_dugmesi, m["kullanici_olustur_dugme"])
+        self._dugme_metni_ayarla(self.kullanici_giris_dugmesi, m["kullanici_giris_dugme"])
+        self.olustur_baslik_etiketi.set_text(m["olustur_baslik"])
+        self.olustur_ad_girisi.set_placeholder_text(m["olustur_ad_yer_tut"])
+        self.olustur_sifre_girisi.set_placeholder_text(m["okul_no_yer_tut"])
+        self._dugme_metni_ayarla(self.olustur_buton, m["olustur_buton"], "white")
+        self.kullanici_giris_baslik_etiketi.set_text(m["kullanici_giris_baslik"])
+        self.giris_ad_combo.get_child().set_placeholder_text(m["giris_ad_yer_tut"])
+        self.giris_sifre_girisi.set_placeholder_text(m["okul_no_yer_tut"])
+        self._dugme_metni_ayarla(self.kullanici_giris_buton, m["kullanici_giris_buton"], "white")
+        self._dugme_metni_ayarla(self.olustur_geri_dugmesi, m["geri"], self._geri_metin_rengi)
+        self._dugme_metni_ayarla(self.giris_geri_dugmesi, m["geri"], self._geri_metin_rengi)
+        self._dugme_metni_ayarla(self.kullanici_degistir_dugmesi, m["kullanici_degistir"], self._geri_metin_rengi)
+        if self.aktif_kullanici:
+            self.hos_geldin_etiketi.set_text(m["hos_geldin"].format(ad=self.aktif_kullanici))
+        else:
+            self.hos_geldin_etiketi.set_text("")
         # Sohbet widget'ları görev sayfasıyla birlikte oluşuyor; bağlantı
         # sayfasındayken henüz yoklar, o yüzden hasattr ile koru.
         if hasattr(self, "sohbet_baslik_etiketi"):
@@ -335,6 +433,13 @@ class PoligonPenceresi(Gtk.Window):
         if self.gorev_verisi:
             senaryo = self.gorev_verisi["senaryo"][self.dil]
             ipucu = self.gorev_verisi["ipucu"][self.dil]
+            # Zorluğa özgü ipucu (ör. sqlmap: zor seviyede komut daha az
+            # şey ele verir). Tanımlıysa görevin temel ipucunun yerine geçer;
+            # port/{aralik} değişimleri bunun üzerine de uygulanır.
+            if self.istemci:
+                _ozel_ipucu = self.istemci.aktif_ipucu(self.dil)
+                if _ozel_ipucu:
+                    ipucu = _ozel_ipucu
             # Port çakışması yüzünden gerçek port değiştiyse, öğrenciye
             # gösterilen metindeki port numarasını da güncelle -- yoksa
             # öğrenci yanlış porta saldırır.
@@ -344,8 +449,24 @@ class PoligonPenceresi(Gtk.Window):
             if tanimli_port and gercek_port and tanimli_port != gercek_port:
                 senaryo = senaryo.replace(str(tanimli_port), str(gercek_port))
                 ipucu = ipucu.replace(str(tanimli_port), str(gercek_port))
+            # Zorluğa göre değişen port aralığı: {aralik} yer tutucusunu
+            # seçili zorluğun aralığıyla doldur (nmap gibi görevler).
+            aralik = self.istemci.aralik_metni() if self.istemci else ""
+            if aralik:
+                senaryo = senaryo.replace("{aralik}", aralik)
+                ipucu = ipucu.replace("{aralik}", aralik)
+            # Sınıf hedef adresi 127.0.0.1 dışıysa (öğretmen "IP ve Adres"
+            # ile belirlediyse) senaryo/ipucu metninde de onu göster.
+            _bind = getattr(self.istemci, "gercek_bind_adres", "127.0.0.1") if self.istemci else "127.0.0.1"
+            if _bind and _bind != "127.0.0.1":
+                senaryo = senaryo.replace("127.0.0.1", _bind)
+                ipucu = ipucu.replace("127.0.0.1", _bind)
             self.senaryo_etiketi.set_text(senaryo)
-            self.gorev_baslik_etiketi.set_text(self.gorev_verisi["baslik"][self.dil])
+            _baslik = self.gorev_verisi["baslik"][self.dil]
+            _no = getattr(self.istemci, "aktif_soru_no", 0) if self.istemci else 0
+            if _no and not self.bireysel_mod:
+                _baslik = m["soru_basligi_bicimi"].format(n=_no, b=_baslik)
+            self.gorev_baslik_etiketi.set_text(_baslik)
             self._ipucu_metni = ipucu
         self._sonuc_etiketini_guncelle()
 
@@ -365,10 +486,188 @@ class PoligonPenceresi(Gtk.Window):
             self.gecmis_ozet_etiketi.set_text(m["gecmis_yok"])
 
     # ------------------------------------------------------------------
+    def _giris_sayfasi_olustur(self):
+        """Açılıştaki ilk ekran: Misafir / Kullanıcı oluştur / Kullanıcı girişi."""
+        kutu = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        kutu.set_margin_top(44); kutu.set_margin_start(40); kutu.set_margin_end(40)
+
+        self.giris_baslik_etiketi = Gtk.Label(xalign=0.5)
+        self.giris_baslik_etiketi.get_style_context().add_class("baslik-sabit")
+        kutu.pack_start(self.giris_baslik_etiketi, False, False, 8)
+
+        self.misafir_dugmesi = Gtk.Button()
+        self.misafir_dugmesi.get_style_context().add_class("vurgu")
+        self.misafir_dugmesi.set_size_request(-1, 52)
+        self.misafir_dugmesi.connect("clicked", self._misafir_secildi)
+        kutu.pack_start(self.misafir_dugmesi, False, False, 0)
+
+        self.misafir_aciklama_etiketi = Gtk.Label(xalign=0.5, wrap=True)
+        self.misafir_aciklama_etiketi.get_style_context().add_class("etiket")
+        kutu.pack_start(self.misafir_aciklama_etiketi, False, False, 0)
+
+        self.kullanici_olustur_dugmesi = Gtk.Button()
+        self.kullanici_olustur_dugmesi.get_style_context().add_class("ikincil")
+        self.kullanici_olustur_dugmesi.set_size_request(-1, 48)
+        self.kullanici_olustur_dugmesi.connect("clicked", self._kullanici_olustur_ekrani)
+        kutu.pack_start(self.kullanici_olustur_dugmesi, False, False, 8)
+
+        self.kullanici_giris_dugmesi = Gtk.Button()
+        self.kullanici_giris_dugmesi.get_style_context().add_class("ikincil")
+        self.kullanici_giris_dugmesi.set_size_request(-1, 48)
+        self.kullanici_giris_dugmesi.connect("clicked", self._kullanici_giris_ekrani)
+        kutu.pack_start(self.kullanici_giris_dugmesi, False, False, 0)
+
+        self.yigin.add_named(kutu, "giris")
+
+    def _kullanici_olustur_sayfasi_olustur(self):
+        kutu = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        kutu.set_margin_top(30); kutu.set_margin_start(40); kutu.set_margin_end(40)
+
+        self.olustur_geri_dugmesi = Gtk.Button()
+        self.olustur_geri_dugmesi.get_style_context().add_class("duz")
+        self.olustur_geri_dugmesi.connect("clicked", lambda _b: self.yigin.set_visible_child_name("giris"))
+        kutu.pack_start(self.olustur_geri_dugmesi, False, False, 0)
+
+        kart = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        kart.get_style_context().add_class("kart")
+
+        self.olustur_baslik_etiketi = Gtk.Label(xalign=0)
+        self.olustur_baslik_etiketi.get_style_context().add_class("baslik")
+        kart.pack_start(self.olustur_baslik_etiketi, False, False, 0)
+
+        self.olustur_ad_girisi = Gtk.Entry()
+        self.olustur_ad_girisi.set_max_length(20)
+        kart.pack_start(self.olustur_ad_girisi, False, False, 0)
+
+        self.olustur_sifre_girisi = Gtk.Entry()
+        self.olustur_sifre_girisi.set_max_length(6)
+        kart.pack_start(self.olustur_sifre_girisi, False, False, 0)
+
+        self.olustur_buton = Gtk.Button()
+        self.olustur_buton.get_style_context().add_class("vurgu")
+        self.olustur_buton.connect("clicked", self._kullaniciyi_olustur)
+        kart.pack_start(self.olustur_buton, False, False, 6)
+
+        self.olustur_durum_etiketi = Gtk.Label(xalign=0, wrap=True)
+        self.olustur_durum_etiketi.get_style_context().add_class("etiket")
+        kart.pack_start(self.olustur_durum_etiketi, False, False, 0)
+
+        kutu.pack_start(kart, False, False, 0)
+        self.yigin.add_named(kutu, "kullanici_olustur")
+
+    def _kullanici_giris_sayfasi_olustur(self):
+        kutu = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        kutu.set_margin_top(30); kutu.set_margin_start(40); kutu.set_margin_end(40)
+
+        self.giris_geri_dugmesi = Gtk.Button()
+        self.giris_geri_dugmesi.get_style_context().add_class("duz")
+        self.giris_geri_dugmesi.connect("clicked", lambda _b: self.yigin.set_visible_child_name("giris"))
+        kutu.pack_start(self.giris_geri_dugmesi, False, False, 0)
+
+        kart = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        kart.get_style_context().add_class("kart")
+
+        self.kullanici_giris_baslik_etiketi = Gtk.Label(xalign=0)
+        self.kullanici_giris_baslik_etiketi.get_style_context().add_class("baslik")
+        kart.pack_start(self.kullanici_giris_baslik_etiketi, False, False, 0)
+
+        # Düzenlenebilir açılır liste: sağdaki ok önceden oluşturulmuş
+        # kullanıcı adlarını gösterir; öğrenci seçer ya da elle yazar.
+        self.giris_ad_combo = Gtk.ComboBoxText.new_with_entry()
+        kart.pack_start(self.giris_ad_combo, False, False, 0)
+
+        self.giris_sifre_girisi = Gtk.Entry()
+        self.giris_sifre_girisi.set_max_length(6)
+        kart.pack_start(self.giris_sifre_girisi, False, False, 0)
+
+        self.kullanici_giris_buton = Gtk.Button()
+        self.kullanici_giris_buton.get_style_context().add_class("vurgu")
+        self.kullanici_giris_buton.connect("clicked", self._kullanici_girisi_yap)
+        kart.pack_start(self.kullanici_giris_buton, False, False, 6)
+
+        self.giris_durum_etiketi = Gtk.Label(xalign=0, wrap=True)
+        self.giris_durum_etiketi.get_style_context().add_class("etiket")
+        kart.pack_start(self.giris_durum_etiketi, False, False, 0)
+
+        kutu.pack_start(kart, False, False, 0)
+        self.yigin.add_named(kutu, "kullanici_giris")
+
+    def _misafir_secildi(self, _düğme):
+        self.aktif_kullanici = None
+        self._metinleri_uygula()
+        self.yigin.set_visible_child_name("mod_secimi")
+
+    def _kullanici_olustur_ekrani(self, _düğme):
+        self.olustur_ad_girisi.set_text("")
+        self.olustur_sifre_girisi.set_text("")
+        self.olustur_durum_etiketi.set_text("")
+        baglam = self.olustur_durum_etiketi.get_style_context()
+        baglam.remove_class("durum-dogru"); baglam.remove_class("durum-yanlis")
+        self.yigin.set_visible_child_name("kullanici_olustur")
+
+    def _kullanici_giris_ekrani(self, _düğme):
+        # Açılır listeyi güncel adlarla doldur (yeni kayıtlar gelmiş olabilir).
+        self.giris_ad_combo.remove_all()
+        for ad in kullanici_defteri.adlari_listele():
+            self.giris_ad_combo.append_text(ad)
+        self.giris_ad_combo.get_child().set_text("")
+        self.giris_sifre_girisi.set_text("")
+        self.giris_durum_etiketi.set_text("")
+        self.yigin.set_visible_child_name("kullanici_giris")
+
+    def _kullaniciyi_olustur(self, _düğme):
+        m = METIN[self.dil]
+        ad = self.olustur_ad_girisi.get_text().strip()
+        sifre = self.olustur_sifre_girisi.get_text().strip()
+        baglam = self.olustur_durum_etiketi.get_style_context()
+        baglam.remove_class("durum-dogru"); baglam.remove_class("durum-yanlis")
+        if not kullanici_defteri.ad_gecerli_mi(ad):
+            self.olustur_durum_etiketi.set_text(m["ad_gecersiz"]); baglam.add_class("durum-yanlis"); return
+        if not kullanici_defteri.sifre_gecerli_mi(sifre):
+            self.olustur_durum_etiketi.set_text(m["sifre_gecersiz"]); baglam.add_class("durum-yanlis"); return
+        try:
+            kullanici_defteri.olustur(ad, sifre)
+        except kullanici_defteri.IsimAlinmis:
+            self.olustur_durum_etiketi.set_text(m["isim_alindi"]); baglam.add_class("durum-yanlis"); return
+        except (OSError, ValueError):
+            self.olustur_durum_etiketi.set_text(m["ad_gecersiz"]); baglam.add_class("durum-yanlis"); return
+        # Başarılı: giriş ekranına dön ve bilgilendir.
+        self.yigin.set_visible_child_name("giris")
+        kutu = Gtk.MessageDialog(
+            transient_for=self, modal=True,
+            message_type=Gtk.MessageType.INFO,
+            buttons=Gtk.ButtonsType.OK,
+            text=m["kullanici_olusturuldu"],
+        )
+        kutu.run(); kutu.destroy()
+
+    def _kullanici_girisi_yap(self, _düğme):
+        m = METIN[self.dil]
+        ad = self.giris_ad_combo.get_child().get_text().strip()
+        sifre = self.giris_sifre_girisi.get_text().strip()
+        baglam = self.giris_durum_etiketi.get_style_context()
+        baglam.remove_class("durum-yanlis")
+        if kullanici_defteri.dogrula(ad, sifre):
+            self.aktif_kullanici = ad
+            self._metinleri_uygula()
+            self.yigin.set_visible_child_name("mod_secimi")
+        else:
+            self.giris_durum_etiketi.set_text(m["giris_basarisiz"])
+            baglam.add_class("durum-yanlis")
+
     def _mod_secim_sayfasi_olustur(self):
         """Açılışta gösterilen ilk sayfa: Bireysel mi Sınıf mı."""
         kutu = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
         kutu.set_margin_top(50); kutu.set_margin_start(40); kutu.set_margin_end(40)
+
+        self.kullanici_degistir_dugmesi = Gtk.Button()
+        self.kullanici_degistir_dugmesi.get_style_context().add_class("duz")
+        self.kullanici_degistir_dugmesi.connect("clicked", lambda _b: self.yigin.set_visible_child_name("giris"))
+        kutu.pack_start(self.kullanici_degistir_dugmesi, False, False, 0)
+
+        self.hos_geldin_etiketi = Gtk.Label(xalign=0.5, wrap=True)
+        self.hos_geldin_etiketi.get_style_context().add_class("etiket")
+        kutu.pack_start(self.hos_geldin_etiketi, False, False, 0)
 
         self.mod_baslik_etiketi = Gtk.Label(xalign=0.5)
         self.mod_baslik_etiketi.get_style_context().add_class("baslik-sabit")
@@ -403,6 +702,9 @@ class PoligonPenceresi(Gtk.Window):
 
     def _sinif_modu_secildi(self, _düğme):
         self.bireysel_mod = False
+        # Giriş yapmış kullanıcının adını "Adın" alanına önceden doldur.
+        if self.aktif_kullanici:
+            self.ad_girisi.set_text(self.aktif_kullanici)
         self.yigin.set_visible_child_name("baglanti")
 
     def _baglanti_sayfasi_olustur(self):
@@ -458,6 +760,23 @@ class PoligonPenceresi(Gtk.Window):
         self.gecmis_ozet_etiketi.get_style_context().add_class("etiket")
         bireysel_kart.pack_start(self.gecmis_ozet_etiketi, False, False, 0)
 
+        # Zorluk seçimi: Kolay / Orta / Zor (varsayılan Orta)
+        self.zorluk_baslik_etiketi = Gtk.Label(xalign=0.5)
+        self.zorluk_baslik_etiketi.get_style_context().add_class("etiket")
+        bireysel_kart.pack_start(self.zorluk_baslik_etiketi, False, False, 0)
+
+        zorluk_kutu = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        zorluk_kutu.set_halign(Gtk.Align.CENTER)
+        self.zorluk_kolay_radio = Gtk.RadioButton.new_with_label(None, "")
+        self.zorluk_orta_radio = Gtk.RadioButton.new_with_label(None, "")
+        self.zorluk_orta_radio.join_group(self.zorluk_kolay_radio)
+        self.zorluk_zor_radio = Gtk.RadioButton.new_with_label(None, "")
+        self.zorluk_zor_radio.join_group(self.zorluk_kolay_radio)
+        self.zorluk_orta_radio.set_active(True)
+        for r in (self.zorluk_kolay_radio, self.zorluk_orta_radio, self.zorluk_zor_radio):
+            zorluk_kutu.pack_start(r, False, False, 0)
+        bireysel_kart.pack_start(zorluk_kutu, False, False, 0)
+
         self.teste_basla_dugmesi = Gtk.Button()
         self.teste_basla_dugmesi.get_style_context().add_class("vurgu")
         self.teste_basla_dugmesi.set_size_request(-1, 50)
@@ -466,6 +785,14 @@ class PoligonPenceresi(Gtk.Window):
 
         bireysel_kutu.pack_start(bireysel_kart, False, False, 0)
         self.yigin.add_named(bireysel_kutu, "bireysel_basla")
+
+    def _secili_zorluk(self) -> str:
+        """Bireysel ekrandaki radyo düğmelerinden seçili zorluğu döner."""
+        if self.zorluk_kolay_radio.get_active():
+            return "kolay"
+        if self.zorluk_zor_radio.get_active():
+            return "zor"
+        return "orta"
 
     def _bireysel_baslat(self, _düğme):
         """Bireysel modda: öğretmen sunucusuna HİÇ bağlanmadan, yerel
@@ -477,6 +804,7 @@ class PoligonPenceresi(Gtk.Window):
         secilen = random.choice(gorev_dosyalari).stem
 
         istemci = PoligonIstemci("", "", "", "bireysel")  # oda bilgisi kullanılmaz
+        istemci.zorluk = self._secili_zorluk()
         gorev = istemci.gorevi_yukle(secilen)
         istemci.gorevi_baslat()
         self._katildi(istemci, gorev)
@@ -504,20 +832,112 @@ class PoligonPenceresi(Gtk.Window):
                 if not basarili:
                     GLib.idle_add(self._katilma_reddedildi, hata_mesaji)
                     return
-                acik_gorevler = istemci.acik_gorevleri_getir()
-                if not acik_gorevler:
-                    GLib.idle_add(self._gorev_yok_hatasi)
-                    return
-                # Şimdilik ilk açık görev otomatik seçiliyor. Öğretmenin
-                # birden fazla görev arasından seçim yaptığı arayüz,
-                # Bireysel/Sınıf mod tasarımıyla birlikte eklenecek.
-                gorev = istemci.gorevi_yukle(acik_gorevler[0])
-                istemci.gorevi_baslat()
-                GLib.idle_add(self._katildi, istemci, gorev)
+                # Katılma başarılı -- artık ilk görevi ZORLA yüklemiyoruz.
+                # Öğretmen bir görev atayana kadar "Öğretmenden soru
+                # bekleniyor" ekranında beklenir; _bekleme_izlemeyi_baslat()
+                # açık görev gelince otomatik yükleyip görev ekranına geçer.
+                GLib.idle_add(self._beklemeye_gec, istemci)
             except BaglantiHatasi:
                 GLib.idle_add(self._katilma_hatasi)
 
         threading.Thread(target=arka_planda, daemon=True).start()
+
+    def _bekleme_sayfasi_olustur(self):
+        """Sınıfa katıldıktan sonra, öğretmen bir görev atayana kadar
+        gösterilen bekleme ekranı. Otomatik görev gelince görev ekranına
+        geçilir (bkz. _bekleme_izlemeyi_baslat)."""
+        kutu = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        kutu.set_margin_top(60); kutu.set_margin_start(40); kutu.set_margin_end(40)
+
+        kart = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        kart.get_style_context().add_class("kart")
+
+        self.bekleme_spinner = Gtk.Spinner()
+        self.bekleme_spinner.set_size_request(36, 36)
+        kart.pack_start(self.bekleme_spinner, False, False, 6)
+
+        self.bekleme_baslik_etiketi = Gtk.Label(xalign=0.5, wrap=True)
+        self.bekleme_baslik_etiketi.get_style_context().add_class("baslik-sabit")
+        kart.pack_start(self.bekleme_baslik_etiketi, False, False, 0)
+
+        self.bekleme_aciklama_etiketi = Gtk.Label(xalign=0.5, wrap=True)
+        self.bekleme_aciklama_etiketi.get_style_context().add_class("etiket")
+        kart.pack_start(self.bekleme_aciklama_etiketi, False, False, 0)
+
+        kutu.pack_start(kart, False, False, 0)
+        self.yigin.add_named(kutu, "bekleme")
+
+    def _beklemeye_gec(self, istemci):
+        """Katılma başarılı olduktan sonra çağrılır: bekleme ekranını
+        gösterir ve açık görev gelmesini izleyen poll'u başlatır."""
+        self.istemci = istemci
+        self.gorev_verisi = None
+        self._bekleme_yukleniyor = False
+        self._metinleri_uygula()
+        self.bekleme_spinner.start()
+        self.yigin.set_visible_child_name("bekleme")
+        self._bekleme_izlemeyi_baslat()
+
+    def _bekleme_izlemeyi_baslat(self):
+        """3 saniyede bir: (1) atılma/oda-kapanma durumunu izler,
+        (2) öğretmen bir görev açtıysa onu (arka planda) yükleyip görev
+        ekranına geçer. gorev_verisi dolunca poll kendiliğinden durur.
+        Not: öğretmen genelde öğrenciler katıldıktan SONRA görev atadığı
+        için ilk kontrolün 3 sn gecikmesi pratikte hissedilmez."""
+        def kontrol_et():
+            if self.istemci is None or self.gorev_verisi is not None:
+                return False
+            if self._bekleme_yukleniyor:
+                return True  # yükleme sürüyor, bekle
+            durum = self.istemci.sinif_baglanti_durumu()
+            if durum == "atildi":
+                self.bekleme_spinner.stop()
+                self._oturumu_sonlandir(m_anahtar="atildin")
+                return False
+            if durum == "oda_kapandi":
+                self.bekleme_spinner.stop()
+                self._oturumu_sonlandir(m_anahtar="oda_kapandi")
+                return False
+            if durum == "belirsiz":
+                return True  # geçici ağ sorunu, sonraki turda tekrar dene
+            try:
+                acik = self.istemci.acik_gorevleri_getir()
+            except BaglantiHatasi:
+                return True
+            if not acik:
+                return True  # hâlâ bekliyoruz
+
+            # Görev geldi -- yüklemeyi arka planda yap (yerel servis
+            # başlatmak UI'yi dondurmasın), sonra görev ekranına geç.
+            self._bekleme_yukleniyor = True
+            istemci = self.istemci
+            secilen = acik[0]
+            # Ogretmenin bu goreve atadigi zorlugu uygula (makine cevabi
+            # buna gore uretilir). acik_gorevleri_getir() yeni cagrildi.
+            istemci.zorluk = istemci.atanan_zorluk(secilen)
+            istemci.ozel_parametreler = istemci.atanan_parametreler(secilen)
+
+            def yukle():
+                try:
+                    gorev = istemci.gorevi_yukle(secilen)
+                    istemci.gorevi_baslat()
+                    GLib.idle_add(self._beklemeden_goreve, gorev)
+                except Exception:
+                    # Yükleme başarısız -- bayrağı bırak, sonraki turda tekrar dene.
+                    self._bekleme_yukleniyor = False
+
+            threading.Thread(target=yukle, daemon=True).start()
+            return True  # gorev_verisi dolunca poll bir sonraki turda durur
+
+        GLib.timeout_add_seconds(3, kontrol_et)
+
+    def _beklemeden_goreve(self, gorev):
+        """Bekleme ekranından, yüklenen göreve geçiş (ana thread'de)."""
+        self.bekleme_spinner.stop()
+        self._bekleme_yukleniyor = False
+        self.istemci._yuklu_soru_no = self.istemci.aktif_soru_no  # bu soruyu yukledim
+        self.istemci._yuklu_ayar_surumu = self.istemci.ayar_surumu
+        self._katildi(self.istemci, gorev)
 
     def _katilma_reddedildi(self, hata_mesaji: str):
         """Sunucu katılmayı reddetti -- yanlış şifre veya isim çakışması --
@@ -561,6 +981,7 @@ class PoligonPenceresi(Gtk.Window):
     def _katildi(self, istemci, gorev):
         self.istemci = istemci
         self.gorev_verisi = gorev
+        self._ipucu_kullanildi = False  # yeni gorev -> ipucu henuz kullanilmadi
         self._metinleri_uygula()
         self.yigin.set_visible_child_name("gorev")
         self._gorev_dugmelerini_guncelle(gorev)
@@ -590,6 +1011,7 @@ class PoligonPenceresi(Gtk.Window):
         secilen = random.choice(gorev_dosyalari).stem
 
         istemci = PoligonIstemci("", "", "", "bireysel")
+        istemci.zorluk = self._secili_zorluk()
         gorev = istemci.gorevi_yukle(secilen)
         istemci.gorevi_baslat()
         self._son_sonuc = None
@@ -610,9 +1032,20 @@ class PoligonPenceresi(Gtk.Window):
         kart = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         kart.get_style_context().add_class("kart")
 
+        # Başlık satırı: solda görev başlığı, sağda Güvenlik Paneli
+        # kısayolu (üzerine gelince "Güvenlik Paneline Git" ipucu çıkar).
+        baslik_satiri = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         self.gorev_baslik_etiketi = Gtk.Label(xalign=0)
         self.gorev_baslik_etiketi.get_style_context().add_class("baslik")
-        kart.pack_start(self.gorev_baslik_etiketi, False, False, 0)
+        baslik_satiri.pack_start(self.gorev_baslik_etiketi, True, True, 0)
+
+        self.guvenlik_paneli_dugmesi = Gtk.Button()
+        self.guvenlik_paneli_dugmesi.get_style_context().add_class("ikincil")
+        self.guvenlik_paneli_dugmesi.connect("clicked", self._guvenlik_panelini_ac)
+        self._guvenlik_paneli_dugmesini_hazirla()
+        baslik_satiri.pack_end(self.guvenlik_paneli_dugmesi, False, False, 0)
+
+        kart.pack_start(baslik_satiri, False, False, 0)
 
         self.senaryo_baslik_etiketi = Gtk.Label(xalign=0)
         self.senaryo_baslik_etiketi.get_style_context().add_class("etiket")
@@ -625,6 +1058,10 @@ class PoligonPenceresi(Gtk.Window):
         self.ipucu_dugmesi.get_style_context().add_class("ikincil")
         self.ipucu_dugmesi.connect("clicked", self._ipucunu_goster)
         kart.pack_start(self.ipucu_dugmesi, False, False, 4)
+
+        self.ipucu_not_etiketi = Gtk.Label(xalign=0, wrap=True)
+        self.ipucu_not_etiketi.get_style_context().add_class("etiket")
+        kart.pack_start(self.ipucu_not_etiketi, False, False, 0)
 
         self.ipucu_etiketi = Gtk.Label(xalign=0, wrap=True)
         self.ipucu_etiketi.get_style_context().add_class("etiket")
@@ -680,7 +1117,96 @@ class PoligonPenceresi(Gtk.Window):
         self._sohbet_mesajlari = []  # öğretmenden gelen tüm notlar, birikir
         self.yigin.add_named(kutu, "gorev")
 
+    def _guvenlik_paneli_dugmesini_hazirla(self):
+        """Butona güvenlik panelinin kendi logosunu koyar. Simge
+        .desktop'taki Icon alanından bulunur: değer tam bir YOL ise
+        dosyadan ölçekleyerek, bare bir İSİM ise tema/hicolor konumlarından.
+        Hiçbiri olmazsa emoji DEĞİL (emoji fontu olmayan sistemde tofu
+        kutusu çıkarır) düz bir metne düşülür. Tooltip _metinleri_uygula'da."""
+        dugme = self.guvenlik_paneli_dugmesi
+        ikon = None
+        try:
+            with open("/usr/share/applications/carotos-security-panel.desktop",
+                      encoding="utf-8") as f:
+                for satir in f:
+                    if satir.startswith("Icon="):
+                        ikon = satir[5:].strip()
+                        break
+        except OSError:
+            pass
+
+        aday_yollar = []
+        if ikon and "/" in ikon:
+            aday_yollar.append(ikon)
+        elif ikon:
+            for boyut in ("256x256", "128x128", "64x64", "48x48", "32x32"):
+                aday_yollar.append(
+                    f"/usr/share/icons/hicolor/{boyut}/apps/{ikon}.png"
+                )
+
+        gorsel = None
+        for yol in aday_yollar:
+            try:
+                if os.path.exists(yol):
+                    pb = GdkPixbuf.Pixbuf.new_from_file_at_size(yol, 20, 20)
+                    gorsel = Gtk.Image.new_from_pixbuf(pb)
+                    break
+            except Exception:
+                continue
+        if (gorsel is None and ikon and "/" not in ikon
+                and Gtk.IconTheme.get_default().has_icon(ikon)):
+            gorsel = Gtk.Image.new_from_icon_name(ikon, Gtk.IconSize.BUTTON)
+
+        if gorsel is not None:
+            dugme.set_image(gorsel)
+            dugme.set_always_show_image(True)
+        else:
+            dugme.set_label("Panel")
+
+    def _guvenlik_panelini_ac(self, _düğme):
+        """CarotOS Güvenlik Paneli'ni açar. Önce desktop dosyası id'siyle
+        (gtk-launch), o olmazsa .desktop içindeki Exec satırını okuyup
+        çalıştırır. Hiçbiri olmazsa öğrenciye kısa bir bilgi gösterir.
+        Panel ayrı bir süreç olarak açılır; Poligon'u bloke etmez."""
+        import shutil
+        import subprocess
+        if shutil.which("gtk-launch"):
+            try:
+                subprocess.Popen(
+                    ["gtk-launch", "carotos-security-panel"],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                )
+                return
+            except OSError:
+                pass
+        try:
+            with open("/usr/share/applications/carotos-security-panel.desktop",
+                      encoding="utf-8") as f:
+                for satir in f:
+                    if satir.startswith("Exec="):
+                        import shlex
+                        komut = satir[5:].strip()
+                        for alan in ("%u", "%U", "%f", "%F", "%i", "%c", "%k"):
+                            komut = komut.replace(alan, "")
+                        subprocess.Popen(
+                            shlex.split(komut),
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                        )
+                        return
+        except OSError:
+            pass
+        m = METIN[self.dil]
+        kutu = Gtk.MessageDialog(
+            transient_for=self, modal=True,
+            message_type=Gtk.MessageType.INFO,
+            buttons=Gtk.ButtonsType.OK,
+            text=m["guvenlik_paneli_yok"],
+        )
+        kutu.run()
+        kutu.destroy()
+
     def _ipucunu_goster(self, _düğme):
+        self._ipucu_kullanildi = True  # bu soruda puan yariya iner
         self.ipucu_etiketi.set_text(self._ipucu_metni)
 
     def _sohbeti_ciz(self):
@@ -774,7 +1300,7 @@ class PoligonPenceresi(Gtk.Window):
 
     def _cevabi_gonder(self, _düğme):
         cevap = self.cevap_girisi.get_text()
-        dogru = self.istemci.cevabi_kontrol_et(cevap)
+        dogru = self.istemci.cevabi_kontrol_et(cevap, getattr(self, "_ipucu_kullanildi", False))
         self._son_sonuc = dogru
         self._sonuc_etiketini_guncelle()
         if dogru:
@@ -877,9 +1403,21 @@ class PoligonPenceresi(Gtk.Window):
         eski yerel servisi durdurur, yeni görevi yükleyip başlatır,
         ekranı günceller."""
         m = METIN[self.dil]
+        # Sadece zorluk mu degisti, yoksa bambaska bir goreve mi gecildi?
+        onceki_id = self.gorev_verisi["id"] if self.gorev_verisi else None
+        sadece_zorluk = (onceki_id == yeni_gorev_id)
+        # Soru numarasi degismediyse bu bir AYAR degisikligidir (ör. hedef
+        # adres), yeni ya da zorlugu degismis bir soru degil.
+        sadece_ayar = (self.istemci.aktif_soru_no == self.istemci._yuklu_soru_no)
+        # Yeni gorevin ogretmence atanan zorlugunu uygula. gorev_degisti_mi()
+        # bunu tetiklerken acik_gorevleri_getir()'i cagirdigindan onbellek taze.
+        self.istemci.zorluk = self.istemci.atanan_zorluk(yeni_gorev_id)
+        self.istemci.ozel_parametreler = self.istemci.atanan_parametreler(yeni_gorev_id)
         yeni_gorev = self.istemci.gorevi_degistir(yeni_gorev_id)
         self.gorev_verisi = yeni_gorev
         self._son_sonuc = None
+        self._ipucu_kullanildi = False
+        self.ipucu_etiketi.set_text("")
         self.cevap_girisi.set_text("")
         self.gonder_dugmesi.set_sensitive(True)
         self._gorev_dugmelerini_guncelle(yeni_gorev)
@@ -888,10 +1426,14 @@ class PoligonPenceresi(Gtk.Window):
         # değiştiğini anlasın
         import time as _time
         saat = _time.strftime("%H:%M")
-        self._sohbet_mesajlari.append({
-            "metin": f"{m['yeni_gorev_bildirimi']} {yeni_gorev['baslik'][self.dil]}",
-            "saat": saat,
-        })
+        if sadece_ayar:
+            bildirim = m["ayar_degisti_bildirimi"]
+        elif sadece_zorluk:
+            zorluk_etiketi = m.get(f"zorluk_{self.istemci.zorluk}", self.istemci.zorluk)
+            bildirim = f"{m['zorluk_degisti_bildirimi']} {zorluk_etiketi}"
+        else:
+            bildirim = f"{m['yeni_gorev_bildirimi']} {yeni_gorev['baslik'][self.dil]}"
+        self._sohbet_mesajlari.append({"metin": bildirim, "saat": saat})
         self._sohbeti_ciz()
 
 
