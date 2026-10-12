@@ -235,7 +235,7 @@ sessizce imzasız grub'a döner, `enable` ise derlemeyi durdurur — bu yüzden
 Doğrulama, ISO bağlanarak yapılır:
 
 ```
-sudo mount -o loop carotos-1.1-amd64.iso ~/iso-mount
+sudo mount -o loop carotos-1.2-amd64.iso ~/iso-mount
 ls -l ~/iso-mount/EFI/boot/
 sudo umount ~/iso-mount
 ```
@@ -386,7 +386,7 @@ Orijinal dosyaları incelemek için (ölçü değişirse doğrulamak amacıyla):
 
 ```
 mkdir -p ~/iso-mount ~/logo-test
-sudo mount -o loop carotos-1.1-amd64.iso ~/iso-mount
+sudo mount -o loop carotos-1.2-amd64.iso ~/iso-mount
 cd ~/logo-test
 zcat ~/iso-mount/install/gtk/initrd.gz | cpio -idmv "usr/share/graphics/*"
 file usr/share/graphics/*
