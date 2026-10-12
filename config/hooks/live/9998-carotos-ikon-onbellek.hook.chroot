@@ -1,0 +1,11 @@
+#!/bin/sh
+# CarotOS: Papirus simge temalarinin onbellegini uret.
+# Onbellek yoksa her GTK sureci (panel, nm-applet, xfdesktop, xfwm4...)
+# binlerce simgeyi tarayip ~100 MB fazla bellek tutar.
+set -e
+for tema in Papirus Papirus-Dark Papirus-Light ePapirus ePapirus-Dark; do
+    if [ -d "/usr/share/icons/$tema" ]; then
+        gtk-update-icon-cache -f -t "/usr/share/icons/$tema" || true
+    fi
+done
+exit 0

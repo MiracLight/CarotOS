@@ -20,6 +20,8 @@ ekstra bir IPC kanali gerekmiyor.
 
 from __future__ import annotations
 
+from ag_guvenlik import loopback_adres_mi  # noqa: E402
+
 import socket
 import threading
 
@@ -28,12 +30,12 @@ class SahteGirisServisi:
     """127.0.0.1 disina ASLA baglanmayan, tek kullanicili sahte giris servisi."""
 
     def __init__(self, kullanici: str, parola: str, port: int, bind_adres: str = "127.0.0.1"):
-        if bind_adres != "127.0.0.1":
+        if not loopback_adres_mi(bind_adres):
             # Modul seviyesinde de zorunlu kilinir -- gorev JSON'undaki
             # kural burada ikinci kez, kod seviyesinde uygulanir.
             raise ValueError(
-                f"GUVENLIK IHLALI: bind_adres '{bind_adres}' -- sadece "
-                "127.0.0.1 kabul edilir."
+                f"GUVENLIK IHLALI: bind_adres '{bind_adres}' -- sadece loopback "
+                "(127.0.0.0/8) kabul edilir."
             )
         self.kullanici = kullanici
         self.parola = parola

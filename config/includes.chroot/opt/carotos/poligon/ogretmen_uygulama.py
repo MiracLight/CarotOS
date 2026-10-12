@@ -29,6 +29,8 @@ from gi.repository import GLib, Gtk  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from ogretmen_sunucu import OdaDurumu, oda_kodu_uret, oda_sifresi_uret, sunucu_baslat  # noqa: E402
+import soru_sablonlari as _sablon  # noqa: E402
+import soru_defteri as _defter  # noqa: E402
 
 
 def _yerel_ip_adresini_bul() -> str:
@@ -71,14 +73,65 @@ METIN = {
         "tum_sinif_aciklama": "Tüm sınıfta uygula",
         "ipucu_gonder": "İpucu Gönder",
         "secim_yok": "Önce listeden bir öğrenci seç",
+        "cevaplari_goster": "Verdiği Cevaplar",
+        "cevaplar_kisa": "Cevaplar",
+        "cevaplar_baslik": "{ad} — Verdiği Cevaplar",
+        "cevaplar_bos": "Bu öğrenci henüz cevap göndermedi.",
+        "cevaplar_soru_no": "{n}. soru:",
+        "cevaplar_kapat": "Kapat",
         "gonderildi": "İpucu gönderildi",
         "gonderildi_tum": "Tüm sınıfa gönderildi",
         "sekme_ogrenciler": "Öğrenciler",
-        "sekme_sinif": "Sınıf",
-        "sinif_basligi": "Sınıf Ayarları",
-        "sinif_aciklama": "Açtığın görevi tüm sınıf görür.",
-        "siradaki_gorev": "Seçili Göreve Geç (Tüm Sınıf)",
+        "sekme_sinif": "Sorular",
+        "sinif_basligi": "Soru Ata",
+        "sinif_aciklama": "Seçtiğin görevi ve zorluğu tüm sınıfa 'soru' olarak gönderirsin; her atama sıradaki soru numarasını alır.",
+        "siradaki_gorev": "Soruyu Ata (Tüm Sınıf)",
+        "soru_atama_durumu": "{n}. soru atandı: {b} · {z}",
+        "henuz_soru_yok": "Henüz soru atanmadı.",
+        "sekme_soru_olustur": "Soru Oluştur",
+        "so_baslik": "Soru Oluştur",
+        "so_aciklama": "Bir araç seç, parametreleri belirle (hazır öneriden seç ya da kendin yaz). Doğru cevabı makine üretir; her öğrencide farklı olur.",
+        "so_arac_etiketi": "Araç",
+        "so_onizle_dugme": "Önizle",
+        "so_gonder_dugme": "Sınıfa Gönder",
+        "so_ornek_cevap": "Örnek cevap (her öğrencide farklı üretilir): {c}",
+        "so_gonderildi": "{n}. soru (özel) atandı: {b} — {e}",
+        "so_hata": "Geçersiz değer:",
+        "so_ad_etiketi": "Soru adı",
+        "so_ad_yer_tut": "İsteğe bağlı (kaydederken görünür)",
+        "so_kaydet_dugme": "Kaydet",
+        "so_kaydedildi": "Soru kaydedildi (Kaydedilmiş Sorular sekmesinde).",
+        "sekme_kayitli": "Kaydedilmiş Sorular",
+        "ks_baslik": "Kaydedilmiş Sorular",
+        "ks_aciklama": "Kaydettiğin soruları buradan sınıfa gönderebilir ya da silebilirsin.",
+        "ks_gonder": "Sınıfa Gönder",
+        "ks_sil": "Sil",
+        "ks_yenile": "Yenile",
+        "ks_bos": "Henüz kayıtlı soru yok. 'Soru Oluştur'da Kaydet'e bas.",
+        "sekme_ip": "IP ve Adres",
+        "ip_baslik": "Sınıf Hedef Adresi",
+        "ip_aciklama": "Görevlerin çalışacağı hedef adresi belirle. Sadece loopback (127.x.x.x) kabul edilir; tüm trafik makinede kalır, dışarı çıkmaz. Ayarladığın adres, AÇIK olan mevcut soru dahil tüm sınıfa anında uygulanır (öğrenciler uyarı alıp görevi yeniden yükler).",
+        "ip_mevcut": "Şu anki sınıf hedef adresi: {a}",
+        "ip_uret_dugme": "Rastgele Üret",
+        "ip_uygula_dugme": "Sınıfa Uygula",
+        "ip_varsayilan_dugme": "Varsayılana Dön (127.0.0.1)",
+        "ip_uygulandi": "Sınıf hedef adresi ayarlandı: {a} (mevcut açık soru dahil tüm sınıfa uygulandı).",
+        "ip_hata": "Geçersiz adres — yalnızca loopback (127.x.x.x) olabilir.",
+        "ip_girdi_yer_tut": "örn. 127.45.0.1",
+        "alt_sekme_ogrenciler": "Öğrenciler",
+        "alt_sekme_sinif": "Sınıf",
+        "ozet_baslik": "Sınıf Skor Tablosu",
+        "ozet_aciklama": "Öğrenciler puana göre sıralı. Puan = çözülen soruların toplamı (ipucu kullanılan soruda yarı puan).",
+        "ozet_bos": "Henüz veri yok.",
+        "ozet_s_ad": "Öğrenci",
+        "ozet_s_cozulen": "Çözülen",
+        "ozet_s_puan": "Puan",
+        "ozet_s_deneme": "Deneme",
         "siradaki_gecildi": "Sınıf şu göreve geçirildi:",
+        "zorluk_basligi": "Zorluk",
+        "zorluk_kolay": "Kolay",
+        "zorluk_orta": "Orta",
+        "zorluk_zor": "Zor",
         "sure_sn": "sn",
         "ogrenciyi_at": "Öğrenciyi listeden çıkar",
         "savunma_ayirici": "— Savunma görevleri (öğrencinin sudo yetkisi olmalı) —",
@@ -98,14 +151,65 @@ METIN = {
         "tum_sinif_aciklama": "Apply to whole class",
         "ipucu_gonder": "Send Hint",
         "secim_yok": "Select a student from the list first",
+        "cevaplari_goster": "Submitted Answers",
+        "cevaplar_kisa": "Answers",
+        "cevaplar_baslik": "{ad} — Submitted Answers",
+        "cevaplar_bos": "This student hasn't submitted any answers yet.",
+        "cevaplar_soru_no": "Q{n}:",
+        "cevaplar_kapat": "Close",
         "gonderildi": "Hint sent",
         "gonderildi_tum": "Sent to the whole class",
         "sekme_ogrenciler": "Students",
-        "sekme_sinif": "Class",
-        "sinif_basligi": "Class Settings",
-        "sinif_aciklama": "Whatever task you open, the whole class sees it.",
-        "siradaki_gorev": "Go to Selected Task (Whole Class)",
+        "sekme_sinif": "Questions",
+        "sinif_basligi": "Assign Question",
+        "sinif_aciklama": "You send the chosen task and difficulty to the whole class as a 'question'; each assignment gets the next question number.",
+        "siradaki_gorev": "Assign Question (Whole Class)",
+        "soru_atama_durumu": "Question {n} assigned: {b} · {z}",
+        "henuz_soru_yok": "No question assigned yet.",
+        "sekme_soru_olustur": "Create Question",
+        "so_baslik": "Create Question",
+        "so_aciklama": "Pick a tool and set the parameters (choose a suggestion or type your own). The machine computes the correct answer; it differs for each student.",
+        "so_arac_etiketi": "Tool",
+        "so_onizle_dugme": "Preview",
+        "so_gonder_dugme": "Send to Class",
+        "so_ornek_cevap": "Sample answer (generated differently per student): {c}",
+        "so_gonderildi": "Question {n} (custom) assigned: {b} — {e}",
+        "so_hata": "Invalid value:",
+        "so_ad_etiketi": "Question name",
+        "so_ad_yer_tut": "Optional (shown when saved)",
+        "so_kaydet_dugme": "Save",
+        "so_kaydedildi": "Question saved (see the Saved Questions tab).",
+        "sekme_kayitli": "Saved Questions",
+        "ks_baslik": "Saved Questions",
+        "ks_aciklama": "Send a saved question to the class or delete it from here.",
+        "ks_gonder": "Send to Class",
+        "ks_sil": "Delete",
+        "ks_yenile": "Refresh",
+        "ks_bos": "No saved questions yet. Press Save in 'Create Question'.",
+        "sekme_ip": "IP & Address",
+        "ip_baslik": "Class Target Address",
+        "ip_aciklama": "Set the address tasks will run on. Only loopback (127.x.x.x) is allowed; all traffic stays on the machine. The address applies to the whole class immediately, including the currently open question (students get a notice and reload the task).",
+        "ip_mevcut": "Current class target address: {a}",
+        "ip_uret_dugme": "Generate Random",
+        "ip_uygula_dugme": "Apply to Class",
+        "ip_varsayilan_dugme": "Reset to Default (127.0.0.1)",
+        "ip_uygulandi": "Class target address set: {a} (applied to the whole class, including the current question).",
+        "ip_hata": "Invalid address — only loopback (127.x.x.x) is allowed.",
+        "ip_girdi_yer_tut": "e.g. 127.45.0.1",
+        "alt_sekme_ogrenciler": "Students",
+        "alt_sekme_sinif": "Class",
+        "ozet_baslik": "Class Scoreboard",
+        "ozet_aciklama": "Students sorted by score. Score = total of solved questions (half points when the hint was used).",
+        "ozet_bos": "No data yet.",
+        "ozet_s_ad": "Student",
+        "ozet_s_cozulen": "Solved",
+        "ozet_s_puan": "Score",
+        "ozet_s_deneme": "Attempts",
         "siradaki_gecildi": "Class advanced to:",
+        "zorluk_basligi": "Difficulty",
+        "zorluk_kolay": "Easy",
+        "zorluk_orta": "Medium",
+        "zorluk_zor": "Hard",
         "sure_sn": "s",
         "ogrenciyi_at": "Remove student from list",
         "savunma_ayirici": "— Defense tasks (student needs sudo access) —",
@@ -199,7 +303,10 @@ class OgretmenPenceresi(Gtk.Window):
         kod = oda_kodu_uret()
         sifre = oda_sifresi_uret()
         self.oda = OdaDurumu(kod, sifre)
-        self.oda.gorev_ac(gorev_id)
+        # Oda BOS baslar: ogretmen "Soruyu Ata" demeden hicbir gorev acik
+        # degildir (ogrenci "ogretmenden soru bekleniyor" ekraninda bekler).
+        # gorev_id yalnizca baslangicta hangi radyonun secili gelecegini belirler.
+        self._on_secili_gorev = gorev_id
         self._gercek_ip = _yerel_ip_adresini_bul()
         self._ip_gorunur = False
         self.sunucu = sunucu_baslat(self.oda, "0.0.0.0", 8642)
@@ -275,6 +382,18 @@ class OgretmenPenceresi(Gtk.Window):
             row:hover {{ background-color: {liste_hover}; }}
             row:selected, row:selected:hover {{ background-color: {VURGU}; }}
             row:selected label {{ color: white; }}
+            .alt-sekme-secici {{
+                background-color: {giris_zemin}; border-radius: 999px; padding: 3px;
+                border: 1px solid {giris_kenar};
+            }}
+            .alt-sekme-secici button {{
+                background-color: transparent; background-image: none;
+                border: none; box-shadow: none; border-radius: 999px;
+                padding: 4px 20px; margin: 0; min-height: 0; color: {metin_soft};
+            }}
+            .alt-sekme-secici button label {{ color: {metin_soft}; font-weight: 600; }}
+            .alt-sekme-secici button:checked {{ background-color: {VURGU}; }}
+            .alt-sekme-secici button:checked label {{ color: white; }}
         """.encode())
 
     def _arayuzu_kur(self):
@@ -341,10 +460,489 @@ class OgretmenPenceresi(Gtk.Window):
 
         self.sekmeler.append_page(self._ogrenciler_sekmesi_olustur(), Gtk.Label(label=""))
         self.sekmeler.append_page(self._sinif_sekmesi_olustur(), Gtk.Label(label=""))
+        self.sekmeler.append_page(self._soru_olustur_sekmesi_olustur(), Gtk.Label(label=""))
+        self.sekmeler.append_page(self._kayitli_sorular_sekmesi_olustur(), Gtk.Label(label=""))
+        self.sekmeler.append_page(self._ip_adres_sekmesi_olustur(), Gtk.Label(label=""))
 
         self.add(disKutu)
 
+    def _soru_olustur_sekmesi_olustur(self) -> Gtk.Widget:
+        icerik = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        icerik.set_margin_top(14); icerik.set_margin_start(16)
+        icerik.set_margin_end(16); icerik.set_margin_bottom(14)
+
+        kart = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        kart.get_style_context().add_class("kart")
+
+        self.so_baslik_etiketi = Gtk.Label(xalign=0)
+        self.so_baslik_etiketi.get_style_context().add_class("baslik-sabit")
+        kart.pack_start(self.so_baslik_etiketi, False, False, 0)
+
+        self.so_aciklama_etiketi = Gtk.Label(xalign=0, wrap=True)
+        self.so_aciklama_etiketi.get_style_context().add_class("etiket")
+        kart.pack_start(self.so_aciklama_etiketi, False, False, 0)
+
+        arac_satir = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        self.so_arac_etiketi = Gtk.Label(xalign=0)
+        self.so_arac_etiketi.get_style_context().add_class("etiket")
+        arac_satir.pack_start(self.so_arac_etiketi, False, False, 0)
+        self.so_arac_combo = Gtk.ComboBoxText()
+        for gid in _sablon.arac_listesi():
+            self.so_arac_combo.append(gid, _sablon.SABLONLAR[gid]["baslik"][self.dil])
+        self.so_arac_combo.set_active(0)
+        self.so_arac_combo.connect("changed", self._so_arac_degisti)
+        arac_satir.pack_start(self.so_arac_combo, True, True, 0)
+        kart.pack_start(arac_satir, False, False, 0)
+
+        # Secili aracin alanlari bu kutuya dinamik cizilir.
+        self.so_alan_kutu = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        kart.pack_start(self.so_alan_kutu, False, False, 0)
+        self._so_alanlar = []  # [(anahtar, combo_with_entry)]
+
+        ad_satir = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        self.so_ad_etiketi = Gtk.Label(xalign=0)
+        self.so_ad_etiketi.get_style_context().add_class("etiket")
+        ad_satir.pack_start(self.so_ad_etiketi, False, False, 0)
+        self.so_ad_girisi = Gtk.Entry()
+        ad_satir.pack_start(self.so_ad_girisi, True, True, 0)
+        kart.pack_start(ad_satir, False, False, 0)
+
+        dugme_satir = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        self.so_onizle_dugmesi = Gtk.Button()
+        self.so_onizle_dugmesi.get_style_context().add_class("ikincil")
+        self.so_onizle_dugmesi.connect("clicked", self._so_onizle)
+        dugme_satir.pack_start(self.so_onizle_dugmesi, False, False, 0)
+        self.so_gonder_dugmesi = Gtk.Button()
+        self.so_gonder_dugmesi.get_style_context().add_class("vurgu")
+        self.so_gonder_dugmesi.connect("clicked", self._so_gonder)
+        dugme_satir.pack_start(self.so_gonder_dugmesi, False, False, 0)
+        self.so_kaydet_dugmesi = Gtk.Button()
+        self.so_kaydet_dugmesi.get_style_context().add_class("ikincil")
+        self.so_kaydet_dugmesi.connect("clicked", self._so_kaydet)
+        dugme_satir.pack_start(self.so_kaydet_dugmesi, False, False, 0)
+        kart.pack_start(dugme_satir, False, False, 6)
+
+        self.so_onizleme_etiketi = Gtk.Label(xalign=0, wrap=True)
+        self.so_onizleme_etiketi.get_style_context().add_class("etiket")
+        kart.pack_start(self.so_onizleme_etiketi, False, False, 0)
+
+        self.so_durum_etiketi = Gtk.Label(xalign=0, wrap=True)
+        self.so_durum_etiketi.get_style_context().add_class("etiket")
+        kart.pack_start(self.so_durum_etiketi, False, False, 0)
+
+        icerik.pack_start(kart, True, True, 0)
+        self._so_alanlari_ciz()  # ilk arac icin alanlari ciz
+        return icerik
+
+    def _so_secili_arac(self) -> str:
+        return self.so_arac_combo.get_active_id() or _sablon.arac_listesi()[0]
+
+    def _so_alanlari_ciz(self):
+        """Secili aracin alan satirlarini (etiket + onerili serbest giris)
+        yeniden cizer."""
+        for c in list(self.so_alan_kutu.get_children()):
+            self.so_alan_kutu.remove(c)
+        self._so_alanlar = []
+        gid = self._so_secili_arac()
+        for alan in _sablon.SABLONLAR[gid]["alanlar"]:
+            satir = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+            etiket = Gtk.Label(xalign=0, label=alan["etiket"][self.dil])
+            etiket.get_style_context().add_class("etiket")
+            etiket.set_size_request(190, -1)
+            satir.pack_start(etiket, False, False, 0)
+            combo = Gtk.ComboBoxText.new_with_entry()
+            for o in _sablon.onerileri_uret(gid, alan["anahtar"]):
+                combo.append_text(o)
+            combo.get_child().set_text(_sablon.varsayilan(gid, alan["anahtar"]))
+            satir.pack_start(combo, True, True, 0)
+            self.so_alan_kutu.pack_start(satir, False, False, 0)
+            self._so_alanlar.append((alan["anahtar"], combo))
+        self.so_alan_kutu.show_all()
+
+    def _so_arac_degisti(self, _combo):
+        self._so_alanlari_ciz()
+        self.so_onizleme_etiketi.set_text("")
+        self.so_durum_etiketi.set_text("")
+
+    def _so_degerleri_topla(self) -> dict:
+        return {anahtar: combo.get_child().get_text().strip()
+                for anahtar, combo in self._so_alanlar}
+
+    def _so_onizle(self, _w):
+        """Secili parametrelerle gorevi YERELDE bir kez calistirip ornek
+        cevabi ve senaryo metnini gosterir (ornek cevap her ogrencide farkli)."""
+        m = METIN[self.dil]
+        gid = self._so_secili_arac()
+        try:
+            params = _sablon.parametreleri_ayristir(gid, self._so_degerleri_topla())
+        except _sablon.GecersizDeger as e:
+            self.so_onizleme_etiketi.set_text("")
+            self.so_durum_etiketi.set_text(f"{m['so_hata']} {e}")
+            return
+        from ogrenci_istemci import PoligonIstemci  # GTK'siz, yerel engine
+        ist = PoligonIstemci("", "", "", "bireysel")
+        ist.ozel_parametreler = params
+        ist.sinif_hedef_adres = self.oda.hedef_adres
+        ornek, senaryo = "", ""
+        try:
+            gorev = ist.gorevi_yukle(gid)
+            ist.gorevi_baslat()
+            ornek = ist._dogru_cevap
+            senaryo = gorev["senaryo"][self.dil]
+            aralik = ist.aralik_metni()
+            if aralik:
+                senaryo = senaryo.replace("{aralik}", aralik)
+        finally:
+            ist.gorevi_durdur()
+        self.so_durum_etiketi.set_text("")
+        self.so_onizleme_etiketi.set_text(
+            senaryo + "\n\n" + m["so_ornek_cevap"].format(c=ornek)
+        )
+
+    def _so_gonder(self, _w):
+        m = METIN[self.dil]
+        gid = self._so_secili_arac()
+        try:
+            params = _sablon.parametreleri_ayristir(gid, self._so_degerleri_topla())
+        except _sablon.GecersizDeger as e:
+            self.so_durum_etiketi.set_text(f"{m['so_hata']} {e}")
+            return
+        etiket = _sablon.etiket_uret(gid, params)
+        soru_no = self.oda.ozel_soru_ata(gid, params, etiket)
+        baslik = _sablon.SABLONLAR[gid]["baslik"][self.dil]
+        self.so_onizleme_etiketi.set_text("")
+        self.so_durum_etiketi.set_text(
+            m["so_gonderildi"].format(n=soru_no, b=baslik, e=etiket)
+        )
+
+    def _so_kaydet(self, _w):
+        m = METIN[self.dil]
+        gid = self._so_secili_arac()
+        try:
+            params = _sablon.parametreleri_ayristir(gid, self._so_degerleri_topla())
+        except _sablon.GecersizDeger as e:
+            self.so_durum_etiketi.set_text(f"{m['so_hata']} {e}")
+            return
+        ad = self.so_ad_girisi.get_text().strip()
+        _defter.kaydet(gid, params, ad)
+        self.so_onizleme_etiketi.set_text("")
+        self.so_durum_etiketi.set_text(m["so_kaydedildi"])
+        if hasattr(self, "ks_liste"):
+            self._kayitli_listesini_yenile()
+
+    def _kayitli_sorular_sekmesi_olustur(self) -> Gtk.Widget:
+        icerik = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        icerik.set_margin_top(14); icerik.set_margin_start(16)
+        icerik.set_margin_end(16); icerik.set_margin_bottom(14)
+
+        kart = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        kart.get_style_context().add_class("kart")
+
+        ust = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        self.ks_baslik_etiketi = Gtk.Label(xalign=0)
+        self.ks_baslik_etiketi.get_style_context().add_class("baslik-sabit")
+        ust.pack_start(self.ks_baslik_etiketi, True, True, 0)
+        self.ks_yenile_dugmesi = Gtk.Button()
+        self.ks_yenile_dugmesi.get_style_context().add_class("ikincil")
+        self.ks_yenile_dugmesi.connect("clicked", self._kayitli_listesini_yenile)
+        ust.pack_start(self.ks_yenile_dugmesi, False, False, 0)
+        kart.pack_start(ust, False, False, 0)
+
+        self.ks_aciklama_etiketi = Gtk.Label(xalign=0, wrap=True)
+        self.ks_aciklama_etiketi.get_style_context().add_class("etiket")
+        kart.pack_start(self.ks_aciklama_etiketi, False, False, 0)
+
+        self.ks_liste = Gtk.ListBox()
+        self.ks_liste.set_selection_mode(Gtk.SelectionMode.NONE)
+        kaydirma = Gtk.ScrolledWindow()
+        kaydirma.set_min_content_height(260)
+        kaydirma.add(self.ks_liste)
+        kart.pack_start(kaydirma, True, True, 0)
+
+        self.ks_durum_etiketi = Gtk.Label(xalign=0, wrap=True)
+        self.ks_durum_etiketi.get_style_context().add_class("etiket")
+        kart.pack_start(self.ks_durum_etiketi, False, False, 0)
+
+        icerik.pack_start(kart, True, True, 0)
+        self._kayitli_listesini_yenile()
+        return icerik
+
+    def _kayitli_listesini_yenile(self, *_):
+        m = METIN[self.dil]
+        for c in list(self.ks_liste.get_children()):
+            self.ks_liste.remove(c)
+        gorunur = 0
+        for kayit in _defter.listele():
+            gid = kayit.get("gorev_id")
+            if gid not in _sablon.SABLONLAR:
+                continue  # artik bilinmeyen arac -- atla
+            gorunur += 1
+            baslik = _sablon.SABLONLAR[gid]["baslik"][self.dil]
+            etiket_metni = _sablon.etiket_uret(gid, kayit.get("parametreler", {}))
+            ad = kayit.get("ad") or baslik
+
+            satir = Gtk.ListBoxRow()
+            kutu = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+            kutu.set_margin_top(4); kutu.set_margin_bottom(4)
+            kutu.set_margin_start(6); kutu.set_margin_end(6)
+            bilgi = Gtk.Label(xalign=0, wrap=True)
+            bilgi.set_markup(
+                "<b>%s</b>\n<small>%s — %s</small>"
+                % (GLib.markup_escape_text(ad),
+                   GLib.markup_escape_text(baslik),
+                   GLib.markup_escape_text(etiket_metni))
+            )
+            kutu.pack_start(bilgi, True, True, 0)
+            gonder = Gtk.Button(label=m["ks_gonder"])
+            gonder.get_style_context().add_class("vurgu")
+            gonder.connect("clicked", self._ks_gonder, kayit)
+            kutu.pack_start(gonder, False, False, 0)
+            sil = Gtk.Button(label=m["ks_sil"])
+            sil.connect("clicked", self._ks_sil, kayit)
+            kutu.pack_start(sil, False, False, 0)
+            satir.add(kutu)
+            self.ks_liste.add(satir)
+
+        if gorunur == 0:
+            bos_satir = Gtk.ListBoxRow(selectable=False, activatable=False)
+            bos_etiket = Gtk.Label(xalign=0.5, label=m["ks_bos"])
+            bos_etiket.get_style_context().add_class("etiket")
+            bos_etiket.set_margin_top(16); bos_etiket.set_margin_bottom(16)
+            bos_satir.add(bos_etiket)
+            self.ks_liste.add(bos_satir)
+        self.ks_liste.show_all()
+
+    def _ks_gonder(self, _btn, kayit):
+        m = METIN[self.dil]
+        gid = kayit["gorev_id"]
+        params = kayit.get("parametreler", {})
+        etiket = _sablon.etiket_uret(gid, params)
+        soru_no = self.oda.ozel_soru_ata(gid, params, etiket)
+        baslik = _sablon.SABLONLAR[gid]["baslik"][self.dil]
+        self.ks_durum_etiketi.set_text(
+            m["so_gonderildi"].format(n=soru_no, b=baslik, e=etiket)
+        )
+
+    def _ks_sil(self, _btn, kayit):
+        _defter.sil(kayit.get("id", ""))
+        self._kayitli_listesini_yenile()
+
+    def _ks_metinleri_uygula(self):
+        m = METIN[self.dil]
+        self.ks_baslik_etiketi.set_text(m["ks_baslik"])
+        self.ks_aciklama_etiketi.set_text(m["ks_aciklama"])
+        self.ks_yenile_dugmesi.set_label(m["ks_yenile"])
+        self._kayitli_listesini_yenile()
+
+    def _so_metinleri_uygula(self):
+        m = METIN[self.dil]
+        self.so_baslik_etiketi.set_text(m["so_baslik"])
+        self.so_aciklama_etiketi.set_text(m["so_aciklama"])
+        self.so_arac_etiketi.set_text(m["so_arac_etiketi"])
+        self.so_onizle_dugmesi.set_label(m["so_onizle_dugme"])
+        self.so_gonder_dugmesi.set_label(m["so_gonder_dugme"])
+        self.so_kaydet_dugmesi.set_label(m["so_kaydet_dugme"])
+        self.so_ad_etiketi.set_text(m["so_ad_etiketi"])
+        self.so_ad_girisi.set_placeholder_text(m["so_ad_yer_tut"])
+
+    def _ip_adres_sekmesi_olustur(self) -> Gtk.Widget:
+        icerik = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        icerik.set_margin_top(14); icerik.set_margin_start(16)
+        icerik.set_margin_end(16); icerik.set_margin_bottom(14)
+
+        kart = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        kart.get_style_context().add_class("kart")
+
+        self.ip_baslik_etiketi2 = Gtk.Label(xalign=0)
+        self.ip_baslik_etiketi2.get_style_context().add_class("baslik-sabit")
+        kart.pack_start(self.ip_baslik_etiketi2, False, False, 0)
+
+        self.ip_aciklama_etiketi = Gtk.Label(xalign=0, wrap=True)
+        self.ip_aciklama_etiketi.get_style_context().add_class("etiket")
+        kart.pack_start(self.ip_aciklama_etiketi, False, False, 0)
+
+        self.ip_mevcut_etiketi = Gtk.Label(xalign=0, wrap=True)
+        self.ip_mevcut_etiketi.get_style_context().add_class("baslik-sabit")
+        kart.pack_start(self.ip_mevcut_etiketi, False, False, 6)
+
+        giris_satir = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        self.ip_girisi = Gtk.Entry()
+        giris_satir.pack_start(self.ip_girisi, True, True, 0)
+        self.ip_uret_dugmesi = Gtk.Button()
+        self.ip_uret_dugmesi.get_style_context().add_class("ikincil")
+        self.ip_uret_dugmesi.connect("clicked", self._ip_rastgele)
+        giris_satir.pack_start(self.ip_uret_dugmesi, False, False, 0)
+        kart.pack_start(giris_satir, False, False, 0)
+
+        dugme_satir = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        self.ip_uygula_dugmesi = Gtk.Button()
+        self.ip_uygula_dugmesi.get_style_context().add_class("vurgu")
+        self.ip_uygula_dugmesi.connect("clicked", self._ip_uygula)
+        dugme_satir.pack_start(self.ip_uygula_dugmesi, False, False, 0)
+        self.ip_varsayilan_dugmesi = Gtk.Button()
+        self.ip_varsayilan_dugmesi.get_style_context().add_class("ikincil")
+        self.ip_varsayilan_dugmesi.connect("clicked", self._ip_varsayilan)
+        dugme_satir.pack_start(self.ip_varsayilan_dugmesi, False, False, 0)
+        kart.pack_start(dugme_satir, False, False, 6)
+
+        self.ip_durum_etiketi = Gtk.Label(xalign=0, wrap=True)
+        self.ip_durum_etiketi.get_style_context().add_class("etiket")
+        kart.pack_start(self.ip_durum_etiketi, False, False, 0)
+
+        icerik.pack_start(kart, True, True, 0)
+        return icerik
+
+    def _ip_rastgele(self, _w):
+        import random
+        a = random.randint(1, 254); b = random.randint(0, 254); c = random.randint(1, 254)
+        self.ip_girisi.set_text(f"127.{a}.{b}.{c}")
+
+    def _ip_uygula(self, _w):
+        m = METIN[self.dil]
+        try:
+            adres = self.oda.set_hedef_adres(self.ip_girisi.get_text())
+        except ValueError:
+            self.ip_durum_etiketi.set_text(m["ip_hata"])
+            return
+        self.ip_durum_etiketi.set_text(m["ip_uygulandi"].format(a=adres))
+        self._ip_mevcut_guncelle()
+
+    def _ip_varsayilan(self, _w):
+        m = METIN[self.dil]
+        adres = self.oda.set_hedef_adres("127.0.0.1")
+        self.ip_girisi.set_text(adres)
+        self.ip_durum_etiketi.set_text(m["ip_uygulandi"].format(a=adres))
+        self._ip_mevcut_guncelle()
+
+    def _ip_mevcut_guncelle(self):
+        m = METIN[self.dil]
+        self.ip_mevcut_etiketi.set_text(m["ip_mevcut"].format(a=self.oda.hedef_adres))
+
+    def _ip_metinleri_uygula(self):
+        m = METIN[self.dil]
+        self.ip_baslik_etiketi2.set_text(m["ip_baslik"])
+        self.ip_aciklama_etiketi.set_text(m["ip_aciklama"])
+        self.ip_uret_dugmesi.set_label(m["ip_uret_dugme"])
+        self.ip_uygula_dugmesi.set_label(m["ip_uygula_dugme"])
+        self.ip_varsayilan_dugmesi.set_label(m["ip_varsayilan_dugme"])
+        self.ip_girisi.set_placeholder_text(m["ip_girdi_yer_tut"])
+        self._ip_mevcut_guncelle()
+
     def _ogrenciler_sekmesi_olustur(self) -> Gtk.Widget:
+        # Ic geçiş: üst ana sekmelerle KARIŞMASIN diye notebook DEĞİL --
+        # segmentli (pill) aç/kapa düğmeleri + Gtk.Stack.
+        dis = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+
+        self.og_ic_yigin = Gtk.Stack()
+        self.og_ic_yigin.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
+        self.og_ic_yigin.set_transition_duration(120)
+        self.og_ic_yigin.add_named(self._ogrenci_listesi_alt_sekmesi(), "liste")
+        self.og_ic_yigin.add_named(self._sinif_ozeti_alt_sekmesi(), "sinif")
+
+        secici = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        secici.get_style_context().add_class("linked")
+        secici.get_style_context().add_class("alt-sekme-secici")
+        self.og_liste_dugmesi = Gtk.RadioButton.new_with_label(None, "")
+        self.og_sinif_dugmesi = Gtk.RadioButton.new_with_label(None, "")
+        self.og_sinif_dugmesi.join_group(self.og_liste_dugmesi)
+        for d in (self.og_liste_dugmesi, self.og_sinif_dugmesi):
+            d.set_mode(False)  # radyo yuvarlağı değil, düğme gibi görün
+            d.connect("toggled", self._og_ic_sekme_degis)
+        self.og_liste_dugmesi.set_active(True)
+        secici.pack_start(self.og_liste_dugmesi, False, False, 0)
+        secici.pack_start(self.og_sinif_dugmesi, False, False, 0)
+
+        secici_kutu = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        secici_kutu.set_halign(Gtk.Align.CENTER)
+        secici_kutu.set_margin_top(8); secici_kutu.set_margin_bottom(2)
+        secici_kutu.pack_start(secici, False, False, 0)
+
+        dis.pack_start(secici_kutu, False, False, 0)
+        dis.pack_start(self.og_ic_yigin, True, True, 0)
+        return dis
+
+    def _og_ic_sekme_degis(self, dugme):
+        # toggled hem eskiyen hem yeni düğmede tetiklenir; sadece aktife tepki ver.
+        if not dugme.get_active():
+            return
+        ad = "sinif" if dugme is self.og_sinif_dugmesi else "liste"
+        self.og_ic_yigin.set_visible_child_name(ad)
+        if ad == "sinif":
+            self._sinif_ozetini_guncelle()
+
+    def _sinif_ozeti_alt_sekmesi(self) -> Gtk.Widget:
+        icerik = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        icerik.set_margin_top(12); icerik.set_margin_start(14)
+        icerik.set_margin_end(14); icerik.set_margin_bottom(12)
+        kart = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        kart.get_style_context().add_class("kart")
+        self.ozet_baslik_etiketi = Gtk.Label(xalign=0)
+        self.ozet_baslik_etiketi.get_style_context().add_class("baslik-sabit")
+        kart.pack_start(self.ozet_baslik_etiketi, False, False, 0)
+        self.ozet_aciklama_etiketi = Gtk.Label(xalign=0, wrap=True)
+        self.ozet_aciklama_etiketi.get_style_context().add_class("etiket")
+        kart.pack_start(self.ozet_aciklama_etiketi, False, False, 0)
+        self.ozet_liste = Gtk.ListBox()
+        self.ozet_liste.set_selection_mode(Gtk.SelectionMode.NONE)
+        kaydirma = Gtk.ScrolledWindow(); kaydirma.set_min_content_height(300)
+        kaydirma.add(self.ozet_liste)
+        kart.pack_start(kaydirma, True, True, 0)
+        icerik.pack_start(kart, True, True, 0)
+        self._sinif_ozetini_guncelle()
+        return icerik
+
+    def _ozet_satir_kutu(self, ad_metni, coz, puan, den, kalin=False):
+        kutu = Gtk.Box(spacing=8)
+        kutu.set_margin_start(6); kutu.set_margin_end(6)
+        kutu.set_margin_top(3); kutu.set_margin_bottom(3)
+        l_ad = Gtk.Label(xalign=0); l_coz = Gtk.Label(xalign=1)
+        l_puan = Gtk.Label(xalign=1); l_den = Gtk.Label(xalign=1)
+        l_coz.set_size_request(70, -1); l_puan.set_size_request(70, -1); l_den.set_size_request(80, -1)
+        esle = [(l_ad, ad_metni), (l_coz, coz), (l_puan, puan), (l_den, den)]
+        for et, metin in esle:
+            if kalin:
+                et.set_markup("<b>%s</b>" % GLib.markup_escape_text(str(metin)))
+            else:
+                et.set_text(str(metin))
+        kutu.pack_start(l_ad, True, True, 0)
+        kutu.pack_start(l_coz, False, False, 0)
+        kutu.pack_start(l_puan, False, False, 0)
+        kutu.pack_start(l_den, False, False, 0)
+        return kutu
+
+    def _sinif_ozetini_guncelle(self):
+        if not hasattr(self, "ozet_liste"):
+            return
+        m = METIN[self.dil]
+        for c in list(self.ozet_liste.get_children()):
+            self.ozet_liste.remove(c)
+        satirlar = self.oda.sinif_ozeti()
+        if not satirlar:
+            satir = Gtk.ListBoxRow(selectable=False, activatable=False)
+            et = Gtk.Label(xalign=0.5, label=m["ozet_bos"])
+            et.set_margin_top(16); et.set_margin_bottom(16)
+            satir.add(et); self.ozet_liste.add(satir)
+            self.ozet_liste.show_all(); return
+        # baslik satiri
+        bas = Gtk.ListBoxRow(selectable=False, activatable=False)
+        bas.add(self._ozet_satir_kutu(m["ozet_s_ad"], m["ozet_s_cozulen"],
+                                      m["ozet_s_puan"], m["ozet_s_deneme"], kalin=True))
+        self.ozet_liste.add(bas)
+        for s in satirlar:
+            satir = Gtk.ListBoxRow()
+            satir.add(self._ozet_satir_kutu(s["ad"], s["cozulen"], s["puan"], s["deneme"]))
+            self.ozet_liste.add(satir)
+        self.ozet_liste.show_all()
+
+    def _og_ic_metinleri_uygula(self):
+        m = METIN[self.dil]
+        self.og_liste_dugmesi.set_label(m["alt_sekme_ogrenciler"])
+        self.og_sinif_dugmesi.set_label(m["alt_sekme_sinif"])
+        self.ozet_baslik_etiketi.set_text(m["ozet_baslik"])
+        self.ozet_aciklama_etiketi.set_text(m["ozet_aciklama"])
+        self._sinif_ozetini_guncelle()
+
+    def _ogrenci_listesi_alt_sekmesi(self) -> Gtk.Widget:
         icerik = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         icerik.set_margin_top(10)
 
@@ -479,7 +1077,7 @@ class OgretmenPenceresi(Gtk.Window):
                 ilk_radio = anahtar
             else:
                 anahtar = Gtk.RadioButton.new_from_widget(ilk_radio)
-            anahtar.set_active(g["id"] in self.oda.acik_gorevler)
+            anahtar.set_active(g["id"] == self._on_secili_gorev)
             satir_kutu.pack_start(anahtar, False, False, 0)
             self._gorev_anahtarlari[g["id"]] = anahtar
 
@@ -497,6 +1095,26 @@ class OgretmenPenceresi(Gtk.Window):
         gorev_kaydirma.set_min_content_height(180)
         gorev_kaydirma.add(gorev_listesi_kutusu)
         kart.pack_start(gorev_kaydirma, True, True, 0)
+
+        # Zorluk seçimi: seçili görev BU zorlukla sınıfa açılır. Makine,
+        # doğru cevabı seçilen zorluğun parametrelerine göre üretir.
+        # (Zorluk parametresi tanımsız görevlerde etkisizdir; görev yine
+        #  servisin kendi varsayılanıyla açılır.)
+        self.zorluk_baslik_etiketi = Gtk.Label(xalign=0)
+        self.zorluk_baslik_etiketi.get_style_context().add_class("etiket")
+        self.zorluk_baslik_etiketi.set_margin_top(6)
+        kart.pack_start(self.zorluk_baslik_etiketi, False, False, 0)
+
+        zorluk_kutu = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        self.zorluk_kolay_radio = Gtk.RadioButton.new_with_label(None, "")
+        self.zorluk_orta_radio = Gtk.RadioButton.new_with_label(None, "")
+        self.zorluk_orta_radio.join_group(self.zorluk_kolay_radio)
+        self.zorluk_zor_radio = Gtk.RadioButton.new_with_label(None, "")
+        self.zorluk_zor_radio.join_group(self.zorluk_kolay_radio)
+        self.zorluk_orta_radio.set_active(True)
+        for r in (self.zorluk_kolay_radio, self.zorluk_orta_radio, self.zorluk_zor_radio):
+            zorluk_kutu.pack_start(r, False, False, 0)
+        kart.pack_start(zorluk_kutu, False, False, 4)
 
         # Seçili göreve geç ("Uygula")
         self.siradaki_dugmesi = Gtk.Button()
@@ -530,9 +1148,22 @@ class OgretmenPenceresi(Gtk.Window):
         self.ipucu_gonder_dugmesi.set_label(m["ipucu_gonder"])
         self.sekmeler.set_tab_label_text(self.sekmeler.get_nth_page(0), m["sekme_ogrenciler"])
         self.sekmeler.set_tab_label_text(self.sekmeler.get_nth_page(1), m["sekme_sinif"])
+        self.sekmeler.set_tab_label_text(self.sekmeler.get_nth_page(2), m["sekme_soru_olustur"])
+        self.sekmeler.set_tab_label_text(self.sekmeler.get_nth_page(3), m["sekme_kayitli"])
+        self.sekmeler.set_tab_label_text(self.sekmeler.get_nth_page(4), m["sekme_ip"])
+        self._so_metinleri_uygula()
+        self._ks_metinleri_uygula()
+        self._ip_metinleri_uygula()
+        self._og_ic_metinleri_uygula()
         self.sinif_baslik_etiketi.set_text(m["sinif_basligi"])
         self.sinif_aciklama_etiketi.set_text(m["sinif_aciklama"])
         self.siradaki_dugmesi.set_label(m["siradaki_gorev"])
+        self.zorluk_baslik_etiketi.set_text(m["zorluk_basligi"])
+        self.zorluk_kolay_radio.set_label(m["zorluk_kolay"])
+        self.zorluk_orta_radio.set_label(m["zorluk_orta"])
+        self.zorluk_zor_radio.set_label(m["zorluk_zor"])
+        if getattr(self, "oda", None) is not None and self.oda.aktif_soru_no == 0:
+            self.sinif_durum_etiketi.set_text(m["henuz_soru_yok"])
         self._listeyi_guncelle()
 
     # ------------------------------------------------------------------
@@ -542,6 +1173,68 @@ class OgretmenPenceresi(Gtk.Window):
         if satir is not None and getattr(satir, "ogrenci_adi", None):
             self.secili_ogrenci = satir.ogrenci_adi
             self._sohbeti_goster()
+
+    def _cevaplari_goster(self, _w, ad=None):
+        """Bir ogrencinin verdigi tum cevaplari ayri bir pencerede gosterir.
+        Ad satir dugmesinden gelebilir; gelmezse secili ogrenci kullanilir.
+        Veri ayni surecte (self.oda) tutuldugu icin HTTP'ye gerek yok."""
+        m = METIN[self.dil]
+        if ad is None:
+            ad = self.secili_ogrenci
+        if not ad:
+            self.ipucu_durum_etiketi.set_text(m["secim_yok"])
+            return
+        kayitlar = self.oda.ogrenci_cevaplari(ad)
+
+        pencere = Gtk.Window(title=m["cevaplar_baslik"].format(ad=ad))
+        pencere.set_default_size(480, 440)
+        pencere.set_transient_for(self)
+        dis = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        dis.set_margin_top(12); dis.set_margin_start(12)
+        dis.set_margin_end(12); dis.set_margin_bottom(12)
+
+        baslik = Gtk.Label(xalign=0)
+        baslik.set_markup("<b>%s</b>" % GLib.markup_escape_text(
+            m["cevaplar_baslik"].format(ad=ad)))
+        dis.pack_start(baslik, False, False, 0)
+
+        liste = Gtk.ListBox()
+        liste.set_selection_mode(Gtk.SelectionMode.NONE)
+        if not kayitlar:
+            satir = Gtk.ListBoxRow(selectable=False, activatable=False)
+            bos = Gtk.Label(xalign=0.5, label=m["cevaplar_bos"])
+            bos.set_margin_top(16); bos.set_margin_bottom(16)
+            satir.add(bos); liste.add(satir)
+        else:
+            import time as _t
+            for k in kayitlar:
+                satir = Gtk.ListBoxRow()
+                dogru = k.get("dogru")
+                isaret = "✓" if dogru else "✗"
+                renk = YESIL if dogru else "#c0546a"
+                no = k.get("soru_no", 0)
+                no_metni = (m["cevaplar_soru_no"].format(n=no) + " ") if no else ""
+                saat = _t.strftime("%H:%M:%S", _t.localtime(k.get("zaman", 0)))
+                lbl = Gtk.Label(xalign=0, wrap=True)
+                lbl.set_margin_top(3); lbl.set_margin_bottom(3)
+                lbl.set_margin_start(6); lbl.set_margin_end(6)
+                lbl.set_markup(
+                    "<span color='%s'><b>%s</b></span> %s<b>%s</b>  "
+                    "<small>%s · %s</small>" % (
+                        renk, isaret, GLib.markup_escape_text(no_metni),
+                        GLib.markup_escape_text(str(k.get("cevap", ""))),
+                        GLib.markup_escape_text(str(k.get("gorev_id", ""))), saat)
+                )
+                satir.add(lbl); liste.add(satir)
+        kaydirma = Gtk.ScrolledWindow(); kaydirma.add(liste)
+        dis.pack_start(kaydirma, True, True, 0)
+
+        kapat = Gtk.Button(label=m["cevaplar_kapat"])
+        kapat.connect("clicked", lambda *_: pencere.destroy())
+        dis.pack_start(kapat, False, False, 0)
+
+        pencere.add(dis)
+        pencere.show_all()
 
     def _mesaj_gonder(self, _widget):
         m = METIN[self.dil]
@@ -582,10 +1275,18 @@ class OgretmenPenceresi(Gtk.Window):
     # ------------------------------------------------------------------
     # Sınıf sekmesi: hangi görevlerin açık olduğu, sıradaki göreve geçiş
     # ------------------------------------------------------------------
+    def _secili_zorluk(self) -> str:
+        """Sınıf sekmesindeki zorluk radyolarından seçili olanı döner."""
+        if self.zorluk_kolay_radio.get_active():
+            return "kolay"
+        if self.zorluk_zor_radio.get_active():
+            return "zor"
+        return "orta"
+
     def _secili_goreve_gec(self, _widget):
-        """Radio grubunda işaretli olan görevi açar, diğer tüm görevleri
-        kapatır. 'Sıradaki' otomatik hesaplaması yerine öğretmenin
-        SEÇTİĞİ göreve gider."""
+        """Radio grubunda işaretli olan görevi SEÇİLİ ZORLUKLA açar, diğer
+        tüm görevleri kapatır. 'Sıradaki' otomatik hesaplaması yerine
+        öğretmenin SEÇTİĞİ görev ve zorluğa gider."""
         m = METIN[self.dil]
         secili_id = None
         for gid, anahtar in self._gorev_anahtarlari.items():
@@ -596,13 +1297,15 @@ class OgretmenPenceresi(Gtk.Window):
         if secili_id is None:
             return  # radio grubunda teorik olarak hep biri seçili olur
 
-        for gid in list(self.oda.acik_gorevler):
-            self.oda.gorev_kapat(gid)
-        self.oda.gorev_ac(secili_id)
+        zorluk = self._secili_zorluk()
+        soru_no = self.oda.gorev_ata(secili_id, zorluk)
 
         secili_gorev = next(g for g in self._tum_gorevler if g["id"] == secili_id)
+        zorluk_etiketi = m[f"zorluk_{zorluk}"]
         self.sinif_durum_etiketi.set_text(
-            f"{m['siradaki_gecildi']} {secili_gorev['baslik']['tr']}"
+            m["soru_atama_durumu"].format(
+                n=soru_no, b=secili_gorev["baslik"][self.dil], z=zorluk_etiketi
+            )
         )
 
     def _listeyi_guncelle(self):
@@ -679,6 +1382,12 @@ class OgretmenPenceresi(Gtk.Window):
                 sure_etiketi.get_style_context().add_class("etiket")
                 icerik.pack_start(sure_etiketi, False, False, 0)
 
+                cevap_dugmesi = Gtk.Button(label=m["cevaplar_kisa"])
+                cevap_dugmesi.get_style_context().add_class("ikincil")
+                cevap_dugmesi.set_tooltip_text(m["cevaplari_goster"])
+                cevap_dugmesi.connect("clicked", self._cevaplari_goster, ad)
+                icerik.pack_start(cevap_dugmesi, False, False, 0)
+
                 at_dugmesi = Gtk.Button(label="✕")
                 at_dugmesi.get_style_context().add_class("duz")
                 at_dugmesi.set_tooltip_text(m["ogrenciyi_at"])
@@ -690,6 +1399,7 @@ class OgretmenPenceresi(Gtk.Window):
                 satir.show_all()
                 self._satirlar[ad] = {"satir": satir, "durum": durum_etiketi, "sure": sure_etiketi}
 
+        self._sinif_ozetini_guncelle()
         return True  # zamanlayıcı tekrarlamaya devam etsin
 
     def _ogrenciyi_at(self, _düğme, ad: str):

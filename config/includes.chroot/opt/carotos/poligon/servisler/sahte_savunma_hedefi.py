@@ -13,6 +13,8 @@ içinde, `sudo ufw status` çıktısı okunarak yapılır -- bkz. oradaki not.
 
 from __future__ import annotations
 
+from ag_guvenlik import loopback_adres_mi  # noqa: E402
+
 import socket
 import threading
 
@@ -21,10 +23,10 @@ class BasitDinleyici:
     """127.0.0.1 dışına ASLA bağlanmayan, tamamen pasif bir TCP dinleyici."""
 
     def __init__(self, port: int, bind_adres: str = "127.0.0.1"):
-        if bind_adres != "127.0.0.1":
+        if not loopback_adres_mi(bind_adres):
             raise ValueError(
-                f"GUVENLIK IHLALI: bind_adres '{bind_adres}' -- sadece "
-                "127.0.0.1 kabul edilir."
+                f"GUVENLIK IHLALI: bind_adres '{bind_adres}' -- sadece loopback "
+                "(127.0.0.0/8) kabul edilir."
             )
         self.port = port
         self.bind_adres = bind_adres

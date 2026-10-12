@@ -58,10 +58,11 @@ def dogrula(dosya_yolu: Path) -> list[str]:
     if tur == "canli_servis":
         # KRİTİK GÜVENLİK KURALI — burada asla ödün verilmez.
         bind = hedef.get("bind_adres")
-        if bind != "127.0.0.1":
+        from ag_guvenlik import loopback_adres_mi
+        if not loopback_adres_mi(bind):
             hatalar.append(
-                f"GÜVENLİK İHLALİ: bind_adres '{bind}' — sadece 127.0.0.1 kabul edilir. "
-                "Bu görev motora YÜKLENEMEZ."
+                f"GÜVENLİK İHLALİ: bind_adres '{bind}' — sadece loopback (127.0.0.0/8) "
+                "kabul edilir. Bu görev motora YÜKLENEMEZ."
             )
         if "port" not in hedef and not hedef.get("coklu_port"):
             hatalar.append(
@@ -90,8 +91,27 @@ def dogrula(dosya_yolu: Path) -> list[str]:
     if dogrulama_turu == "fail2ban_durumu" and not hedef.get("jail"):
         hatalar.append("dogrulama.tur == 'fail2ban_durumu' için hedef.jail zorunlu (örn. 'sshd')")
 
-    if not isinstance(veri.get("puan"), int) or veri["puan"] <= 0:
-        hatalar.append("'puan' pozitif bir tam sayı olmalı")
+    puan = veri.get("puan")
+    if isinstance(puan, dict):
+        gecersiz_anahtar = set(puan) - {"kolay", "orta", "zor"}
+        if not puan or any(not isinstance(v, int) or v <= 0 for v in puan.values()):
+            hatalar.append("'puan' sözlüğündeki her değer pozitif tam sayı olmalı")
+        if gecersiz_anahtar:
+            hatalar.append(f"'puan' sözlüğünde geçersiz zorluk anahtarı: {gecersiz_anahtar}")
+    elif not isinstance(puan, int) or puan <= 0:
+        hatalar.append("'puan' pozitif bir tam sayı ya da zorluk sözlüğü olmalı")
+
+    zorluklar = veri.get("zorluklar")
+    if zorluklar is not None:
+        if not isinstance(zorluklar, dict) or not zorluklar:
+            hatalar.append("'zorluklar' boş olmayan bir sözlük olmalı")
+        else:
+            gecersiz = set(zorluklar) - {"kolay", "orta", "zor"}
+            if gecersiz:
+                hatalar.append(f"'zorluklar' içinde geçersiz anahtar: {gecersiz}")
+            for seviye, p in zorluklar.items():
+                if not isinstance(p, dict):
+                    hatalar.append(f"zorluklar['{seviye}'] bir sözlük olmalı")
 
     savunma_id = veri.get("savunma_gorevi_id")
     if savunma_id is not None and not isinstance(savunma_id, str):

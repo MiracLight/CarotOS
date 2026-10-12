@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=CarotOS Store
+Name[tr]=CarotOS Mağaza
+Comment=Install apps and security tools curated for CarotOS
+Comment[tr]=CarotOS için seçilmiş uygulamaları ve güvenlik araçlarını kur
+Exec=/opt/carotos/magaza/carotos-magaza.py
+Icon=carotos-magaza
+Terminal=false
+Categories=System;PackageManager;Settings;
+Keywords=store;software;install;apps;security;magaza;
+Keywords[tr]=mağaza;yazılım;kur;uygulama;güvenlik;market;
+X-XFCE-Source=file:///usr/share/applications/carotos-magaza.desktop
+Path=
+StartupNotify=false

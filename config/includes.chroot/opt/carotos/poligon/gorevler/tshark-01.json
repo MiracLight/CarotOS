@@ -2,22 +2,18 @@
   "id": "tshark-01",
   "arac": "tshark",
   "seviye": "orta",
-
   "baslik": {
     "tr": "Trafiği Yakala",
     "en": "Capture the Traffic"
   },
-
   "senaryo": {
     "tr": "Bilgisayarında, loopback (lo) arayüzü üzerinden port 15900'e periyodik bağlantılar kuran bir program çalışıyor. Bu bağlantılar düz metin bir mesaj taşıyor. tshark ile trafiği yakalayıp içindeki flag'i oku.",
     "en": "A program on your machine is periodically connecting to port 15900 over the loopback (lo) interface. These connections carry a plain-text message. Capture the traffic with tshark and read the flag inside it."
   },
-
   "ipucu": {
     "tr": "tshark -i lo -f \"tcp port 15900\" -a duration:5 -T fields -e tcp.payload",
     "en": "tshark -i lo -f \"tcp port 15900\" -a duration:5 -T fields -e tcp.payload"
   },
-
   "hedef": {
     "tur": "canli_servis",
     "servis_modulu": "servisler.sahte_trafik.SahteTrafik",
@@ -26,21 +22,48 @@
     "_kural": "bind_adres HER ZAMAN 127.0.0.1. SahteTrafik kendi yapıcısında da bunu zorunlu kılıyor.",
     "_not_izin": "Gerçek kurulumda paket yakalama, kullanıcının 'wireshark' grubunda olmasını veya pkexec ile çalıştırmayı gerektirebilir. Bu, dağıtımın paketleme yapılandırmasıdır, bu görevin kodu değil."
   },
-
   "flag_uretimi": {
     "yontem": "trafik_flag",
     "modul": "servisler.sahte_trafik",
     "_not": "Rastgele değer üretilir (parola_uret()), sürekli tekrarlanan bağlantılarda düz metin olarak gönderilir. Öğrenci tshark ile yakaladığı payload'dan flag'i okuyup yazar."
   },
-
   "dogrulama": {
     "tur": "kullanici_girdisi",
     "karsilastirma": "birebir_ve_kucuk_harf_duyarsiz",
     "deneme_siniri": null
   },
-
-  "puan": 125,
+  "_zorluk_notu": "Zorluk: (1) flag tasimayan gurultu baglantilari artar, (2) 'zor'da flag payload icinde hex kodlu gider. Flag her seviyede yakalanabilir/cozulebilir -> gorev hep cozulebilir.",
+  "zorluklar": {
+    "kolay": {
+      "gurultu": 0,
+      "kodlama": "duz",
+      "ipucu": {
+        "tr": "tshark -i lo -f \"tcp port 15900\" -a duration:5 -T fields -e tcp.payload",
+        "en": "tshark -i lo -f \"tcp port 15900\" -a duration:5 -T fields -e tcp.payload"
+      }
+    },
+    "orta": {
+      "gurultu": 2,
+      "kodlama": "duz",
+      "ipucu": {
+        "tr": "tshark -i lo -f \"tcp port 15900\" -a duration:5 -T fields -e tcp.payload   (birden çok mesaj yakalanır; 'flag=' ile başlayan satırı bul)",
+        "en": "tshark -i lo -f \"tcp port 15900\" -a duration:5 -T fields -e tcp.payload   (you'll capture several messages; find the line starting with 'flag=')"
+      }
+    },
+    "zor": {
+      "gurultu": 3,
+      "kodlama": "hex",
+      "ipucu": {
+        "tr": "tshark -i lo -f \"tcp port 15900\" -a duration:5 -T fields -e tcp.payload   ('flag=' değeri HEX kodlu; örn. echo <hex> | xxd -r -p ile çöz)",
+        "en": "tshark -i lo -f \"tcp port 15900\" -a duration:5 -T fields -e tcp.payload   (the 'flag=' value is HEX-encoded; decode e.g. echo <hex> | xxd -r -p)"
+      }
+    }
+  },
+  "puan": {
+    "kolay": 60,
+    "orta": 125,
+    "zor": 225
+  },
   "sure_siniri_dk": null,
-
   "savunma_gorevi_id": null
 }

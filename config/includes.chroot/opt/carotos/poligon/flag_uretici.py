@@ -21,11 +21,22 @@ VARSAYILAN_KELIME_LISTESI = [
 ]
 
 
-def parola_uret(kelime_listesi: list[str] | None = None) -> str:
-    """Rastgele bir kelime + 4 haneli sayı. Örnek: 'firewall7392'."""
+def parola_uret(kelime_listesi: list[str] | None = None,
+                basamak: int = 4) -> str:
+    """Rastgele bir kelime + 'basamak' haneli sayı. Örnek: 'firewall7392'.
+
+    basamak, parolanın kaç haneli sayıyla biteceğini belirler; john
+    görevinde zorluk bununla ayarlanır (daha çok hane = daha büyük anahtar
+    uzayı = kırması daha zor). basamak<=0 ise salt kelime döner. Varsayılan
+    4'tür -- bu, eski sabit davranışın AYNISIDIR, bu yüzden parametresiz
+    çağıran tüm görevler (hydra/sql/trafik) hiç etkilenmez."""
     kelimeler = kelime_listesi or VARSAYILAN_KELIME_LISTESI
     kelime = secrets.choice(kelimeler)
-    sayi = secrets.randbelow(9000) + 1000  # 1000-9999
+    if basamak <= 0:
+        return kelime
+    alt = 10 ** (basamak - 1)      # örn. basamak=4 -> 1000
+    ust = 10 ** basamak            # örn. basamak=4 -> 10000
+    sayi = secrets.randbelow(ust - alt) + alt  # hep tam 'basamak' haneli
     return f"{kelime}{sayi}"
 
 

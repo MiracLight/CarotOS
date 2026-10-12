@@ -32,20 +32,87 @@ class OdaDurumu:
         self.oda_kodu = oda_kodu
         self.sifre = sifre
         self.acik_gorevler: set[str] = set()
+        # Her acik gorevin zorlugu: gorev_id -> 'kolay'|'orta'|'zor'.
+        # Ogretmen gorevi atarken secer; ogrenci /gorevler'den okur.
+        self.gorev_zorluklari: dict[str, str] = {}
+        # "Soru Olustur" ile atanan OZEL parametreler: gorev_id -> param sozlugu.
+        # Isimli zorluk yerine dogrudan bu parametreler ogrenciye tasinir.
+        self.gorev_parametreleri: dict[str, dict] = {}
+        # Siniftaki "N. soru" sayaci. 0 = henuz soru atanmadi. Ogretmen her
+        # "Soruyu Ata" dediginde (gorev_ata / ozel_soru_ata) 1 artar.
+        self.aktif_soru_no = 0
         self.ogrenciler: dict[str, dict] = {}
         # Her öğrenci için BİRİKEN sohbet geçmişi (tek seferlik kuyruk değil):
         # ad -> [{"kimden","metin","zaman","no"}]. Mesajlar silinmez.
         self.sohbetler: dict[str, list] = {}
+        # Her öğrenci için BİRİKEN cevap günlüğü (öğretmenin "Verdiği
+        # Cevaplar" penceresi okur): ad -> [{soru_no,gorev_id,cevap,dogru,zaman}].
+        self.cevaplar: dict[str, list] = {}
+        # "IP ve Adres": ogretmenin sinifa uyguladigi hedef loopback adresi.
+        # Varsayilan 127.0.0.1. Atanan gorevler bu adrese baglanir (hepsi
+        # 127.0.0.0/8 -- makineyi terk etmez).
+        self.hedef_adres = "127.0.0.1"
+        # Ayar surumu: hedef adres gibi "mevcut soruyu etkileyen" ayarlar
+        # degisince artar. Ogrenci bunu gorunce soruyu (numara degismeden)
+        # yeniden yukler ve uyari gosterir.
+        self.ayar_surumu = 0
+        # Skor: her ogrencinin COZDUGU sorular -> {soru_no: {"puan","gorev_id"}}.
+        # soru_no benzersiz oldugu icin tekrar cozmek puani sismiyor; en iyi
+        # deneme saklaniyor. "Sinif" skor sekmesinin kaynagi budur.
+        self.cozulen_sorular: dict[str, dict] = {}
         self._mesaj_sayaci = 0
         self._kilit = threading.Lock()
 
-    def gorev_ac(self, gorev_id: str) -> None:
+    def gorev_ac(self, gorev_id: str, zorluk: str = "orta") -> None:
+        if zorluk not in ("kolay", "orta", "zor"):
+            zorluk = "orta"
         with self._kilit:
             self.acik_gorevler.add(gorev_id)
+            self.gorev_zorluklari[gorev_id] = zorluk
 
     def gorev_kapat(self, gorev_id: str) -> None:
         with self._kilit:
             self.acik_gorevler.discard(gorev_id)
+            self.gorev_zorluklari.pop(gorev_id, None)
+
+    def gorev_ata(self, gorev_id: str, zorluk: str = "orta") -> int:
+        """Ogretmen 'Soruyu Ata' dediginde cagrilir: acik gorevi (ve
+        zorlugunu) bununla DEGISTIRIR ve sira numarasini bir artirir.
+        Siniftaki 'N. soru' kavraminin kaynagi budur. Atanan soru
+        numarasini doner."""
+        if zorluk not in ("kolay", "orta", "zor"):
+            zorluk = "orta"
+        with self._kilit:
+            self.acik_gorevler = {gorev_id}
+            self.gorev_zorluklari = {gorev_id: zorluk}
+            self.gorev_parametreleri = {}  # hazir soru -> ozel parametre yok
+            self.aktif_soru_no += 1
+            return self.aktif_soru_no
+
+    def ozel_soru_ata(self, gorev_id: str, parametreler: dict, etiket: str = "") -> int:
+        """'Soru Olustur': ogretmenin KENDI belirledigi parametrelerle bir
+        soru atar. Isimli zorluk yerine parametreler dogrudan ogrenciye
+        tasinir; makine cevabi bunlara gore uretilir. Soru numarasini doner."""
+        with self._kilit:
+            self.acik_gorevler = {gorev_id}
+            self.gorev_zorluklari = {}          # ozel soruda isimli zorluk yok
+            self.gorev_parametreleri = {gorev_id: dict(parametreler)}
+            self.aktif_soru_no += 1
+            return self.aktif_soru_no
+
+    def set_hedef_adres(self, adres: str) -> str:
+        """'IP ve Adres': sinif hedef adresini belirler. SADECE loopback
+        (127.0.0.0/8) kabul edilir -- hepsi makinede kalir. Gecersizse
+        ValueError. Ayarlanan adresi doner."""
+        from ag_guvenlik import loopback_adres_mi
+        adres = str(adres).strip()
+        if not loopback_adres_mi(adres):
+            raise ValueError("adres loopback (127.0.0.0/8) olmali")
+        with self._kilit:
+            if adres != self.hedef_adres:
+                self.hedef_adres = adres
+                self.ayar_surumu += 1  # mevcut soruyu etkiler -> ogrenci yeniden yukler
+            return adres
 
     def ogrenci_aktif_mi(self, ad: str) -> bool:
         """Öğrencinin KENDİ istemcisinin periyodik olarak sorması içindir:
@@ -82,7 +149,9 @@ class OdaDurumu:
             }
 
     def ilerleme_guncelle(self, ad: str, sifre: str, gorev_id: str,
-                           durum: str, sure_sn: float) -> None:
+                           durum: str, sure_sn: float,
+                           cevap: str | None = None, soru_no: int = 0,
+                           puan: int = 0) -> None:
         if not secrets.compare_digest(sifre, self.sifre):
             raise PermissionError("yanlış oda şifresi")
         with self._kilit:
@@ -92,6 +161,44 @@ class OdaDurumu:
                 "sure_sn": sure_sn,
                 "son_gorulme": time.time(),
             }
+            # Gerçek bir cevap denemesi ise cevap günlüğüne ekle (başladı/
+            # atlandı gibi durumlarda cevap metni olmaz).
+            if cevap is not None and durum in ("tamamlandi", "yanlis_denedi"):
+                self.cevaplar.setdefault(ad, []).append({
+                    "soru_no": int(soru_no or 0),
+                    "gorev_id": gorev_id,
+                    "cevap": cevap,
+                    "dogru": durum == "tamamlandi",
+                    "zaman": time.time(),
+                })
+            # Dogru cevapta puani kaydet (soru basina en iyi deneme).
+            if durum == "tamamlandi":
+                d = self.cozulen_sorular.setdefault(ad, {})
+                no = int(soru_no or 0)
+                if int(puan or 0) >= d.get(no, {}).get("puan", -1):
+                    d[no] = {"puan": int(puan or 0), "gorev_id": gorev_id}
+
+    def sinif_ozeti(self) -> list:
+        """Her ogrenci icin ozet: cozulen soru sayisi, toplam puan, deneme
+        sayisi, durum. Puana (sonra cozulene) gore sirali -- skor tablosu."""
+        with self._kilit:
+            satirlar = []
+            for ad, bilgi in self.ogrenciler.items():
+                cozulen = self.cozulen_sorular.get(ad, {})
+                satirlar.append({
+                    "ad": ad,
+                    "cozulen": len(cozulen),
+                    "puan": sum(v.get("puan", 0) for v in cozulen.values()),
+                    "deneme": len(self.cevaplar.get(ad, [])),
+                    "durum": bilgi.get("durum", ""),
+                })
+            satirlar.sort(key=lambda s: (-s["puan"], -s["cozulen"], s["ad"].lower()))
+            return satirlar
+
+    def ogrenci_cevaplari(self, ad: str) -> list:
+        """Bir öğrencinin verdiği tüm cevapların (zaman sırasıyla) kopyası."""
+        with self._kilit:
+            return [dict(k) for k in self.cevaplar.get(ad, [])]
 
     def mesaj_ekle(self, ogrenci: str, kimden: str, metin: str) -> dict:
         """Bir ogrencinin sohbetine mesaj ekler.
@@ -121,6 +228,11 @@ class OdaDurumu:
             return {
                 "oda_kodu": self.oda_kodu,
                 "acik_gorevler": sorted(self.acik_gorevler),
+                "zorluklar": dict(self.gorev_zorluklari),
+                "parametreler": dict(self.gorev_parametreleri),
+                "hedef_adres": self.hedef_adres,
+                "ayar_surumu": self.ayar_surumu,
+                "aktif_soru_no": self.aktif_soru_no,
                 "ogrenciler": dict(self.ogrenciler),
             }
 
@@ -176,7 +288,14 @@ def _sunucu_sinifi_olustur(oda: OdaDurumu):
             elif ayristirilan.path == "/gorevler":
                 # Kimlik doğrulama gerekmez: hangi görevin açık olduğu
                 # gizli bir bilgi değil, öğrenci katılmadan önce bunu bilmeli.
-                self._json_gonder({"acik_gorevler": sorted(oda.acik_gorevler)})
+                self._json_gonder({
+                    "acik_gorevler": sorted(oda.acik_gorevler),
+                    "zorluklar": dict(oda.gorev_zorluklari),
+                    "parametreler": dict(oda.gorev_parametreleri),
+                    "hedef_adres": oda.hedef_adres,
+                    "ayar_surumu": oda.ayar_surumu,
+                    "aktif_soru_no": oda.aktif_soru_no,
+                })
             elif ayristirilan.path == "/aktif_mi":
                 # Öğrenci istemcisi, öğretmen '✕' ile kendisini attı mı
                 # diye periyodik olarak bunu sorar. Kimlik doğrulama
@@ -222,6 +341,9 @@ def _sunucu_sinifi_olustur(oda: OdaDurumu):
                         ad=veri["ogrenci"], sifre=veri["sifre"],
                         gorev_id=veri["gorev_id"], durum=veri["durum"],
                         sure_sn=veri.get("sure_sn", 0),
+                        cevap=veri.get("cevap"),
+                        soru_no=int(veri.get("soru_no", 0) or 0),
+                        puan=int(veri.get("puan", 0) or 0),
                     )
                     self._json_gonder({"tamam": True})
                 except PermissionError:
