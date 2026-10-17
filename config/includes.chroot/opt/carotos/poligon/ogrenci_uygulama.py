@@ -50,6 +50,114 @@ def _bireysel_havuz() -> list:
         if g.stem != "sablon-ve-ornek" and not _gorev_sudo_gerektirir_mi(g.stem)
     ]
 
+def _css_olcekle(css, s):
+    """CSS'teki piksel degerlerini s (0.65-1.0) ile carpar ve temel yazi
+    boyutunu ayni oranda kucultur. s >= 1 ise HICBIR sey degismez; yani
+    normal ekranlarda gorunum eskisiyle birebir ayni kalir. 1px cizgiler
+    ile 100px ustu degerler (tam yuvarlak kose) oldugu gibi birakilir."""
+    if s >= 0.999:
+        return css
+    import re
+
+    def _px(eslesme):
+        deger = float(eslesme.group(1))
+        if deger <= 1 or deger >= 100:
+            return eslesme.group(0)
+        return "%dpx" % max(1, round(deger * s))
+
+    css = re.sub(r"(\d+(?:\.\d+)?)px", _px, css)
+    boyut = 10.0
+    try:
+        ayar = Gtk.Settings.get_default().get_property("gtk-font-name") or ""
+        boyut = float(ayar.rsplit(" ", 1)[-1])
+    except (ValueError, TypeError, AttributeError):
+        pass
+    return css + "\n window { font-size: %.1fpt; }\n" % (boyut * s)
+
+
+def _ic_kaydirmalari_olcekle(pencere, s):
+    """Ic kaydirma alanlarinin KODDA sabit yazilmis en-kucuk yuksekliklerini
+    (set_min_content_height) ayni oranla kucultur. Bu degerler CSS'te
+    olmadigi icin yazi olcegiyle birlikte kuculmuyor ve kucuk ekranda
+    pencere yuksekligini tek baslarina sisiriyorlardi. Taban deger bir kez
+    saklanir; boylece her turda ustune ustune kucultulmez."""
+    def gez(w):
+        if isinstance(w, Gtk.ScrolledWindow):
+            taban = getattr(w, "_taban_min_yukseklik", None)
+            if taban is None:
+                taban = w.get_min_content_height()
+                w._taban_min_yukseklik = taban
+            if taban > 0:
+                w.set_min_content_height(max(80, int(round(taban * s))))
+        if isinstance(w, Gtk.Container):
+            for c in w.get_children():
+                gez(c)
+    gez(pencere)
+
+
+def _olcek_uygula(pencere, icerik, taban_g, taban_y):
+    """Pencereyi ekrana sigdirir: yazi, bosluk ve liste yukseklikleri
+    birlikte, ayni oranda kuculur -- oranlar bozulmaz.
+
+    Olcek =  min(1, ekran_sinirlari / icerigin gercek en kucuk boyutu),
+    alt sinir 0.85. Ekran yetiyorsa olcek 1.00'dir ve GORUNUM DEGISMEZ;
+    yani yazi boyutu en fazla mevcut boyut kadardir. Kodda sabit yazilmis
+    bosluklar CSS ile kuculmedigi icin tek bir carpan yetmiyor, bu yuzden
+    olcup yineliyoruz. 0.85'in altina inilmez (yazi okunmaz olurdu); artan
+    fark dikey kaydirma cubuguyla karsilanir.
+
+    ONEMLI: pencere ekrana ciktiktan SONRA cagrilmali. __init__ icinde
+    olcmek yanlis sonuc veriyor, cunku Notebook/Stack sayfalari henuz
+    gerceklenmedigi icin icerik oldugundan kucuk olculuyor."""
+    try:
+        from gi.repository import Gdk
+        ekran = Gdk.Display.get_default()
+        monitor = ekran.get_primary_monitor() or ekran.get_monitor(0)
+        alan = monitor.get_workarea()
+        sinir_g, sinir_y = alan.width - 40, alan.height - 80
+
+        for _tur in range(6):
+            en_kucuk = icerik.get_preferred_size()[0]
+            istek_g = max(taban_g, en_kucuk.width)
+            istek_y = max(taban_y, en_kucuk.height)
+            if istek_g <= sinir_g and istek_y <= sinir_y:
+                break
+            oran = min(sinir_g / istek_g, sinir_y / istek_y) * 0.98
+            s = max(0.85, min(1.0, pencere._olcek * oran))
+            if abs(s - pencere._olcek) < 0.005:
+                break
+            pencere._olcek = s
+            pencere._css_uygula()
+            _ic_kaydirmalari_olcekle(pencere, s)
+
+        en_kucuk = icerik.get_preferred_size()[0]
+        g = min(max(taban_g, en_kucuk.width), sinir_g)
+        y = min(max(taban_y, en_kucuk.height), sinir_y)
+        if pencere.get_realized():
+            pencere.resize(g, y)
+        else:
+            pencere.set_default_size(g, y)
+    except Exception:  # noqa: BLE001 -- olcum basarisizsa taban boyut kalsin
+        pencere.set_default_size(taban_g, taban_y)
+    return False
+
+
+def _olcek_planla(pencere, icerik, taban_g, taban_y):
+    """Olcegi pencere gorundukten sonra, birkac turda hesaplar.
+
+    Tek tur yetmiyor: CSS ve liste yuksekligi degisince GTK yeni boyut
+    istegini hemen degil, bir sonraki dongude hesapliyor. Uc kisa tur,
+    olculen boyutun oturmasina izin veriyor."""
+    pencere._olcek_turu = 0
+
+    def _adim():
+        _olcek_uygula(pencere, icerik, taban_g, taban_y)
+        pencere._olcek_turu += 1
+        return pencere._olcek_turu < 3
+
+    GLib.timeout_add(150, _adim, priority=GLib.PRIORITY_LOW)
+
+
 def _sistem_dilini_belirle() -> str:
     """Uygulama ilk açıldığında hangi dille başlayacağını belirler:
     sistem dili Türkçe ise 'tr', başka HERHANGİ bir dilse (ya da hiç
@@ -255,7 +363,7 @@ class PoligonPenceresi(Gtk.Window):
         self.bireysel_mod = False  # True ise öğretmen sunucusuna hiç bağlanılmaz
         self.aktif_kullanici = None  # giriş yapan kullanıcının adı (misafirde None)
 
-        self.set_default_size(560, 480)
+        self._olcek = 1.0  # ekran kucukse __init__ sonunda hesaplanip dusurulur
         self._css_uygula()
 
         self.yigin = Gtk.Stack()
@@ -272,10 +380,17 @@ class PoligonPenceresi(Gtk.Window):
         ana = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         ana.pack_start(self._ust_cubuk_olustur(), False, False, 0)
         ana.pack_start(self.yigin, True, True, 0)
-        self.add(ana)
+        # Kucuk ekranda alt kisimlar disarida kalmasin: icerik kaydirilabilir.
+        kaydirma = Gtk.ScrolledWindow()
+        kaydirma.get_style_context().add_class("pencere-kaydirma")
+        kaydirma.set_shadow_type(Gtk.ShadowType.NONE)
+        kaydirma.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        kaydirma.add(ana)
+        self.add(kaydirma)
 
         self._metinleri_uygula()
         self.yigin.set_visible_child_name("giris")
+        _olcek_planla(self, ana, 560, 480)
 
     # ------------------------------------------------------------------
     def _css_uygula(self):
@@ -301,8 +416,9 @@ class PoligonPenceresi(Gtk.Window):
         self._ikincil_metin_rengi = "#eaf4fc"
         self._geri_metin_rengi = "#a8c6e0"
 
-        self._css_saglayici.load_from_data(f"""
+        self._css_saglayici.load_from_data(_css_olcekle(f"""
             window {{ background-color: {KOYU_ZEMIN}; }}
+            scrolledwindow.pencere-kaydirma, scrolledwindow.pencere-kaydirma > viewport {{ background-color: {KOYU_ZEMIN}; }}
             label {{ color: {metin_ana}; }}
             .kart {{
                 background-color: {kart_zemin}; border-radius: 10px; padding: 18px;
@@ -339,7 +455,7 @@ class PoligonPenceresi(Gtk.Window):
             button.duz label {{ color: {metin_soft}; }}
             .sohbet-ogretmen {{ background-color: {sohbet_zemin}; color: {sohbet_metin}; border-radius: 8px; padding: 6px 10px; }}
             .sohbet-ogrenci {{ background-color: {VURGU}; color: white; border-radius: 8px; padding: 6px 10px; }}
-        """.encode())
+        """, getattr(self, "_olcek", 1.0)).encode())
 
     def _ust_cubuk_olustur(self):
         cubuk = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)

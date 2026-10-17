@@ -19,7 +19,21 @@ import os
 
 CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".config", "carotos-panel")
 CONFIG_PATH = os.path.join(CONFIG_DIR, "settings.json")
-DEFAULT_SETTINGS = {"language": "tr", "theme": "dark"}
+
+def _varsayilan_dil():
+    """Ilk acilis dili: sistem dili Turkce ise 'tr', baska HERHANGI bir dilse
+    'en'. Sabit 'tr' yazmak, kurulumda baska dil secen kullanicinin
+    uygulamalari Turkce gormesine yol aciyordu. C/POSIX dil bilgisi
+    tasimaz, o yuzden atlanir. Kayitli bir ayar varsa o yine onceliklidir."""
+    import os
+    for degisken in ("LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE"):
+        deger = os.environ.get(degisken, "").strip()
+        if deger and deger not in ("C", "POSIX"):
+            return "tr" if deger.lower().startswith("tr") else "en"
+    return "en"
+
+
+DEFAULT_SETTINGS = {"language": _varsayilan_dil(), "theme": "dark"}
 
 
 def load_settings():

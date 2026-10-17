@@ -10,6 +10,35 @@ sayılmamıştır.
 
 ---
 
+## Sürüm 13 — 1.2.2 "Eggshell": ses denetimi, uygulama dili ve Poligon ölçekleme
+**Durum:** Yayınlandı (ISO adı 1.2 olarak kaldı; `carotos-1.2-amd64.iso`
+dosyası güncellendi, carotos.org ve GitHub Release metni yeni sha256 ile
+düzeltildi).
+- **Üst panel:** ses denetimi eklendi (`xfce4-pulseaudio-plugin`, sistem
+  tepsisinin yanında). Simgeye tıklanınca ses çubuğu açılır, fare tekerleği
+  sesi değiştirir.
+- **Uygulama dili:** Güvenlik Paneli, Sistem Sağlığı, USB Denetimi ve
+  Karşılama Sihirbazı ilk açılışta her zaman Türkçe başlıyordu. Artık sistem
+  dili Türkçe değilse İngilizce açılıyor; kayıtlı bir tercih varsa o geçerli.
+- **Karşılama Sihirbazı → Güvenlik Paneli dil aktarımı:** sihirbaz seçilen dili
+  panele `lang` anahtarıyla yazıyordu, panel ise `language` okuyor; seçim
+  panele hiç ulaşmıyordu. Düzeltildi.
+- **Karşılama Sihirbazı menü simgesi:** Uygulamalar > Sistem'de yer tutucu
+  simge görünüyordu; CarotOS logosu eklendi
+  (`/usr/share/pixmaps/carotos-welcome.png`).
+- **CarotOS Poligon, küçük ekran:** pencerenin alt kısmı ekran dışında
+  kalıyordu. Pencere, yazı ve liste yükseklikleri artık ekrana orantılı
+  küçülüyor (en fazla mevcut boyut, en az 0,85 kat); kalan fark dikey
+  kaydırmayla karşılanıyor, yatay kırpılma oluşmuyor.
+- **CarotOS Poligon Öğretmen, dil:** Sınıf sekmesindeki görev adları, savunma
+  ayırıcısı, "sudo gerekir" notu ve Soru Oluştur araç listesi TR/EN
+  düğmesiyle artık dil değiştiriyor (eskiden hep Türkçe kalıyordu).
+- **Oturum açılış perdesi:** masaüstünün hazır olduğu artık süreçlerin
+  başlamasından değil, masaüstü ve panel pencerelerinin gerçekten görünür
+  olmasından anlaşılıyor; duvar kâğıdı için ek bekleme masaüstünün geliş
+  süresiyle orantılı. LightDM giriş resmi, kök pencere anında beyaza
+  boyanarak gizleniyor; perde masaüstünün üzerinden eriyerek kapanıyor.
+
 ## Sürüm 12 — 1.2.1 "Eggshell": bellek, açılış ve Poligon güncellemesi
 **Durum:** Yayınlandı (ISO adı 1.2 olarak kaldı; `carotos-1.2-amd64.iso`
 dosyası güncellendi, carotos.org ve GitHub Release metni yeni sha256 ile
