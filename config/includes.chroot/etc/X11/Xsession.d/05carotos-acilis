@@ -1,8 +1,15 @@
 # CarotOS: oturum acilisinda siyah ekran yerine logo perdesi.
 # LightDM girisinden hemen sonra, masaustu bilesenlerinden once baslar;
-# panel ve masaustu hazir olunca kendini kapatir. Takilma olursa 20 saniye
-# sonunda zorla sonlandirilir. Devre disi birakmak icin
-# CAROTOS_ACILIS_KAPALI=1 tanimlanabilir.
+# masaustu gercekten ekrana gelince masaustunun uzerinden eriyerek kapanir.
+# Takilma olursa 32 saniye sonunda zorla sonlandirilir. Devre disi
+# birakmak icin CAROTOS_ACILIS_KAPALI=1 tanimlanabilir.
 if [ -x /usr/local/bin/carotos-oturum-acilis ] && [ -z "$CAROTOS_ACILIS_KAPALI" ]; then
-    timeout -k 2 20 /usr/local/bin/carotos-oturum-acilis >/dev/null 2>&1 &
+    # LightDM'in giris resmi kok pencerede kalir; perde (Python + GTK) eski
+    # bilgisayarlarda 1-2 saniyede acildigi icin o resim arada gorunuyordu.
+    # Kok pencereyi perdeyle ayni renge (beyaz) ANINDA boya: gecis kesintisiz.
+    # "|| true" sart: Xsession "set -e" ile calisir, bir hata oturumu dusururdu.
+    if command -v xsetroot >/dev/null 2>&1; then
+        xsetroot -solid '#ffffff' >/dev/null 2>&1 || true
+    fi
+    timeout -k 2 32 /usr/local/bin/carotos-oturum-acilis >/dev/null 2>&1 &
 fi

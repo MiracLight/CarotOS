@@ -1,17 +1,28 @@
 #!/usr/bin/env python3
 """CarotOS oturum acilis perdesi.
 
-LightDM girisinden sonra masaustu hazir olana kadar gecen surede siyah ekran
-yerine CarotOS logosunu gosterir. Masaustu (xfdesktop) ve panel calismaya
-basladiktan sonra kendini yumusakca kapatir.
+LightDM girisinden sonra masaustu GERCEKTEN ekrana gelene kadar CarotOS
+logosunu gosterir, sonra masaustunun uzerinden yumusakca erir.
 
-Tasarim ilkeleri (kararlilik ve dusuk bellek):
-  * Pencere "override-redirect" (POPUP) turundedir: pencere yoneticisi
-    (xfwm4) henuz baslamamis olsa da tam ekran ve en ustte kalir.
-  * Solma animasyonu icin ekran birlestirici (compositor) gerekmez; logo
-    onceden beyaz zemine karistirilmis birkac kareden olusur.
-  * Hazirlik kontrolu surec baslatmaz, /proc dizinini okur ve saniyede
-    yalnizca birkac kez calisir.
+Neden bu tasarim (1.2.2):
+  * Eski surum masaustunun hazir oldugunu xfdesktop/xfce4-panel
+    SURECLERININ baslamis olmasindan anliyordu. Surec 1 saniyede baslar
+    ama duvar kagidi ancak birkac saniye sonra cizilir; perde erken
+    kapaniyor, arada LightDM resmi gorunuyordu. Simdi pencere yoneticisinin
+    yigininda masaustu (DESKTOP) ve panel (DOCK) pencerelerinin gercekten
+    GORUNUR olmasi bekleniyor.
+  * Duvar kagidinin cizilmesi icin beklenen ek sure sabit degil: masaustu
+    ne kadar gec geldiyse (yavas/eski bilgisayar) o kadar uzun bekleniyor:
+        bekleme = 0.6 x masaustunun gelis suresi   (1.2 ile 3.5 sn arasi)
+  * Python ve GTK eski bilgisayarda 1-2 saniyede acilir; o arada gorunen
+    LightDM resmini Xsession betigi kok pencereyi beyaza boyayarak gizler
+    (perde zemini de beyaz, gecis kesintisiz).
+  * Pencere once BOS (beyaz) acilir, logo kareleri SONRA hazirlanir;
+    boylece ilk goruntu gecikmez.
+  * Kapanis: birlestirici (compositor) aciksa pencere saydamlasarak
+    masaustunun uzerinden erir (60 fps). Kapaliysa logo beyaza solar.
+  * Pencere "override-redirect" (POPUP): pencere yoneticisi baslamadan da
+    tam ekran ve en ustte kalir. Hazirlik kontrolu surec baslatmaz.
   * Her turlu hatada sessizce cikar; kesin sure asiminda kendini sonlandirir.
 
 Ortam degiskenleri:
@@ -27,15 +38,18 @@ LOGO_ADAYLARI = [
     "/usr/share/carotos/welcome/logo.png",
     "/usr/share/carotos/logo.png",
 ]
-SURE_EN_AZ = 2.0       # saniye: perde en az bu kadar gorunur
-SURE_EN_COK = 14.0     # saniye: masaustu gelmese bile bu surede kapanir
-HAZIR_SONRASI = 2.0    # panel/masaustu goruldukten sonra: duvar kagidinin cizilmesini bekle
-KARE_MS = 80           # animasyon adimi
-GIRIS_KARE = 8         # belirme kare sayisi
-CIKIS_KARE = 5         # solma kare sayisi
-KONTROL_ADIM = 5       # hazirlik kontrolu: her 5 adimda bir (~0,4 sn)
-NOKTA_ADIM = 6         # yukleniyor noktalari: her 6 adimda bir
-BEKLENEN = ("xfdesktop", "xfce4-panel")
+SURE_EN_AZ = 2.5        # sn: perde en az bu kadar gorunur (animasyon tamamlansin)
+SURE_EN_COK = 25.0      # sn: masaustu hic gelmese bile bu surede kapanir
+BEKLEME_ORANI = 0.6     # duvar kagidi icin ek bekleme = oran x masaustu gelis suresi
+BEKLEME_EN_AZ = 1.2
+BEKLEME_EN_COK = 3.5
+GIRIS_KARE = 14         # logo belirme kare sayisi
+GIRIS_MS = 35           # belirme kare araligi (~0.5 sn)
+BEKLE_MS = 250          # bekleme fazi tik araligi (dusuk islemci)
+CIKIS_MS = 16           # erime kare araligi (~60 fps)
+CIKIS_SURE = 0.45       # sn: erime suresi
+YEDEK_SURE = 6.0        # pencere yigini okunamazsa surec kontrolune gecis suresi
+BEKLENEN_SUREC = ("xfdesktop", "xfce4-panel")
 
 
 def calisanlar():
@@ -74,32 +88,13 @@ def main():
     ekran = Gdk.Screen.get_default()
     if ekran is None:
         return 0
-    gen, yuk = ekran.get_width(), ekran.get_height()
+    kok = ekran.get_root_window()
+    gen, yuk = kok.get_width(), kok.get_height()
+    test_gunluk = os.environ.get("CAROTOS_ACILIS_GUNLUK")   # test: faz gunlugu
 
-    test = os.environ.get("CAROTOS_ACILIS_TEST")          # test: sabit sure
-    goruntu = os.environ.get("CAROTOS_ACILIS_GORUNTU")    # test: ekran goruntusu
-
-    # Logo ve belirme/solma kareleri
-    giris = []
-    logo = None
-    yol = next((y for y in LOGO_ADAYLARI if os.path.isfile(y)), None)
-    if yol:
-        try:
-            h = max(150, min(320, int(yuk * 0.26)))
-            logo = GdkPixbuf.Pixbuf.new_from_file_at_scale(yol, -1, h, True)
-            for i in range(GIRIS_KARE):
-                a = (i + 1) / float(GIRIS_KARE)
-                giris.append(logo.composite_color_simple(
-                    logo.get_width(), logo.get_height(),
-                    GdkPixbuf.InterpType.NEAREST, int(255 * a), 16,
-                    0xffffff, 0xffffff))
-        except GLib.Error:
-            giris = []
-    cikis = []
-    if giris:
-        for i in range(CIKIS_KARE):
-            idx = int((GIRIS_KARE - 1) * (1 - (i + 1) / float(CIKIS_KARE + 1)))
-            cikis.append(giris[idx])
+    def gunluk(m):
+        if test_gunluk:
+            print("[acilis %.2f] %s" % (time.monotonic() - baslangic, m), flush=True)
 
     css = (
         "window.acilis { background-color: #ffffff; }"
@@ -117,92 +112,130 @@ def main():
     pencere.get_style_context().add_class("acilis")
     pencere.set_default_size(gen, yuk)
     pencere.move(0, 0)
+    gorsel = ekran.get_rgba_visual()
+    if gorsel is not None:
+        pencere.set_visual(gorsel)   # saydamlasarak erime icin
 
     kutu = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
     kutu.set_halign(Gtk.Align.CENTER)
     kutu.set_valign(Gtk.Align.CENTER)
-    resim = None
-    if giris:
-        resim = Gtk.Image.new_from_pixbuf(giris[0])
-        kutu.pack_start(resim, False, False, 0)
-    else:
-        yazi = Gtk.Label(label="CarotOS")
-        yazi.get_style_context().add_class("acilis-yazi")
-        kutu.pack_start(yazi, False, False, 0)
-    noktalar = Gtk.Label(label="●  ○  ○")
+    resim = Gtk.Image()
+    kutu.pack_start(resim, False, False, 0)
+    noktalar = Gtk.Label(label="")
     noktalar.get_style_context().add_class("acilis-nokta")
     kutu.pack_start(noktalar, False, False, 0)
     pencere.add(kutu)
 
     baslangic = time.monotonic()
-    d = {"adim": 0, "faz": "giris", "hazir_an": None, "cikis_i": 0,
-         "goruntu": False}
-    nokta_dizi = ["●  ○  ○", "○  ●  ○",
-                  "○  ○  ●"]
+    d = {"giris": [], "i": 0, "hazir_an": None, "bekleme": BEKLEME_EN_AZ,
+         "tik": 0, "cikis_bas": None}
+    nokta_dizi = ["●  ○  ○", "○  ●  ○", "○  ○  ●"]
 
     def bitir():
         Gtk.main_quit()
         return False
 
-    def adim():
-        d["adim"] += 1
-        n = d["adim"]
+    # --- 1) Belirme: kareler pencere gorundukten SONRA hazirlanir ---------
+    def kareleri_hazirla():
+        yol = next((y for y in LOGO_ADAYLARI if os.path.isfile(y)), None)
+        if yol:
+            try:
+                h = max(150, min(320, int(yuk * 0.26)))
+                logo = GdkPixbuf.Pixbuf.new_from_file_at_scale(yol, -1, h, True)
+                for i in range(GIRIS_KARE):
+                    a = (i + 1) / float(GIRIS_KARE)
+                    a = 1 - (1 - a) ** 2          # yumusak (ease-out)
+                    d["giris"].append(logo.composite_color_simple(
+                        logo.get_width(), logo.get_height(),
+                        GdkPixbuf.InterpType.BILINEAR, int(255 * a), 16,
+                        0xffffff, 0xffffff))
+            except GLib.Error:
+                d["giris"] = []
+        if not d["giris"]:
+            yazi = Gtk.Label(label="CarotOS")
+            yazi.get_style_context().add_class("acilis-yazi")
+            kutu.pack_start(yazi, False, False, 0)
+            kutu.reorder_child(yazi, 0)
+            yazi.show()
+        gunluk("kareler hazir (%d)" % len(d["giris"]))
+        GLib.timeout_add(GIRIS_MS, belir)
+        return False
+
+    def belir():
+        if d["i"] < len(d["giris"]):
+            resim.set_from_pixbuf(d["giris"][d["i"]])
+            d["i"] += 1
+            return True
+        noktalar.set_text(nokta_dizi[0])
+        gunluk("belirme bitti")
+        GLib.timeout_add(BEKLE_MS, bekle)
+        return False
+
+    # --- 2) Bekleme: masaustu GERCEKTEN gorunene kadar ---------------------
+    def masaustu_gorunur_mu():
+        """Pencere yoneticisinin yigininda gorunur bir masaustu ve panel
+        penceresi var mi? Yigin okunamiyorsa None (pencere yoneticisi yok)."""
+        yigin = ekran.get_window_stack()
+        if yigin is None:
+            return None
+        turler = set()
+        for w in yigin:
+            try:
+                if w.is_viewable():
+                    turler.add(w.get_type_hint())
+            except Exception:
+                continue
+        return (Gdk.WindowTypeHint.DESKTOP in turler
+                and Gdk.WindowTypeHint.DOCK in turler)
+
+    def bekle():
+        d["tik"] += 1
         t = time.monotonic() - baslangic
+        noktalar.set_text(nokta_dizi[(d["tik"] // 2) % 3])
+        try:
+            pencere.get_window().raise_()     # en ustte kal
+        except Exception:
+            pass
 
-        if d["faz"] == "giris":
-            if resim is not None and n <= GIRIS_KARE:
-                resim.set_from_pixbuf(giris[n - 1])
-            if n >= GIRIS_KARE:
-                d["faz"] = "bekle"
-            return True
+        if d["hazir_an"] is None:
+            gorunur = masaustu_gorunur_mu()
+            if gorunur is None and t >= YEDEK_SURE:
+                # Yigin yok: eski yontem (surec kontrolu), daha uzun bekleme
+                if all(a in calisanlar() for a in BEKLENEN_SUREC):
+                    gorunur = True
+            if gorunur:
+                d["hazir_an"] = time.monotonic()
+                d["bekleme"] = max(BEKLEME_EN_AZ,
+                                   min(BEKLEME_EN_COK, BEKLEME_ORANI * t))
+                gunluk("masaustu gorundu, ek bekleme %.2f sn" % d["bekleme"])
 
-        if d["faz"] == "cikis":
-            i = d["cikis_i"]
-            if i >= len(cikis):
-                return bitir()
-            if resim is not None:
-                resim.set_from_pixbuf(cikis[i])
-            noktalar.set_opacity(0.0)
-            d["cikis_i"] = i + 1
-            return True
-
-        # faz == "bekle"
-        if n % NOKTA_ADIM == 0:
-            noktalar.set_text(nokta_dizi[(n // NOKTA_ADIM) % 3])
-
-        if goruntu and not d["goruntu"] and t > 1.2:
-            d["goruntu"] = True
-            try:
-                pb = Gdk.pixbuf_get_from_window(
-                    pencere.get_window(), 0, 0,
-                    pencere.get_allocated_width(),
-                    pencere.get_allocated_height())
-                if pb is not None:
-                    pb.savev(goruntu, "png", [], [])
-            except Exception:
-                pass
-
-        if n % KONTROL_ADIM == 0:
-            try:
-                pencere.get_window().raise_()     # en ustte kal
-            except Exception:
-                pass
-            if test:
-                gecti = t >= float(test)
-            else:
-                var = calisanlar()
-                if all(a in var for a in BEKLENEN) and d["hazir_an"] is None:
-                    d["hazir_an"] = time.monotonic()
-                gecti = (t >= SURE_EN_AZ and d["hazir_an"] is not None
-                         and time.monotonic() - d["hazir_an"] >= HAZIR_SONRASI)
-                if t >= SURE_EN_COK:
-                    gecti = True
-            if gecti:
-                d["faz"] = "cikis"
+        gecti = (d["hazir_an"] is not None and t >= SURE_EN_AZ
+                 and time.monotonic() - d["hazir_an"] >= d["bekleme"])
+        if gecti or t >= SURE_EN_COK:
+            gunluk("kapanis basliyor (birlestirici=%s)" % ekran.is_composited())
+            d["cikis_bas"] = time.monotonic()
+            GLib.timeout_add(CIKIS_MS, eri)
+            return False
         return True
 
-    GLib.timeout_add(KARE_MS, adim)
+    # --- 3) Kapanis: masaustunun uzerinden erime ---------------------------
+    def eri():
+        oran = (time.monotonic() - d["cikis_bas"]) / CIKIS_SURE
+        if oran >= 1.0:
+            gunluk("bitti")
+            return bitir()
+        yumusak = 1 - (1 - oran) ** 3            # ease-out
+        if ekran.is_composited():
+            Gtk.Widget.set_opacity(pencere, 1.0 - yumusak)
+        elif d["giris"]:
+            idx = int((len(d["giris"]) - 1) * (1 - yumusak))
+            resim.set_from_pixbuf(d["giris"][idx])
+            noktalar.set_opacity(0.0)
+        return True
+
     pencere.show_all()
+    gunluk("pencere gosterildi")
+    GLib.idle_add(kareleri_hazirla)
     Gtk.main()
     return 0
 

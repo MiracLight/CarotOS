@@ -22,6 +22,7 @@
         <value type="int" value="25"/>
         <value type="int" value="5"/>
         <value type="int" value="6"/>
+        <value type="int" value="30"/>
         <value type="int" value="7"/>
         <value type="int" value="9"/>
         <value type="int" value="3"/>
@@ -82,6 +83,8 @@
     <property name="plugin-7" type="string" value="separator">
       <property name="style" type="uint" value="0"/>
     </property>
+    <!-- Ses denetimi: xfce4-pulseaudio-plugin (xfce4-goodies ile gelir). Tikla = ses cubugu, fare tekerlegi = ses ayari -->
+    <property name="plugin-30" type="string" value="pulseaudio"/>
     <property name="plugin-8" type="string" value="clock">
       <property name="mode" type="uint" value="2"/>
     </property>

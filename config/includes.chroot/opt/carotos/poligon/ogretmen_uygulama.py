@@ -49,6 +49,114 @@ def _yerel_ip_adresini_bul() -> str:
         s.close()
 
 
+def _css_olcekle(css, s):
+    """CSS'teki piksel degerlerini s (0.65-1.0) ile carpar ve temel yazi
+    boyutunu ayni oranda kucultur. s >= 1 ise HICBIR sey degismez; yani
+    normal ekranlarda gorunum eskisiyle birebir ayni kalir. 1px cizgiler
+    ile 100px ustu degerler (tam yuvarlak kose) oldugu gibi birakilir."""
+    if s >= 0.999:
+        return css
+    import re
+
+    def _px(eslesme):
+        deger = float(eslesme.group(1))
+        if deger <= 1 or deger >= 100:
+            return eslesme.group(0)
+        return "%dpx" % max(1, round(deger * s))
+
+    css = re.sub(r"(\d+(?:\.\d+)?)px", _px, css)
+    boyut = 10.0
+    try:
+        ayar = Gtk.Settings.get_default().get_property("gtk-font-name") or ""
+        boyut = float(ayar.rsplit(" ", 1)[-1])
+    except (ValueError, TypeError, AttributeError):
+        pass
+    return css + "\n window { font-size: %.1fpt; }\n" % (boyut * s)
+
+
+def _ic_kaydirmalari_olcekle(pencere, s):
+    """Ic kaydirma alanlarinin KODDA sabit yazilmis en-kucuk yuksekliklerini
+    (set_min_content_height) ayni oranla kucultur. Bu degerler CSS'te
+    olmadigi icin yazi olcegiyle birlikte kuculmuyor ve kucuk ekranda
+    pencere yuksekligini tek baslarina sisiriyorlardi. Taban deger bir kez
+    saklanir; boylece her turda ustune ustune kucultulmez."""
+    def gez(w):
+        if isinstance(w, Gtk.ScrolledWindow):
+            taban = getattr(w, "_taban_min_yukseklik", None)
+            if taban is None:
+                taban = w.get_min_content_height()
+                w._taban_min_yukseklik = taban
+            if taban > 0:
+                w.set_min_content_height(max(80, int(round(taban * s))))
+        if isinstance(w, Gtk.Container):
+            for c in w.get_children():
+                gez(c)
+    gez(pencere)
+
+
+def _olcek_uygula(pencere, icerik, taban_g, taban_y):
+    """Pencereyi ekrana sigdirir: yazi, bosluk ve liste yukseklikleri
+    birlikte, ayni oranda kuculur -- oranlar bozulmaz.
+
+    Olcek =  min(1, ekran_sinirlari / icerigin gercek en kucuk boyutu),
+    alt sinir 0.85. Ekran yetiyorsa olcek 1.00'dir ve GORUNUM DEGISMEZ;
+    yani yazi boyutu en fazla mevcut boyut kadardir. Kodda sabit yazilmis
+    bosluklar CSS ile kuculmedigi icin tek bir carpan yetmiyor, bu yuzden
+    olcup yineliyoruz. 0.85'in altina inilmez (yazi okunmaz olurdu); artan
+    fark dikey kaydirma cubuguyla karsilanir.
+
+    ONEMLI: pencere ekrana ciktiktan SONRA cagrilmali. __init__ icinde
+    olcmek yanlis sonuc veriyor, cunku Notebook/Stack sayfalari henuz
+    gerceklenmedigi icin icerik oldugundan kucuk olculuyor."""
+    try:
+        from gi.repository import Gdk
+        ekran = Gdk.Display.get_default()
+        monitor = ekran.get_primary_monitor() or ekran.get_monitor(0)
+        alan = monitor.get_workarea()
+        sinir_g, sinir_y = alan.width - 40, alan.height - 80
+
+        for _tur in range(6):
+            en_kucuk = icerik.get_preferred_size()[0]
+            istek_g = max(taban_g, en_kucuk.width)
+            istek_y = max(taban_y, en_kucuk.height)
+            if istek_g <= sinir_g and istek_y <= sinir_y:
+                break
+            oran = min(sinir_g / istek_g, sinir_y / istek_y) * 0.98
+            s = max(0.85, min(1.0, pencere._olcek * oran))
+            if abs(s - pencere._olcek) < 0.005:
+                break
+            pencere._olcek = s
+            pencere._css_uygula()
+            _ic_kaydirmalari_olcekle(pencere, s)
+
+        en_kucuk = icerik.get_preferred_size()[0]
+        g = min(max(taban_g, en_kucuk.width), sinir_g)
+        y = min(max(taban_y, en_kucuk.height), sinir_y)
+        if pencere.get_realized():
+            pencere.resize(g, y)
+        else:
+            pencere.set_default_size(g, y)
+    except Exception:  # noqa: BLE001 -- olcum basarisizsa taban boyut kalsin
+        pencere.set_default_size(taban_g, taban_y)
+    return False
+
+
+def _olcek_planla(pencere, icerik, taban_g, taban_y):
+    """Olcegi pencere gorundukten sonra, birkac turda hesaplar.
+
+    Tek tur yetmiyor: CSS ve liste yuksekligi degisince GTK yeni boyut
+    istegini hemen degil, bir sonraki dongude hesapliyor. Uc kisa tur,
+    olculen boyutun oturmasina izin veriyor."""
+    pencere._olcek_turu = 0
+
+    def _adim():
+        _olcek_uygula(pencere, icerik, taban_g, taban_y)
+        pencere._olcek_turu += 1
+        return pencere._olcek_turu < 3
+
+    GLib.timeout_add(150, _adim, priority=GLib.PRIORITY_LOW)
+
+
 def _sistem_dilini_belirle() -> str:
     """ogrenci_uygulama.py::_sistem_dilini_belirle ile AYNI mantık --
     sistem dili Türkçe ise 'tr', değilse 'en'. Bkz. oradaki docstring."""
@@ -311,10 +419,11 @@ class OgretmenPenceresi(Gtk.Window):
         self._ip_gorunur = False
         self.sunucu = sunucu_baslat(self.oda, "0.0.0.0", 8642)
 
-        self.set_default_size(520, 560)
+        self._olcek = 1.0  # ekran kucukse __init__ sonunda hesaplanip dusurulur
         self._css_uygula()
         self._arayuzu_kur()
         self._metinleri_uygula()
+        _olcek_planla(self, self._ana_kutu, 520, 560)
 
         GLib.timeout_add(800, self._listeyi_guncelle)
 
@@ -338,8 +447,9 @@ class OgretmenPenceresi(Gtk.Window):
         durum_basladi = "#a8c6e0"
         self._geri_metin_rengi = "#a8c6e0"
 
-        self._css_saglayici.load_from_data(f"""
+        self._css_saglayici.load_from_data(_css_olcekle(f"""
             window {{ background-color: {KOYU_ZEMIN}; }}
+            scrolledwindow.pencere-kaydirma, scrolledwindow.pencere-kaydirma > viewport {{ background-color: {KOYU_ZEMIN}; }}
             label {{ color: {metin_ana}; }}
             .kart {{
                 background-color: {kart_zemin}; border-radius: 10px; padding: 16px;
@@ -394,7 +504,7 @@ class OgretmenPenceresi(Gtk.Window):
             .alt-sekme-secici button label {{ color: {metin_soft}; font-weight: 600; }}
             .alt-sekme-secici button:checked {{ background-color: {VURGU}; }}
             .alt-sekme-secici button:checked label {{ color: white; }}
-        """.encode())
+        """, getattr(self, "_olcek", 1.0)).encode())
 
     def _arayuzu_kur(self):
         disKutu = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
@@ -464,7 +574,14 @@ class OgretmenPenceresi(Gtk.Window):
         self.sekmeler.append_page(self._kayitli_sorular_sekmesi_olustur(), Gtk.Label(label=""))
         self.sekmeler.append_page(self._ip_adres_sekmesi_olustur(), Gtk.Label(label=""))
 
-        self.add(disKutu)
+        # Kucuk ekranda alt kisimlar disarida kalmasin: icerik kaydirilabilir.
+        kaydirma = Gtk.ScrolledWindow()
+        kaydirma.get_style_context().add_class("pencere-kaydirma")
+        kaydirma.set_shadow_type(Gtk.ShadowType.NONE)
+        kaydirma.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        self._ana_kutu = disKutu  # olcek hesabi icin
+        kaydirma.add(disKutu)
+        self.add(kaydirma)
 
     def _soru_olustur_sekmesi_olustur(self) -> Gtk.Widget:
         icerik = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
@@ -739,6 +856,10 @@ class OgretmenPenceresi(Gtk.Window):
         self.so_baslik_etiketi.set_text(m["so_baslik"])
         self.so_aciklama_etiketi.set_text(m["so_aciklama"])
         self.so_arac_etiketi.set_text(m["so_arac_etiketi"])
+        # Arac listesindeki adlar da secili dile gore degissin (satir
+        # sirasi ve secili oge ayni kalir; sinyal tetiklenmez).
+        for _satir in self.so_arac_combo.get_model():
+            _satir[0] = _sablon.SABLONLAR[_satir[1]]["baslik"][self.dil]
         self.so_onizle_dugmesi.set_label(m["so_onizle_dugme"])
         self.so_gonder_dugmesi.set_label(m["so_gonder_dugme"])
         self.so_kaydet_dugmesi.set_label(m["so_kaydet_dugme"])
@@ -1032,6 +1153,9 @@ class OgretmenPenceresi(Gtk.Window):
         # gerçek geçiş "Uygula" butonuna basınca olur.
         self._tum_gorevler = _tum_gorevleri_yukle()
         self._gorev_anahtarlari: dict[str, Gtk.RadioButton] = {}
+        # Dil degisince gorev listesindeki metinleri tazeleyen islevler
+        # (liste bir kez kurulur; etiketler eskiden hep Turkce kaliyordu).
+        self._gorev_dil_yenileyicileri = []
 
         gorev_listesi_kutusu = Gtk.ListBox()
         gorev_listesi_kutusu.set_selection_mode(Gtk.SelectionMode.NONE)
@@ -1051,6 +1175,11 @@ class OgretmenPenceresi(Gtk.Window):
                 )
                 ayirici_etiketi.set_margin_top(8); ayirici_etiketi.set_margin_bottom(4)
                 ayirici_satir.add(ayirici_etiketi)
+                self._gorev_dil_yenileyicileri.append(
+                    lambda e=ayirici_etiketi: e.set_markup(
+                        f"<span size='small' color='#7fa8cc'>{METIN[self.dil]['savunma_ayirici']}</span>"
+                    )
+                )
                 gorev_listesi_kutusu.add(ayirici_satir)
                 savunma_ayirici_eklendi = True
 
@@ -1062,7 +1191,11 @@ class OgretmenPenceresi(Gtk.Window):
 
             ad_kutu = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
             ad_etiketi = Gtk.Label(xalign=0)
-            ad_etiketi.set_markup(f"<b>{g['baslik']['tr']}</b>  ·  {g['arac']}")
+            ad_etiketi.set_markup(f"<b>{g['baslik'][self.dil]}</b>  ·  {g['arac']}")
+            self._gorev_dil_yenileyicileri.append(
+                lambda e=ad_etiketi, gv=g: e.set_markup(
+                    f"<b>{gv['baslik'][self.dil]}</b>  ·  {gv['arac']}")
+            )
             ad_kutu.pack_start(ad_etiketi, False, False, 0)
             if sudo_gerekli:
                 not_etiketi = Gtk.Label(xalign=0)
@@ -1070,6 +1203,11 @@ class OgretmenPenceresi(Gtk.Window):
                     f"<span size='small' color='#a8c6e0'>{METIN[self.dil]['sudo_gerektirir_notu']}</span>"
                 )
                 ad_kutu.pack_start(not_etiketi, False, False, 0)
+                self._gorev_dil_yenileyicileri.append(
+                    lambda e=not_etiketi: e.set_markup(
+                        f"<span size='small' color='#a8c6e0'>{METIN[self.dil]['sudo_gerektirir_notu']}</span>"
+                    )
+                )
             satir_kutu.pack_start(ad_kutu, True, True, 0)
 
             if ilk_radio is None:
@@ -1158,6 +1296,8 @@ class OgretmenPenceresi(Gtk.Window):
         self.sinif_baslik_etiketi.set_text(m["sinif_basligi"])
         self.sinif_aciklama_etiketi.set_text(m["sinif_aciklama"])
         self.siradaki_dugmesi.set_label(m["siradaki_gorev"])
+        for _yenile in getattr(self, "_gorev_dil_yenileyicileri", []):
+            _yenile()
         self.zorluk_baslik_etiketi.set_text(m["zorluk_basligi"])
         self.zorluk_kolay_radio.set_label(m["zorluk_kolay"])
         self.zorluk_orta_radio.set_label(m["zorluk_orta"])

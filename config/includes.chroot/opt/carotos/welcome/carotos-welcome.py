@@ -506,7 +506,20 @@ PAGES = [
 # Ayarlar
 # ---------------------------------------------------------------------------
 
-DEFAULTS = {"lang": "tr", "theme": "dark", "show_on_startup": True,
+def _varsayilan_dil():
+    """Ilk acilis dili: sistem dili Turkce ise 'tr', baska HERHANGI bir dilse
+    'en'. Sabit 'tr' yazmak, kurulumda baska dil secen kullanicinin
+    uygulamalari Turkce gormesine yol aciyordu. C/POSIX dil bilgisi
+    tasimaz, o yuzden atlanir. Kayitli bir ayar varsa o yine onceliklidir."""
+    import os
+    for degisken in ("LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE"):
+        deger = os.environ.get(degisken, "").strip()
+        if deger and deger not in ("C", "POSIX"):
+            return "tr" if deger.lower().startswith("tr") else "en"
+    return "en"
+
+
+DEFAULTS = {"lang": _varsayilan_dil(), "theme": "dark", "show_on_startup": True,
             "wallpaper": ""}
 
 # Sihirbaz ust bandindaki secicilerin yaninda gosterilen aciklama
@@ -775,6 +788,10 @@ def apply_sibling_settings(lang, theme):
         except (OSError, ValueError):
             pass
         data["lang"] = lang
+        if folder == "carotos-panel":
+            # Guvenlik Paneli dil anahtarini "language" diye okur; "lang"
+            # yazmak onu hic etkilemiyordu.
+            data["language"] = lang
         data["theme"] = theme
         try:
             os.makedirs(os.path.dirname(path), exist_ok=True)
