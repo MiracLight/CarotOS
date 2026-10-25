@@ -1381,6 +1381,8 @@ LOGO_CANDIDATES = [
 
 UI = {
     "app_title": {"tr": "CarotOS Sistem Sağlığı", "en": "CarotOS System Health"},
+    "header_sub": {"tr": "Güvenlik ve bakım denetimi",
+                   "en": "Security and maintenance audit"},
     "summary": {"tr": "Özet", "en": "Summary"},
     "refresh": {"tr": "Yeniden denetle", "en": "Re-scan"},
     "full_audit": {"tr": "Root ile tam denetim", "en": "Full audit as root"},
@@ -1641,13 +1643,25 @@ class HealthWindow(Gtk.Window):
     # -- ust bant ----------------------------------------------------------
 
     def build_header(self):
+        # Ust bant: kenarlari yuvarlatilmis tek parca (Carotene ile ayni).
+        # Uygulama adi pencere basliginda yazdigi icin burada tekrar edilmez.
+        dis = Gtk.Box()
+        dis.set_margin_top(10)
+        dis.set_margin_bottom(10)
+        dis.set_margin_start(12)
+        dis.set_margin_end(12)
+        bant = Gtk.Box()
+        bant.get_style_context().add_class("header")
+        dis.pack_start(bant, True, True, 0)
         box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        box.get_style_context().add_class("header")
-        box.set_border_width(13)
+        box.set_margin_top(7)
+        box.set_margin_bottom(7)
+        box.set_margin_start(14)
+        box.set_margin_end(8)
+        bant.pack_start(box, True, True, 0)
 
-        # Ust bantta logo yok: pencere kenarindaki simgeyle tekrar oluyordu.
         self.title_label = Gtk.Label(xalign=0.0)
-        self.title_label.get_style_context().add_class("wordmark")
+        self.title_label.get_style_context().add_class("header-sub")
         box.pack_start(self.title_label, False, False, 0)
 
         self.lang_combo = Gtk.ComboBoxText()
@@ -1674,7 +1688,7 @@ class HealthWindow(Gtk.Window):
         self.refresh_btn.connect("clicked", lambda *_: self.start_scan(False))
         box.pack_end(self.refresh_btn, False, False, 0)
 
-        return box
+        return dis
 
     # -- yan menu ----------------------------------------------------------
 
@@ -2390,7 +2404,7 @@ class HealthWindow(Gtk.Window):
 
     def retranslate(self):
         self.set_title(UI["app_title"][self.lang])
-        self.title_label.set_text(UI["app_title"][self.lang])
+        self.title_label.set_text(UI["header_sub"][self.lang])
         self.refresh_btn.set_label(UI["refresh"][self.lang])
         self.root_btn.set_label(UI["full_audit"][self.lang])
         self.export_btn.set_label(UI["export"][self.lang])
@@ -2429,8 +2443,8 @@ class HealthWindow(Gtk.Window):
         window {{ background-color: {bg}; color: {fg}; }}
         label {{ color: {fg}; }}
 
-        .header {{ background-color: {header}; }}
-        .wordmark {{ font-size: 122%; font-weight: bold; }}
+        .header {{ background-color: {header}; border-radius: 10px; }}
+        .header-sub {{ color: {sub}; font-size: 104%; font-weight: bold; }}
         .sidebar {{ background-color: {side}; }}
         .nav-title {{ font-weight: bold; }}
         .nav-sub {{ color: {sub}; font-size: 88%; }}
