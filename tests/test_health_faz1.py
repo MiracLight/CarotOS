@@ -231,6 +231,36 @@ class RkhunterTesti(unittest.TestCase):
         self.assertEqual(komut[-1], "--check")
 
 
+class RkhunterAyarTesti(unittest.TestCase):
+    YOL = os.path.join(KOK, "config/includes.chroot/etc/rkhunter.conf.local")
+
+    def test_yerel_ayar_syslogu_kapatir(self):
+        # Turkce dil ayarinda rkhunter varsayilan USE_SYSLOG degerini gecersiz
+        # sayip --config-check'i (ve paket kurulumunu) bozuyor.
+        with open(self.YOL, encoding="utf-8") as f:
+            satirlar = [s.strip() for s in f if s.strip() and not s.startswith("#")]
+        self.assertIn("USE_SYSLOG=none", satirlar)
+
+    def test_yerel_ayar_yalniz_bilinen_anahtarlar(self):
+        izinli = {"SCRIPTWHITELIST", "ALLOWHIDDENFILE", "ALLOWIPCPROC", "USE_SYSLOG"}
+        with open(self.YOL, encoding="utf-8") as f:
+            for s in f:
+                s = s.strip()
+                if s and not s.startswith("#"):
+                    self.assertIn(s.split("=")[0], izinli, s)
+
+
+class DenetimHookTesti(unittest.TestCase):
+    YOL = os.path.join(KOK, "config/hooks/live/9990-carotos-denetim-araclari.hook.chroot")
+
+    def test_kurulum_dil_ayarindan_bagimsiz(self):
+        with open(self.YOL, encoding="utf-8") as f:
+            komutlar = [s.strip() for s in f if "apt-get install" in s and not s.lstrip().startswith("#")]
+        self.assertEqual(len(komutlar), 1)
+        self.assertTrue(komutlar[0].startswith("LC_ALL=C "), komutlar[0])
+        self.assertIn("--no-install-recommends", komutlar[0])
+
+
 class YapiTesti(unittest.TestCase):
     def iki_dilli(self, sozluk, yer):
         self.assertEqual(set(sozluk), {"tr", "en"}, yer)

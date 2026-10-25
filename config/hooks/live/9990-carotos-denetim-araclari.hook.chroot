@@ -5,4 +5,8 @@ set -e
 # LB_APT_RECOMMENDS acik oldugundan paket listesinden kurulsalardi exim4 (mail
 # sunucusu), ruby ve bir dizi gereksiz paket de gelirdi. Bu yuzden onerilen
 # paketler olmadan burada kurulurlar.
-DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends rkhunter debsums
+#
+# LC_ALL=C sart: rkhunter'in kurulum betigi debconf soru adlarini
+# "tr '[:upper:]' '[:lower:]'" ile uretir; Turkce dil ayarinda "I" harfi
+# kuculmez (cron_daIly_run) ve betik 10 koduyla dusup paketi yarim birakir.
+LC_ALL=C DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends rkhunter debsums

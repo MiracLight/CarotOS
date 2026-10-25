@@ -12,3 +12,9 @@ ALLOWHIDDENFILE=/etc/.updated
 ALLOWIPCPROC=/usr/bin/xfdesktop
 ALLOWIPCPROC=/usr/bin/xfce4-terminal
 ALLOWIPCPROC=/usr/libexec/polkit-mate-authentication-agent-1
+
+# rkhunter, Turkce dil ayarinda varsayilan syslog degerini ([a-z] araligi "i"
+# harfini disarida birakir) gecersiz sayar; bu hem taramayi hem paket kurulum
+# betigini (rkhunter --config-check) bozar. Sistem gunlugune yazmak kapatilir;
+# rkhunter kendi gunlugunu /var/log/rkhunter.log dosyasina yazmaya devam eder.
+USE_SYSLOG=none
