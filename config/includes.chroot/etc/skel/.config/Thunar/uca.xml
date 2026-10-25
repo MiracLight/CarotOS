@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<actions>
+<action>
+	<icon>utilities-terminal</icon>
+	<name>Open Terminal Here</name>
+	<name xml:lang="tr">Uçbirimi Burada Aç</name>
+	<submenu></submenu>
+	<unique-id>1693000000000000-1</unique-id>
+	<command>exo-open --working-directory %f --launch TerminalEmulator</command>
+	<description>Open a terminal in this folder</description>
+	<description xml:lang="tr">Bu klasörde uçbirim açar</description>
+	<range></range>
+	<patterns>*</patterns>
+	<startup-notify/>
+	<directories/>
+</action>
+<action>
+	<icon>carotene</icon>
+	<name>Scan with Carotene</name>
+	<name xml:lang="tr">Carotene ile tara</name>
+	<submenu></submenu>
+	<unique-id>1693000000000000-2</unique-id>
+	<command>/opt/carotos/carotene/carotene.py --tara %F</command>
+	<description>Scan the selected files or folders for known malware</description>
+	<description xml:lang="tr">Seçilen dosya ya da klasörleri bilinen zararlı yazılımlara karşı tarar</description>
+	<range></range>
+	<patterns>*</patterns>
+	<startup-notify/>
+	<directories/>
+	<audio-files/>
+	<image-files/>
+	<other-files/>
+	<text-files/>
+	<video-files/>
+</action>
+</actions>

@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Carotene
+Name[tr]=Carotene
+GenericName=Antivirus
+GenericName[tr]=Antivirüs
+Comment=Scan files for known malware with ClamAV
+Comment[tr]=Dosyaları ClamAV ile bilinen zararlı yazılımlara karşı tarar
+Exec=/opt/carotos/carotene/carotene.py
+Icon=carotene
+Terminal=false
+Categories=System;Security;
+Keywords=antivirus;virus;malware;clamav;scan;quarantine;
+Keywords[tr]=antivirüs;virüs;zararlı;clamav;tarama;karantina;

@@ -1,0 +1,32 @@
+#!/bin/sh
+set -e
+
+# Carotene (antivirus) icin ClamAV.
+# - Onerilen paketler olmadan kurulur (LB_APT_RECOMMENDS acik).
+# - LC_ALL=C: Turkce dil ayarinda bazi paket betikleri bozuluyor (rkhunter
+#   ornegi); kurulum dil ayarindan bagimsiz yapilir.
+# - Arka planda calisan otomatik guncelleme hizmeti kapatilir: tanimlar
+#   yalnizca kullanici Carotene'den istediginde guncellenir.
+# - ISO'ya taze tanimlar konur (cevrimdisi siniflar icin). Indirilemezse
+#   derleme durmaz; ISO tanimsiz cikar ve Carotene bunu acikca gosterir.
+LC_ALL=C DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends clamav clamav-freshclam
+
+systemctl disable clamav-freshclam.service 2>/dev/null || true
+
+if LC_ALL=C freshclam --stdout; then
+    echo "CarotOS: ClamAV tanimlari ISO'ya eklendi."
+else
+    echo "CarotOS UYARI: ClamAV tanimlari indirilemedi; ISO tanimsiz cikacak." >&2
+fi
+# Her kurulumun kendi kimligi olsun; derleme gunlugu ISO'ya girmesin
+rm -f /var/lib/clamav/freshclam.dat /var/log/clamav/freshclam.log
+
+chmod 755 /opt/carotos/carotene/carotene.py
+chmod 644 /opt/carotos/ortak/tarama_motoru.py /opt/carotos/ortak/bekleme_cubugu.py
+chmod 644 /usr/share/applications/carotos-carotene.desktop
+chmod 644 /usr/share/icons/hicolor/*/apps/carotene.png
+chmod 644 /etc/skel/.config/Thunar/uca.xml
+chmod 644 /etc/skel/.config/xfce4/panel/launcher-27/17870033396.desktop
+# Yeni simge hicolor onbellegine girsin (panel ve menu simgeyi bulsun)
+gtk-update-icon-cache -f -t /usr/share/icons/hicolor || true
+echo "CarotOS: Carotene yerlestirildi."
