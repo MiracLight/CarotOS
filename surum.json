@@ -1,0 +1,14 @@
+{
+  "_not": "CarotOS surum bilgisinin tek kaynagi. Degistirdikten sonra: python3 tools/surum_esitle.py uygula",
+  "dagitim": {
+    "surum": "1.2",
+    "kod_adi": "Eggshell"
+  },
+  "uygulamalar": {
+    "health":  "1.1",
+    "usb":     "1.1",
+    "welcome": "1.2",
+    "magaza":  "1.0"
+  },
+  "surumsuz_uygulamalar": ["poligon", "security-panel"]
+}
