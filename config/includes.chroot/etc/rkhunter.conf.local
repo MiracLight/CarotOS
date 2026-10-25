@@ -1,0 +1,14 @@
+# CarotOS: rkhunter yerel ayarlari (paketin /etc/rkhunter.conf dosyasina
+# dokunmaz). Yalnizca CarotOS'un kendi masaustunde bilinen ve zararsiz olan
+# yanlis pozitifler beyaz listeye alinmistir; baska hicbir denetim kapatilmaz.
+
+# Debian'da Perl betigi olarak dagitilan komut
+SCRIPTWHITELIST=/usr/bin/lwp-request
+
+# systemd'nin biraktigi gizli dosya
+ALLOWHIDDENFILE=/etc/.updated
+
+# Masaustu bilesenlerinin kullandigi buyuk paylasimli bellek bolumleri
+ALLOWIPCPROC=/usr/bin/xfdesktop
+ALLOWIPCPROC=/usr/bin/xfce4-terminal
+ALLOWIPCPROC=/usr/libexec/polkit-mate-authentication-agent-1

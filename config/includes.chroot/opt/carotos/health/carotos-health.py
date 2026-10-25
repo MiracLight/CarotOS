@@ -377,6 +377,392 @@ def check_fail2ban():
                        "en": "fail2ban is installed but not running."}}
 
 
+# --- AppArmor ----------------------------------------------------------------
+
+def _systemd_durum(birim):
+    """(acilista_etkin, su_an_calisiyor) dondurur; root gerektirmez."""
+    _, enabled = run(["systemctl", "is-enabled", birim])
+    _, active = run(["systemctl", "is-active", birim])
+    return (enabled.strip() in ("enabled", "enabled-runtime"),
+            active.strip() == "active")
+
+
+def check_apparmor_enabled():
+    if not have("apparmor_parser"):
+        return {"status": INFO,
+                "detail": {"tr": "AppArmor kurulu değildir.",
+                           "en": "AppArmor is not installed."}}
+    kernel = (read_file("/sys/module/apparmor/parameters/enabled") or "").strip()
+    if kernel != "Y":
+        return {"status": WARN,
+                "detail": {"tr": "AppArmor çekirdekte etkin değildir. Bu uygulama "
+                                 "çekirdek açılış parametrelerini değiştirmez.",
+                           "en": "AppArmor is not enabled in the kernel. This "
+                                 "application does not change kernel boot "
+                                 "parameters."}}
+    enabled, running = _systemd_durum("apparmor")
+    if enabled and running:
+        return {"status": OK,
+                "detail": {"tr": "AppArmor etkindir ve sistem açılışında "
+                                 "başlatılmaktadır.",
+                           "en": "AppArmor is enabled and is started at boot."}}
+    if running and not enabled:
+        return {"status": FAIL,
+                "detail": {"tr": "AppArmor şu anda çalışmaktadır ancak sistem "
+                                 "açılışında başlatılmayacaktır.",
+                           "en": "AppArmor is currently running but will not be "
+                                 "started at boot."}}
+    if enabled and not running:
+        return {"status": FAIL,
+                "detail": {"tr": "AppArmor sistem açılışında başlatılacaktır "
+                                 "ancak şu anda çalışmamaktadır.",
+                           "en": "AppArmor will be started at boot but is not "
+                                 "currently running."}}
+    return {"status": FAIL,
+            "detail": {"tr": "AppArmor devre dışıdır. Uygulamalar profillerle "
+                             "kısıtlanmamaktadır.",
+                       "en": "AppArmor is disabled. Applications are not "
+                             "restricted by profiles."}}
+
+
+_AA_SATIR = re.compile(r"^(.*) \((enforce|complain|kill|unconfined|prompt|mixed)\)$")
+
+
+def parse_aa_profiles(metin):
+    """/sys/kernel/security/apparmor/profiles icerigini sayar."""
+    sayac = {"enforce": 0, "complain": 0, "diger": 0}
+    for satir in (metin or "").splitlines():
+        eslesme = _AA_SATIR.match(satir.strip())
+        if not eslesme:
+            continue
+        mod = eslesme.group(2)
+        sayac[mod if mod in ("enforce", "complain") else "diger"] += 1
+    sayac["toplam"] = sayac["enforce"] + sayac["complain"] + sayac["diger"]
+    return sayac
+
+
+def check_apparmor_profiles():
+    if not is_root():
+        return {"status": NEEDROOT,
+                "detail": {"tr": "Yüklü profillerin listesi yalnızca yönetici "
+                                 "yetkisiyle okunabilir.",
+                           "en": "The list of loaded profiles can only be read "
+                                 "with administrator privileges."}}
+    if not have("apparmor_parser"):
+        return {"status": INFO,
+                "detail": {"tr": "AppArmor kurulu değildir.",
+                           "en": "AppArmor is not installed."}}
+    metin = read_file("/sys/kernel/security/apparmor/profiles")
+    if metin is None:
+        return {"status": INFO,
+                "detail": {"tr": "Profil listesi okunamadı (AppArmor devre dışı "
+                                 "olabilir).",
+                           "en": "The profile list could not be read (AppArmor "
+                                 "may be disabled)."}}
+    sayac = parse_aa_profiles(metin)
+    _, running = _systemd_durum("apparmor")
+    if sayac["toplam"] == 0:
+        if running:
+            return {"status": WARN,
+                    "detail": {"tr": "AppArmor çalışmaktadır ancak yüklü profil "
+                                     "bulunmamaktadır.",
+                               "en": "AppArmor is running but no profiles are "
+                                     "loaded."}}
+        return {"status": INFO,
+                "detail": {"tr": "Yüklü profil bulunmamaktadır (AppArmor devre "
+                                 "dışı).",
+                           "en": "No profiles are loaded (AppArmor is disabled)."}}
+    ozet_tr = (f"{sayac['toplam']} profil yüklüdür: {sayac['enforce']} zorlayıcı, "
+               f"{sayac['complain']} şikâyet (yalnızca kayıt) modundadır.")
+    ozet_en = (f"{sayac['toplam']} profiles are loaded: {sayac['enforce']} "
+               f"enforcing, {sayac['complain']} in complain (log-only) mode.")
+    if not running:
+        return {"status": WARN,
+                "detail": {"tr": "AppArmor hizmeti devre dışı görünmektedir "
+                                 "ancak profiller hâlâ yüklüdür. " + ozet_tr,
+                           "en": "The AppArmor service appears disabled but "
+                                 "profiles are still loaded. " + ozet_en}}
+    if sayac["enforce"] == 0:
+        return {"status": WARN,
+                "detail": {"tr": ozet_tr + " Zorlayıcı modda profil "
+                                 "bulunmamaktadır; profiller engelleme "
+                                 "yapmamakta, yalnızca kayıt tutmaktadır.",
+                           "en": ozet_en + " No profile is in enforce mode; "
+                                 "profiles only log and do not block."}}
+    return {"status": OK, "detail": {"tr": ozet_tr, "en": ozet_en}}
+
+
+# --- Ayrintili taramalar (istege bagli, yonetici yetkisi ister) --------------
+
+def is_live():
+    """Canli oturumda mi calisiyoruz (kalici kayit tutulamaz)."""
+    return "boot=live" in (read_file("/proc/cmdline") or "")
+
+
+# CarotOS'un kendi ozellestirmeleri nedeniyle paket ozetinden farkli olmasi
+# beklenen dosyalar.
+DEBSUMS_BEKLENEN = ("/usr/lib/os-release",)
+
+_DEBSUMS_YOL = re.compile(r"changed file (\S+)|^(\S+)\s+FAILED", re.I)
+
+
+def parse_debsums(code, out):
+    """debsums -s ciktisini yorumlar. Cikti bicimi tum surumlerde ayni
+    olmayabilir; yorumlanamazsa ham satirlar gosterilir."""
+    if code in (126, 127) and not out:
+        return {"status": INFO,
+                "detail": {"tr": "Tarama çalıştırılamadı.",
+                           "en": "The scan could not be run."}, "extra": []}
+    bulgular = []
+    for satir in (out or "").splitlines():
+        metin = satir.strip()
+        dusuk = metin.lower()
+        if metin and ("failed" in dusuk or "changed" in dusuk):
+            eslesme = _DEBSUMS_YOL.search(metin)
+            yol = (eslesme.group(1) or eslesme.group(2)) if eslesme else None
+            bulgular.append((yol, metin))
+    beklenen = [b for b in bulgular if b[0] in DEBSUMS_BEKLENEN]
+    beklenmeyen = [b for b in bulgular if b[0] not in DEBSUMS_BEKLENEN]
+    ekstra = ([{"text": m, "explain": {
+                   "tr": "CarotOS özelleştirmesi nedeniyle beklenen farklılıktır.",
+                   "en": "An expected difference caused by a CarotOS "
+                         "customisation."}} for _, m in beklenen]
+              + [{"text": m, "explain": None} for _, m in beklenmeyen])[:40]
+    if beklenmeyen:
+        n = len(beklenmeyen)
+        return {"status": WARN,
+                "detail": {"tr": f"{n} dosyanın sağlama toplamı paketle "
+                                 f"uyuşmamaktadır. Dosya adları incelenmelidir.",
+                           "en": f"The checksum of {n} files does not match the "
+                                 f"package. The file names should be reviewed."},
+                "extra": ekstra}
+    if code == 0 or beklenen:
+        k = len(beklenen)
+        tr = "Paketlerle dağıtılan dosyalarda değişiklik tespit edilmemiştir."
+        en = "No changes were detected in files distributed with packages."
+        if k:
+            tr = (f"Beklenmeyen değişiklik tespit edilmemiştir; yalnızca "
+                  f"CarotOS özelleştirmesi olan {k} dosya farklıdır.")
+            en = (f"No unexpected changes were detected; only {k} file(s) "
+                  f"differ because of CarotOS customisation.")
+        return {"status": OK, "detail": {"tr": tr, "en": en}, "extra": ekstra}
+    ham = [s.strip() for s in (out or "").splitlines() if s.strip()][:20]
+    return {"status": INFO,
+            "detail": {"tr": f"Çıktı yorumlanamadı (çıkış kodu {code}).",
+                       "en": f"The output could not be interpreted (exit code {code})."},
+            "extra": [{"text": s, "explain": None} for s in ham]}
+
+
+_RKH_UYARI = re.compile(r"^\s*Warning:\s*(.*)$")
+
+# rkhunter'in kendi ön koşul denetimi: tehdit bulgusu degildir, yalnizca
+# bazi alt denetimlerin atlandigini bildirir.
+_RKH_ONKOSUL = re.compile(r"prerequisites", re.I)
+_RKH_ONKOSUL_ACIKLAMA = {
+    "tr": "rkhunter bir ön koşulu sağlayamamıştır ve bazı alt denetimleri "
+          "(örneğin betikle değiştirilmiş komutların denetimi) atlamıştır. "
+          "Bu bir tehdit bulgusu değildir. Ayrıntı /var/log/rkhunter.log "
+          "dosyasındadır.",
+    "en": "rkhunter could not satisfy a prerequisite and skipped some "
+          "sub-checks (for example the check for commands replaced by "
+          "scripts). This is not a threat finding. Details are in "
+          "/var/log/rkhunter.log.",
+}
+
+_RKH_ACIKLAMALAR = [
+    (re.compile(r"replaced by a script", re.I),
+     {"tr": "Bir sistem komutu betikle değiştirilmiş görünmektedir. Debian'da "
+            "bazı komutlar zaten betik olarak dağıtıldığından bu uyarı "
+            "çoğunlukla yanlış pozitiftir.",
+      "en": "A system command appears to have been replaced by a script. Some "
+            "Debian commands are distributed as scripts, so this warning is "
+            "usually a false positive."}),
+    (re.compile(r"hidden (file|dir)", re.I),
+     {"tr": "Gizli bir dosya veya dizin bulunmuştur. Sistem bileşenleri de "
+            "gizli dosya kullanabilir; ad tanınıyorsa uyarı göz ardı "
+            "edilebilir.",
+      "en": "A hidden file or directory was found. System components may also "
+            "use hidden files; the warning can be disregarded if the name is "
+            "recognised."}),
+    (re.compile(r"shared memory", re.I),
+     {"tr": "Bazı masaüstü bileşenleri (ekran, oturum, terminal) büyük "
+            "paylaşımlı bellek kullanır; bu normaldir. Listelenen süreçler "
+            "tanınan uygulamalara aitse uyarı göz ardı edilebilir; "
+            "tanınmayan bir süreç varsa incelenmelidir.",
+      "en": "Some desktop components (display, session, terminal) use large "
+            "shared memory segments; this is normal. If the listed processes "
+            "belong to recognised applications the warning can be "
+            "disregarded; an unrecognised process should be investigated."}),
+    (re.compile(r"propert", re.I),
+     {"tr": "Bir dosyanın özellikleri kayıtlı değerlerden farklıdır. Sistem "
+            "güncellemesinden sonra beklenen bir durumdur; güncelleme "
+            "yapılmadıysa incelenmelidir.",
+      "en": "A file's properties differ from the recorded values. This is "
+            "expected after a system update; if no update was made, it should "
+            "be investigated."}),
+    (re.compile(r"ssh|PermitRootLogin", re.I),
+     {"tr": "SSH yapılandırması rkhunter'ın beklediği değerlerden farklıdır. "
+            "Bu bir yapılandırma uyuşmazlığıdır ve tek başına tehdit "
+            "göstergesi değildir.",
+      "en": "The SSH configuration differs from the values rkhunter expects. "
+            "This is a configuration mismatch and is not a threat indicator "
+            "by itself."}),
+    (re.compile(r"no copy of|\.dat|database|propupd", re.I),
+     {"tr": "Karşılaştırma kaydı bulunamamış veya güncel değildir. İlk "
+            "çalıştırmada beklenen bir durumdur. Sistemin güvenilir olduğu "
+            "doğrulandıysa “Kaydı yenile” ile oluşturulabilir.",
+      "en": "The comparison record is missing or out of date. If the system is "
+            "known to be trustworthy, it can be created with “Refresh "
+            "record”."}),
+]
+
+_RKH_VARSAYILAN = {
+    "tr": "Bu uyarının ayrıntıları incelenmelidir. Sistem güncellemesinden sonra "
+          "yanlış pozitif olabilir; emin olunamıyorsa uyarı metni araştırılmalı "
+          "veya proje ekibine bildirilmelidir.",
+    "en": "The details of this warning should be reviewed. It may be a false "
+          "positive after a system update; if unsure, the warning text should "
+          "be researched or reported to the project team.",
+}
+
+
+def rkhunter_aciklama(metin):
+    for desen, aciklama in _RKH_ACIKLAMALAR:
+        if desen.search(metin):
+            return aciklama
+    return _RKH_VARSAYILAN
+
+
+_RKH_BELLEK = re.compile(r"shared memory", re.I)
+
+
+def parse_rkhunter(code, out, own_pid=None):
+    if code in (126, 127) and not out:
+        return {"status": INFO,
+                "detail": {"tr": "Tarama çalıştırılamadı.",
+                           "en": "The scan could not be run."}, "extra": []}
+    uyarilar, notlar = [], []
+    # Bir uyarinin altindaki girintili satirlar (ornegin surec listesi) o
+    # uyariya aittir ve birlikte gosterilir.
+    gecerli, ilk = None, ""
+    for satir in (out or "").splitlines():
+        eslesme = _RKH_UYARI.match(satir)
+        if eslesme and eslesme.group(1).strip():
+            ilk = eslesme.group(1).strip()
+            gecerli = [ilk]
+            (notlar if _RKH_ONKOSUL.search(ilk) else uyarilar).append(gecerli)
+        elif gecerli is not None and satir[:1] in (" ", "\t") and satir.strip():
+            gecerli.append(satir.strip())
+        else:
+            gecerli = None
+    # Taramayi baslatan bu uygulamanin kendi paylasimli bellegi (GTK ekran
+    # cizimi) rkhunter tarafindan listelenir; yalnizca bu uygulamanin kendi
+    # surec numarasi listeden cikarilir, baska hicbir surec cikarilmaz.
+    pid = own_pid if own_pid is not None else os.getpid()
+    kendi = re.compile(r"\bPID:\s*%d\b" % pid)
+    suzulen, elendi = [], False
+    for u in uyarilar:
+        if _RKH_BELLEK.search(u[0]):
+            ayrintilar = [x for x in u[1:] if not kendi.search(x)]
+            if len(u) > 1 and not ayrintilar:
+                elendi = True
+                continue
+            u = [u[0]] + ayrintilar
+        suzulen.append(u)
+    uyarilar = ["\n".join(u) for u in suzulen]
+    notlar = ["\n".join(m) for m in notlar]
+    not_ekstra = [{"text": m, "explain": _RKH_ONKOSUL_ACIKLAMA} for m in notlar]
+    if uyarilar:
+        n = len(uyarilar)
+        return {"status": WARN,
+                "detail": {"tr": f"{n} uyarı tespit edilmiştir. Her uyarının "
+                                 f"altında olası anlamı belirtilmiştir.",
+                           "en": f"{n} warnings were detected. The possible "
+                                 f"meaning is given under each warning."},
+                "extra": [{"text": u, "explain": rkhunter_aciklama(u)}
+                          for u in uyarilar[:40]] + not_ekstra}
+    if notlar:
+        return {"status": INFO,
+                "detail": {"tr": "Bilinen izlere rastlanmamıştır; ancak bir ön "
+                                 "koşul uyarısı nedeniyle bazı alt denetimler "
+                                 "atlanmıştır. Bu sonuç sistemin güvenli "
+                                 "olduğunu garanti etmez.",
+                           "en": "No known traces were found, but some "
+                                 "sub-checks were skipped because of a "
+                                 "prerequisite warning. This result does not "
+                                 "guarantee that the system is secure."},
+                "extra": not_ekstra}
+    if code == 0 or elendi:
+        return {"status": OK,
+                "detail": {"tr": "Bilinen izlere rastlanmamıştır. Bu sonuç "
+                                 "sistemin güvenli olduğunu garanti etmez.",
+                           "en": "No known traces were found. This result does "
+                                 "not guarantee that the system is secure."},
+                "extra": []}
+    ham = [s.strip() for s in (out or "").splitlines() if s.strip()][:20]
+    return {"status": INFO,
+            "detail": {"tr": f"Çıktı yorumlanamadı (çıkış kodu {code}).",
+                       "en": f"The output could not be interpreted (exit code {code})."},
+            "extra": [{"text": s, "explain": None} for s in ham]}
+
+
+def deep_command(binary, args):
+    """Ayrintili tarama komutu. Araclar Turkce dil ayariyla bazi desenleri
+    yanlis yorumladigindan (ornegin [a-z] araligi) ve ciktilari Ingilizce
+    metinlere gore yorumlandigindan LC_ALL=C ile calistirilir."""
+    return (["pkexec", bin_path("env"), "LC_ALL=C", bin_path(binary)]
+            + list(args))
+
+
+# Sabit komutlar: kullanici metni argumana hic girmez. rkhunter'a
+# "--syslog none" verilir: yapilandirmadaki syslog degeri dogrulanirken
+# bazi sistemlerde tarama baslamadan hata veriyordu.
+DEEP_SCANS = [
+    {
+        "id": "debsums", "binary": "debsums", "args": ["-s"], "timeout": 900,
+        "parse": parse_debsums,
+        "title": {"tr": "Paket bütünlüğü denetimi (debsums)",
+                  "en": "Package integrity check (debsums)"},
+        "why": {"tr": "Kurulu paketlerin dosyalarını, paketle birlikte "
+                      "dağıtılan sağlama toplamlarıyla karşılaştırır. Sağlama "
+                      "toplamı uyuşmayan dosya değiştirilmiş ya da bozulmuş "
+                      "olabilir.",
+                "en": "Compares the files of installed packages with the "
+                      "checksums distributed with the package. A file whose "
+                      "checksum does not match may have been modified or "
+                      "corrupted."},
+    },
+    {
+        "id": "rkhunter", "binary": "rkhunter",
+        "args": ["--check", "--skip-keypress", "--report-warnings-only",
+                 "--nocolors", "--syslog", "none"],
+        "timeout": 1800, "parse": parse_rkhunter, "live_note": True,
+        "propupd_args": ["--propupd", "--syslog", "none"],
+        "propupd_warning": {
+            "tr": "Sistemin mevcut durumu temiz kabul edilerek karşılaştırma "
+                  "kaydı olarak saklanacaktır. İşleme yalnızca sistemin "
+                  "güvenilir olduğundan emin olunduğunda devam edilmelidir; "
+                  "ele geçirilmiş bir sistemde bu kayıt sorunu normal "
+                  "gösterir.",
+            "en": "The current state of the system will be stored as the "
+                  "clean comparison record. Continue only if the system is "
+                  "known to be trustworthy; on a compromised system this "
+                  "record makes the problem appear normal."},
+        "title": {"tr": "Rootkit denetimi (rkhunter)",
+                  "en": "Rootkit check (rkhunter)"},
+        "why": {"tr": "Bilinen rootkit izlerini, gizli dosyaları ve temel "
+                      "sistem programlarındaki değişiklikleri denetler. Sistem "
+                      "güncellemelerinden sonra yanlış pozitif uyarı "
+                      "üretebilir; her uyarının altındaki açıklama dikkate "
+                      "alınmalıdır.",
+                "en": "Checks for known rootkit traces, hidden files and "
+                      "changes in core system programs. It may produce false "
+                      "positive warnings after system updates; the explanation "
+                      "under each warning should be taken into account."},
+    },
+]
+
+
 def check_root_locked():
     if not is_root():
         return {"status": NEEDROOT,
@@ -583,8 +969,10 @@ CATEGORIES = [
     ("updates",  {"tr": "Güncellemeler",       "en": "Updates"}),
     ("repos",    {"tr": "Depolar",             "en": "Repositories"}),
     ("network",  {"tr": "Ağ ve güvenlik duvarı", "en": "Network & firewall"}),
+    ("protect",  {"tr": "Koruma katmanları",   "en": "Protection layers"}),
     ("accounts", {"tr": "Hesaplar ve erişim",  "en": "Accounts & access"}),
     ("storage",  {"tr": "Disk ve bellek",      "en": "Storage & memory"}),
+    ("deep",     {"tr": "Ayrıntılı taramalar", "en": "Detailed scans"}),
 ]
 
 CHECKS = [
@@ -685,6 +1073,18 @@ CHECKS = [
         "action": {"cmd": 'ufw --force enable',
                    "label": {'tr': 'Duvarı aç', 'en': 'Enable firewall'},
                    "confirm": False},
+        "off": {"cmd": 'ufw disable',
+                "label": {'tr': 'Devre dışı bırak', 'en': 'Disable'},
+                "confirm": True,
+                "warning": {"tr": "Güvenlik duvarı devre dışı bırakılacaktır ve "
+                                  "yeniden başlatmadan sonra da devre dışı "
+                                  "kalacaktır. Gelen bağlantılar "
+                                  "filtrelenmeyecektir. Bu karttaki düğme ile "
+                                  "yeniden etkinleştirilebilir.",
+                            "en": "The firewall will be disabled and will "
+                                  "remain disabled after a restart. Incoming "
+                                  "connections will not be filtered. It can be "
+                                  "re-enabled with the button on this card."}},
     },
     {
         "id": "fw_policy", "category": "network", "func": check_firewall_policy,
@@ -718,6 +1118,57 @@ CHECKS = [
         "action": {"cmd": 'systemctl enable --now fail2ban',
                    "label": {'tr': 'Başlat', 'en': 'Start'},
                    "confirm": False},
+    },
+    {
+        "id": "apparmor", "category": "protect", "func": check_apparmor_enabled,
+        "title": {"tr": "AppArmor (uygulama kısıtlama)",
+                  "en": "AppArmor (application confinement)"},
+        "why": {"tr": "AppArmor, programların yalnızca izin verilen dosya ve "
+                      "kaynaklara erişmesini sağlar. Ele geçirilen bir "
+                      "programın verebileceği zarar bu sayede sınırlandırılır.",
+                "en": "AppArmor restricts programs to the files and resources "
+                      "they are permitted to access. This limits the damage "
+                      "that a compromised program can cause."},
+        "fix": "sudo systemctl enable --now apparmor",
+        "action": {"cmd": 'systemctl enable --now apparmor',
+                   "label": {'tr': 'Etkinleştir', 'en': 'Enable'},
+                   "confirm": False},
+        # Hizmeti durdurmak yuklu profilleri bellekten kaldirmaz; bu nedenle
+        # aa-teardown da calistirilir. Profil listesi zaten bossa basarili sayilir.
+        "off": {"cmd": 'systemctl disable --now apparmor && '
+                       '{ aa-teardown || [ -z "$(cat /sys/kernel/security/apparmor/profiles)" ]; }',
+                "label": {'tr': 'Devre dışı bırak', 'en': 'Disable'},
+                "confirm": True,
+                "warning": {"tr": "AppArmor devre dışı bırakılacak, yüklü profiller "
+                                  "bellekten kaldırılacak ve yeniden başlatmadan "
+                                  "sonra da devre dışı kalacaktır. Programlar "
+                                  "profillerle kısıtlanmayacaktır. Bu karttaki "
+                                  "düğme ile yeniden etkinleştirilebilir; "
+                                  "etkinleştirildiğinde çalışmakta olan "
+                                  "programlar, kapatılıp yeniden açılana kadar "
+                                  "kısıtlanmaz.",
+                            "en": "AppArmor will be disabled, the loaded profiles "
+                                  "will be removed from memory and it will remain "
+                                  "disabled after a restart. Programs will not be "
+                                  "restricted by profiles. It can be re-enabled "
+                                  "with the button on this card; once enabled, "
+                                  "programs that are already running are not "
+                                  "restricted until they are closed and opened "
+                                  "again."}},
+    },
+    {
+        "id": "apparmor_profiles", "category": "protect",
+        "func": check_apparmor_profiles,
+        "title": {"tr": "AppArmor profilleri", "en": "AppArmor profiles"},
+        "why": {"tr": "Zorlayıcı moddaki profiller ihlalleri engeller; şikâyet "
+                      "modundakiler yalnızca kayıt tutar. Debian bazı "
+                      "profilleri bilerek şikâyet modunda dağıtır; bu bir hata "
+                      "değildir.",
+                "en": "Profiles in enforce mode block violations; those in "
+                      "complain mode only keep a record. Debian distributes "
+                      "some profiles in complain mode on purpose; this is not "
+                      "an error."},
+        "fix": "sudo aa-status",
     },
     {
         "id": "root_locked", "category": "accounts", "func": check_root_locked,
@@ -904,6 +1355,43 @@ UI = {
                       "en": "The action was cancelled or not authorised."},
     "all_clear": {"tr": "Dikkat gerektiren bulgu yok.",
                   "en": "Nothing needs attention."},
+    "deep_intro": {
+        "tr": "Ayrıntılı taramalar yönetici yetkisi gerektirir ve uzun "
+              "sürebilir. Yalnızca kullanıcı başlattığında çalıştırılır. "
+              "Sonuçlar yalnızca tespit edilen bulguları listeler; sistemin "
+              "güvenli olduğunu garanti etmez.",
+        "en": "Detailed scans require administrator privileges and may take a "
+              "long time. They are run only when started by the user. Results "
+              "list only the findings detected and do not guarantee that the "
+              "system is secure.",
+    },
+    "deep_none": {"tr": "Henüz çalıştırılmamıştır.", "en": "Not run yet."},
+    "deep_missing": {"tr": "Bu araç kurulu değildir.",
+                     "en": "This tool is not installed."},
+    "deep_working": {"tr": "Tarama sürmektedir.", "en": "Scan in progress."},
+    "deep_badge_none": {"tr": "ÇALIŞTIRILMADI", "en": "NOT RUN"},
+    "deep_badge_run": {"tr": "ÇALIŞIYOR", "en": "RUNNING"},
+    "deep_scan": {"tr": "Tara", "en": "Scan"},
+    "deep_rescan": {"tr": "Yeniden tara", "en": "Scan again"},
+    "deep_propupd": {"tr": "Kaydı yenile", "en": "Refresh record"},
+    "deep_running": {"tr": "{title} çalışmaktadır. İşlem birkaç dakika "
+                           "sürebilir.",
+                     "en": "{title} is running. This may take a few minutes."},
+    "deep_finished": {"tr": "{title}: tarama tamamlandı.",
+                      "en": "{title}: scan completed."},
+    "deep_propupd_ok": {"tr": "{title}: karşılaştırma kaydı yenilendi.",
+                        "en": "{title}: comparison record refreshed."},
+    "deep_propupd_failed": {"tr": "{title}: karşılaştırma kaydı yenilenemedi.",
+                            "en": "{title}: the comparison record could not be "
+                                  "refreshed."},
+    "deep_live_note": {
+        "tr": "Canlı oturumda çalışılmaktadır. Sistem her açılışta "
+              "sıfırlandığından karşılaştırma kaydı kalıcı değildir; sonuçlar "
+              "yalnızca o anki durumu yansıtır.",
+        "en": "A live session is in use. Because the system is reset at every "
+              "boot, the comparison record is not permanent; results reflect "
+              "only the current state.",
+    },
 }
 
 STATUS_LABEL = {
@@ -968,6 +1456,61 @@ def check_meta(check_id):
     return None
 
 
+class SweepBar(Gtk.Image):
+    """Süresi belirsiz işlemler için tek yönde ilerleyen ince çubuk.
+
+    Soldan sağa akan bir parça gösterir; sağ uca ulaşınca yeniden soldan
+    başlar (ileri geri gitmez). Cairo gerektirmez: kareler GdkPixbuf ile
+    önceden üretilir ve her adımda sırayla gösterilir."""
+
+    WIDTH = 132
+    HEIGHT = 5
+    FRAMES = 44
+    TAIL = 52
+    _onbellek = {}
+
+    @classmethod
+    def kareler(cls, renk):
+        if renk in cls._onbellek:
+            return cls._onbellek[renk]
+        r, g, b = (int(renk[i:i + 2], 16) for i in (1, 3, 5))
+        w, h, n, kuyruk = cls.WIDTH, cls.HEIGHT, cls.FRAMES, cls.TAIL
+        zemin = 0.22
+        kareler = []
+        for k in range(n):
+            bas = k * (w + kuyruk) // n
+            veri = bytearray()
+            for y in range(h):
+                for x in range(w):
+                    mesafe = bas - x
+                    if 0 <= mesafe <= kuyruk:
+                        parca = (1.0 - mesafe / kuyruk) ** 1.6
+                        if mesafe < 3:
+                            parca *= (mesafe + 1) / 4.0
+                    else:
+                        parca = 0.0
+                    alfa = max(zemin, parca)
+                    if (x in (0, w - 1)) and (y in (0, h - 1)):
+                        alfa = 0.0
+                    veri += bytes((r, g, b, int(alfa * 255)))
+            kareler.append(GdkPixbuf.Pixbuf.new_from_bytes(
+                GLib.Bytes.new(bytes(veri)), GdkPixbuf.Colorspace.RGB,
+                True, 8, w, h, w * 4))
+        cls._onbellek[renk] = kareler
+        return kareler
+
+    def __init__(self, renk):
+        super().__init__()
+        self._kareler = self.kareler(renk)
+        self.set_from_pixbuf(self._kareler[0])
+        self.set_size_request(self.WIDTH, self.HEIGHT)
+        self.set_valign(Gtk.Align.CENTER)
+        self.set_no_show_all(True)
+
+    def adim(self, sayac):
+        self.set_from_pixbuf(self._kareler[sayac % len(self._kareler)])
+
+
 class HealthWindow(Gtk.Window):
 
     ACCENT = "#87979B"
@@ -983,11 +1526,12 @@ class HealthWindow(Gtk.Window):
         self.theme = settings["theme"]
         self.results = []
         self.audited_as_root = False
-        self.busy = False
+        self.jobs = set()
+        self.job_ui = {}
+        self.sweep_id = 0
+        self.sweep_step = 0
+        self.rescan_pending = False
         self.current_category = "summary"
-        self.fix_buttons = []
-        self.pulse_id = 0
-        self.pulse_bar = None
 
         self.set_default_size(1000, 700)
         self.set_size_request(880, 600)
@@ -1119,8 +1663,7 @@ class HealthWindow(Gtk.Window):
 
     def show_category(self, key):
         self.current_category = key
-        self.stop_pulse()
-        self.fix_buttons = []
+        self.job_ui = {}
         self.clear_content()
 
         holder = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
@@ -1129,6 +1672,17 @@ class HealthWindow(Gtk.Window):
 
         if key == "summary":
             holder.pack_start(self.build_summary(), False, False, 0)
+        elif key == "deep":
+            heading = Gtk.Label(label=dict(CATEGORIES)[key][self.lang], xalign=0.0)
+            heading.get_style_context().add_class("page-title")
+            holder.pack_start(heading, False, False, 0)
+            intro = Gtk.Label(label=UI["deep_intro"][self.lang], xalign=0.0)
+            intro.set_line_wrap(True)
+            intro.set_max_width_chars(88)
+            intro.get_style_context().add_class("page-subtitle")
+            holder.pack_start(intro, False, False, 0)
+            for scan in DEEP_SCANS:
+                holder.pack_start(self.build_deep_card(scan), False, False, 0)
         else:
             title = None
             for cat_key, label in CATEGORIES:
@@ -1264,17 +1818,22 @@ class HealthWindow(Gtk.Window):
             fix_btn.connect("clicked", self.on_fix, meta)
             top.pack_end(fix_btn, False, False, 0)
 
-            # Islem suresince dugmenin solunda darbeli ilerleme cubugu
-            bar = Gtk.ProgressBar()
-            bar.set_show_text(False)
-            bar.set_valign(Gtk.Align.CENTER)
-            bar.set_size_request(130, -1)
-            bar.set_no_show_all(True)
-            bar.hide()
+            # Islem suresince dugmenin solunda tek yonlu ilerleme cubugu
+            bar = self.new_bar()
             top.pack_end(bar, False, False, 0)
-            fix_btn.progress_bar = bar
+            self.job_attach(("fix", meta["id"]), fix_btn, bar)
+        # Kapatma anahtari: koruma aciksa ve denetimin "off" eylemi varsa
+        off = meta.get("off") if meta else None
+        if off and status == OK:
+            off_btn = Gtk.Button(label=off["label"][self.lang])
+            off_btn.get_style_context().add_class("destructive-action")
+            off_btn.set_valign(Gtk.Align.CENTER)
+            off_btn.connect("clicked", self.on_fix, meta, off)
+            top.pack_end(off_btn, False, False, 0)
 
-            self.fix_buttons.append(fix_btn)
+            off_bar = self.new_bar()
+            top.pack_end(off_bar, False, False, 0)
+            self.job_attach(("fix", meta["id"]), off_btn, off_bar)
         inner.pack_start(top, False, False, 0)
 
         detail = Gtk.Label(label=result["detail"][self.lang], xalign=0.0)
@@ -1314,24 +1873,28 @@ class HealthWindow(Gtk.Window):
 
     # -- duzeltme calistirma -----------------------------------------------
 
-    def on_fix(self, button, meta):
-        action = meta["action"]
+    def on_fix(self, button, meta, action=None):
+        action = action or meta["action"]
+        key = ("fix", meta["id"])
+        if key in self.jobs:
+            return
         if action.get("confirm"):
             dialog = Gtk.MessageDialog(
                 transient_for=self, modal=True,
                 message_type=Gtk.MessageType.QUESTION,
                 buttons=Gtk.ButtonsType.OK_CANCEL,
                 text=meta["title"][self.lang])
-            dialog.format_secondary_text(
-                UI["confirm_body"][self.lang].format(
-                    action=action["label"][self.lang]))
+            body = UI["confirm_body"][self.lang].format(
+                action=action["label"][self.lang])
+            if action.get("warning"):
+                body += "\n\n" + action["warning"][self.lang]
+            dialog.format_secondary_text(body)
             response = dialog.run()
             dialog.destroy()
             if response != Gtk.ResponseType.OK:
                 return
 
-        self.set_busy(True)
-        self.start_pulse(getattr(button, "progress_bar", None))
+        self.job_begin(key)
         self.status.set_text(UI["applying"][self.lang].format(
             action=action["label"][self.lang]))
 
@@ -1342,36 +1905,231 @@ class HealthWindow(Gtk.Window):
 
         threading.Thread(target=worker, daemon=True).start()
 
-    def start_pulse(self, bar):
-        self.stop_pulse()
-        if bar is None:
-            return
-        self.pulse_bar = bar
-        bar.set_fraction(0.0)
-        bar.show()
-        bar.pulse()
-        self.pulse_id = GLib.timeout_add(110, self._pulse)
+    # -- ayrintili taramalar -----------------------------------------------
 
-    def _pulse(self):
-        if self.pulse_bar is not None:
-            self.pulse_bar.pulse()
-            return True
+    def deep_state(self):
+        if not hasattr(self, "deep"):
+            self.deep = {}
+        return self.deep
+
+    def build_deep_card(self, scan):
+        key = ("deep", scan["id"])
+        state = self.deep_state().get(scan["id"])
+        installed = have(scan["binary"])
+        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        card.get_style_context().add_class("card")
+
+        inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=9)
+        inner.set_margin_top(18)
+        inner.set_margin_bottom(18)
+        inner.set_margin_start(22)
+        inner.set_margin_end(22)
+        card.pack_start(inner, True, True, 0)
+
+        top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=11)
+        if key in self.jobs:
+            badge_text = UI["deep_badge_run"][self.lang]
+            badge_class = "badge-info"
+        elif state and "status" in state:
+            badge_text = STATUS_LABEL[state["status"]][self.lang]
+            badge_class = {OK: "badge-ok", WARN: "badge-warn", FAIL: "badge-fail",
+                           INFO: "badge-info"}.get(state["status"], "badge-info")
+        else:
+            badge_text = UI["deep_badge_none"][self.lang]
+            badge_class = "badge-info"
+        badge = Gtk.Label(label=badge_text)
+        badge.get_style_context().add_class("badge")
+        badge.get_style_context().add_class(badge_class)
+        badge.set_valign(Gtk.Align.CENTER)
+        top.pack_start(badge, False, False, 0)
+
+        title = Gtk.Label(label=scan["title"][self.lang], xalign=0.0)
+        title.get_style_context().add_class("card-title")
+        title.set_line_wrap(True)
+        title.set_valign(Gtk.Align.CENTER)
+        top.pack_start(title, True, True, 0)
+
+        if installed:
+            scan_btn = Gtk.Button(
+                label=UI["deep_rescan" if state and "status" in state
+                         else "deep_scan"][self.lang])
+            scan_btn.get_style_context().add_class("suggested-action")
+            scan_btn.set_valign(Gtk.Align.CENTER)
+            scan_btn.connect("clicked", self.start_deep, scan, "scan")
+            top.pack_end(scan_btn, False, False, 0)
+
+            if scan.get("propupd_args"):
+                prop_btn = Gtk.Button(label=UI["deep_propupd"][self.lang])
+                prop_btn.set_valign(Gtk.Align.CENTER)
+                prop_btn.connect("clicked", self.start_deep, scan, "propupd")
+                top.pack_end(prop_btn, False, False, 0)
+                self.job_attach(key, prop_btn)
+
+            bar = self.new_bar()
+            top.pack_end(bar, False, False, 0)
+            self.job_attach(key, scan_btn, bar)
+        inner.pack_start(top, False, False, 0)
+
+        if not installed:
+            detail_text = UI["deep_missing"][self.lang]
+        elif key in self.jobs:
+            detail_text = UI["deep_working"][self.lang]
+        elif state and "detail" in state:
+            detail_text = state["detail"][self.lang]
+        else:
+            detail_text = UI["deep_none"][self.lang]
+        detail = Gtk.Label(label=detail_text, xalign=0.0)
+        detail.set_line_wrap(True)
+        detail.set_max_width_chars(88)
+        inner.pack_start(detail, False, False, 0)
+
+        why = Gtk.Label(label=f"{UI['why'][self.lang]}: {scan['why'][self.lang]}",
+                        xalign=0.0)
+        why.set_line_wrap(True)
+        why.set_max_width_chars(88)
+        why.get_style_context().add_class("why-text")
+        inner.pack_start(why, False, False, 0)
+
+        if scan.get("live_note") and is_live():
+            note = Gtk.Label(label=UI["deep_live_note"][self.lang], xalign=0.0)
+            note.set_line_wrap(True)
+            note.set_max_width_chars(88)
+            note.get_style_context().add_class("caption-text")
+            inner.pack_start(note, False, False, 0)
+
+        for item in (state or {}).get("extra", []):
+            line = Gtk.Label(label=item["text"], xalign=0.0)
+            line.set_selectable(True)
+            line.set_line_wrap(True)
+            line.set_max_width_chars(88)
+            line.get_style_context().add_class("code-text")
+            inner.pack_start(line, False, False, 0)
+            if item.get("explain"):
+                expl = Gtk.Label(label=item["explain"][self.lang], xalign=0.0)
+                expl.set_line_wrap(True)
+                expl.set_max_width_chars(88)
+                expl.get_style_context().add_class("why-text")
+                inner.pack_start(expl, False, False, 0)
+        return card
+
+    def start_deep(self, button, scan, mode):
+        key = ("deep", scan["id"])
+        if key in self.jobs:
+            return
+        if mode == "propupd":
+            dialog = Gtk.MessageDialog(
+                transient_for=self, modal=True,
+                message_type=Gtk.MessageType.QUESTION,
+                buttons=Gtk.ButtonsType.OK_CANCEL,
+                text=scan["title"][self.lang])
+            dialog.format_secondary_text(scan["propupd_warning"][self.lang])
+            response = dialog.run()
+            dialog.destroy()
+            if response != Gtk.ResponseType.OK:
+                return
+            args = scan["propupd_args"]
+        else:
+            args = scan["args"]
+
+        self.job_begin(key)
+        if self.current_category == "deep":
+            self.show_category("deep")
+        self.status.set_text(UI["deep_running"][self.lang].format(
+            title=scan["title"][self.lang]))
+
+        def worker():
+            code, out = run(deep_command(scan["binary"], args),
+                            timeout=scan["timeout"])
+            GLib.idle_add(self.deep_done, scan, mode, code, out)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def deep_done(self, scan, mode, code, out):
+        self.job_end(("deep", scan["id"]))
+        title = scan["title"][self.lang]
+        if code in (126, 127) and not out:
+            self.status.set_text(UI["fix_cancelled"][self.lang])
+        elif mode == "propupd":
+            key = "deep_propupd_ok" if code == 0 else "deep_propupd_failed"
+            self.status.set_text(UI[key][self.lang].format(title=title))
+            if code != 0:
+                self.show_output(title, out or "")
+        else:
+            result = scan["parse"](code, out)
+            result["stamp"] = time.strftime("%H:%M")
+            self.deep_state()[scan["id"]] = result
+            self.status.set_text(UI["deep_finished"][self.lang].format(title=title))
+        if self.current_category == "deep":
+            self.show_category("deep")
         return False
 
-    def stop_pulse(self):
-        if self.pulse_id:
-            GLib.source_remove(self.pulse_id)
-            self.pulse_id = 0
-        if self.pulse_bar is not None:
-            try:
-                self.pulse_bar.hide()
-            except Exception:
-                pass
-            self.pulse_bar = None
+    # -- eşzamanlı işler ---------------------------------------------------
+    # Her iş bir anahtarla izlenir: ("scan",), ("fix", denetim_kimligi),
+    # ("deep", tarama_kimligi). Farklı işler aynı anda çalışabilir; aynı
+    # anahtara bağlı düğmeler iş sürerken devre dışı kalır.
+
+    def job_attach(self, key, button, bar=None):
+        self.job_ui.setdefault(key, []).append((button, bar))
+        running = key in self.jobs
+        button.set_sensitive(not running)
+        if bar is not None and running:
+            bar.show()
+
+    def new_bar(self):
+        return SweepBar(self.ACCENT)
+
+    def apply_jobs(self):
+        scanning = ("scan",) in self.jobs
+        self.refresh_btn.set_sensitive(not scanning)
+        self.root_btn.set_sensitive(not scanning)
+        for key, items in self.job_ui.items():
+            running = key in self.jobs
+            for button, bar in items:
+                try:
+                    button.set_sensitive(not running)
+                    if bar is not None:
+                        bar.show() if running else bar.hide()
+                except Exception:
+                    pass
+
+    def job_begin(self, key):
+        self.jobs.add(key)
+        self.apply_jobs()
+        self.spinner.start()
+        if not self.sweep_id:
+            self.sweep_step = 0
+            self.sweep_id = GLib.timeout_add(45, self._sweep)
+
+    def job_end(self, key):
+        self.jobs.discard(key)
+        self.apply_jobs()
+        if not self.jobs:
+            self.spinner.stop()
+            self.sweep_stop()
+
+    def _sweep(self):
+        if not self.jobs:
+            self.sweep_id = 0
+            return False
+        self.sweep_step += 1
+        for key in self.jobs:
+            for _button, bar in self.job_ui.get(key, []):
+                if bar is not None:
+                    bar.adim(self.sweep_step)
+        return True
+
+    def sweep_stop(self):
+        if self.sweep_id:
+            GLib.source_remove(self.sweep_id)
+            self.sweep_id = 0
+
+    def flush_rescan(self):
+        if self.rescan_pending:
+            self.rescan_pending = False
+            self.start_scan(False)
 
     def fix_done(self, code, out, meta):
-        self.stop_pulse()
-        self.set_busy(False)
+        self.job_end(("fix", meta["id"]))
         if code == 0:
             self.status.set_text(UI["fix_ok"][self.lang].format(
                 title=meta["title"][self.lang]))
@@ -1409,26 +2167,15 @@ class HealthWindow(Gtk.Window):
         dialog.run()
         dialog.destroy()
 
-    def set_busy(self, busy):
-        self.busy = busy
-        if busy:
-            self.spinner.start()
-        else:
-            self.spinner.stop()
-        self.refresh_btn.set_sensitive(not busy)
-        self.root_btn.set_sensitive(not busy)
-        for button in self.fix_buttons:
-            try:
-                button.set_sensitive(not busy)
-            except Exception:
-                pass
-
     # -- tarama ------------------------------------------------------------
 
     def start_scan(self, as_root):
-        if self.busy:
+        if ("scan",) in self.jobs:
+            # Devam eden tarama varken istenen yeniden tarama, bitince yapilir
+            if not as_root:
+                self.rescan_pending = True
             return
-        self.set_busy(True)
+        self.job_begin(("scan",))
         self.status.set_text(UI["scanning"][self.lang])
 
         def worker():
@@ -1447,10 +2194,11 @@ class HealthWindow(Gtk.Window):
         threading.Thread(target=worker, daemon=True).start()
 
     def scan_done(self, data, was_root):
-        self.set_busy(False)
+        self.job_end(("scan",))
 
         if data is None:
             self.status.set_text(UI["audit_failed"][self.lang])
+            self.flush_rescan()
             return False
 
         if was_root:
@@ -1465,6 +2213,7 @@ class HealthWindow(Gtk.Window):
 
         self.update_tallies()
         self.show_category(self.current_category)
+        self.flush_rescan()
         return False
 
     def merge_results(self, fresh):
@@ -1527,6 +2276,16 @@ class HealthWindow(Gtk.Window):
                 lines.append(f"  {tag:<14} {title}")
                 lines.append(f"                 {result['detail'][self.lang]}")
             lines.append("")
+        for scan in DEEP_SCANS:
+            state = getattr(self, "deep", {}).get(scan["id"])
+            if not state or "status" not in state:
+                continue
+            lines.append(f"[{scan['title'][self.lang]}]")
+            tag = STATUS_LABEL[state["status"]][self.lang]
+            lines.append(f"  {tag:<14} {state['detail'][self.lang]}")
+            for item in state.get("extra", [])[:20]:
+                lines.append(f"                 {item['text']}")
+            lines.append("")
         return "\n".join(lines)
 
     def on_export(self, _button):
@@ -1578,7 +2337,7 @@ class HealthWindow(Gtk.Window):
         self.show_category(self.current_category)
 
     def on_destroy(self, _widget):
-        self.stop_pulse()
+        self.sweep_stop()
         Gtk.main_quit()
 
     # -- tema --------------------------------------------------------------
@@ -1677,6 +2436,11 @@ class HealthWindow(Gtk.Window):
             color: #ffffff;
         }}
         button.suggested-action label {{ color: #ffffff; }}
+        button.destructive-action {{
+            background-color: {self.C_FAIL}; border-color: {self.C_FAIL};
+            color: #ffffff;
+        }}
+        button.destructive-action label {{ color: #ffffff; }}
 
         combobox button {{ background-color: {field}; color: {fg}; }}
         combobox button label {{ color: {fg}; }}

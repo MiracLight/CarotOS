@@ -1,0 +1,8 @@
+#!/bin/sh
+set -e
+
+# Sistem Sagligi'nin "Ayrintili taramalar" bolumu icin rkhunter ve debsums.
+# LB_APT_RECOMMENDS acik oldugundan paket listesinden kurulsalardi exim4 (mail
+# sunucusu), ruby ve bir dizi gereksiz paket de gelirdi. Bu yuzden onerilen
+# paketler olmadan burada kurulurlar.
+DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends rkhunter debsums
