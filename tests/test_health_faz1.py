@@ -261,6 +261,45 @@ class DenetimHookTesti(unittest.TestCase):
         self.assertIn("--no-install-recommends", komutlar[0])
 
 
+class VirusTanimTesti(Ortak):
+    def motor(self, durum, yas=2, clamav=True):
+        return types.SimpleNamespace(
+            TANIM_YOK="__TANIM_YOK__", TANIM_ESKI="__TANIM_ESKI__",
+            clamscan_yolu=lambda: "/usr/bin/clamscan" if clamav else None,
+            tanim_bilgisi=lambda: {"durum": durum, "zaman": 1792927200,
+                                   "yas_gun": yas})
+
+    def test_durumlar(self):
+        for durum, beklenen in (("__TANIM_GUNCEL__", H.OK), ("__TANIM_ESKI__", H.WARN),
+                                ("__TANIM_YOK__", H.FAIL)):
+            self.kur(_tarama_motoru=lambda d=durum: self.motor(d, yas=12))
+            r = H.check_av_definitions()
+            self.assertEqual(r["status"], beklenen, durum)
+            self.assertEqual(set(r["detail"]), {"tr", "en"})
+        self.kur(_tarama_motoru=lambda: self.motor("__TANIM_ESKI__", yas=12))
+        self.assertIn("12 gün", H.check_av_definitions()["detail"]["tr"])
+
+    def test_kurulu_degilse_bilgi(self):
+        self.kur(_tarama_motoru=lambda: None)
+        self.assertEqual(H.check_av_definitions()["status"], H.INFO)
+        self.kur(_tarama_motoru=lambda: self.motor("x", clamav=False))
+        self.assertEqual(H.check_av_definitions()["status"], H.INFO)
+
+    def test_kart_ve_komut(self):
+        kart = [c for c in H.CHECKS if c["id"] == "av_definitions"][0]
+        self.assertEqual(kart["category"], "protect")
+        self.assertEqual(kart["action"]["cmd"],
+                         "systemctl stop clamav-freshclam 2>/dev/null; LC_ALL=C freshclam")
+
+    def test_gercek_motor_yuklenir(self):
+        # Depodaki ortak klasorden gercek motor yuklenir, __pycache__ birakmaz
+        motor = H._tarama_motoru()
+        ortak = os.path.join(KOK, "config/includes.chroot/opt/carotos/ortak")
+        if os.path.isdir(ortak):
+            self.assertIsNotNone(motor)
+            self.assertFalse(os.path.exists(os.path.join(ortak, "__pycache__")))
+
+
 class YapiTesti(unittest.TestCase):
     def iki_dilli(self, sozluk, yer):
         self.assertEqual(set(sozluk), {"tr", "en"}, yer)

@@ -492,6 +492,53 @@ def check_apparmor_profiles():
     return {"status": OK, "detail": {"tr": ozet_tr, "en": ozet_en}}
 
 
+# --- Virus tanimlari (Carotene) ---------------------------------------------
+# Tanim dosyalari ortak tarama motoruyla okunur (karar D2). Motor yoksa ya da
+# ClamAV kurulu degilse kart bilgi olarak kalir, puani etkilemez.
+
+def _tarama_motoru():
+    ortak = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                         "ortak")
+    if ortak not in sys.path:
+        sys.path.insert(0, ortak)
+    # Ortak klasore __pycache__ yazilmasin (depoda ISO'ya girer, pkexec ile
+    # root olarak calisinca /opt altina yazar)
+    sys.dont_write_bytecode = True
+    try:
+        import tarama_motoru
+        return tarama_motoru
+    except ImportError:
+        return None
+
+
+def check_av_definitions():
+    motor = _tarama_motoru()
+    if motor is None or not motor.clamscan_yolu():
+        return {"status": INFO,
+                "detail": {"tr": "Carotene (ClamAV) bu sistemde kurulu değildir.",
+                           "en": "Carotene (ClamAV) is not installed on this "
+                                 "system."}}
+    bilgi = motor.tanim_bilgisi()
+    if bilgi["durum"] == motor.TANIM_YOK:
+        return {"status": FAIL,
+                "detail": {"tr": "Virüs tanımları bulunamadı. Carotene tarama "
+                                 "yapamaz.",
+                           "en": "No virus definitions were found. Carotene "
+                                 "cannot scan."}}
+    tarih = time.strftime("%d.%m.%Y", time.localtime(bilgi["zaman"]))
+    gun = bilgi["yas_gun"]
+    if bilgi["durum"] == motor.TANIM_ESKI:
+        return {"status": WARN,
+                "detail": {"tr": f"Virüs tanımları {gun} günlüktür ({tarih}). "
+                                 f"Eski tanımlarla yeni tehditler bulunamaz.",
+                           "en": f"Virus definitions are {gun} days old "
+                                 f"({tarih}). New threats cannot be found with "
+                                 f"old definitions."}}
+    return {"status": OK,
+            "detail": {"tr": f"Virüs tanımları günceldir ({tarih}).",
+                       "en": f"Virus definitions are up to date ({tarih})."}}
+
+
 # --- Ayrintili taramalar (istege bagli, yonetici yetkisi ister) --------------
 
 def is_live():
@@ -1169,6 +1216,25 @@ CHECKS = [
                       "some profiles in complain mode on purpose; this is not "
                       "an error."},
         "fix": "sudo aa-status",
+    },
+    {
+        "id": "av_definitions", "category": "protect",
+        "func": check_av_definitions,
+        "title": {"tr": "Virüs tanımları (Carotene)",
+                  "en": "Virus definitions (Carotene)"},
+        "why": {"tr": "Carotene, dosyaları bilinen zararlı yazılım imzalarıyla "
+                      "karşılaştırır. Her gün yeni imzalar yayımlanır; "
+                      "tanımlar güncellenmedikçe yeni tehditler bulunamaz. "
+                      "Arka planda otomatik güncelleme yapılmaz.",
+                "en": "Carotene compares files with known malware signatures. "
+                      "New signatures are published every day; new threats "
+                      "cannot be found unless the definitions are updated. No "
+                      "automatic update runs in the background."},
+        "fix": "sudo freshclam",
+        "action": {"cmd": 'systemctl stop clamav-freshclam 2>/dev/null; '
+                          'LC_ALL=C freshclam',
+                   "label": {'tr': 'Tanımları güncelle', 'en': 'Update definitions'},
+                   "confirm": False},
     },
     {
         "id": "root_locked", "category": "accounts", "func": check_root_locked,
