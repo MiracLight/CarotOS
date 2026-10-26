@@ -4,8 +4,13 @@
 CarotOS USB Denetimi
 
 Takilan cikarilabilir aygitlari algilar ve hizli bir guvenlik kontrolu yapar.
-Dosya ICERIKLERINI OKUMAZ — yalnizca dosya adlarina, uzantilarina, izinlerine
-ve konumlarina bakar. Bu yuzden buyuk bir bellekte bile saniyeler surer.
+Otomatik kontrol dosya ICERIKLERINI OKUMAZ — yalnizca dosya adlarina,
+uzantilarina, izinlerine ve konumlarina bakar. Bu yuzden buyuk bir bellekte
+bile saniyeler surer.
+
+Ayrintili tarama (ClamAV) icerigi okur ve YALNIZCA kullanici pencereden
+baslattiginda calisir (karar D7). Ortak tarama motoru kullanilir (karar D2);
+bulunan dosyalara dokunulmaz, yalnizca raporlanir.
 
 Kullanim:
     carotos-usb-check --monitor     Arka planda izler (oturum acilisinda)
@@ -239,6 +244,13 @@ def split_extensions(name):
 # Denetim
 # ---------------------------------------------------------------------------
 
+def metin(deger, lang):
+    """Bulgu metni iki dilli sozluk ya da (eski kayitlarda) duz metindir."""
+    if isinstance(deger, dict):
+        return deger.get(lang) or deger.get("tr") or ""
+    return deger or ""
+
+
 def scan_path(root, cancel=None):
     """Verilen dizini denetler. Dosya iceriklerini OKUMAZ.
 
@@ -293,9 +305,13 @@ def scan_path(root, cancel=None):
                 else:
                     visible_dirs.add(lowered)
             if has_bidi_trick(name):
-                add(HIGH, "bidi", "Adı gizlenmiş klasör",
-                    "Klasör adında, adı ekranda farklı göstermek için "
-                    "kullanılan görünmez bir karakter var.", full_dir)
+                add(HIGH, "bidi",
+                    {"tr": "Adı gizlenmiş klasör", "en": "Folder with a disguised name"},
+                    {"tr": "Klasör adında, adı ekranda farklı göstermek için "
+                           "kullanılan görünmez bir karakter var.",
+                     "en": "The folder name contains an invisible character "
+                           "used to make the name look different on screen."},
+                    full_dir)
 
         for name in files:
             file_count += 1
@@ -314,26 +330,42 @@ def scan_path(root, cancel=None):
             first_ext, last_ext = split_extensions(lowered)
 
             if lowered == "autorun.inf" and at_root:
-                add(HIGH, "autorun", "Otomatik çalıştırma dosyası",
-                    "Bu dosya, bellek takıldığında Windows'ta bir programın "
-                    "kendiliğinden çalışmasını sağlamak için kullanılır. "
-                    "Zararlı yazılımların en bilinen yayılma yöntemidir.",
+                add(HIGH, "autorun",
+                    {"tr": "Otomatik çalıştırma dosyası", "en": "Autorun file"},
+                    {"tr": "Bu dosya, bellek takıldığında Windows'ta bir "
+                           "programın kendiliğinden çalışmasını sağlamak için "
+                           "kullanılır. Zararlı yazılımların en bilinen "
+                           "yayılma yöntemidir.",
+                     "en": "This file is used to make a program start by "
+                           "itself on Windows when the device is plugged in. "
+                           "It is the best-known way malware spreads."},
                     full)
                 continue
 
             if has_bidi_trick(name):
-                add(HIGH, "bidi", "Adı gizlenmiş dosya",
-                    "Dosya adında, gerçek uzantıyı ekranda farklı göstermek "
-                    "için kullanılan görünmez bir karakter var. Belge gibi "
-                    "görünen dosya aslında çalıştırılabilir olabilir.", full)
+                add(HIGH, "bidi",
+                    {"tr": "Adı gizlenmiş dosya", "en": "File with a disguised name"},
+                    {"tr": "Dosya adında, gerçek uzantıyı ekranda farklı "
+                           "göstermek için kullanılan görünmez bir karakter "
+                           "var. Belge gibi görünen dosya aslında "
+                           "çalıştırılabilir olabilir.",
+                     "en": "The file name contains an invisible character used "
+                           "to make the real extension look different on "
+                           "screen. A file that looks like a document may "
+                           "actually be executable."}, full)
                 continue
 
             if first_ext in DOC_EXT and last_ext in EXEC_EXT:
-                add(HIGH, "double_ext", "Çift uzantılı dosya",
-                    f"Dosya adı belge gibi görünüyor ama gerçek uzantısı "
-                    f"{last_ext} — yani çalıştırılabilir bir programdır. "
-                    f"Kullanıcıyı yanıltmak için sık kullanılan bir "
-                    f"yöntemdir.", full)
+                add(HIGH, "double_ext",
+                    {"tr": "Çift uzantılı dosya", "en": "Double extension"},
+                    {"tr": f"Dosya adı belge gibi görünüyor ama gerçek "
+                           f"uzantısı {last_ext}; yani çalıştırılabilir bir "
+                           f"programdır. Kullanıcıyı yanıltmak için sık "
+                           f"kullanılan bir yöntemdir.",
+                     "en": f"The file name looks like a document, but its real "
+                           f"extension is {last_ext}, so it is an executable "
+                           f"program. This is a common way to mislead users."},
+                    full)
                 continue
 
             if last_ext == ".lnk":
@@ -345,9 +377,13 @@ def scan_path(root, cancel=None):
                     exec_in_root.append((name, full))
                 elif os.path.basename(current).startswith("."):
                     add(MEDIUM, "hidden_exec",
-                        "Gizli klasörde çalıştırılabilir dosya",
-                        "Gizlenmiş bir klasörün içinde çalıştırılabilir bir "
-                        "dosya bulundu. Olağan bir yerleşim değildir.", full)
+                        {"tr": "Gizli klasörde çalıştırılabilir dosya",
+                         "en": "Executable file in a hidden folder"},
+                        {"tr": "Gizlenmiş bir klasörün içinde "
+                               "çalıştırılabilir bir dosya bulundu. Olağan bir "
+                               "yerleşim değildir.",
+                         "en": "An executable file was found inside a hidden "
+                               "folder. This is not a usual layout."}, full)
 
         if truncated or cancelled:
             break
@@ -362,37 +398,59 @@ def scan_path(root, cancel=None):
     # kanittir; gizli klasor GORULMESINI sart kosmayiz.
     if disguised and (hidden_dirs or len(disguised) >= 2):
         names = ", ".join(n for n, _ in disguised[:4])
-        add(HIGH, "lnk_worm", "Klasörler kısayolla değiştirilmiş olabilir",
-            f"Görünür bir klasöre karşılık gelmeyen kısayol dosyaları "
-            f"bulundu ({names}). Bu, gerçek klasörleri gizleyip yerlerine "
-            f"zararlı kısayol koyan yaygın bir USB zararlısı davranışıdır. "
-            f"Kısayollara tıklamayın.", disguised[0][1])
+        add(HIGH, "lnk_worm",
+            {"tr": "Klasörler kısayolla değiştirilmiş olabilir",
+             "en": "Folders may have been replaced by shortcuts"},
+            {"tr": f"Görünür bir klasöre karşılık gelmeyen kısayol dosyaları "
+                   f"bulundu ({names}). Bu, gerçek klasörleri gizleyip "
+                   f"yerlerine zararlı kısayol koyan yaygın bir USB zararlısı "
+                   f"davranışıdır. Kısayollara tıklamayın.",
+             "en": f"Shortcut files that do not match any visible folder were "
+                   f"found ({names}). This is common USB malware behaviour: "
+                   f"real folders are hidden and replaced by malicious "
+                   f"shortcuts. Do not click the shortcuts."},
+            disguised[0][1])
     elif disguised:
         add(MEDIUM, "lnk_single",
-            f"{len(disguised)} karşılıksız kısayol dosyası",
-            "Bir klasöre karşılık gelmeyen kısayol dosyası bulundu. "
-            "Kısayollar tek başına zararlı değildir, ancak gizlenmiş bir "
-            "klasörün yerine geçmiş olabilirler.", disguised[0][1])
+            {"tr": f"{len(disguised)} karşılıksız kısayol dosyası",
+             "en": f"{len(disguised)} unmatched shortcut files"},
+            {"tr": "Bir klasöre karşılık gelmeyen kısayol dosyası bulundu. "
+                   "Kısayollar tek başına zararlı değildir, ancak gizlenmiş "
+                   "bir klasörün yerine geçmiş olabilirler.",
+             "en": "A shortcut file that does not match any folder was found. "
+                   "Shortcuts are not harmful by themselves, but they may "
+                   "have replaced a hidden folder."}, disguised[0][1])
 
     if exec_in_root:
         names = ", ".join(n for n, _ in exec_in_root[:5])
         level = MEDIUM if len(exec_in_root) < 4 else HIGH
         add(level, "root_exec",
-            f"Ana dizinde {len(exec_in_root)} çalıştırılabilir dosya",
-            f"{names}. Bunlar Windows'ta çalışabilen programlardır. "
-            f"Kaynağını bilmediğiniz programları çalıştırmayın.",
+            {"tr": f"Ana dizinde {len(exec_in_root)} çalıştırılabilir dosya",
+             "en": f"{len(exec_in_root)} executable files in the top folder"},
+            {"tr": f"{names}. Bunlar Windows'ta çalışabilen programlardır. "
+                   f"Kaynağını bilmediğiniz programları çalıştırmayın.",
+             "en": f"{names}. These are programs that can run on Windows. Do "
+                   f"not run programs whose source you do not know."},
             exec_in_root[0][1])
 
     if hidden_dirs and not disguised:
-        add(LOW, "hidden_dirs", f"{len(hidden_dirs)} gizli klasör",
-            "Gizli klasörler çoğu zaman normaldir (sistem dosyaları), "
-            "ancak içeriğine bakmakta fayda var.",
+        add(LOW, "hidden_dirs",
+            {"tr": f"{len(hidden_dirs)} gizli klasör",
+             "en": f"{len(hidden_dirs)} hidden folders"},
+            {"tr": "Gizli klasörler çoğu zaman normaldir (sistem dosyaları), "
+                   "ancak içeriğine bakmakta fayda var.",
+             "en": "Hidden folders are often normal (system files), but it is "
+                   "worth looking at their contents."},
             os.path.join(root, hidden_dirs[0]))
 
     if unreadable:
-        add(LOW, "unreadable", f"{len(unreadable)} klasör okunamadı",
-            "Bazı klasörlere erişim izni olmadığı için içerikleri "
-            "denetlenemedi. Sonuç eksik olabilir.", unreadable[0])
+        add(LOW, "unreadable",
+            {"tr": f"{len(unreadable)} klasör okunamadı",
+             "en": f"{len(unreadable)} folders could not be read"},
+            {"tr": "Bazı klasörlere erişim izni olmadığı için içerikleri "
+                   "denetlenemedi. Sonuç eksik olabilir.",
+             "en": "Some folders could not be checked because access was "
+                   "denied. The result may be incomplete."}, unreadable[0])
 
     order = {HIGH: 0, MEDIUM: 1, LOW: 2}
     findings.sort(key=lambda f: order.get(f["level"], 3))
@@ -505,6 +563,35 @@ def _gtk_araclari():
     return _ResultWindowClass
 
 
+_motor = None
+
+
+def tarama_motoru():
+    """Ortak tarama motorunu ilk ayrintili taramada yukler. Izleme modunda
+    hic yuklenmez. Bulunamazsa None doner."""
+    global _motor
+    if _motor is None:
+        ortak = os.path.join(os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__))), "ortak")
+        if ortak not in sys.path:
+            sys.path.insert(0, ortak)
+        sys.dont_write_bytecode = True   # ortak klasore __pycache__ yazilmasin
+        try:
+            import tarama_motoru as _tm
+            _motor = _tm
+        except ImportError:
+            return None
+    return _motor
+
+
+def clamav_bulgusu(bulgu):
+    """Ayrintili tarama bulgusunu mevcut bulgu bicimine cevirir."""
+    return {"level": HIGH, "kind": "clamav", "path": bulgu["yol"],
+            "title": {dil: UI["deep_finding_title"][dil].format(imza=bulgu["imza"])
+                      for dil in ("tr", "en")},
+            "detail": dict(UI["deep_finding_detail"])}
+
+
 CONFIG_DIR = os.path.join(GLib.get_user_config_dir(), "carotos-usb")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "settings.json")
 def _varsayilan_dil():
@@ -577,15 +664,85 @@ UI = {
     "duration": {"tr": "{seconds} saniyede tarandı",
                  "en": "checked in {seconds} seconds"},
     "note": {
-        "tr": "Bu kontrol dosya adlarına ve konumlarına bakar, dosya "
-              "içeriklerini taramaz. Bulunan zararlılar genellikle Windows'a "
-              "yöneliktir ve CarotOS'ta çalışamaz — ancak belleği başka bir "
+        "tr": "Otomatik kontrol dosya adlarına ve konumlarına bakar, dosya "
+              "içeriklerini okumaz. İçerik, yalnızca siz ayrıntılı taramayı "
+              "başlattığınızda okunur. Bulunan zararlılar genellikle Windows'a "
+              "yöneliktir ve CarotOS'ta çalışamaz; ancak belleği başka bir "
               "bilgisayara taktığınızda oraya bulaşabilirler.",
-        "en": "This check looks at file names and locations; it does not scan "
-              "file contents. Threats found are usually aimed at Windows and "
-              "cannot run on CarotOS — but they can infect another computer "
+        "en": "The automatic check looks at file names and locations and does "
+              "not read file contents. Contents are read only when you start "
+              "the detailed scan. Threats found are usually aimed at Windows "
+              "and cannot run on CarotOS, but they can infect another computer "
               "when you plug the device in there.",
     },
+    "deep_title": {"tr": "Ayrıntılı tarama (ClamAV)", "en": "Detailed scan (ClamAV)"},
+    "deep_desc": {
+        "tr": "Dosya içerikleri bilinen zararlı yazılım imzalarına karşı "
+              "taranır. İçerik yalnızca bu taramayı başlattığınızda okunur. "
+              "Bulunan dosyalara dokunulmaz; yalnızca raporlanır.",
+        "en": "File contents are scanned against known malware signatures. "
+              "Contents are read only when you start this scan. Files that "
+              "are found are not touched; they are only reported."},
+    "deep_all": {"tr": "Tüm aygıtı tara", "en": "Scan whole device"},
+    "deep_pick": {"tr": "Klasör seç", "en": "Choose folder"},
+    "deep_stop": {"tr": "Durdur", "en": "Stop"},
+    "deep_running": {"tr": "Taranan dosya: {n} · Bulgu: {b}",
+                     "en": "Files scanned: {n} · Findings: {b}"},
+    "deep_loading": {
+        "tr": "Virüs tanımları belleğe yükleniyor. Bu adım yaklaşık 10 saniye "
+              "sürer.",
+        "en": "Loading virus definitions into memory. This step takes about "
+              "10 seconds."},
+    "deep_clean": {"tr": "Bilinen bir tehdide rastlanmadı. {n} dosya tarandı, "
+                         "{s} sn sürdü.",
+                   "en": "No known threat was found. {n} files scanned in "
+                         "{s} s."},
+    "deep_found": {"tr": "{b} dosyada bilinen tehdit bulundu. {n} dosya "
+                         "tarandı, {s} sn sürdü. Bulgular yukarıda "
+                         "listelenmiştir.",
+                   "en": "A known threat was found in {b} files. {n} files "
+                         "scanned in {s} s. The findings are listed above."},
+    "deep_cancelled": {"tr": "Tarama durduruldu. Sonuç eksiktir.",
+                       "en": "The scan was stopped. The result is incomplete."},
+    "deep_removed": {"tr": "Aygıt tarama sırasında çıkarıldı; tarama "
+                           "durduruldu. Sonuç eksiktir.",
+                     "en": "The device was removed during the scan; the scan "
+                           "was stopped. The result is incomplete."},
+    "deep_error": {"tr": "Tarama tamamlanamadı.",
+                   "en": "The scan could not be completed."},
+    "deep_no_clamav": {"tr": "ClamAV kurulu değildir; ayrıntılı tarama "
+                             "yapılamaz.",
+                       "en": "ClamAV is not installed; the detailed scan "
+                             "cannot run."},
+    "deep_no_defs": {"tr": "Virüs tanımları bulunamadı. Tanımları Carotene "
+                           "uygulamasından güncelleyin.",
+                     "en": "No virus definitions were found. Update them in "
+                           "the Carotene application."},
+    "deep_old_defs": {"tr": "Virüs tanımları {gun} günlüktür; yeni tehditler "
+                            "bulunamayabilir. Tanımlar Carotene'den "
+                            "güncellenebilir.",
+                      "en": "Virus definitions are {gun} days old; new threats "
+                            "may not be found. They can be updated in "
+                            "Carotene."},
+    "deep_outside": {"tr": "Seçilen klasör bu aygıtın içinde değil.",
+                     "en": "The selected folder is not on this device."},
+    "deep_mem_title": {"tr": "Bellek az", "en": "Low memory"},
+    "deep_mem_body": {
+        "tr": "Kullanılabilir bellek {mb} MB. Tarama sırasında virüs tanımları "
+              "yaklaşık 1 GB bellek kullanır; sistem yavaşlayabilir. Tarama "
+              "başlatılsın mı?",
+        "en": "Available memory is {mb} MB. Virus definitions use about 1 GB "
+              "of memory during a scan; the system may slow down. Start the "
+              "scan?"},
+    "deep_finding_title": {"tr": "Zararlı yazılım imzası: {imza}",
+                           "en": "Malware signature: {imza}"},
+    "deep_finding_detail": {
+        "tr": "ClamAV bu dosyada bilinen bir zararlı yazılım imzası buldu. "
+              "Dosya aygıtta yerinde bırakıldı; açılmamalı ve başka bir "
+              "bilgisayara kopyalanmamalıdır.",
+        "en": "ClamAV found a known malware signature in this file. The file "
+              "was left in place on the device; it should not be opened or "
+              "copied to another computer."},
 }
 
 
@@ -630,8 +787,8 @@ def build_report(result, lang):
     for finding in result["findings"]:
         tag = {HIGH: UI["level_high"], MEDIUM: UI["level_medium"],
                LOW: UI["level_low"]}[finding["level"]][lang]
-        lines.append(f"[{tag}] {finding['title']}")
-        lines.append(f"    {finding['detail']}")
+        lines.append(f"[{tag}] {metin(finding['title'], lang)}")
+        lines.append(f"    {metin(finding['detail'], lang)}")
         if finding.get("path"):
             lines.append(f"    {finding['path']}")
         lines.append("")
@@ -656,6 +813,18 @@ def _tanimla_result_window(Gtk, Gdk):
             self.on_destroy_cb = on_destroy
             self.scan_thread = None
             self.cancel = None
+            # ayrintili tarama durumu
+            self.deep = {"durum": None}
+            self.tarama = None
+            self.deep_sayac = {"n": 0, "b": 0, "son": ""}
+            self.deep_ui_bekliyor = False
+            self.deep_bar = None
+            self.deep_count = None
+            self.deep_path = None
+            self.sweep_id = 0
+            self.sweep_step = 0
+            self.watch_id = 0
+            self.deep_bagli_mi = False
 
             super().__init__(title=UI["app_title"][self.lang])
             self.set_default_size(780, 580)
@@ -740,6 +909,7 @@ def _tanimla_result_window(Gtk, Gdk):
                 self.body.pack_start(self._build_clean_card(), False, False, 0)
             for finding in findings:
                 self.body.pack_start(self._build_card(finding), False, False, 0)
+            self.body.pack_start(self._build_deep_card(), False, False, 0)
             self.body.pack_start(self._build_note(), False, False, 0)
 
             self.header_holder.show_all()
@@ -861,7 +1031,7 @@ def _tanimla_result_window(Gtk, Gdk):
             badge.set_valign(Gtk.Align.CENTER)
             top.pack_start(badge, False, False, 0)
 
-            title = Gtk.Label(label=finding["title"], xalign=0.0)
+            title = Gtk.Label(label=metin(finding["title"], self.lang), xalign=0.0)
             title.get_style_context().add_class("card-title")
             title.set_line_wrap(True)
             title.set_valign(Gtk.Align.CENTER)
@@ -874,7 +1044,7 @@ def _tanimla_result_window(Gtk, Gdk):
                 top.pack_end(btn, False, False, 0)
             inner.pack_start(top, False, False, 0)
 
-            detail = Gtk.Label(label=finding["detail"], xalign=0.0)
+            detail = Gtk.Label(label=metin(finding["detail"], self.lang), xalign=0.0)
             detail.set_line_wrap(True)
             detail.set_max_width_chars(84)
             inner.pack_start(detail, False, False, 0)
@@ -888,6 +1058,221 @@ def _tanimla_result_window(Gtk, Gdk):
                 inner.pack_start(path, False, False, 0)
 
             return card
+
+        # -- ayrintili tarama (ClamAV) ----------------------------------------
+
+        def _label(self, text, css=None, wrap=True):
+            lab = Gtk.Label(label=text, xalign=0.0)
+            if wrap:
+                lab.set_line_wrap(True)
+                lab.set_max_width_chars(84)
+            if css:
+                lab.get_style_context().add_class(css)
+            return lab
+
+        def _build_deep_card(self):
+            card, inner = self._card_shell()
+            top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=11)
+            title = self._label(UI["deep_title"][self.lang], "card-title")
+            title.set_valign(Gtk.Align.CENTER)
+            top.pack_start(title, True, True, 0)
+            self.deep_bar = None
+            if self.tarama is not None:
+                stop = Gtk.Button(label=UI["deep_stop"][self.lang])
+                stop.set_valign(Gtk.Align.CENTER)
+                stop.connect("clicked", lambda *_: self.tarama and self.tarama.iptal())
+                top.pack_end(stop, False, False, 0)
+                from bekleme_cubugu import SweepBar
+                self.deep_bar = SweepBar(ACCENT)
+                self.deep_bar.show()
+                top.pack_end(self.deep_bar, False, False, 0)
+            else:
+                etkin = not (self.scan_thread and self.scan_thread.is_alive())
+                tum = Gtk.Button(label=UI["deep_all"][self.lang])
+                tum.get_style_context().add_class("suggested-action")
+                tum.connect("clicked", lambda *_: self.start_deep(None))
+                sec = Gtk.Button(label=UI["deep_pick"][self.lang])
+                sec.connect("clicked", self.on_deep_pick)
+                for btn in (tum, sec):
+                    btn.set_valign(Gtk.Align.CENTER)
+                    btn.set_sensitive(etkin)
+                    top.pack_end(btn, False, False, 0)
+            inner.pack_start(top, False, False, 0)
+            inner.pack_start(self._label(UI["deep_desc"][self.lang], "sub-text"),
+                             False, False, 0)
+
+            durum = self.deep.get("durum")
+            if self.tarama is not None:
+                self.deep_count = self._label("")
+                self.deep_path = self._label("", "path-text", wrap=False)
+                self.deep_path.set_ellipsize(2)   # PANGO_ELLIPSIZE_MIDDLE
+                inner.pack_start(self.deep_count, False, False, 0)
+                inner.pack_start(self.deep_path, False, False, 0)
+                self._deep_sayac_yaz()
+            elif durum:
+                inner.pack_start(self._label(self.deep["mesaj"],
+                                             "warn-text" if durum != "temiz" else None),
+                                 False, False, 0)
+            uyari = self.deep.get("tanim_uyarisi")
+            if uyari and self.tarama is None:
+                inner.pack_start(self._label(uyari, "warn-text"), False, False, 0)
+            return card
+
+        def _deep_sayac_yaz(self):
+            self.deep_ui_bekliyor = False
+            if self.tarama is None or self.deep_count is None:
+                return False
+            try:
+                self.deep_count.set_text(UI["deep_running"][self.lang].format(
+                    n=self.deep_sayac["n"], b=self.deep_sayac["b"]))
+                self.deep_path.set_text(self.deep_sayac["son"]
+                                        or UI["deep_loading"][self.lang])
+            except Exception:  # noqa: BLE001
+                pass
+            return False
+
+        def on_deep_pick(self, _button):
+            root = self.result.get("root")
+            if not self._device_present():
+                self.status.set_text(UI["gone"][self.lang])
+                return
+            dialog = Gtk.FileChooserDialog(
+                title=UI["deep_pick"][self.lang], transient_for=self,
+                action=Gtk.FileChooserAction.SELECT_FOLDER)
+            dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+                               Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
+            dialog.set_current_folder(root)
+            secilen = (dialog.get_filename()
+                       if dialog.run() == Gtk.ResponseType.OK else None)
+            dialog.destroy()
+            if not secilen:
+                return
+            gercek = os.path.realpath(secilen)
+            kok = os.path.realpath(root)
+            if gercek != kok and not gercek.startswith(kok + os.sep):
+                self.status.set_text(UI["deep_outside"][self.lang])
+                return
+            self.start_deep([gercek])
+
+        def start_deep(self, yollar):
+            if self.tarama is not None:
+                return
+            if self.scan_thread and self.scan_thread.is_alive():
+                return
+            root = self.result.get("root")
+            if not self._device_present():
+                self.status.set_text(UI["gone"][self.lang])
+                return
+            motor = tarama_motoru()
+            if motor is None or not motor.clamscan_yolu():
+                self.status.set_text(UI["deep_no_clamav"][self.lang])
+                return
+            bilgi = motor.tanim_bilgisi()
+            if bilgi["durum"] == motor.TANIM_YOK:
+                self.status.set_text(UI["deep_no_defs"][self.lang])
+                return
+            self.deep["tanim_uyarisi"] = (
+                UI["deep_old_defs"][self.lang].format(gun=bilgi["yas_gun"])
+                if bilgi["durum"] == motor.TANIM_ESKI else None)
+            yeterli, mb = motor.bellek_yeterli()
+            if not yeterli:
+                dialog = Gtk.MessageDialog(
+                    transient_for=self, modal=True,
+                    message_type=Gtk.MessageType.QUESTION,
+                    buttons=Gtk.ButtonsType.OK_CANCEL,
+                    text=UI["deep_mem_title"][self.lang])
+                dialog.format_secondary_text(
+                    UI["deep_mem_body"][self.lang].format(mb=mb))
+                yanit = dialog.run()
+                dialog.destroy()
+                if yanit != Gtk.ResponseType.OK:
+                    return
+            # Tarama suresince aygitin cikarilip cikarilmadigi izlenir
+            self.deep_bagli_mi = os.path.ismount(root)
+            self.deep_sayac = {"n": 0, "b": 0, "son": ""}
+            self.deep = {"durum": None,
+                         "tanim_uyarisi": self.deep.get("tanim_uyarisi")}
+            self.deep_cikarildi = False
+            self.tarama = motor.Tarama(yollar or [root], olay=self._deep_olay)
+            self.rescan_btn.set_sensitive(False)
+            self.spinner.start()
+            self.status.set_text("")
+            threading.Thread(target=self._deep_isi, args=(self.tarama,),
+                             daemon=True).start()
+            self.sweep_id = GLib.timeout_add(45, self._sweep)
+            self.watch_id = GLib.timeout_add(1000, self._aygit_izle)
+            self.refresh()
+
+        def _deep_olay(self, tur, veri):
+            # is parcaciginda calisir
+            if tur in ("temiz", "bulgu"):
+                self.deep_sayac["n"] += 1
+                self.deep_sayac["son"] = veri if tur == "temiz" else veri[0]
+                if tur == "bulgu":
+                    self.deep_sayac["b"] += 1
+            if not self.deep_ui_bekliyor:
+                self.deep_ui_bekliyor = True
+                GLib.timeout_add(150, self._deep_sayac_yaz)
+
+        def _deep_isi(self, tarama):
+            sonuc = tarama.calistir()
+            GLib.idle_add(self._deep_done, tarama, sonuc)
+
+        def _sweep(self):
+            if self.tarama is None:
+                self.sweep_id = 0
+                return False
+            self.sweep_step += 1
+            if self.deep_bar is not None:
+                self.deep_bar.adim(self.sweep_step)
+            return True
+
+        def _aygit_izle(self):
+            if self.tarama is None:
+                self.watch_id = 0
+                return False
+            root = self.result.get("root")
+            gitti = not root or not os.path.isdir(root) or (
+                self.deep_bagli_mi and not os.path.ismount(root))
+            if gitti:
+                self.deep_cikarildi = True
+                self.tarama.iptal()
+                self.watch_id = 0
+                return False
+            return True
+
+        def _deep_done(self, tarama, sonuc):
+            if tarama is not self.tarama:
+                return False
+            self.tarama = None
+            for kaynak in ("sweep_id", "watch_id"):
+                if getattr(self, kaynak):
+                    GLib.source_remove(getattr(self, kaynak))
+                    setattr(self, kaynak, 0)
+            self.spinner.stop()
+            self.rescan_btn.set_sensitive(True)
+            motor = tarama_motoru()
+            durum = sonuc["durum"]
+            n, sure = sonuc["taranan"], sonuc["sure"]
+            if self.deep_cikarildi:
+                self.deep.update(durum="cikarildi", mesaj=UI["deep_removed"][self.lang])
+            elif durum == motor.IPTAL:
+                self.deep.update(durum="iptal", mesaj=UI["deep_cancelled"][self.lang])
+            elif durum == motor.BULGU:
+                self.deep.update(durum="bulgu", mesaj=UI["deep_found"][self.lang].format(
+                    b=len(sonuc["bulgular"]), n=n, s=sure))
+            elif durum == motor.TEMIZ:
+                self.deep.update(durum="temiz", mesaj=UI["deep_clean"][self.lang].format(
+                    n=n, s=sure))
+            else:
+                self.deep.update(durum="hata", mesaj=UI["deep_error"][self.lang])
+            # Yeni ClamAV bulgulari mevcut listeye eklenir (eskileri yenilenir)
+            bulgular = [f for f in self.result["findings"] if f.get("kind") != "clamav"]
+            bulgular = [clamav_bulgusu(b) for b in sonuc["bulgular"]] + bulgular
+            self.result["findings"] = bulgular
+            self.status.set_text(self.deep["mesaj"])
+            self.refresh()
+            return False
 
         def _build_note(self):
             note = Gtk.Label(label=UI["note"][self.lang], xalign=0.0)
@@ -914,6 +1299,8 @@ def _tanimla_result_window(Gtk, Gdk):
         def _destroyed(self, _widget):
             if self.cancel is not None:
                 self.cancel.set()
+            if self.tarama is not None:
+                self.tarama.iptal()
             # Pencereye ozel CSS saglayicisini ekrandan kaldir; izleme modunda
             # her takista yeni pencere acildigi icin saglayicilar birikmesin.
             try:
@@ -959,6 +1346,8 @@ def _tanimla_result_window(Gtk, Gdk):
             """Ayni pencerede yeniden tarar; yeni pencere ACMAZ."""
             if self.scan_thread and self.scan_thread.is_alive():
                 return
+            if self.tarama is not None:
+                return
             root = self.result.get("root")
             if not self._device_present():
                 self.status.set_text(UI["gone"][self.lang])
@@ -983,7 +1372,10 @@ def _tanimla_result_window(Gtk, Gdk):
             self.save_btn.set_sensitive(True)
             self.status.set_text("")
             if not fresh["stats"].get("cancelled"):
+                # Hizli kontrol yenilendi; onceki ayrintili tarama sonucu
+                # artik bu listeye ait degil
                 self.result = fresh
+                self.deep = {"durum": None}
                 self.refresh()
             return False
 
@@ -1113,7 +1505,7 @@ def send_notification(result, settings, on_details=None):
         timeout = 5000
     else:
         summary = UI["found_title"][lang].format(label=label, n=count)
-        body = findings[0]["title"]
+        body = metin(findings[0]["title"], lang)
         if count > 1:
             body += f"  ·  +{count - 1}"
         worst = worst_level(findings)
