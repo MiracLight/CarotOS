@@ -19,6 +19,10 @@ sayılmamıştır.
   gösterilir.
 - **Mağaza:** `--paket <ad>` parametresiyle doğrudan bir uygulamanın
   ayrıntı sayfasını açar.
+- **Bilgisayar adı:** Canlı oturumda ve kurulu sistemde bilgisayar adı
+  `debian` yerine `carotos` olur (`user@carotos`).
+- Sistemde görünen sürüm 1.3 olarak kalır; 1.3.1 yalnızca depo ve ISO dosya
+  adında kullanılır.
 
 ## Sürüm 14 — 1.3 "Eggshell": Carotene, CarotPot, Filenor, Former ve GSD
 **Durum:** Yayınlandı (`carotos-1.3-amd64.iso`, 2,53 GB, carotos.org).
