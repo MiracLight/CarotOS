@@ -21,7 +21,7 @@ lb config \
   --architectures amd64 \
   --debian-installer live \
   --archive-areas "main contrib non-free non-free-firmware" \
-  --image-name "carotos-1.3" \
+  --image-name "carotos-1.3.1" \
   --uefi-secure-boot enable \
   --firmware-chroot true
 sudo lb build 2>&1 | tee build.log
@@ -73,7 +73,7 @@ göstermez).
 Ayrıca şu **boş dönmelidir**:
 
 ```
-grep -E "^(shim-signed|grub-efi-amd64-signed)" carotos-1.3-amd64.packages
+grep -E "^(shim-signed|grub-efi-amd64-signed)" carotos-1.3.1-amd64.packages
 ```
 
 Gerekçesi için "Secure Boot" bölümüne bakın.
@@ -235,7 +235,7 @@ sessizce imzasız grub'a döner, `enable` ise derlemeyi durdurur — bu yüzden
 Doğrulama, ISO bağlanarak yapılır:
 
 ```
-sudo mount -o loop carotos-1.3-amd64.iso ~/iso-mount
+sudo mount -o loop carotos-1.3.1-amd64.iso ~/iso-mount
 ls -l ~/iso-mount/EFI/boot/
 sudo umount ~/iso-mount
 ```
@@ -263,7 +263,7 @@ engeller ve kurulum önyükleyicisiz kalır.
 
 `--uefi-secure-boot enable` parametresi tek başına yeterlidir: live-build o
 paketleri derleme sırasında geçici olarak kullanır, kurulan sisteme geçirmez.
-Bu yüzden doğrulamada `carotos-1.3-amd64.packages` içinde bu iki paket
+Bu yüzden doğrulamada `carotos-1.3.1-amd64.packages` içinde bu iki paket
 **bulunmamalıdır**.
 
 ## Uygulama simgeleri
@@ -386,7 +386,7 @@ Orijinal dosyaları incelemek için (ölçü değişirse doğrulamak amacıyla):
 
 ```
 mkdir -p ~/iso-mount ~/logo-test
-sudo mount -o loop carotos-1.3-amd64.iso ~/iso-mount
+sudo mount -o loop carotos-1.3.1-amd64.iso ~/iso-mount
 cd ~/logo-test
 zcat ~/iso-mount/install/gtk/initrd.gz | cpio -idmv "usr/share/graphics/*"
 file usr/share/graphics/*

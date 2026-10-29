@@ -10,6 +10,16 @@ sayılmamıştır.
 
 ---
 
+## Sürüm 15 — 1.3.1 (ara sürüm)
+**Durum:** Derleniyor ve sınanıyor. Ana sürüm 1.3 olarak kalır
+(`carotos-1.3-amd64.iso`).
+- **Karşılama:** Carotene, CarotPot ve Filenor sayfa başlıklarından "CarotOS"
+  öneki kaldırıldı; Poligon sayfasının görseli gerçek arayüzle yenilendi.
+- **Carotene:** ClamAV kurulu değilse "Mağaza'da ClamAV'ı kur" düğmesi
+  gösterilir.
+- **Mağaza:** `--paket <ad>` parametresiyle doğrudan bir uygulamanın
+  ayrıntı sayfasını açar.
+
 ## Sürüm 14 — 1.3 "Eggshell": Carotene, CarotPot, Filenor, Former ve GSD
 **Durum:** Yayınlandı (`carotos-1.3-amd64.iso`, 2,53 GB, carotos.org).
 - **Carotene** eklendi: ClamAV ile hızlı, ana klasör ve özel tarama; karantina
