@@ -26,7 +26,7 @@ anlatılmış.**
 
 ## Öne çıkanlar
 
-- **Dört özgün uygulama** — Python ve GTK3 ile sıfırdan yazıldı
+- **On iki özgün uygulama** — Python ve GTK3 ile sıfırdan yazıldı
 - **Türkçe arayüz** (İngilizce seçeneğiyle), kurulumdan masaüstüne kadar
 - **On güvenlik aracı**, rehberli bir panelden kullanılabilir
 - **BIOS ve UEFI** desteği, imzalı önyükleyici (Secure Boot)
@@ -37,77 +37,116 @@ anlatılmış.**
 
 <div align="center">
 
-<img src="docs/screenshots/desktop.png" alt="CarotOS masaüstü" width="760">
+<img src="docs/screenshots/masaustu.webp" alt="CarotOS masaüstü" width="760">
 
-*XFCE masaüstü — iki panelli düzen, Türkçe arayüz*
-
-<br><br>
-
-<img src="docs/screenshots/health.png" alt="CarotOS Sistem Sağlığı" width="760">
-
-*Sistem Sağlığı — yirmi denetim, sağlık puanı ve tek tıkla düzeltme*
+*CarotOS masaüstü — XFCE 4 ile iki panelli masaüstü düzeni ve CarotOS duvar kâğıdı.*
 
 <br><br>
 
-<img src="docs/screenshots/panel.png" alt="CarotOS Güvenlik Paneli" width="760">
+<img src="docs/screenshots/karsilama-1.webp" alt="CarotOS Karşılama Sihirbazı" width="760">
 
-*Güvenlik Paneli — her araç için form, açıklama ve canlı çıktı*
-
-<br><br>
-
-<img src="docs/screenshots/welcome.png" alt="CarotOS Karşılama Sihirbazı" width="760">
-
-*Karşılama Sihirbazı — ilk açılışta çıkan iki dilli tanıtım*
+*CarotOS Karşılama Sihirbazı — İlk oturumda açılan, Linux'u ilk kez kullananlar için kısa tanıtım.*
 
 <br><br>
 
-<img src="docs/screenshots/poligon-ogrenci.png" alt="CarotOS Poligon öğrenci uygulaması" width="420">
+<img src="docs/screenshots/guvenlik-paneli.webp" alt="CarotOS Güvenlik Paneli" width="760">
 
-*CarotOS Poligon — öğrenci uygulaması, bireysel pratik ve sınıfa katılma*
+*CarotOS Güvenlik Paneli — Güvenlik araçlarını komut yazmadan kullanabilirsiniz.*
 
 <br><br>
 
-<img src="docs/screenshots/poligon-ogretmen.png" alt="CarotOS Poligon öğretmen uygulaması" width="420">
+<img src="docs/screenshots/sistem-sagligi.webp" alt="CarotOS Sistem Sağlığı" width="760">
 
-*CarotOS Poligon — öğretmen uygulaması, oda kodu ve öğrenci listesi*
+*CarotOS Sistem Sağlığı — Sistem durumu 23 denetimle kontrol edilir ve bir sağlık puanı olarak gösterilir.*
+
+<br><br>
+
+<img src="docs/screenshots/usb-denetimi.webp" alt="CarotOS USB Denetimi" width="760">
+
+*CarotOS USB Denetimi — Bulgular önem derecesine göre sıralanır. Her bulgunun gerekçesi ve dosya yolu görünür.*
+
+<br><br>
+
+<img src="docs/screenshots/magaza.webp" alt="CarotOS Mağaza" width="760">
+
+*CarotOS Mağaza — On kategorideki 153 uygulama tek tıkla kurulur ve kaldırılır.*
+
+<br><br>
+
+<img src="docs/screenshots/carotene.webp" alt="Carotene" width="760">
+
+*Carotene — ClamAV ile hızlı, ana klasör ve özel klasör taraması. Bulunan dosyalar karantinaya alınabilir.*
+
+<br><br>
+
+<img src="docs/screenshots/carotpot.webp" alt="CarotPot" width="760">
+
+*CarotPot — Tuzak sisteminin panosu: saatlik etkinlik, tuzak başına olaylar ve en etkin saldırganlar.*
+
+<br><br>
+
+<img src="docs/screenshots/filenor.webp" alt="Filenor" width="760">
+
+*Filenor — Eklenen dosyalar için hedef biçim seçilir ve dönüştürme ayarları yapılır.*
+
+<br><br>
+
+<img src="docs/screenshots/former.webp" alt="CarotOS Former" width="760">
+
+*CarotOS Former — Güvenlik araçlarını animasyonlarla ve adım adım anlatan rehber.*
+
+<br><br>
+
+<img src="docs/screenshots/gsd.webp" alt="CarotOS GSD" width="760">
+
+*CarotOS GSD — 161 terimlik, aranabilir, Türkçe ve İngilizce sözlük.*
+
+<br><br>
+
+<img src="docs/screenshots/poligon-ogrenci.webp" alt="CarotOS Poligon öğrenci uygulaması" width="330">
+<img src="docs/screenshots/poligon-ogretmen.webp" alt="CarotOS Poligon öğretmen uygulaması" width="330">
+
+*CarotOS Poligon — solda öğrenci, sağda öğretmen uygulaması*
 
 </div>
 
 ## Uygulamalar
 
 ### CarotOS Güvenlik Paneli
-On güvenlik aracını grafik forma dönüştürür. Alanları doldurursunuz, komut
-kendiliğinden oluşur. Her araç için "ne işe yarar, ne zaman kullanılır, örnek
-kullanım" açıklaması vardır. Çıktı canlı akar; yetki gerektiren işlemler tek
-tıkla yükseltilir.
+nmap, tcpdump ve hydra gibi on güvenlik aracını komut yazmadan kullanabileceğiniz grafik arayüz. Her aracın ne işe yaradığı ekranda anlatılır, sonuçlar canlı olarak izlenir.
 
 ### CarotOS Karşılama Sihirbazı
-İlk açılışta çıkan, on bir sayfalık, iki dilli tanıtım. Linux nedir, dosya
-sistemi nasıl çalışır, yazılım nasıl kurulur, güvenlik araçları ne işe yarar.
-Ayrıca sistemin teması ve dili buradan seçilir.
+CarotOS'u ilk açtığınızda karşınıza gelen tanıtım rehberi. Linux'un temel kavramlarını, masaüstünü ve CarotOS ile gelen uygulamaları 21 sayfada Türkçe ve İngilizce anlatır. Tema, dil ve masaüstü arka planını da buradan seçebilirsiniz.
 
 ### CarotOS Sistem Sağlığı
-Sistemin güvenlik durumunu yirmi başlıkta denetler: güvenlik duvarı,
-güncellemeler, depolar, açık portlar, hesap güvenliği, disk. Bir sağlık puanı
-verir ve bulunan sorunları tek tıkla düzeltme düğmeleri sunar.
+Bilgisayarınızın genel durumunu kontrol eden araç. Sistem, güncellemeler, ağ ve güvenlik duvarı, koruma katmanları, hesaplar ve disk gibi alanlarda 23 denetim yapar, sonucu bir sağlık puanı olarak gösterir. Sorunların çoğu tek tıkla düzeltilebilir, ayrıntılı tarama yapılabilir ve sonuçlar rapor olarak kaydedilir.
 
 ### CarotOS USB Denetimi
-Takılan çıkarılabilir aygıtları kendiliğinden denetler. Dosya içeriklerini
-taramaz; dosya adlarına, uzantılarına ve konumlarına bakar. `autorun.inf`,
-çift uzantılı dosyalar, gizlenmiş uzantılar ve klasör yerine konmuş kısayollar
-gibi bilinen yayılma yöntemlerini yakalar — bir saniyeden kısa sürede.
+USB belleklerde zararlı yazılım belirtilerini arayan araç. Oturum açıldığında arka planda başlar, bir bellek takıldığında autorun.inf dosyalarını, çift uzantılı dosyaları ve klasör gibi görünen kısayolları kontrol eder. Bu kontrol dosyaların içini okumaz. İsterseniz ClamAV ile ayrıntılı bir tarama da başlatabilirsiniz. Bulunan dosyalara dokunulmaz, yalnızca raporlanır.
 
 ### CarotOS Poligon
-Öğrenci uygulaması. İzole bir ortamda hydra, nmap, john, sqlmap ve tshark ile
-gerçek görevler çözülür; ufw ve fail2ban ile savunma pratiği de yapılır.
-Bireysel modda ilerleme kalıcı olarak saklanır; sınıf modunda öğretmenin
-açtığı bir odaya katılınır. Kaynak kodu ayrı bir depoda tutulur:
-[CarotOS-Poligon](https://github.com/MiracLight/CarotOS-Poligon).
+Öğrencilerin sızma testini güvenli bir ortamda öğrendiği uygulama. Görevler hydra, nmap, john, sqlmap ve tshark ile çözülür, ufw ve fail2ban ile savunma da denenir. Tüm çalışma kendi bilgisayarınızda kalır. Kaynak kodu ayrı bir depoda tutulur: [CarotOS-Poligon](https://github.com/MiracLight/CarotOS-Poligon).
 
 ### CarotOS Poligon Öğretmen
-Öğretmen uygulaması. Tek tıkla bir sınıf odası açar, öğrencilerin
-ilerlemesini gösterir, sınıfı bir sonraki göreve yönlendirir ve ihtiyacı
-olan öğrenciye özel ipucu gönderir.
+Öğretmenlerin sınıfı yönettiği uygulama. Tek tıkla sınıf odası açar, öğrencilerin ilerlemesini izler, görev yönlendirir ve istenen öğrenciye ipucu gönderir.
+
+### CarotOS Mağaza
+Debian depolarındaki 153 uygulamayı on kategoride listeleyen yazılım mağazası. Uygulamaları tek tıkla kurup kaldırabilirsiniz. Açık ve koyu tema ile Türkçe ve İngilizce arayüz seçeneği vardır.
+
+### Carotene
+ClamAV tabanlı antivirüs uygulaması. Hızlı tarama, ana klasör taraması ve seçtiğiniz klasörün taranması mümkündür. Bulunan dosyalar karantinaya alınır, virüs tanımları uygulamadan güncellenir ve tarama geçmişi saklanır. Arka planda çalışan bir hizmet kurmaz, yalnızca siz başlattığınızda tarar.
+
+### CarotPot
+Yerel ağınızdaki şüpheli hareketleri yakalayan tuzak sistemi. SSH, Telnet, FTP ve MySQL gibi sahte hizmetler açar, bunlara bağlanan cihazları kaydeder ve sizi uyarır. Gerçek bir giriş yapılamaz. Tuzak dosyalar açıldığında ya da değiştirildiğinde de uyarır. Sistem açılışında kendiliğinden başlamaz.
+
+### Filenor
+Görsel, ses, video, belge, tablo, sunum ve yazı tipi dosyalarını tek arayüzden dönüştüren uygulama. PDF dosyalarını birleştirebilir, bölebilir, döndürebilir, küçültebilir ve kilitleyebilir, taranmış belgelerde metin tanıma (OCR) yapabilirsiniz. Var olan bir dosyanın üzerine hiçbir zaman yazmaz. Komut satırı sürümü de vardır.
+
+### CarotOS Former
+Güvenlik araçlarını animasyonlarla öğreten rehber uygulama. Güvenlik Paneli'ndeki araçların ve CarotPot ile Carotene'in her biri için konu anlatımı, oynatılabilir bir animasyon ve “kendin dene” bölümü bulunur. Türkçe ve İngilizce çalışır.
+
+### CarotOS GSD
+Genel Sistem Sözlüğü. Linux, ağ, siber güvenlik, kriptografi ve bilgisayar bilimi alanlarında 161 terim içerir. Terimleri arayabilir, örnek komutları görebilir ve ilgili terimlere geçebilirsiniz. Türkçe ve İngilizce kullanılabilir.
 
 ## Güvenlik araçları
 
@@ -217,7 +256,7 @@ Hata bildirirken sürüm numarasını, kullandığınız donanımı ve sorunu ye
 
 ## Lisans
 
-CarotOS'un kendi bileşenleri (dört uygulama, yapılandırma dosyaları,
+CarotOS'un kendi bileşenleri (uygulamalar, yapılandırma dosyaları,
 belgeler) [GNU GPL v3](LICENSE) altında dağıtılır.
 
 CarotOS bir Debian türevidir. İçerdiği paketler kendi lisansları altındadır;
