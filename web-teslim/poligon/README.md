@@ -6,10 +6,16 @@ hazırlanmış bir öğrenci/öğretmen uygulama çiftidir.
 olarak geliştirilmiştir ve dağıtımın ISO görüntüsüne dahildir.
 
 <div align="center">
-<img src="docs/ekran/poligon-ogrenci.webp" alt="CarotOS Poligon öğrenci uygulaması" width="330">
-<img src="docs/ekran/poligon-ogretmen.webp" alt="CarotOS Poligon öğretmen uygulaması" width="330">
+<img src="docs/ekran/poligon-ogretmen.webp" alt="CarotOS Poligon öğretmen uygulaması" width="640">
 
-*Solda öğrenci, sağda öğretmen uygulaması*
+*Öğretmen uygulaması — oda kodu, öğrenci listesi ve ipucu gönderme*
+
+<br>
+
+<img src="docs/ekran/poligon-ogrenci.webp" alt="CarotOS Poligon öğrenci uygulaması giriş ekranı" width="420">
+<img src="docs/ekran/poligon-ogrenci-gorev.webp" alt="CarotOS Poligon öğrenci uygulaması görev ekranı" width="420">
+
+*Öğrenci uygulaması — giriş seçenekleri ve sınıf modunda görev ekranı*
 
 </div>
 
