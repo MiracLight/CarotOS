@@ -1,0 +1,64 @@
+{
+  "id": "web-01",
+  "arac": "curl",
+  "seviye": "orta",
+  "baslik": {
+    "tr": "Gizli Dizin Keşfi",
+    "en": "Hidden Directory Discovery"
+  },
+  "senaryo": {
+    "tr": "127.0.0.1:{port} adresinde bir web sitesi çalışıyor. Sitenin gizli bir bölümü var ve bayrak orada. Gizli bölümü bul ve CAROT{...} bayrağını yaz.",
+    "en": "A web site is running at 127.0.0.1:{port}. It has a hidden section holding the flag. Find the hidden section and enter the CAROT{...} flag."
+  },
+  "ipucu": {
+    "tr": "curl -s http://127.0.0.1:{port}/robots.txt   —   curl -i http://127.0.0.1:{port}/<dizin>/",
+    "en": "curl -s http://127.0.0.1:{port}/robots.txt   —   curl -i http://127.0.0.1:{port}/<dir>/"
+  },
+  "hedef": {
+    "tur": "canli_servis",
+    "servis_modulu": "servisler.sahte_site.SahteSite",
+    "bind_adres": "127.0.0.1",
+    "coklu_port": true,
+    "_kural": "bind_adres HER ZAMAN loopback; üreteç ag_guvenlik ile ayrıca denetler."
+  },
+  "flag_uretimi": {
+    "yontem": "uretec",
+    "uretec": "gizli_sayfa",
+    "_not": "İçerik her açılışta rastgele üretilir (uretilen_gorevler.gizli_sayfa)."
+  },
+  "dogrulama": {
+    "tur": "kullanici_girdisi",
+    "karsilastirma": "birebir",
+    "deneme_siniri": null
+  },
+  "zorluklar": {
+    "kolay": {
+      "kesif": "robots",
+      "ipucu": {
+        "tr": "curl -s http://127.0.0.1:{port}/robots.txt   (robots.txt 'Disallow' ile gizli dizinleri sızdırır)",
+        "en": "curl -s http://127.0.0.1:{port}/robots.txt   (robots.txt leaks hidden directories via 'Disallow')"
+      }
+    },
+    "orta": {
+      "kesif": "sozluk",
+      "ipucu": {
+        "tr": "for k in $(cat {sozluk}); do echo \"$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:{port}/$k/) $k\"; done   (200 dönen dizin gizli olandır; robots.txt artık yardımcı olmaz)",
+        "en": "for k in $(cat {sozluk}); do echo \"$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:{port}/$k/) $k\"; done   (the directory returning 200 is the hidden one; robots.txt no longer helps)"
+      }
+    },
+    "zor": {
+      "kesif": "cerez",
+      "ipucu": {
+        "tr": "Önce çerez al: curl -c c.txt http://127.0.0.1:{port}/  ·  sözlük: {sozluk}  ·  sonra: curl -i -b c.txt http://127.0.0.1:{port}/<dizin>/  (bayrak yanıt BAŞLIĞINDA)",
+        "en": "First get a cookie: curl -c c.txt http://127.0.0.1:{port}/  ·  wordlist: {sozluk}  ·  then: curl -i -b c.txt http://127.0.0.1:{port}/<dir>/  (the flag is in a response HEADER)"
+      }
+    }
+  },
+  "puan": {
+    "kolay": 60,
+    "orta": 130,
+    "zor": 250
+  },
+  "sure_siniri_dk": null,
+  "savunma_gorevi_id": null
+}

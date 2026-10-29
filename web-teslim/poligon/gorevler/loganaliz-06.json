@@ -1,0 +1,61 @@
+{
+  "id": "loganaliz-06",
+  "arac": "carotpot",
+  "seviye": "orta",
+  "baslik": {
+    "tr": "Çok Hizmetli Tarama Tespiti",
+    "en": "Multi-Service Scan Detection"
+  },
+  "senaryo": {
+    "tr": "Bir CarotPot tuzağının kayıt dosyası ({bicim_tr}) şu: {dosya}. Bir kaynak, port taraması yapar gibi birçok farklı tuzak hizmetine (ssh, ftp, telnet, http...) dokundu. {soru_tr}",
+    "en": "This is a CarotPot trap's log file ({bicim_en}): {dosya}. One source touched many different trap services (ssh, ftp, telnet, http...) like a port scan. {soru_en}"
+  },
+  "ipucu": {
+    "tr": "{ipucu_tr}",
+    "en": "{ipucu_en}"
+  },
+  "hedef": {
+    "tur": "statik_dosya",
+    "servis_modulu": "uretilen_gorevler",
+    "_not": "Yalnız yerel geçici dosya; ağ bağlantısı yok."
+  },
+  "flag_uretimi": {
+    "yontem": "uretec",
+    "uretec": "carotpot_kayit",
+    "sabit_parametreler": {
+      "soru": "tarayici"
+    },
+    "_not": "İçerik her açılışta rastgele üretilir (uretilen_gorevler.carotpot_kayit)."
+  },
+  "dogrulama": {
+    "tur": "kullanici_girdisi",
+    "karsilastirma": "birebir",
+    "deneme_siniri": null
+  },
+  "zorluklar": {
+    "kolay": {
+      "saldirgan_sayisi": 3,
+      "taranan_hizmet": 5,
+      "satir_sayisi": 100
+    },
+    "orta": {
+      "saldirgan_sayisi": 5,
+      "taranan_hizmet": 4,
+      "cok_olayli_rakip": 1,
+      "satir_sayisi": 300
+    },
+    "zor": {
+      "saldirgan_sayisi": 7,
+      "taranan_hizmet": 3,
+      "cok_olayli_rakip": 1,
+      "satir_sayisi": 600
+    }
+  },
+  "puan": {
+    "kolay": 60,
+    "orta": 120,
+    "zor": 240
+  },
+  "sure_siniri_dk": null,
+  "savunma_gorevi_id": null
+}

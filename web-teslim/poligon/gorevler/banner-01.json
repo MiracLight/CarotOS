@@ -1,0 +1,71 @@
+{
+  "id": "banner-01",
+  "arac": "nmap",
+  "seviye": "orta",
+  "baslik": {
+    "tr": "Servis Sürümü Tespiti",
+    "en": "Service Version Detection"
+  },
+  "senaryo": {
+    "tr": "127.0.0.1 üzerinde {aralik} port aralığında {port_sayisi} servis çalışıyor. Servislerden biri bağlanana 'CarotBox/x.y.z ready' başlığı veriyor. O servisin sürüm numarasını (x.y.z) yaz.",
+    "en": "{port_sayisi} services are running on 127.0.0.1 within the {aralik} port range. One of them answers connections with a 'CarotBox/x.y.z ready' banner. Enter that service's version number (x.y.z)."
+  },
+  "ipucu": {
+    "tr": "nmap -sV -p {aralik} 127.0.0.1   ·   tek port: echo | nc -w1 127.0.0.1 <port>",
+    "en": "nmap -sV -p {aralik} 127.0.0.1   ·   single port: echo | nc -w1 127.0.0.1 <port>"
+  },
+  "hedef": {
+    "tur": "canli_servis",
+    "servis_modulu": "servisler.sahte_banner.SahteBannerOrtami",
+    "bind_adres": "127.0.0.1",
+    "coklu_port": true,
+    "_kural": "bind_adres HER ZAMAN loopback; üreteç ag_guvenlik ile ayrıca denetler."
+  },
+  "flag_uretimi": {
+    "yontem": "uretec",
+    "uretec": "banner_avi",
+    "_not": "İçerik her açılışta rastgele üretilir (uretilen_gorevler.banner_avi)."
+  },
+  "dogrulama": {
+    "tur": "kullanici_girdisi",
+    "karsilastirma": "birebir",
+    "deneme_siniri": null
+  },
+  "zorluklar": {
+    "kolay": {
+      "port_sayisi": 4,
+      "port_araligi": [
+        24000,
+        24049
+      ],
+      "mod": "hemen"
+    },
+    "orta": {
+      "port_sayisi": 8,
+      "port_araligi": [
+        24000,
+        24299
+      ],
+      "mod": "hemen"
+    },
+    "zor": {
+      "port_sayisi": 12,
+      "port_araligi": [
+        24000,
+        24999
+      ],
+      "mod": "istek",
+      "ipucu": {
+        "tr": "nmap -sV -p {aralik} 127.0.0.1   (bu servisler başlığı ancak bir satır gönderince verir; nmap -sV bunu dener)   ·   elle: echo | nc -w1 127.0.0.1 <port>",
+        "en": "nmap -sV -p {aralik} 127.0.0.1   (these services only answer after receiving a line; nmap -sV tries that)   ·   by hand: echo | nc -w1 127.0.0.1 <port>"
+      }
+    }
+  },
+  "puan": {
+    "kolay": 60,
+    "orta": 120,
+    "zor": 240
+  },
+  "sure_siniri_dk": null,
+  "savunma_gorevi_id": null
+}

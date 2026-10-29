@@ -1,0 +1,60 @@
+{
+  "id": "loganaliz-04",
+  "arac": "awk",
+  "seviye": "orta",
+  "baslik": {
+    "tr": "Taramayla Ulaşılan Yol",
+    "en": "Path Reached by a Scan"
+  },
+  "senaryo": {
+    "tr": "Bir web sunucusunun erişim günlüğü ({bicim_tr}) şu dosyada: {dosya}. Tarayıcı IP sonunda gizli bir sayfa buldu ve 200 (başarılı) cevap aldı. {soru_tr}",
+    "en": "A web server's access log ({bicim_en}) is in this file: {dosya}. The scanning IP finally found a hidden page and got a 200 (success) response. {soru_en}"
+  },
+  "ipucu": {
+    "tr": "{ipucu_tr}",
+    "en": "{ipucu_en}"
+  },
+  "hedef": {
+    "tur": "statik_dosya",
+    "servis_modulu": "uretilen_gorevler",
+    "_not": "Yalnız yerel geçici dosya; ağ bağlantısı yok."
+  },
+  "flag_uretimi": {
+    "yontem": "uretec",
+    "uretec": "web_tarayici",
+    "sabit_parametreler": {
+      "soru": "yol"
+    },
+    "_not": "İçerik her açılışta rastgele üretilir (uretilen_gorevler.web_tarayici)."
+  },
+  "dogrulama": {
+    "tur": "kullanici_girdisi",
+    "karsilastirma": "birebir",
+    "deneme_siniri": null
+  },
+  "zorluklar": {
+    "kolay": {
+      "satir_sayisi": 300,
+      "tarayici_sayisi": 1,
+      "arac_ua": 1
+    },
+    "orta": {
+      "satir_sayisi": 800,
+      "tarayici_sayisi": 2,
+      "arac_ua": 0
+    },
+    "zor": {
+      "satir_sayisi": 2000,
+      "tarayici_sayisi": 4,
+      "arac_ua": 0,
+      "yakin_rakip": 1
+    }
+  },
+  "puan": {
+    "kolay": 60,
+    "orta": 120,
+    "zor": 240
+  },
+  "sure_siniri_dk": null,
+  "savunma_gorevi_id": null
+}

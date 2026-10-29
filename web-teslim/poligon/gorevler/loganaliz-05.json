@@ -1,0 +1,57 @@
+{
+  "id": "loganaliz-05",
+  "arac": "carotpot",
+  "seviye": "baslangic",
+  "baslik": {
+    "tr": "Tuzak Kaydında Kullanıcı Adı Analizi",
+    "en": "Username Analysis in Honeypot Logs"
+  },
+  "senaryo": {
+    "tr": "Bir CarotPot tuzağının kayıt dosyası ({bicim_tr}) şu: {dosya}. Saldırganlar tuzağa giriş denerken çeşitli kullanıcı adları yazdı. {soru_tr}",
+    "en": "This is a CarotPot trap's log file ({bicim_en}): {dosya}. Attackers typed various usernames while trying to log in. {soru_en}"
+  },
+  "ipucu": {
+    "tr": "{ipucu_tr}",
+    "en": "{ipucu_en}"
+  },
+  "hedef": {
+    "tur": "statik_dosya",
+    "servis_modulu": "uretilen_gorevler",
+    "_not": "Yalnız yerel geçici dosya; ağ bağlantısı yok."
+  },
+  "flag_uretimi": {
+    "yontem": "uretec",
+    "uretec": "carotpot_kayit",
+    "sabit_parametreler": {
+      "soru": "kullanici"
+    },
+    "_not": "İçerik her açılışta rastgele üretilir (uretilen_gorevler.carotpot_kayit)."
+  },
+  "dogrulama": {
+    "tur": "kullanici_girdisi",
+    "karsilastirma": "birebir",
+    "deneme_siniri": null
+  },
+  "zorluklar": {
+    "kolay": {
+      "saldirgan_sayisi": 2,
+      "satir_sayisi": 100
+    },
+    "orta": {
+      "saldirgan_sayisi": 4,
+      "satir_sayisi": 300
+    },
+    "zor": {
+      "saldirgan_sayisi": 8,
+      "satir_sayisi": 800,
+      "yakin_rakip": 1
+    }
+  },
+  "puan": {
+    "kolay": 50,
+    "orta": 100,
+    "zor": 200
+  },
+  "sure_siniri_dk": null,
+  "savunma_gorevi_id": null
+}

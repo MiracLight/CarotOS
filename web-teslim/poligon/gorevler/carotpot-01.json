@@ -1,0 +1,56 @@
+{
+  "id": "carotpot-01",
+  "arac": "carotpot",
+  "seviye": "baslangic",
+  "baslik": {
+    "tr": "Honeypot Tetikleme",
+    "en": "Triggering a Honeypot"
+  },
+  "senaryo": {
+    "tr": "Bilgisayarında senin için ayrı bir CarotPot tuzağı kuruldu. {tuzaklar} tuzakları 127.0.0.1 üzerinde {aralik} port aralığında dinliyor. Önce nmap ile tuzakların portlarını bul, sonra her tuzağa '{kullanici}' kullanıcı adıyla {sayi} kez giriş dene (parolayı istediğini yazabilirsin, giriş zaten reddedilecek). CarotPot her denemeyi kaydeder; 'Kontrol Et' dediğinde bu kayıtlar okunur ve görev doğrulanır.",
+    "en": "A separate CarotPot trap has been set up on your computer just for you. The {tuzaklar} traps listen on 127.0.0.1 within the {aralik} port range. First find the trap ports with nmap, then try to log in {sayi} time(s) to each trap as '{kullanici}' (any password works, the login is always rejected). CarotPot records every attempt; when you press Check, those records are read and the task is verified."
+  },
+  "ipucu": {
+    "tr": "nmap -sV -p {aralik} 127.0.0.1   →   ftp: 'USER {kullanici}' + 'PASS x' (nc 127.0.0.1 PORT)   |   telnet: nc 127.0.0.1 PORT   |   http: curl -d 'username={kullanici}&password=x' http://127.0.0.1:PORT/",
+    "en": "nmap -sV -p {aralik} 127.0.0.1   →   ftp: 'USER {kullanici}' + 'PASS x' (nc 127.0.0.1 PORT)   |   telnet: nc 127.0.0.1 PORT   |   http: curl -d 'username={kullanici}&password=x' http://127.0.0.1:PORT/"
+  },
+  "hedef": {
+    "tur": "canli_servis",
+    "servis_modulu": "tuzak_laboratuvari.TuzakLab",
+    "bind_adres": "127.0.0.1",
+    "coklu_port": true,
+    "_kural": "bind_adres HER ZAMAN loopback. TuzakLab kendi yapıcısında da bunu zorunlu kılar; CarotPot'a --dinle ile yalnızca bu adres verilir."
+  },
+  "flag_uretimi": {
+    "yontem": "tuzak_kaydi",
+    "_not": "Cevap kutusu yok. Doğrulama, laboratuvar CarotPot'unun olay kayıtlarından yapılır (ogrenci_istemci.tuzak_kaydini_dogrula)."
+  },
+  "dogrulama": {
+    "tur": "carotpot_kaydi",
+    "deneme_siniri": null
+  },
+  "zorluklar": {
+    "kolay": {
+      "hizmetler": ["ftp"],
+      "tuzak_port_araligi": [21000, 21099],
+      "gerekli_giris": 1
+    },
+    "orta": {
+      "hizmetler": ["ftp", "telnet"],
+      "tuzak_port_araligi": [21000, 21999],
+      "gerekli_giris": 2
+    },
+    "zor": {
+      "hizmetler": ["ftp", "telnet", "http"],
+      "tuzak_port_araligi": [21000, 24999],
+      "gerekli_giris": 3
+    }
+  },
+  "puan": {
+    "kolay": 60,
+    "orta": 120,
+    "zor": 220
+  },
+  "sure_siniri_dk": null,
+  "savunma_gorevi_id": null
+}
