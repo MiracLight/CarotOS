@@ -8,7 +8,7 @@ execution via pkexec.
 
 import gi
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk, Gdk, GLib
+from gi.repository import Gtk, GLib
 import subprocess
 import shutil
 import threading
@@ -16,6 +16,7 @@ import shlex
 import signal
 import json
 import os
+import sys
 
 CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".config", "carotos-panel")
 CONFIG_PATH = os.path.join(CONFIG_DIR, "settings.json")
@@ -364,84 +365,107 @@ TOOLS = [
 ]
 
 
+# ===========================================================================
+# Arayüz (CarotOS ortak grafit teması)
+# ===========================================================================
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ORTAK = os.path.join(os.path.dirname(BASE_DIR), "ortak")
+for _y in (ORTAK, BASE_DIR):
+    if _y not in sys.path:
+        sys.path.insert(0, _y)
+
+import tema  # noqa: E402
+from bekleme_cubugu import SweepBar  # noqa: E402
+
+VURGU = "guvenlik"        # ortak/tema.py: kehribar
+
+# Araç -> kenar menüsü simgesi
+TOOL_IKON = {
+    "nmap": "hedef", "tcpdump": "ag", "tshark": "liste", "aircrack-ng": "kilit",
+    "nikto": "arama", "sqlmap": "elmas", "john": "kilit", "hydra": "kisi",
+    "ufw": "kalkan", "fail2ban": "yasak",
+}
+
+LOGO_CANDIDATES = [
+    "/usr/share/icons/carotos/security-panel-icon.png",
+    "/usr/share/carotos/welcome/logo.png",
+]
+
+
+def find_logo():
+    for path in LOGO_CANDIDATES:
+        if os.path.isfile(path):
+            return path
+    return None
+
+
 class ToolPage(Gtk.Box):
+    """Bir aracın sayfası. Örnekler stack yerine yeniden kullanılır; böylece
+    araçlar arasında geçince çıktı korunur."""
+
     def __init__(self, tool, app):
-        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=14)
         self.tool = tool
         self.app = app
         self.widgets = {}
         self.process = None
-        self.set_border_width(20)
+        self.run_as_root = False
 
-        self.title = Gtk.Label(xalign=0)
-        self.pack_start(self.title, False, False, 0)
-        self.tagline = Gtk.Label(xalign=0)
-        self.pack_start(self.tagline, False, False, 0)
+        # Açıklama kartı
+        dis, ic = tema.kart()
+        self.what = tema.etiket("", None, sar=True, genislik=100)
+        ic.pack_start(self.what, False, False, 0)
+        self.when = tema.etiket("", "kart-alt", sar=True, genislik=100)
+        ic.pack_start(self.when, False, False, 0)
+        self.example = tema.etiket("", "kart-alt", sar=True, genislik=100)
+        ic.pack_start(self.example, False, False, 0)
+        self.pack_start(dis, False, False, 0)
 
-        self.info = Gtk.Label(xalign=0)
-        self.info.set_line_wrap(True)
-        self.info.set_xalign(0)
-        info_frame = Gtk.Frame()
-        info_frame.get_style_context().add_class("info-frame")
-        info_inner = Gtk.Box()
-        info_inner.set_border_width(10)
-        info_inner.pack_start(self.info, True, True, 0)
-        info_frame.add(info_inner)
-        self.pack_start(info_frame, False, False, 4)
-
-        self.form = Gtk.Grid(column_spacing=12, row_spacing=8)
-        self.pack_start(self.form, False, False, 6)
+        # Form kartı
+        fdis, fic = tema.kart()
+        self.form = Gtk.Grid(column_spacing=12, row_spacing=10)
+        fic.pack_start(self.form, False, False, 0)
         self._build_fields()
-
-        self.root_hint = Gtk.Label(xalign=0)
-        self.root_hint.set_line_wrap(True)
-        self.root_hint.get_style_context().add_class("hint-label")
-        self.pack_start(self.root_hint, False, False, 0)
-
-        btn_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        self.pack_start(btn_row, False, False, 4)
-
-        self.run_btn = Gtk.Button()
-        self.run_btn.get_style_context().add_class("suggested-action")
-        self.run_btn.connect("clicked", lambda b: self.run(as_root=False))
-        btn_row.pack_start(self.run_btn, False, False, 0)
-
-        self.root_btn = Gtk.Button()
-        self.root_btn.connect("clicked", lambda b: self.run(as_root=True))
-        btn_row.pack_start(self.root_btn, False, False, 0)
-
-        self.stop_btn = Gtk.Button()
+        self.root_hint_kutu, self.root_hint = tema.not_kutusu("", "uyari")
+        self.root_hint_kutu.set_no_show_all(True)
+        fic.pack_start(self.root_hint_kutu, False, False, 4)
+        btn_row = Gtk.Box(spacing=8)
+        self.run_btn = tema.dugme("", "ana", lambda: self.run(False))
+        self.root_btn = tema.dugme("", None, lambda: self.run(True))
+        self.stop_btn = tema.dugme("", "tehlike", self.stop)
         self.stop_btn.set_sensitive(False)
-        self.stop_btn.connect("clicked", self.stop)
+        self.clear_btn = tema.dugme("", "duz", lambda: self.output_buffer.set_text(""))
+        btn_row.pack_start(self.run_btn, False, False, 0)
+        btn_row.pack_start(self.root_btn, False, False, 0)
         btn_row.pack_start(self.stop_btn, False, False, 0)
-
-        self.clear_btn = Gtk.Button()
-        self.clear_btn.connect("clicked", lambda b: self.output_buffer.set_text(""))
         btn_row.pack_end(self.clear_btn, False, False, 0)
+        fic.pack_start(btn_row, False, False, 0)
+        self.pack_start(fdis, False, False, 0)
 
-        self.preview = Gtk.Label(xalign=0)
-        self.preview.set_selectable(True)
-        self.preview.set_line_wrap(True)
-        self.preview.get_style_context().add_class("preview-label")
+        # Çıktı
+        self.preview = tema.etiket("", "mono", sar=True, sec=True)
         self.pack_start(self.preview, False, False, 0)
-
+        cdis, cic = tema.kart(2, 0)
         scroller = Gtk.ScrolledWindow()
+        scroller.set_min_content_height(280)
         scroller.set_vexpand(True)
-        scroller.set_shadow_type(Gtk.ShadowType.IN)
-        self.output_view = Gtk.TextView()
-        self.output_view.set_editable(False)
-        self.output_view.set_cursor_visible(False)
-        self.output_view.set_monospace(True)
+        self.output_view = Gtk.TextView(editable=False, cursor_visible=False, monospace=True)
         self.output_view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
+        self.output_view.set_left_margin(10)
+        self.output_view.set_right_margin(10)
+        self.output_view.set_top_margin(8)
         self.output_buffer = self.output_view.get_buffer()
         scroller.add(self.output_view)
-        self.pack_start(scroller, True, True, 0)
+        cic.pack_start(scroller, True, True, 0)
+        self.pack_start(cdis, True, True, 0)
 
     def _build_fields(self):
         for i, field in enumerate(self.tool["fields"]):
             key, label, kind, default, *rest = field
             placeholder = rest[0] if rest else None
-            lbl = Gtk.Label(xalign=0)
+            lbl = tema.etiket("", "soluk")
+            lbl.set_valign(Gtk.Align.CENTER)
             self.form.attach(lbl, 0, i, 1, 1)
             if kind == "combo":
                 widget = Gtk.ComboBoxText()
@@ -457,7 +481,7 @@ class ToolPage(Gtk.Box):
                 widget = Gtk.Entry()
                 if isinstance(default, str):
                     widget.set_text(default)
-                widget.set_width_chars(32)
+                widget.set_width_chars(34)
                 options = None
             self.form.attach(widget, 1, i, 1, 1)
             self.widgets[key] = {"kind": kind, "widget": widget, "label": label,
@@ -466,15 +490,9 @@ class ToolPage(Gtk.Box):
     def retranslate(self):
         lang = self.app.lang
         t = self.tool
-        self.title.set_markup(f"<span size='xx-large' weight='bold'>{t['name']}</span>")
-        self.tagline.set_markup(f"<span foreground='{self.app.accent}'>{t['tagline'][lang]}</span>")
-        info_markup = (
-            f"{GLib.markup_escape_text(t['what'][lang])}\n\n"
-            f"<b>{T('when_to_use', lang)}:</b> {GLib.markup_escape_text(t['when'][lang])}\n"
-            f"<b>{T('example', lang)}:</b> {GLib.markup_escape_text(t['example'][lang])}"
-        )
-        self.info.set_markup(info_markup)
-
+        self.what.set_text(t["what"][lang])
+        self.when.set_text(f"{T('when_to_use', lang)}: {t['when'][lang]}")
+        self.example.set_text(f"{T('example', lang)}: {t['example'][lang]}")
         for key, d in self.widgets.items():
             d["lbl"].set_text(d["label"][lang])
             if d["kind"] == "combo":
@@ -485,25 +503,20 @@ class ToolPage(Gtk.Box):
                 d["widget"].set_active(active if active >= 0 else 0)
             elif d["kind"] == "file":
                 d["widget"].set_title(T("choose_file", lang))
-            else:
-                if d["placeholder"]:
-                    d["widget"].set_placeholder_text(d["placeholder"][lang])
-
+            elif d["placeholder"]:
+                d["widget"].set_placeholder_text(d["placeholder"][lang])
         self.run_btn.set_label(T("run", lang))
         self.root_btn.set_label(T("run_root", lang))
         self.stop_btn.set_label(T("stop", lang))
         self.clear_btn.set_label(T("clear", lang))
-
         if t.get("needs_root"):
-            self.root_hint.set_markup(f"⚠ {GLib.markup_escape_text(T('root_hint', lang))}")
-            self.root_hint.show()
-            self.root_btn.show()
+            self.root_hint.set_text(T("root_hint", lang))
+            self.root_hint_kutu.set_visible(True)
+            self.root_hint_kutu.show_all()
+            self.root_btn.set_visible(True)
         else:
-            self.root_hint.hide()
-            if t.get("root_optional"):
-                self.root_btn.show()
-            else:
-                self.root_btn.hide()
+            self.root_hint_kutu.set_visible(False)
+            self.root_btn.set_visible(bool(t.get("root_optional")))
 
     def _collect(self):
         values = {}
@@ -526,7 +539,7 @@ class ToolPage(Gtk.Box):
                 return
         try:
             cmd = self.tool["build"](values)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             self.append(f"[!] {T('build_error', lang, err=exc)}\n")
             return
         cmd = [c for c in cmd if c != ""]
@@ -540,19 +553,17 @@ class ToolPage(Gtk.Box):
         self.run_as_root = as_root
         if as_root:
             cmd = ["pkexec"] + cmd
-        self.preview.set_markup("<tt>$ " + GLib.markup_escape_text(" ".join(shlex.quote(c) for c in cmd)) + "</tt>")
+        self.preview.set_text("$ " + " ".join(shlex.quote(c) for c in cmd))
         self.output_buffer.set_text("")
         self.run_btn.set_sensitive(False)
         self.root_btn.set_sensitive(False)
         self.stop_btn.set_sensitive(True)
-        self.app.set_status(T("running", lang, tool=self.tool["name"]))
+        self.app.calisiyor(True, T("running", lang, tool=self.tool["name"]))
         threading.Thread(target=self._worker, args=(cmd,), daemon=True).start()
 
     def _worker(self, cmd):
         lang = self.app.lang
         try:
-            # start_new_session: araci kendi surec grubunda baslatir; boylece
-            # pkexec ile root olarak calisan alt sureci de sinyalle ulasabiliriz
             self.process = subprocess.Popen(
                 cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                 text=True, bufsize=1, start_new_session=True)
@@ -560,7 +571,7 @@ class ToolPage(Gtk.Box):
                 GLib.idle_add(self.append, line)
             self.process.wait()
             GLib.idle_add(self.append, f"\n[{T('finished', lang, code=self.process.returncode)}]\n")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             GLib.idle_add(self.append, f"[!] {exc}\n")
         finally:
             GLib.idle_add(self._done)
@@ -569,9 +580,10 @@ class ToolPage(Gtk.Box):
         self.run_btn.set_sensitive(True)
         self.root_btn.set_sensitive(True)
         self.stop_btn.set_sensitive(False)
-        self.app.set_status(T("ready", self.app.lang))
+        self.app.calisiyor(False, T("ready", self.app.lang))
+        return False
 
-    def stop(self, _b):
+    def stop(self):
         if not (self.process and self.process.poll() is None):
             return
         lang = self.app.lang
@@ -579,16 +591,11 @@ class ToolPage(Gtk.Box):
             pgid = os.getpgid(self.process.pid)
         except OSError:
             pgid = None
-
-        if getattr(self, "run_as_root", False):
-            # pkexec ile baslatilan araclar root'a aittir; normal kullanici
-            # onlari dogrudan olduremez. kill'i de root ile calistiririz.
-            # Surec grubunun tamamina TERM gonderilir (negatif PGID).
+        if self.run_as_root:
             target = f"-{pgid}" if pgid else str(self.process.pid)
             try:
-                subprocess.run(["pkexec", "kill", "-TERM", target],
-                               timeout=30)
-            except Exception as exc:
+                subprocess.run(["pkexec", "kill", "-TERM", target], timeout=30)
+            except Exception as exc:  # noqa: BLE001
                 self.append(f"[!] {exc}\n")
         else:
             try:
@@ -598,7 +605,6 @@ class ToolPage(Gtk.Box):
                     self.process.terminate()
             except OSError:
                 self.process.terminate()
-
         self.append(f"\n[{T('stopped', lang)}]\n")
 
     def append(self, text):
@@ -611,18 +617,12 @@ class ToolPage(Gtk.Box):
 
 class SettingsPage(Gtk.Box):
     def __init__(self, app):
-        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=16)
         self.app = app
-        self.set_border_width(20)
-        self.title = Gtk.Label(xalign=0)
-        self.pack_start(self.title, False, False, 0)
-        self.desc = Gtk.Label(xalign=0)
-        self.desc.set_line_wrap(True)
-        self.pack_start(self.desc, False, False, 0)
+
+        gdis, gic = tema.kart()
         grid = Gtk.Grid(column_spacing=16, row_spacing=14)
-        grid.set_margin_top(10)
-        self.pack_start(grid, False, False, 0)
-        self.lang_label = Gtk.Label(xalign=0)
+        self.lang_label = tema.etiket("", "soluk")
         grid.attach(self.lang_label, 0, 0, 1, 1)
         self.lang_combo = Gtk.ComboBoxText()
         self.lang_combo.append("tr", "Türkçe")
@@ -630,42 +630,36 @@ class SettingsPage(Gtk.Box):
         self.lang_combo.set_active_id(app.lang)
         self.lang_combo.connect("changed", self.on_lang)
         grid.attach(self.lang_combo, 1, 0, 1, 1)
-        self.theme_label = Gtk.Label(xalign=0)
+        self.theme_label = tema.etiket("", "soluk")
         grid.attach(self.theme_label, 0, 1, 1, 1)
-        self.theme_combo = Gtk.ComboBoxText()
-        self.theme_combo.append("dark", "")
-        self.theme_combo.append("light", "")
-        self.theme_combo.set_active_id(app.theme)
-        self.theme_combo.connect("changed", self.on_theme)
-        grid.attach(self.theme_combo, 1, 1, 1, 1)
+        self.theme_sec, _ = tema.secim_grubu(
+            [("dark", T("theme_dark", app.lang)), ("light", T("theme_light", app.lang))],
+            app.theme, self.on_theme)
+        grid.attach(self.theme_sec, 1, 1, 1, 1)
+        gic.pack_start(grid, False, False, 0)
+        self.pack_start(gdis, False, False, 0)
 
-        # --- Firewall section ---
-        sep = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
-        sep.set_margin_top(10)
-        sep.set_margin_bottom(4)
-        self.pack_start(sep, False, False, 0)
-
-        self.fw_title = Gtk.Label(xalign=0)
-        self.pack_start(self.fw_title, False, False, 0)
-        self.fw_desc = Gtk.Label(xalign=0)
-        self.fw_desc.set_line_wrap(True)
-        self.pack_start(self.fw_desc, False, False, 0)
-
-        fw_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        fw_row.set_margin_top(8)
-        self.pack_start(fw_row, False, False, 0)
-
+        fdis, fic = tema.kart()
+        satir = Gtk.Box(spacing=10)
+        bilgi = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        self.fw_title = tema.etiket("", "kart-baslik")
+        self.fw_desc = tema.etiket("", "kart-alt", sar=True, genislik=70)
+        bilgi.pack_start(self.fw_title, False, False, 0)
+        bilgi.pack_start(self.fw_desc, False, False, 0)
+        satir.pack_start(bilgi, True, True, 0)
         self.fw_switch = Gtk.Switch()
+        self.fw_switch.set_valign(Gtk.Align.CENTER)
         self.fw_switch.set_sensitive(False)
         self.fw_switch.connect("state-set", self.on_switch)
-        fw_row.pack_start(self.fw_switch, False, False, 0)
-
-        self.fw_status_label = Gtk.Label(xalign=0)
-        fw_row.pack_start(self.fw_status_label, False, False, 0)
-
-        self.fw_refresh_btn = Gtk.Button()
-        self.fw_refresh_btn.connect("clicked", lambda b: self.refresh_firewall())
-        fw_row.pack_start(self.fw_refresh_btn, False, False, 0)
+        satir.pack_end(self.fw_switch, False, False, 0)
+        fic.pack_start(satir, False, False, 0)
+        durum_satir = Gtk.Box(spacing=10)
+        self.fw_status_label = tema.etiket("", "soluk")
+        durum_satir.pack_start(self.fw_status_label, True, True, 0)
+        self.fw_refresh_btn = tema.dugme("", None, self.refresh_firewall)
+        durum_satir.pack_end(self.fw_refresh_btn, False, False, 0)
+        fic.pack_start(durum_satir, False, False, 6)
+        self.pack_start(fdis, False, False, 0)
 
         self._fw_state = None
         self.retranslate()
@@ -680,13 +674,11 @@ class SettingsPage(Gtk.Box):
     def _check_firewall_worker(self):
         ufw_path = resolve_binary("ufw") or "/usr/sbin/ufw"
         try:
-            result = subprocess.run(
-                ["pkexec", ufw_path, "status"],
-                capture_output=True, text=True, timeout=30,
-            )
+            result = subprocess.run(["pkexec", ufw_path, "status"],
+                                    capture_output=True, text=True, timeout=30)
             active = "Status: active" in result.stdout
             GLib.idle_add(self._apply_firewall_state, active, True)
-        except Exception:
+        except Exception:  # noqa: BLE001
             GLib.idle_add(self._apply_firewall_state, None, False)
 
     def _apply_firewall_state(self, active, known):
@@ -695,8 +687,8 @@ class SettingsPage(Gtk.Box):
         if known:
             self.fw_switch.set_active(bool(active))
             self.fw_switch.set_sensitive(True)
-            lang = self.app.lang
-            self.fw_status_label.set_text(T("firewall_on" if active else "firewall_off", lang))
+            self.fw_status_label.set_text(
+                T("firewall_on" if active else "firewall_off", self.app.lang))
         else:
             self.fw_switch.set_sensitive(False)
             self.fw_status_label.set_text(T("firewall_unknown", self.app.lang))
@@ -712,217 +704,163 @@ class SettingsPage(Gtk.Box):
     def _set_firewall_worker(self, enable):
         ufw_path = resolve_binary("ufw") or "/usr/sbin/ufw"
         try:
-            action = "enable" if enable else "disable"
-            subprocess.run(["pkexec", ufw_path, action], capture_output=True, text=True, timeout=30)
-        except Exception:
+            subprocess.run(["pkexec", ufw_path, "enable" if enable else "disable"],
+                           capture_output=True, text=True, timeout=30)
+        except Exception:  # noqa: BLE001
             pass
         GLib.idle_add(self.refresh_firewall)
 
     def retranslate(self):
         lang = self.app.lang
-        self.title.set_markup(f"<span size='xx-large' weight='bold'>{T('settings', lang)}</span>")
-        self.desc.set_text(T("settings_desc", lang))
         self.lang_label.set_text(T("language", lang))
         self.theme_label.set_text(T("theme", lang))
-        active = self.theme_combo.get_active_id()
-        self.theme_combo.handler_block_by_func(self.on_theme)
-        self.theme_combo.remove_all()
-        self.theme_combo.append("dark", T("theme_dark", lang))
-        self.theme_combo.append("light", T("theme_light", lang))
-        self.theme_combo.set_active_id(active or self.app.theme)
-        self.theme_combo.handler_unblock_by_func(self.on_theme)
-
-        self.fw_title.set_markup(f"<span size='large' weight='bold'>{T('firewall', lang)}</span>")
+        self.fw_title.set_text(T("firewall", lang))
         self.fw_desc.set_text(T("firewall_desc", lang))
         self.fw_refresh_btn.set_label(T("refresh", lang))
         if self._fw_state is not None:
-            self.fw_status_label.set_text(T("firewall_on" if self._fw_state else "firewall_off", lang))
-        elif hasattr(self, "fw_status_label"):
-            pass
+            self.fw_status_label.set_text(
+                T("firewall_on" if self._fw_state else "firewall_off", lang))
 
     def on_lang(self, combo):
         new = combo.get_active_id()
         if new and new != self.app.lang:
             self.app.set_language(new)
 
-    def on_theme(self, combo):
-        new = combo.get_active_id()
-        if new and new != self.app.theme:
-            self.app.set_theme(new)
+    def on_theme(self, secim):
+        if secim != self.app.theme:
+            self.app.set_theme(secim)
 
 
 class PanelApp(Gtk.Window):
-    ACCENT = "#87979B"
-
     def __init__(self):
         super().__init__()
         self.settings = load_settings()
         self.lang = self.settings["language"]
-        self.theme = self.settings["theme"]
-        self.accent = self.ACCENT
-        self.set_default_size(1000, 660)
+        self.theme = self.settings["theme"] if self.settings["theme"] in ("dark", "light") else "dark"
+        self.accent = tema.VURGULAR[VURGU]
+        self.aktif = None
+
+        tema.uygula(self.theme, VURGU)
+        self.set_default_size(1120, 720)
+        self.set_size_request(900, 600)
+        self.set_position(Gtk.WindowPosition.CENTER)
+        logo = find_logo()
+        if logo:
+            try:
+                self.set_icon_from_file(logo)
+            except GLib.Error:
+                pass
         self.connect("destroy", Gtk.main_quit)
 
-        self.css_provider = Gtk.CssProvider()
-        Gtk.StyleContext.add_provider_for_screen(
-            Gdk.Screen.get_default(), self.css_provider,
-            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        bolumler = [
+            ("araclar", [(t["name"], TOOL_IKON.get(t["name"], "liste")) for t in TOOLS]),
+            ("sistem", [("__settings__", "ayar")]),
+        ]
+        self.kabuk = tema.Kabuk(logo, bolumler, self.sayfa_secildi, genislik=238)
+        self.add(self.kabuk)
 
-        root = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        self.add(root)
+        self.bar = SweepBar(tema.AKTIF["vurgu"])
+        self.hap = tema.DurumHapi()
+        self.kabuk.ust_sag.pack_start(self.bar, False, False, 0)
+        self.kabuk.ust_sag.pack_start(self.hap, False, False, 0)
 
-        sidebar = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        sidebar.set_size_request(230, -1)
-        sidebar.get_style_context().add_class("sidebar")
-        root.pack_start(sidebar, False, False, 0)
-
-        self.header = Gtk.Label(xalign=0)
-        self.header.set_margin_top(16)
-        self.header.set_margin_start(14)
-        self.header.set_margin_bottom(12)
-        sidebar.pack_start(self.header, False, False, 0)
-
-        self.listbox = Gtk.ListBox()
-        self.listbox.get_style_context().add_class("nav-list")
-        self.listbox.connect("row-selected", self.on_selected)
-        nav_scroll = Gtk.ScrolledWindow()
-        nav_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        nav_scroll.add(self.listbox)
-        sidebar.pack_start(nav_scroll, True, True, 0)
-
-        self.status = Gtk.Label(xalign=0)
-        self.status.set_margin_start(12)
-        self.status.set_margin_top(6)
-        self.status.set_margin_bottom(8)
-        self.status.get_style_context().add_class("status-label")
-        sidebar.pack_start(self.status, False, False, 0)
-
-        self.stack = Gtk.Stack()
-        self.stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
-        self.stack.set_transition_duration(120)
-        root.pack_start(self.stack, True, True, 0)
+        alt = Gtk.Box(spacing=8)
+        self.lang_combo = Gtk.ComboBoxText()
+        self.lang_combo.append("tr", "Türkçe")
+        self.lang_combo.append("en", "English")
+        self.lang_combo.set_active_id(self.lang)
+        self.lang_combo.connect("changed", self._dil_degisti)
+        alt.pack_start(self.lang_combo, True, True, 0)
+        self.theme_btn = tema.dugme("", None, self._tema_degistir)
+        alt.pack_start(self.theme_btn, False, False, 0)
+        self.kabuk.yan_alt.pack_start(alt, False, False, 0)
 
         self.pages = {}
         for tool in TOOLS:
-            page = ToolPage(tool, self)
-            self.stack.add_named(page, tool["name"])
-            self.pages[tool["name"]] = page
-
+            self.pages[tool["name"]] = ToolPage(tool, self)
         self.settings_page = SettingsPage(self)
-        self.stack.add_named(self.settings_page, "__settings__")
+        self.pages["__settings__"] = self.settings_page
 
-        self._build_nav()
-        self.apply_theme()
         self.retranslate()
+        self.show_all()
+        self.bar.hide()
+        self.kabuk.sec(TOOLS[0]["name"])
 
-        first = self.listbox.get_row_at_index(0)
-        if first:
-            self.listbox.select_row(first)
-
-    def _build_nav(self):
-        for tool in TOOLS:
-            row = Gtk.ListBoxRow()
-            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=1)
-            box.set_border_width(9)
-            name = Gtk.Label(xalign=0)
-            name.set_markup(f"<b>{tool['name']}</b>")
-            tag = Gtk.Label(xalign=0)
-            tag.get_style_context().add_class("nav-sub")
-            box.pack_start(name, False, False, 0)
-            box.pack_start(tag, False, False, 0)
-            row.add(box)
-            row.kind = "tool"
-            row.tool = tool
-            row.tag_label = tag
-            self.listbox.add(row)
-
-        sep_row = Gtk.ListBoxRow()
-        sep_row.set_selectable(False)
-        sep = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
-        sep.set_margin_top(4)
-        sep.set_margin_bottom(4)
-        sep_row.add(sep)
-        self.listbox.add(sep_row)
-
-        settings_row = Gtk.ListBoxRow()
-        sbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        sbox.set_border_width(9)
-        self.settings_nav_label = Gtk.Label(xalign=0)
-        sbox.pack_start(self.settings_nav_label, False, False, 0)
-        settings_row.add(sbox)
-        settings_row.kind = "settings"
-        self.listbox.add(settings_row)
-
-    def on_selected(self, _lb, row):
-        if row is None or not hasattr(row, "kind"):
+    def sayfa_secildi(self, key):
+        self.aktif = key
+        sayfa = self.pages.get(key)
+        if sayfa is None:
             return
-        if row.kind == "tool":
-            self.stack.set_visible_child_name(row.tool["name"])
-        elif row.kind == "settings":
-            self.stack.set_visible_child_name("__settings__")
+        if key == "__settings__":
+            self.kabuk.baslik_ayarla(T("settings", self.lang), T("settings_desc", self.lang))
+        else:
+            self.kabuk.baslik_ayarla(sayfa.tool["name"], sayfa.tool["tagline"][self.lang])
+        self.kabuk.icerik(sayfa)
 
-    def set_status(self, text):
-        self.status.set_text(text)
+    def calisiyor(self, aktif, metin):
+        if aktif:
+            self.bar.show()
+            if not getattr(self, "_bar_id", 0):
+                self._bar_step = 0
+                self._bar_id = GLib.timeout_add(45, self._bar_adim)
+            self.hap.ayarla(metin, "uyari")
+        else:
+            self.bar.hide()
+            if getattr(self, "_bar_id", 0):
+                GLib.source_remove(self._bar_id)
+                self._bar_id = 0
+            self.hap.ayarla(metin, "kapali")
+
+    def _bar_adim(self):
+        self._bar_step += 1
+        self.bar.adim(self._bar_step)
+        return True
 
     def set_language(self, lang):
-        self.lang = lang
-        self.settings["language"] = lang
+        self.lang = self.settings["language"] = lang
         save_settings(self.settings)
+        if self.lang_combo.get_active_id() != lang:
+            self.lang_combo.set_active_id(lang)
         self.retranslate()
+        if self.aktif:
+            self.sayfa_secildi(self.aktif)
 
     def set_theme(self, theme):
-        self.theme = theme
-        self.settings["theme"] = theme
+        self.theme = self.settings["theme"] = theme
         save_settings(self.settings)
-        self.apply_theme()
+        tema.uygula(self.theme, VURGU)
+        self.retranslate()
+        if self.aktif:
+            self.sayfa_secildi(self.aktif)
+        self.queue_draw()
+
+    def _dil_degisti(self, combo):
+        new = combo.get_active_id()
+        if new and new != self.lang:
+            self.set_language(new)
+
+    def _tema_degistir(self):
+        self.set_theme("light" if self.theme == "dark" else "dark")
 
     def retranslate(self):
         self.set_title(T("app_title", self.lang))
-        self.header.set_markup(f"<span size='large' weight='bold'>{T('sidebar_title', self.lang)}</span>")
-        self.status.set_text(T("ready", self.lang))
-        for row in self.listbox.get_children():
-            if getattr(row, "kind", None) == "tool":
-                row.tag_label.set_text(row.tool["tagline"][self.lang])
-            elif getattr(row, "kind", None) == "settings":
-                self.settings_nav_label.set_markup(f"<b>⚙  {T('settings', self.lang)}</b>")
+        self.kabuk.marka_ayarla("CarotOS", {"tr": "Güvenlik paneli", "en": "Security panel"}[self.lang])
+        self.kabuk.bolum_metni("araclar", {"tr": "Araçlar", "en": "Tools"}[self.lang])
+        self.kabuk.bolum_metni("sistem", {"tr": "Sistem", "en": "System"}[self.lang])
+        for tool in TOOLS:
+            self.kabuk.menu_metni(tool["name"], tool["name"])
+        self.kabuk.menu_metni("__settings__", T("settings", self.lang))
+        koyu = self.theme == "dark"
+        self.theme_btn.set_label("☀" if koyu else "☾")
+        self.hap.ayarla(T("ready", self.lang), "kapali")
         for page in self.pages.values():
             page.retranslate()
-        self.settings_page.retranslate()
 
-    def apply_theme(self):
-        if self.theme == "dark":
-            bg = "#1f2325"; sidebar = "#2b2f31"; fg = "#e6e6e6"
-            sub = "#9aa4a8"; field = "#2b2f31"; info_bg = "#262b2d"
-        else:
-            bg = "#f4f5f6"; sidebar = "#e4e7e9"; fg = "#1f2325"
-            sub = "#5c666a"; field = "#ffffff"; info_bg = "#eceef0"
 
-        Gtk.Settings.get_default().set_property(
-            "gtk-application-prefer-dark-theme", self.theme == "dark")
-
-        css = f"""
-        window {{ background-color: {bg}; color: {fg}; }}
-        .sidebar {{ background-color: {sidebar}; }}
-        .sidebar label {{ color: {fg}; }}
-        .nav-sub {{ color: {sub}; font-size: 90%; }}
-        .status-label {{ color: {sub}; font-size: 90%; }}
-        .nav-list row:selected {{ background-color: {self.ACCENT}; }}
-        .nav-list row:selected label {{ color: #ffffff; }}
-        .info-frame {{ background-color: {info_bg}; border-radius: 6px; }}
-        .info-frame label {{ color: {fg}; }}
-        .hint-label {{ color: #c9a227; font-size: 92%; }}
-        .preview-label {{ color: {sub}; font-size: 90%; }}
-        textview {{ background-color: {field}; color: {fg}; }}
-        textview text {{ background-color: {field}; color: {fg}; }}
-        entry {{ background-color: {field}; color: {fg}; }}
-        label {{ color: {fg}; }}
-        """
-        self.css_provider.load_from_data(css.encode())
+def main():
+    PanelApp()
+    Gtk.main()
 
 
 if __name__ == "__main__":
-    app = PanelApp()
-    app.show_all()
-    for page in app.pages.values():
-        page.retranslate()
-    Gtk.main()
+    main()

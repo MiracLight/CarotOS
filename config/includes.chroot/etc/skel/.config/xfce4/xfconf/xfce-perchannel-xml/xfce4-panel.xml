@@ -21,6 +21,10 @@
         <value type="int" value="23"/>
         <value type="int" value="24"/>
         <value type="int" value="25"/>
+        <value type="int" value="28"/>
+        <value type="int" value="29"/>
+        <value type="int" value="31"/>
+        <value type="int" value="32"/>
         <value type="int" value="5"/>
         <value type="int" value="6"/>
         <value type="int" value="30"/>
@@ -144,6 +148,26 @@
     <property name="plugin-25" type="string" value="launcher">
       <property name="items" type="array">
         <value type="string" value="17870033394.desktop"/>
+      </property>
+    </property>
+    <property name="plugin-28" type="string" value="launcher">
+      <property name="items" type="array">
+        <value type="string" value="17870033397.desktop"/>
+      </property>
+    </property>
+    <property name="plugin-29" type="string" value="launcher">
+      <property name="items" type="array">
+        <value type="string" value="17870033398.desktop"/>
+      </property>
+    </property>
+    <property name="plugin-31" type="string" value="launcher">
+      <property name="items" type="array">
+        <value type="string" value="17870033399.desktop"/>
+      </property>
+    </property>
+    <property name="plugin-32" type="string" value="launcher">
+      <property name="items" type="array">
+        <value type="string" value="17870033400.desktop"/>
       </property>
     </property>
     <!-- Carotene (antivirus): ust panelde Sistem Sagligi'nin yaninda -->

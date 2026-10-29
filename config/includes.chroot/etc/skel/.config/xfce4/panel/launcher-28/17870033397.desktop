@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=CarotPot
+Name[tr]=CarotPot
+Comment=Detect devices that probe or attack this computer on the local network
+Comment[tr]=Yerel ağda bu bilgisayarı tarayan ya da saldıran cihazları tespit eder
+Exec=/opt/carotos/carotpot/carotpot-arayuz.py
+Icon=carotpot
+Terminal=false
+Categories=System;Security;Network;
+Keywords=honeypot;trap;network;intrusion;fail2ban;
+Keywords[tr]=bal küpü;tuzak;ağ;saldırı;fail2ban;
+X-XFCE-Source=file:///usr/share/applications/carotos-carotpot.desktop
+Path=
+StartupNotify=false

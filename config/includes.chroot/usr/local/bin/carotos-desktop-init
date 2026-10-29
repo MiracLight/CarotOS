@@ -75,6 +75,10 @@ CIKISLAR=$(xrandr --query 2>/dev/null | awk '/ connected/ {print $1}')
 # xrandr yoksa veya cikti vermezse en azindan bilinen genel adlari dene
 [ -z "$CIKISLAR" ] && CIKISLAR="0 default"
 
+# Bilinen genel adlar HER ZAMAN eklenir: xfdesktop monitoru bazen ada degil
+# sira numarasina gore (monitor0) kaydediyor. Fazladan ozellik zararsiz.
+CIKISLAR="$CIKISLAR 0 default"
+
 for cikis in $CIKISLAR; do
     tiresiz=$(printf '%s' "$cikis" | tr -d '-')
     for ad in "$cikis" "$tiresiz"; do
@@ -105,6 +109,20 @@ done
 # ---------------------------------------------------------------
 # Uygula ve damgayi birak
 # ---------------------------------------------------------------
+# xfdesktop, yukaridaki tahmin tutmadiginda bilmedigi bir monitor adiyla
+# kendi varsayilan kaydini olusturabilir. Acilmasini bekle (en fazla 20 sn),
+# sonra var olan butun last-image kayitlarini bir kez daha guncelle.
+i=0
+while [ "$i" -lt 20 ]; do
+    pgrep -x xfdesktop >/dev/null 2>&1 && break
+    i=$((i + 1))
+    sleep 1
+done
+sleep 3
+KANAL=xfce4-desktop
+xfconf-query -c xfce4-desktop -l 2>/dev/null | grep '/last-image$' | while read -r p; do
+    xfconf-query -c xfce4-desktop -p "$p" -s "$WALL" 2>/dev/null
+done
 xfdesktop --reload >/dev/null 2>&1
 
 mkdir -p "$(dirname "$STAMP")"

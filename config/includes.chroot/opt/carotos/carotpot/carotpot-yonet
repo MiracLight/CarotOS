@@ -1,0 +1,333 @@
+#!/usr/bin/python3 -I
+# -*- coding: utf-8 -*-
+"""
+CarotPot yonetici yardimcisi. Arayuz bunu pkexec ile cagirir.
+
+Yalnizca sabit komutlar calistirir; disaridan gelen tek veri IP adresi ve
+ayar JSON'udur, ikisi de ipaddress/ayar_dogrula ile dogrulanir ve komutlara
+liste argumani olarak verilir (kabuk yok).
+
+  carotpot-yonet baslat            hizmeti baslatir, ufw'de tuzak portlarini acar
+  carotpot-yonet durdur            hizmeti durdurur, acilan portlari kapatir
+  carotpot-yonet ayar              stdin'den ayar JSON'u okur ve kaydeder
+  carotpot-yonet engelle IP [DK]   IP'yi ufw ile engeller (onayli eylem, D8);
+                                   DK verilirse engel o kadar dakika surer
+  carotpot-yonet kaldir IP         engeli kaldirir
+  carotpot-yonet sure-denetle      suresi dolan engelleri kaldirir (zamanlayici
+                                   ve acilistaki temizlik birimi cagirir)
+  carotpot-yonet parolalar IP      bu kaynagin denedigi parolalari (maskesiz)
+                                   dondurur; arayuzdeki "Goster" icin
+  carotpot-yonet otomatik ac|kapat fail2ban ile otomatik engellemeyi acar/kapatir
+
+Cikti tek satir JSON: {"kod": "__TAMAM__", ...}
+"""
+
+import importlib.util
+import json
+import os
+import sqlite3
+import subprocess
+import sys
+import time
+
+BURASI = os.path.dirname(os.path.abspath(__file__))
+_spec = importlib.util.spec_from_file_location(
+    "carotpot", os.path.join(BURASI, "carotpot.py"))
+CP = importlib.util.module_from_spec(_spec)
+sys.dont_write_bytecode = True
+_spec.loader.exec_module(CP)
+KENDISI = os.path.abspath(__file__)
+
+AYAR = CP.AYAR_DOSYASI
+ACILAN = "/etc/carotpot/acilan_portlar.json"
+ENGELLILER = "/var/log/carotpot/engelliler.json"
+JAIL = "/etc/fail2ban/jail.d/carotos-carotpot.local"
+ORTAM = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL": "C", "LANG": "C"}
+
+
+def cikis(kod, **ek):
+    print(json.dumps(dict(kod=kod, **ek), ensure_ascii=False))
+    sys.exit(0 if kod == "__TAMAM__" else 1)
+
+
+def calistir(komut, zaman=60):
+    try:
+        p = subprocess.run(komut, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                           text=True, errors="replace", timeout=zaman, env=ORTAM)
+        return p.returncode, p.stdout
+    except (OSError, subprocess.TimeoutExpired) as hata:
+        return 127, str(hata)
+
+
+def json_oku(yol, varsayilan):
+    try:
+        with open(yol, encoding="utf-8") as fh:
+            return json.load(fh)
+    except (OSError, ValueError):
+        return varsayilan
+
+
+def json_yaz(yol, veri, mod=0o644):
+    os.makedirs(os.path.dirname(yol), exist_ok=True)
+    gecici = yol + ".yeni"
+    with open(gecici, "w", encoding="utf-8") as fh:
+        json.dump(veri, fh, ensure_ascii=False, indent=1)
+    os.chmod(gecici, mod)
+    os.replace(gecici, yol)
+
+
+# --- ag bilgisi: kendini kilitleme korumasi ---------------------------------
+
+def korunan_adresler():
+    """Hicbir kosulda engellenmeyecek adresler: kendi adreslerimiz, ag
+    gecitleri, geri dongu ve kullanicinin yoksay listesi."""
+    adresler = {"127.0.0.1", "::1"}
+    kod, cikti = calistir(["ip", "-j", "addr"])
+    if kod == 0:
+        try:
+            for arayuz in json.loads(cikti):
+                for a in arayuz.get("addr_info", []):
+                    if a.get("local"):
+                        adresler.add(str(CP.adres_coz(a["local"]) or a["local"]))
+        except ValueError:
+            pass
+    for aile in ("-4", "-6"):
+        kod, cikti = calistir(["ip", aile, "-j", "route", "show", "default"])
+        if kod == 0:
+            try:
+                for rota in json.loads(cikti):
+                    if rota.get("gateway"):
+                        adresler.add(str(CP.adres_coz(rota["gateway"]) or rota["gateway"]))
+            except ValueError:
+                pass
+    adresler.update(CP.ayar_oku(AYAR)["yoksay"])
+    return adresler
+
+
+def engel_adresi_dogrula(ham):
+    adr = CP.adres_coz(ham)
+    if adr is None or adr.is_unspecified or adr.is_multicast or adr.is_loopback:
+        cikis("__GECERSIZ_IP__")
+    if str(adr) in korunan_adresler():
+        cikis("__KORUNAN_ADRES__", ip=str(adr))
+    return str(adr)
+
+
+# --- ufw ------------------------------------------------------------------------
+
+def ufw_aktif():
+    kod, cikti = calistir(["ufw", "status"])
+    return kod == 0 and "Status: active" in cikti
+
+
+def portlari_ac(portlar):
+    acilan = []
+    if ufw_aktif():
+        for port in portlar:
+            kod, _ = calistir(["ufw", "allow", f"{int(port)}/tcp", "comment", "carotpot"])
+            if kod == 0:
+                acilan.append(int(port))
+    json_yaz(ACILAN, acilan)
+    return acilan
+
+
+def portlari_kapat():
+    for port in json_oku(ACILAN, []):
+        if isinstance(port, int) and 1024 <= port <= 65535:
+            calistir(["ufw", "delete", "allow", f"{port}/tcp"])
+    json_yaz(ACILAN, [])
+
+
+# --- komutlar -------------------------------------------------------------------
+
+def k_baslat():
+    ayar = CP.ayar_oku(AYAR)
+    if not os.path.exists(AYAR):
+        json_yaz(AYAR, ayar)
+    portlar = [p for p in ayar["portlar"].values() if p]
+    portlari_kapat()
+    acilan = portlari_ac(portlar)
+    kod, cikti = calistir(["systemctl", "start", "carotpot.service"])
+    if kod != 0:
+        portlari_kapat()
+        cikis("__BASLATILAMADI__", cikti=cikti[-2000:])
+    cikis("__TAMAM__", ufw_izinleri=acilan)
+
+
+def k_durdur():
+    kod, cikti = calistir(["systemctl", "stop", "carotpot.service"])
+    portlari_kapat()
+    if kod != 0:
+        cikis("__DURDURULAMADI__", cikti=cikti[-2000:])
+    cikis("__TAMAM__")
+
+
+def k_ayar():
+    try:
+        veri = json.loads(sys.stdin.read(65536))
+        ayar = CP.ayar_dogrula(veri)
+    except ValueError as hata:
+        cikis("__AYAR_HATASI__", ayrinti=str(hata))
+    json_yaz(AYAR, ayar)
+    kod, _ = calistir(["systemctl", "is-active", "--quiet", "carotpot.service"])
+    if kod == 0:
+        portlari_kapat()
+        portlari_ac([p for p in ayar["portlar"].values() if p])
+        calistir(["systemctl", "restart", "carotpot.service"])
+    cikis("__TAMAM__")
+
+
+SURE_SINIRI = 7 * 24 * 60     # dakika: en fazla bir hafta
+
+
+def sure_coz(ham):
+    if ham is None:
+        return None
+    if not ham.isdigit() or not 1 <= int(ham) <= SURE_SINIRI:
+        cikis("__GECERSIZ_SURE__")
+    return int(ham)
+
+
+def zamanlayici_kur(saniye):
+    """Suresi dolunca sure-denetle'yi calistiracak gecici systemd
+    zamanlayicisi. Yeniden baslatmada kaybolur; o durumda acilistaki
+    carotpot-engel-temizle birimi temizler."""
+    calistir(["systemd-run", "--quiet", "--collect",
+              f"--unit=carotpot-sure-{int(time.time())}-{os.getpid()}",
+              f"--on-active={int(saniye) + 5}s", "--timer-property=AccuracySec=15s",
+              "/usr/bin/python3", "-I", KENDISI, "sure-denetle"])
+
+
+def k_engelle(ham, sure_ham=None):
+    dakika = sure_coz(sure_ham)
+    ip = engel_adresi_dogrula(ham)
+    if not ufw_aktif():
+        cikis("__UFW_KAPALI__")
+    kod, cikti = calistir(["ufw", "prepend", "deny", "from", ip, "to", "any",
+                           "comment", "carotpot-engel"])
+    if kod != 0:
+        kod, cikti = calistir(["ufw", "deny", "from", ip, "to", "any",
+                               "comment", "carotpot-engel"])
+    if kod != 0:
+        cikis("__UFW_HATASI__", cikti=cikti[-1000:])
+    simdi = int(time.time())
+    kayit = {"ip": ip, "tarih": simdi}
+    if dakika:
+        kayit["bitis"] = simdi + dakika * 60
+    liste = [e for e in json_oku(ENGELLILER, []) if e.get("ip") != ip]
+    liste.append(kayit)
+    json_yaz(ENGELLILER, liste)
+    if dakika:
+        zamanlayici_kur(dakika * 60)
+    cikis("__TAMAM__", ip=ip, bitis=kayit.get("bitis"))
+
+
+def k_kaldir(ham):
+    adr = CP.adres_coz(ham)
+    if adr is None:
+        cikis("__GECERSIZ_IP__")
+    ip = str(adr)
+    calistir(["ufw", "delete", "deny", "from", ip, "to", "any"])
+    json_yaz(ENGELLILER, [e for e in json_oku(ENGELLILER, []) if e.get("ip") != ip])
+    cikis("__TAMAM__", ip=ip)
+
+
+def k_sure_denetle():
+    simdi = time.time()
+    liste = json_oku(ENGELLILER, [])
+    kalan, kaldirilan = [], []
+    for e in liste:
+        if not isinstance(e, dict):
+            continue
+        bitis = e.get("bitis")
+        adr = CP.adres_coz(e.get("ip", ""))
+        if isinstance(bitis, (int, float)) and bitis <= simdi and adr is not None:
+            calistir(["ufw", "delete", "deny", "from", str(adr), "to", "any"])
+            kaldirilan.append(str(adr))
+        else:
+            kalan.append(e)
+    if kaldirilan:
+        json_yaz(ENGELLILER, kalan)
+    cikis("__TAMAM__", kaldirilan=kaldirilan)
+
+
+def k_parolalar(ham):
+    adr = CP.adres_coz(ham)
+    if adr is None:
+        cikis("__GECERSIZ_IP__")
+    yol = os.path.join(CP.VERI_DIZINI, "olaylar.db")
+    try:
+        db = sqlite3.connect(f"file:{yol}?mode=ro", uri=True)
+        satirlar = db.execute(
+            "SELECT hizmet, kullanici, parola, COUNT(*) FROM olaylar WHERE kaynak=? AND "
+            "parola IS NOT NULL AND parola != '' GROUP BY hizmet, kullanici, parola "
+            "ORDER BY 4 DESC LIMIT 50", (str(adr),)).fetchall()
+        db.close()
+    except sqlite3.Error:
+        satirlar = []
+    cikis("__TAMAM__", parolalar=[{"hizmet": h, "kullanici": k or "", "parola": p, "sayi": n}
+                                  for h, k, p, n in satirlar])
+
+
+def jail_metni(acik, korunan):
+    return (
+        "# CarotOS CarotPot: otomatik engelleme (Carotpot uygulamasi yonetir).\n"
+        "# Kapali gelir (karar D8). Kendi adresleri ve ag gecitleri ignoreip'tedir.\n"
+        "[carotos-carotpot]\n"
+        f"enabled = {'true' if acik else 'false'}\n"
+        "filter = carotos-carotpot\n"
+        "logpath = /var/log/carotpot/olaylar.log\n"
+        "backend = auto\n"
+        "maxretry = 3\n"
+        "findtime = 10m\n"
+        "bantime = 1h\n"
+        "banaction = ufw\n"
+        f"ignoreip = {' '.join(sorted(korunan))}\n")
+
+
+def k_otomatik(durum):
+    if durum not in ("ac", "kapat"):
+        cikis("__GECERSIZ_KOMUT__")
+    acik = durum == "ac"
+    if acik and not ufw_aktif():
+        cikis("__UFW_KAPALI__")
+    korunan = korunan_adresler() | {"127.0.0.0/8"}
+    with open(JAIL + ".yeni", "w", encoding="utf-8") as fh:
+        fh.write(jail_metni(acik, korunan))
+    os.chmod(JAIL + ".yeni", 0o644)
+    os.replace(JAIL + ".yeni", JAIL)
+    if acik:
+        calistir(["systemctl", "enable", "--now", "fail2ban.service"])
+    kod, cikti = calistir(["fail2ban-client", "reload"])
+    if acik and kod != 0:
+        cikis("__FAIL2BAN_HATASI__", cikti=cikti[-1000:])
+    cikis("__TAMAM__", otomatik=acik)
+
+
+def main(argv):
+    if os.geteuid() != 0:
+        cikis("__YETKI_YOK__")
+    if not argv:
+        cikis("__GECERSIZ_KOMUT__")
+    komut, arg = argv[0], (argv[1] if len(argv) > 1 else None)
+    if komut == "baslat":
+        k_baslat()
+    elif komut == "durdur":
+        k_durdur()
+    elif komut == "ayar":
+        k_ayar()
+    elif komut == "engelle" and arg:
+        k_engelle(arg, argv[2] if len(argv) > 2 else None)
+    elif komut == "sure-denetle":
+        k_sure_denetle()
+    elif komut == "parolalar" and arg:
+        k_parolalar(arg)
+    elif komut == "kaldir" and arg:
+        k_kaldir(arg)
+    elif komut == "otomatik" and arg:
+        k_otomatik(arg)
+    cikis("__GECERSIZ_KOMUT__")
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

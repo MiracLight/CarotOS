@@ -1361,22 +1361,34 @@ if __name__ == "__main__" and "--audit-json" in sys.argv:
     sys.exit(0)
 
 
+
 # ===========================================================================
-# Arayüz
+# Arayüz (CarotOS ortak grafit teması)
 # ===========================================================================
 
 import gi  # noqa: E402
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk, Gdk, GdkPixbuf, GLib  # noqa: E402
+from gi.repository import Gtk, GLib  # noqa: E402
 
 import threading  # noqa: E402
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ORTAK = os.path.join(os.path.dirname(BASE_DIR), "ortak")
+for _y in (ORTAK, BASE_DIR):
+    if _y not in sys.path:
+        sys.path.insert(0, _y)
+
+import tema  # noqa: E402
+from bekleme_cubugu import SweepBar  # noqa: E402
+
+VURGU = "health"          # ortak/tema.py: nane yeşili
 
 CONFIG_DIR = os.path.join(GLib.get_user_config_dir(), "carotos-health")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "settings.json")
 
 LOGO_CANDIDATES = [
+    "/usr/share/icons/hicolor/256x256/apps/carotos-health.png",
     "/usr/share/carotos/welcome/logo.png",
-    "/usr/share/icons/carotos/security-panel-icon.png",
 ]
 
 UI = {
@@ -1384,6 +1396,8 @@ UI = {
     "header_sub": {"tr": "Güvenlik ve bakım denetimi",
                    "en": "Security and maintenance audit"},
     "summary": {"tr": "Özet", "en": "Summary"},
+    "summary_sub": {"tr": "Sağlık puanı ve dikkat gerektiren bulgular",
+                    "en": "Health score and findings that need attention"},
     "refresh": {"tr": "Yeniden denetle", "en": "Re-scan"},
     "full_audit": {"tr": "Root ile tam denetim", "en": "Full audit as root"},
     "export": {"tr": "Raporu kaydet", "en": "Save report"},
@@ -1392,16 +1406,14 @@ UI = {
     "score": {"tr": "Sağlık puanı", "en": "Health score"},
     "why": {"tr": "Neden önemli", "en": "Why it matters"},
     "suggested": {"tr": "Önerilen komut", "en": "Suggested command"},
-    "language": {"tr": "Dil", "en": "Language"},
-    "theme_light": {"tr": "Açık tema", "en": "Light theme"},
-    "theme_dark": {"tr": "Koyu tema", "en": "Dark theme"},
     "count_ok": {"tr": "sorunsuz", "en": "passed"},
     "count_warn": {"tr": "iyileştirilebilir", "en": "could improve"},
     "count_fail": {"tr": "dikkat", "en": "needs attention"},
     "root_hint": {
-        "tr": "Bazı denetimler root yetkisi ister. Tam sonuç için yukarıdaki "
-              "düğmeyi kullanın.",
-        "en": "Some checks require root. Use the button above for full results.",
+        "tr": "Bazı denetimler root yetkisi ister. Tam sonuç için üstteki "
+              "“Root ile tam denetim” düğmesini kullanın.",
+        "en": "Some checks require root. Use “Full audit as root” above for full "
+              "results.",
     },
     "saved": {"tr": "Rapor kaydedildi: {path}", "en": "Report saved: {path}"},
     "save_failed": {"tr": "Rapor kaydedilemedi.", "en": "Could not save report."},
@@ -1409,10 +1421,10 @@ UI = {
         "tr": "Tam denetim çalıştırılamadı (iptal edildi veya yetki verilmedi).",
         "en": "The full audit could not run (cancelled or not authorised).",
     },
-    "as_root": {"tr": "root yetkisiyle denetlendi", "en": "audited as root"},
+    "as_root": {"tr": "root ile denetlendi", "en": "audited as root"},
     "confirm_body": {
-        "tr": "\u201c{action}\u201d işlemi uygulanacak. Devam edilsin mi?",
-        "en": "The action \u201c{action}\u201d will be applied. Continue?",
+        "tr": "“{action}” işlemi uygulanacak. Devam edilsin mi?",
+        "en": "The action “{action}” will be applied. Continue?",
     },
     "applying": {"tr": "{action} uygulanıyor…", "en": "Applying {action}…"},
     "fix_ok": {"tr": "{title}: düzeltme uygulandı, yeniden denetleniyor.",
@@ -1421,6 +1433,7 @@ UI = {
                    "en": "{title}: the fix failed."},
     "fix_cancelled": {"tr": "İşlem iptal edildi veya yetki verilmedi.",
                       "en": "The action was cancelled or not authorised."},
+    "all_clear_baslik": {"tr": "Her şey yolunda", "en": "All good"},
     "all_clear": {"tr": "Dikkat gerektiren bulgu yok.",
                   "en": "Nothing needs attention."},
     "deep_intro": {
@@ -1460,6 +1473,11 @@ UI = {
               "boot, the comparison record is not permanent; results reflect "
               "only the current state.",
     },
+    "kapat": {"tr": "Kapat", "en": "Close"},
+    "iptal": {"tr": "İptal", "en": "Cancel"},
+    "uygula": {"tr": "Uygula", "en": "Apply"},
+    "gorunum_koyu": {"tr": "Koyu", "en": "Dark"},
+    "gorunum_acik": {"tr": "Açık", "en": "Light"},
 }
 
 STATUS_LABEL = {
@@ -1470,13 +1488,18 @@ STATUS_LABEL = {
     NEEDROOT: {"tr": "ROOT GEREKLİ", "en": "ROOT REQUIRED"},
 }
 
+# Durum -> ortak temadaki rozet rengi
+STATUS_RENK = {OK: "yesil", WARN: "sari", FAIL: "kirmizi", INFO: "gri", NEEDROOT: "gri"}
+
+# Kenar menüsü simgeleri
+KATEGORI_IKON = {
+    "summary": "kalp", "system": "ayar", "updates": "indir", "repos": "dosya",
+    "network": "ag", "protect": "kalkan", "accounts": "kisi", "storage": "pano",
+    "deep": "hedef",
+}
+
 
 def _varsayilan_dil():
-    """Ilk acilis dili: sistem dili Turkce ise 'tr', baska HERHANGI bir dilse
-    'en'. Sabit 'tr' yazmak, kurulumda baska dil secen kullanicinin
-    uygulamalari Turkce gormesine yol aciyordu. C/POSIX dil bilgisi
-    tasimaz, o yuzden atlanir. Kayitli bir ayar varsa o yine onceliklidir."""
-    import os
     for degisken in ("LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE"):
         deger = os.environ.get(degisken, "").strip()
         if deger and deger not in ("C", "POSIX"):
@@ -1524,74 +1547,21 @@ def check_meta(check_id):
     return None
 
 
-class SweepBar(Gtk.Image):
-    """Süresi belirsiz işlemler için tek yönde ilerleyen ince çubuk.
-
-    Soldan sağa akan bir parça gösterir; sağ uca ulaşınca yeniden soldan
-    başlar (ileri geri gitmez). Cairo gerektirmez: kareler GdkPixbuf ile
-    önceden üretilir ve her adımda sırayla gösterilir."""
-
-    WIDTH = 132
-    HEIGHT = 5
-    FRAMES = 44
-    TAIL = 52
-    _onbellek = {}
-
-    @classmethod
-    def kareler(cls, renk):
-        if renk in cls._onbellek:
-            return cls._onbellek[renk]
-        r, g, b = (int(renk[i:i + 2], 16) for i in (1, 3, 5))
-        w, h, n, kuyruk = cls.WIDTH, cls.HEIGHT, cls.FRAMES, cls.TAIL
-        zemin = 0.22
-        kareler = []
-        for k in range(n):
-            bas = k * (w + kuyruk) // n
-            veri = bytearray()
-            for y in range(h):
-                for x in range(w):
-                    mesafe = bas - x
-                    if 0 <= mesafe <= kuyruk:
-                        parca = (1.0 - mesafe / kuyruk) ** 1.6
-                        if mesafe < 3:
-                            parca *= (mesafe + 1) / 4.0
-                    else:
-                        parca = 0.0
-                    alfa = max(zemin, parca)
-                    if (x in (0, w - 1)) and (y in (0, h - 1)):
-                        alfa = 0.0
-                    veri += bytes((r, g, b, int(alfa * 255)))
-            kareler.append(GdkPixbuf.Pixbuf.new_from_bytes(
-                GLib.Bytes.new(bytes(veri)), GdkPixbuf.Colorspace.RGB,
-                True, 8, w, h, w * 4))
-        cls._onbellek[renk] = kareler
-        return kareler
-
-    def __init__(self, renk):
-        super().__init__()
-        self._kareler = self.kareler(renk)
-        self.set_from_pixbuf(self._kareler[0])
-        self.set_size_request(self.WIDTH, self.HEIGHT)
-        self.set_valign(Gtk.Align.CENTER)
-        self.set_no_show_all(True)
-
-    def adim(self, sayac):
-        self.set_from_pixbuf(self._kareler[sayac % len(self._kareler)])
+def kod_kutusu(komut):
+    """Monospace komutu çerçeveli, seçilebilir bir kutuda gösterir."""
+    dis, ic = tema.kart(12, 0, "serit")
+    etk = tema.etiket(komut, "mono", sar=True, sec=True, genislik=96)
+    ic.pack_start(etk, True, True, 0)
+    return dis
 
 
 class HealthWindow(Gtk.Window):
 
-    ACCENT = "#87979B"
-    C_OK = "#4c9a6a"
-    C_WARN = "#c8952a"
-    C_FAIL = "#c2554f"
-    C_INFO = "#6d7a7e"
-
     def __init__(self, settings):
-        super().__init__(title=UI["app_title"][settings["lang"]])
+        super().__init__(title=UI["app_title"]["tr"])
         self.settings = settings
         self.lang = settings["lang"]
-        self.theme = settings["theme"]
+        self.ui_theme = settings["theme"] if settings["theme"] in ("dark", "light") else "dark"
         self.results = []
         self.audited_as_root = False
         self.jobs = set()
@@ -1600,9 +1570,11 @@ class HealthWindow(Gtk.Window):
         self.sweep_step = 0
         self.rescan_pending = False
         self.current_category = "summary"
+        self.deep = {}
 
-        self.set_default_size(1000, 700)
-        self.set_size_request(880, 600)
+        tema.uygula(self.ui_theme, VURGU)
+        self.set_default_size(1120, 740)
+        self.set_size_request(900, 600)
         self.set_position(Gtk.WindowPosition.CENTER)
         logo = find_logo()
         if logo:
@@ -1612,541 +1584,329 @@ class HealthWindow(Gtk.Window):
                 pass
         self.connect("destroy", self.on_destroy)
 
-        self.css_provider = Gtk.CssProvider()
-        Gtk.StyleContext.add_provider_for_screen(
-            Gdk.Screen.get_default(), self.css_provider,
-            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        bolumler = [
+            ("ozet", [("summary", "kalp")]),
+            ("denetimler", [(k, KATEGORI_IKON.get(k, "liste"))
+                            for k, _ in CATEGORIES if k != "deep"]),
+            ("ayrintili", [("deep", "hedef")]),
+        ]
+        self.kabuk = tema.Kabuk(logo, bolumler, self.on_category_selected)
+        self.add(self.kabuk)
 
-        root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        self.add(root)
-        root.pack_start(self.build_header(), False, False, 0)
-        root.pack_start(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL),
-                        False, False, 0)
+        self.bar = SweepBar(tema.AKTIF["vurgu"])
+        self.hap = tema.DurumHapi()
+        self.refresh_btn = tema.dugme("", "ana", lambda: self.start_scan(False))
+        self.root_btn = tema.dugme("", None, self.on_full_audit)
+        self.export_btn = tema.dugme("", None, self.on_export)
+        self.kabuk.ust_sag.pack_start(self.bar, False, False, 0)
+        self.kabuk.ust_sag.pack_start(self.hap, False, False, 0)
+        self.kabuk.ust_sag.pack_start(self.export_btn, False, False, 0)
+        self.kabuk.ust_sag.pack_start(self.root_btn, False, False, 0)
+        self.kabuk.ust_sag.pack_start(self.refresh_btn, False, False, 0)
 
-        split = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        root.pack_start(split, True, True, 0)
-        split.pack_start(self.build_sidebar(), False, False, 0)
-        split.pack_start(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL),
-                         False, False, 0)
-
-        self.content = Gtk.ScrolledWindow()
-        self.content.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        split.pack_start(self.content, True, True, 0)
-
-        root.pack_start(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL),
-                        False, False, 0)
-        root.pack_start(self.build_statusbar(), False, False, 0)
-
-        self.apply_theme()
-        self.retranslate()
-
-    # -- ust bant ----------------------------------------------------------
-
-    def build_header(self):
-        # Ust bant: kenarlari yuvarlatilmis tek parca (Carotene ile ayni).
-        # Uygulama adi pencere basliginda yazdigi icin burada tekrar edilmez.
-        dis = Gtk.Box()
-        dis.set_margin_top(10)
-        dis.set_margin_bottom(10)
-        dis.set_margin_start(12)
-        dis.set_margin_end(12)
-        bant = Gtk.Box()
-        bant.get_style_context().add_class("header")
-        dis.pack_start(bant, True, True, 0)
-        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        box.set_margin_top(7)
-        box.set_margin_bottom(7)
-        box.set_margin_start(14)
-        box.set_margin_end(8)
-        bant.pack_start(box, True, True, 0)
-
-        self.title_label = Gtk.Label(xalign=0.0)
-        self.title_label.get_style_context().add_class("header-sub")
-        box.pack_start(self.title_label, False, False, 0)
-
+        alt = Gtk.Box(spacing=8)
         self.lang_combo = Gtk.ComboBoxText()
         self.lang_combo.append("tr", "Türkçe")
         self.lang_combo.append("en", "English")
         self.lang_combo.set_active_id(self.lang)
         self.lang_combo.connect("changed", self.on_lang_changed)
-        box.pack_end(self.lang_combo, False, False, 0)
+        alt.pack_start(self.lang_combo, True, True, 0)
+        self.theme_btn = tema.dugme("", None, self.on_theme_toggled)
+        alt.pack_start(self.theme_btn, False, False, 0)
+        self.kabuk.yan_alt.pack_start(alt, False, False, 0)
 
-        self.theme_btn = Gtk.Button()
-        self.theme_btn.connect("clicked", self.on_theme_toggled)
-        box.pack_end(self.theme_btn, False, False, 0)
+        self.retranslate_static()
+        self.show_all()
+        self.bar.hide()
+        self.kabuk.sec("summary")
 
-        self.export_btn = Gtk.Button()
-        self.export_btn.connect("clicked", self.on_export)
-        box.pack_end(self.export_btn, False, False, 0)
+    # -- metin / dil / tema -------------------------------------------------
+    def retranslate_static(self):
+        self.set_title(UI["app_title"][self.lang])
+        self.kabuk.marka_ayarla(UI["app_title"][self.lang], UI["header_sub"][self.lang])
+        self.kabuk.bolum_metni("ozet", UI["summary"][self.lang])
+        self.kabuk.bolum_metni("denetimler",
+                               {"tr": "Denetimler", "en": "Checks"}[self.lang])
+        self.kabuk.bolum_metni("ayrintili",
+                               {"tr": "Ayrıntılı", "en": "Detailed"}[self.lang])
+        self.kabuk.menu_metni("summary", UI["summary"][self.lang])
+        for key, label in CATEGORIES:
+            self.kabuk.menu_metni(key, label[self.lang])
+        self.refresh_btn.set_label(UI["refresh"][self.lang])
+        self.root_btn.set_label(UI["full_audit"][self.lang])
+        self.export_btn.set_label(UI["export"][self.lang])
+        koyu = self.ui_theme == "dark"
+        self.theme_btn.set_label("☀" if koyu else "☾")
+        self.hap.ayarla(UI["ready"][self.lang], "kapali")
+        self.update_tallies()
 
-        self.root_btn = Gtk.Button()
-        self.root_btn.connect("clicked", self.on_full_audit)
-        box.pack_end(self.root_btn, False, False, 0)
+    def on_lang_changed(self, combo):
+        chosen = combo.get_active_id()
+        if chosen and chosen != self.lang:
+            self.lang = self.settings["lang"] = chosen
+            save_settings(self.settings)
+            self.retranslate_static()
+            self.show_category(self.current_category)
 
-        self.refresh_btn = Gtk.Button()
-        self.refresh_btn.get_style_context().add_class("suggested-action")
-        self.refresh_btn.connect("clicked", lambda *_: self.start_scan(False))
-        box.pack_end(self.refresh_btn, False, False, 0)
+    def on_theme_toggled(self):
+        self.ui_theme = "light" if self.ui_theme == "dark" else "dark"
+        self.settings["theme"] = self.ui_theme
+        save_settings(self.settings)
+        tema.uygula(self.ui_theme, VURGU)
+        self.retranslate_static()
+        self.kabuk.sec(self.current_category)
+        self.queue_draw()
 
-        return dis
-
-    # -- yan menu ----------------------------------------------------------
-
-    def build_sidebar(self):
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        box.get_style_context().add_class("sidebar")
-        box.set_size_request(210, -1)
-
-        self.listbox = Gtk.ListBox()
-        self.listbox.get_style_context().add_class("nav-list")
-        self.listbox.connect("row-selected", self.on_category_selected)
-        box.pack_start(self.listbox, True, True, 0)
-
-        self.nav_rows = []
-        entries = [("summary", UI["summary"])] + list(CATEGORIES)
-        for key, label in entries:
-            row = Gtk.ListBoxRow()
-            row.category_key = key
-            inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-            inner.set_border_width(12)
-            name = Gtk.Label(xalign=0.0)
-            name.get_style_context().add_class("nav-title")
-            inner.pack_start(name, False, False, 0)
-            tally = Gtk.Label(xalign=0.0)
-            tally.get_style_context().add_class("nav-sub")
-            inner.pack_start(tally, False, False, 0)
-            row.add(inner)
-            row.name_label = name
-            row.tally_label = tally
-            row.label_source = label
-            self.listbox.add(row)
-            self.nav_rows.append(row)
-
-        return box
-
-    def build_statusbar(self):
-        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        box.set_border_width(9)
-        self.status = Gtk.Label(xalign=0.0)
-        self.status.get_style_context().add_class("status-label")
-        box.pack_start(self.status, True, True, 0)
-        self.spinner = Gtk.Spinner()
-        box.pack_end(self.spinner, False, False, 0)
-        return box
-
-    # -- icerik ------------------------------------------------------------
-
-    def clear_content(self):
-        child = self.content.get_child()
-        if child:
-            self.content.remove(child)
+    # -- gezinme ------------------------------------------------------------
+    def on_category_selected(self, key):
+        self.show_category(key)
 
     def show_category(self, key):
         self.current_category = key
-        self.job_ui = {}
-        self.clear_content()
-
-        holder = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
-        holder.set_border_width(26)
-        self.content.add(holder)
-
+        self.job_ui = {k: v for k, v in self.job_ui.items() if k in self.jobs}
         if key == "summary":
-            holder.pack_start(self.build_summary(), False, False, 0)
-        elif key == "deep":
-            heading = Gtk.Label(label=dict(CATEGORIES)[key][self.lang], xalign=0.0)
-            heading.get_style_context().add_class("page-title")
-            holder.pack_start(heading, False, False, 0)
-            intro = Gtk.Label(label=UI["deep_intro"][self.lang], xalign=0.0)
-            intro.set_line_wrap(True)
-            intro.set_max_width_chars(88)
-            intro.get_style_context().add_class("page-subtitle")
-            holder.pack_start(intro, False, False, 0)
+            self.kabuk.baslik_ayarla(UI["summary"][self.lang], UI["summary_sub"][self.lang])
+            self.kabuk.icerik(self.build_summary())
+            return
+        etiket = next((lbl for k, lbl in CATEGORIES if k == key), {"tr": "", "en": ""})
+        holder = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        if key == "deep":
+            self.kabuk.baslik_ayarla(etiket[self.lang],
+                                     {"tr": "Yönetici yetkili, kullanıcı başlatır",
+                                      "en": "Administrator-level, user-initiated"}[self.lang])
+            kutu, _ = tema.not_kutusu(UI["deep_intro"][self.lang], "bilgi")
+            holder.pack_start(kutu, False, False, 0)
             for scan in DEEP_SCANS:
                 holder.pack_start(self.build_deep_card(scan), False, False, 0)
         else:
-            title = None
-            for cat_key, label in CATEGORIES:
-                if cat_key == key:
-                    title = label[self.lang]
-            heading = Gtk.Label(label=title or "", xalign=0.0)
-            heading.get_style_context().add_class("page-title")
-            holder.pack_start(heading, False, False, 0)
-
+            self.kabuk.baslik_ayarla(etiket[self.lang], "")
             order = {FAIL: 0, WARN: 1, NEEDROOT: 2, OK: 3, INFO: 4}
             rows = sorted((r for r in self.results if r["category"] == key),
                           key=lambda r: order.get(r["status"], 9))
             if not rows:
-                holder.pack_start(Gtk.Label(label=UI["scanning"][self.lang],
-                                            xalign=0.0), False, False, 0)
+                holder.pack_start(tema.bos_durum("yenile", UI["scanning"][self.lang]),
+                                  True, True, 0)
             for result in rows:
                 holder.pack_start(self.build_card(result), False, False, 0)
+        self.kabuk.icerik(holder)
 
-        holder.show_all()
-
+    # -- özet ---------------------------------------------------------------
     def build_summary(self):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
-
         percent, ok, warn, fail = score(self.results)
+        renk = "yesil" if percent >= 85 else ("sari" if percent >= 60 else "kirmizi")
 
-        hero_outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        hero_outer.get_style_context().add_class("card")
-        hero = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        hero.set_margin_top(24); hero.set_margin_bottom(24)
-        hero.set_margin_start(24); hero.set_margin_end(24)
-        hero_outer.pack_start(hero, True, True, 0)
-
-        big = Gtk.Label(label=f"{percent}%" if self.results else "\u2014")
-        big.get_style_context().add_class("score-big")
-        if percent >= 85:
-            big.get_style_context().add_class("score-ok")
-        elif percent >= 60:
-            big.get_style_context().add_class("score-warn")
-        else:
-            big.get_style_context().add_class("score-fail")
-        hero.pack_start(big, False, False, 0)
-
-        caption = Gtk.Label(label=UI["score"][self.lang])
-        caption.get_style_context().add_class("page-subtitle")
-        hero.pack_start(caption, False, False, 0)
-
-        tally = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=18)
-        tally.set_halign(Gtk.Align.CENTER)
-        tally.set_margin_top(12)
-        for count, key, css in ((ok, "count_ok", "pill-ok"),
-                                (warn, "count_warn", "pill-warn"),
-                                (fail, "count_fail", "pill-fail")):
-            pill = Gtk.Label(label=f"{count} {UI[key][self.lang]}")
-            pill.get_style_context().add_class("pill")
-            pill.get_style_context().add_class(css)
-            tally.pack_start(pill, False, False, 0)
-        hero.pack_start(tally, False, False, 0)
-        box.pack_start(hero_outer, False, False, 0)
+        dis, ic = tema.kart(22, 10)
+        ust = Gtk.Box(spacing=24)
+        ust.set_halign(Gtk.Align.CENTER)
+        halka = tema.CizimAlani(
+            lambda cr, w, h, v: tema.halka(cr, w, h, v, renk, UI["score"][self.lang]),
+            150, 150, percent if self.results else 0)
+        ust.pack_start(halka, False, False, 0)
+        sayac = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        sayac.set_valign(Gtk.Align.CENTER)
+        for n, anahtar, r in ((ok, "count_ok", "yesil"), (warn, "count_warn", "sari"),
+                              (fail, "count_fail", "kirmizi")):
+            satir = Gtk.Box(spacing=10)
+            rozet = tema.rozet(str(n), r)
+            rozet.set_size_request(40, -1)
+            satir.pack_start(rozet, False, False, 0)
+            satir.pack_start(tema.etiket(UI[anahtar][self.lang], "kart-alt"), False, False, 0)
+            sayac.pack_start(satir, False, False, 0)
+        ust.pack_start(sayac, False, False, 0)
+        ic.pack_start(ust, False, False, 0)
+        box.pack_start(dis, False, False, 0)
 
         if not is_root() and not self.audited_as_root:
-            hint = Gtk.Label(label=UI["root_hint"][self.lang], xalign=0.0)
-            hint.set_line_wrap(True)
-            hint.get_style_context().add_class("note-text")
-            hint_body = Gtk.Box()
-            hint_body.set_margin_top(15); hint_body.set_margin_bottom(15)
-            hint_body.set_margin_start(20); hint_body.set_margin_end(20)
-            hint_body.pack_start(hint, True, True, 0)
-            wrap = Gtk.Box()
-            wrap.get_style_context().add_class("note-box")
-            wrap.pack_start(hint_body, True, True, 0)
-            box.pack_start(wrap, False, False, 0)
+            kutu, _ = tema.not_kutusu(UI["root_hint"][self.lang], "uyari")
+            box.pack_start(kutu, False, False, 0)
 
-        # Dikkat gerektiren bulgular one cikarilir
         problems = [r for r in self.results if r["status"] in (FAIL, WARN)]
         problems.sort(key=lambda r: 0 if r["status"] == FAIL else 1)
         if self.results and not problems:
-            clear = Gtk.Label(label=UI["all_clear"][self.lang], xalign=0.0)
-            clear.get_style_context().add_class("page-subtitle")
-            wrap = Gtk.Box()
-            wrap.get_style_context().add_class("card")
-            body = Gtk.Box()
-            body.set_margin_top(18); body.set_margin_bottom(18)
-            body.set_margin_start(22); body.set_margin_end(22)
-            body.pack_start(clear, True, True, 0)
-            wrap.pack_start(body, True, True, 0)
-            box.pack_start(wrap, False, False, 0)
+            box.pack_start(tema.bos_durum("onay", UI["all_clear_baslik"][self.lang],
+                                          UI["all_clear"][self.lang]), False, False, 10)
         for result in problems:
             box.pack_start(self.build_card(result), False, False, 0)
-
         return box
 
+    # -- denetim kartı ------------------------------------------------------
     def build_card(self, result):
         meta = check_meta(result["id"])
         status = result["status"]
-        colour_class = {
-            OK: "badge-ok", WARN: "badge-warn", FAIL: "badge-fail",
-            INFO: "badge-info", NEEDROOT: "badge-info",
-        }[status]
+        dis, ic = tema.kart()
+        top = Gtk.Box(spacing=11)
+        rozet = tema.rozet(STATUS_LABEL[status][self.lang], STATUS_RENK[status])
+        rozet.set_valign(Gtk.Align.CENTER)
+        top.pack_start(rozet, False, False, 0)
+        baslik = tema.etiket(meta["title"][self.lang] if meta else result["id"],
+                             "kart-baslik", sar=True, genislik=70)
+        baslik.set_valign(Gtk.Align.CENTER)
+        top.pack_start(baslik, True, True, 0)
 
-        # Dis kutu yalnizca zemin ve cerceve tasir; ic bosluklar
-        # icerideki kutunun kenar bosluklariyla verilir ki ust/alt esit,
-        # sol/sag biraz daha ferah olsun.
-        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        card.get_style_context().add_class("card")
-
-        inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=9)
-        inner.set_margin_top(18)
-        inner.set_margin_bottom(18)
-        inner.set_margin_start(22)
-        inner.set_margin_end(22)
-        card.pack_start(inner, True, True, 0)
-
-        top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=11)
-        badge = Gtk.Label(label=STATUS_LABEL[status][self.lang])
-        badge.get_style_context().add_class("badge")
-        badge.get_style_context().add_class(colour_class)
-        badge.set_valign(Gtk.Align.CENTER)
-        top.pack_start(badge, False, False, 0)
-
-        title = Gtk.Label(label=meta["title"][self.lang] if meta else result["id"],
-                          xalign=0.0)
-        title.get_style_context().add_class("card-title")
-        title.set_line_wrap(True)
-        title.set_valign(Gtk.Align.CENTER)
-        top.pack_start(title, True, True, 0)
-
-        # Duzeltme dugmesi: yalnizca eylemi olan ve sorunlu denetimlerde
         action = meta.get("action") if meta else None
         if action and status in (WARN, FAIL):
-            fix_btn = Gtk.Button(label=action["label"][self.lang])
-            fix_btn.get_style_context().add_class("suggested-action")
-            fix_btn.set_valign(Gtk.Align.CENTER)
-            fix_btn.connect("clicked", self.on_fix, meta)
-            top.pack_end(fix_btn, False, False, 0)
-
-            # Islem suresince dugmenin solunda tek yonlu ilerleme cubugu
+            fix_btn = tema.dugme(action["label"][self.lang], "ana", self.on_fix, meta, None)
             bar = self.new_bar()
+            top.pack_end(fix_btn, False, False, 0)
             top.pack_end(bar, False, False, 0)
             self.job_attach(("fix", meta["id"]), fix_btn, bar)
-        # Kapatma anahtari: koruma aciksa ve denetimin "off" eylemi varsa
         off = meta.get("off") if meta else None
         if off and status == OK:
-            off_btn = Gtk.Button(label=off["label"][self.lang])
-            off_btn.get_style_context().add_class("destructive-action")
-            off_btn.set_valign(Gtk.Align.CENTER)
-            off_btn.connect("clicked", self.on_fix, meta, off)
-            top.pack_end(off_btn, False, False, 0)
-
+            off_btn = tema.dugme(off["label"][self.lang], "tehlike", self.on_fix, meta, off)
             off_bar = self.new_bar()
+            top.pack_end(off_btn, False, False, 0)
             top.pack_end(off_bar, False, False, 0)
             self.job_attach(("fix", meta["id"]), off_btn, off_bar)
-        inner.pack_start(top, False, False, 0)
+        ic.pack_start(top, False, False, 0)
 
-        detail = Gtk.Label(label=result["detail"][self.lang], xalign=0.0)
-        detail.set_line_wrap(True)
-        detail.set_max_width_chars(88)
-        inner.pack_start(detail, False, False, 0)
-
+        ic.pack_start(tema.etiket(result["detail"][self.lang], None, sar=True, genislik=96),
+                      False, False, 0)
         if meta and status in (WARN, FAIL, NEEDROOT):
-            why = Gtk.Label(label=f"{UI['why'][self.lang]}: {meta['why'][self.lang]}",
-                            xalign=0.0)
-            why.set_line_wrap(True)
-            why.set_max_width_chars(88)
-            why.get_style_context().add_class("why-text")
-            inner.pack_start(why, False, False, 0)
-
+            ic.pack_start(tema.etiket(f"{UI['why'][self.lang]}: {meta['why'][self.lang]}",
+                                      "kart-alt", sar=True, genislik=96), False, False, 0)
         if meta and meta.get("fix") and status in (WARN, FAIL):
-            caption = Gtk.Label(label=UI["suggested"][self.lang], xalign=0.0)
-            caption.get_style_context().add_class("caption-text")
-            inner.pack_start(caption, False, False, 0)
+            ic.pack_start(tema.etiket(UI["suggested"][self.lang], "silik"), False, False, 0)
+            ic.pack_start(kod_kutusu(meta["fix"]), False, False, 0)
+        return dis
 
-            code = Gtk.Label(label=meta["fix"], xalign=0.0)
-            code.set_selectable(True)
-            code.set_line_wrap(True)
-            code.get_style_context().add_class("code-text")
-            code_inner = Gtk.Box()
-            code_inner.set_margin_top(9)
-            code_inner.set_margin_bottom(9)
-            code_inner.set_margin_start(13)
-            code_inner.set_margin_end(13)
-            code_inner.pack_start(code, True, True, 0)
-            code_box = Gtk.Box()
-            code_box.get_style_context().add_class("code-box")
-            code_box.pack_start(code_inner, True, True, 0)
-            inner.pack_start(code_box, False, False, 0)
-
-        return card
-
-    # -- duzeltme calistirma -----------------------------------------------
-
-    def on_fix(self, button, meta, action=None):
+    # -- düzeltme -----------------------------------------------------------
+    def on_fix(self, meta, action=None):
         action = action or meta["action"]
         key = ("fix", meta["id"])
         if key in self.jobs:
             return
         if action.get("confirm"):
-            dialog = Gtk.MessageDialog(
-                transient_for=self, modal=True,
-                message_type=Gtk.MessageType.QUESTION,
-                buttons=Gtk.ButtonsType.OK_CANCEL,
-                text=meta["title"][self.lang])
-            body = UI["confirm_body"][self.lang].format(
-                action=action["label"][self.lang])
+            metin = UI["confirm_body"][self.lang].format(action=action["label"][self.lang])
             if action.get("warning"):
-                body += "\n\n" + action["warning"][self.lang]
-            dialog.format_secondary_text(body)
-            response = dialog.run()
-            dialog.destroy()
-            if response != Gtk.ResponseType.OK:
+                metin += "\n\n" + action["warning"][self.lang]
+            if not tema.onay_sor(self, meta["title"][self.lang], metin,
+                                 UI["uygula"][self.lang], UI["iptal"][self.lang],
+                                 tehlike=bool(action.get("warning"))):
                 return
-
         self.job_begin(key)
-        self.status.set_text(UI["applying"][self.lang].format(
-            action=action["label"][self.lang]))
+        self.kabuk.bildir(UI["applying"][self.lang].format(action=action["label"][self.lang]))
 
         def worker():
-            code, out = run(["pkexec", "/bin/sh", "-c", action["cmd"]],
-                            timeout=900)
+            code, out = run(["pkexec", "/bin/sh", "-c", action["cmd"]], timeout=900)
             GLib.idle_add(self.fix_done, code, out, meta)
-
         threading.Thread(target=worker, daemon=True).start()
 
-    # -- ayrintili taramalar -----------------------------------------------
+    def fix_done(self, code, out, meta):
+        self.job_end(("fix", meta["id"]))
+        if code == 0:
+            self.kabuk.bildir(UI["fix_ok"][self.lang].format(title=meta["title"][self.lang]),
+                              "basari")
+            self.start_scan(False)
+        elif code in (126, 127):
+            self.kabuk.bildir(UI["fix_cancelled"][self.lang])
+        else:
+            self.kabuk.bildir(UI["fix_failed"][self.lang].format(
+                title=meta["title"][self.lang]), "hata")
+            self.show_output(meta["title"][self.lang], out or "")
+        return False
 
-    def deep_state(self):
-        if not hasattr(self, "deep"):
-            self.deep = {}
-        return self.deep
-
+    # -- ayrıntılı taramalar ------------------------------------------------
     def build_deep_card(self, scan):
         key = ("deep", scan["id"])
-        state = self.deep_state().get(scan["id"])
+        state = self.deep.get(scan["id"])
         installed = have(scan["binary"])
-        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        card.get_style_context().add_class("card")
-
-        inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=9)
-        inner.set_margin_top(18)
-        inner.set_margin_bottom(18)
-        inner.set_margin_start(22)
-        inner.set_margin_end(22)
-        card.pack_start(inner, True, True, 0)
-
-        top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=11)
+        dis, ic = tema.kart()
+        top = Gtk.Box(spacing=11)
         if key in self.jobs:
-            badge_text = UI["deep_badge_run"][self.lang]
-            badge_class = "badge-info"
+            rozet = tema.rozet(UI["deep_badge_run"][self.lang], "vurgu")
         elif state and "status" in state:
-            badge_text = STATUS_LABEL[state["status"]][self.lang]
-            badge_class = {OK: "badge-ok", WARN: "badge-warn", FAIL: "badge-fail",
-                           INFO: "badge-info"}.get(state["status"], "badge-info")
+            rozet = tema.rozet(STATUS_LABEL[state["status"]][self.lang],
+                               STATUS_RENK.get(state["status"], "gri"))
         else:
-            badge_text = UI["deep_badge_none"][self.lang]
-            badge_class = "badge-info"
-        badge = Gtk.Label(label=badge_text)
-        badge.get_style_context().add_class("badge")
-        badge.get_style_context().add_class(badge_class)
-        badge.set_valign(Gtk.Align.CENTER)
-        top.pack_start(badge, False, False, 0)
-
-        title = Gtk.Label(label=scan["title"][self.lang], xalign=0.0)
-        title.get_style_context().add_class("card-title")
-        title.set_line_wrap(True)
-        title.set_valign(Gtk.Align.CENTER)
-        top.pack_start(title, True, True, 0)
-
+            rozet = tema.rozet(UI["deep_badge_none"][self.lang], "gri")
+        rozet.set_valign(Gtk.Align.CENTER)
+        top.pack_start(rozet, False, False, 0)
+        baslik = tema.etiket(scan["title"][self.lang], "kart-baslik", sar=True, genislik=70)
+        baslik.set_valign(Gtk.Align.CENTER)
+        top.pack_start(baslik, True, True, 0)
         if installed:
-            scan_btn = Gtk.Button(
-                label=UI["deep_rescan" if state and "status" in state
-                         else "deep_scan"][self.lang])
-            scan_btn.get_style_context().add_class("suggested-action")
-            scan_btn.set_valign(Gtk.Align.CENTER)
-            scan_btn.connect("clicked", self.start_deep, scan, "scan")
-            top.pack_end(scan_btn, False, False, 0)
-
+            scan_btn = tema.dugme(UI["deep_rescan" if state and "status" in state
+                                     else "deep_scan"][self.lang], "ana",
+                                  self.start_deep, scan, "scan")
             if scan.get("propupd_args"):
-                prop_btn = Gtk.Button(label=UI["deep_propupd"][self.lang])
-                prop_btn.set_valign(Gtk.Align.CENTER)
-                prop_btn.connect("clicked", self.start_deep, scan, "propupd")
+                prop_btn = tema.dugme(UI["deep_propupd"][self.lang], None,
+                                      self.start_deep, scan, "propupd")
                 top.pack_end(prop_btn, False, False, 0)
                 self.job_attach(key, prop_btn)
-
             bar = self.new_bar()
+            top.pack_end(scan_btn, False, False, 0)
             top.pack_end(bar, False, False, 0)
             self.job_attach(key, scan_btn, bar)
-        inner.pack_start(top, False, False, 0)
+        ic.pack_start(top, False, False, 0)
 
         if not installed:
-            detail_text = UI["deep_missing"][self.lang]
+            detay = UI["deep_missing"][self.lang]
         elif key in self.jobs:
-            detail_text = UI["deep_working"][self.lang]
+            detay = UI["deep_working"][self.lang]
         elif state and "detail" in state:
-            detail_text = state["detail"][self.lang]
+            detay = state["detail"][self.lang]
         else:
-            detail_text = UI["deep_none"][self.lang]
-        detail = Gtk.Label(label=detail_text, xalign=0.0)
-        detail.set_line_wrap(True)
-        detail.set_max_width_chars(88)
-        inner.pack_start(detail, False, False, 0)
-
-        why = Gtk.Label(label=f"{UI['why'][self.lang]}: {scan['why'][self.lang]}",
-                        xalign=0.0)
-        why.set_line_wrap(True)
-        why.set_max_width_chars(88)
-        why.get_style_context().add_class("why-text")
-        inner.pack_start(why, False, False, 0)
-
+            detay = UI["deep_none"][self.lang]
+        ic.pack_start(tema.etiket(detay, None, sar=True, genislik=96), False, False, 0)
+        ic.pack_start(tema.etiket(f"{UI['why'][self.lang]}: {scan['why'][self.lang]}",
+                                  "kart-alt", sar=True, genislik=96), False, False, 0)
         if scan.get("live_note") and is_live():
-            note = Gtk.Label(label=UI["deep_live_note"][self.lang], xalign=0.0)
-            note.set_line_wrap(True)
-            note.set_max_width_chars(88)
-            note.get_style_context().add_class("caption-text")
-            inner.pack_start(note, False, False, 0)
-
+            ic.pack_start(tema.etiket(UI["deep_live_note"][self.lang], "silik",
+                                      sar=True, genislik=96), False, False, 0)
         for item in (state or {}).get("extra", []):
-            line = Gtk.Label(label=item["text"], xalign=0.0)
-            line.set_selectable(True)
-            line.set_line_wrap(True)
-            line.set_max_width_chars(88)
-            line.get_style_context().add_class("code-text")
-            inner.pack_start(line, False, False, 0)
+            ic.pack_start(tema.etiket(item["text"], "mono", sar=True, sec=True, genislik=96),
+                          False, False, 0)
             if item.get("explain"):
-                expl = Gtk.Label(label=item["explain"][self.lang], xalign=0.0)
-                expl.set_line_wrap(True)
-                expl.set_max_width_chars(88)
-                expl.get_style_context().add_class("why-text")
-                inner.pack_start(expl, False, False, 0)
-        return card
+                ic.pack_start(tema.etiket(item["explain"][self.lang], "kart-alt",
+                                          sar=True, genislik=96), False, False, 0)
+        return dis
 
-    def start_deep(self, button, scan, mode):
+    def start_deep(self, scan, mode):
         key = ("deep", scan["id"])
         if key in self.jobs:
             return
         if mode == "propupd":
-            dialog = Gtk.MessageDialog(
-                transient_for=self, modal=True,
-                message_type=Gtk.MessageType.QUESTION,
-                buttons=Gtk.ButtonsType.OK_CANCEL,
-                text=scan["title"][self.lang])
-            dialog.format_secondary_text(scan["propupd_warning"][self.lang])
-            response = dialog.run()
-            dialog.destroy()
-            if response != Gtk.ResponseType.OK:
+            if not tema.onay_sor(self, scan["title"][self.lang],
+                                 scan["propupd_warning"][self.lang],
+                                 UI["uygula"][self.lang], UI["iptal"][self.lang]):
                 return
             args = scan["propupd_args"]
         else:
             args = scan["args"]
-
         self.job_begin(key)
         if self.current_category == "deep":
             self.show_category("deep")
-        self.status.set_text(UI["deep_running"][self.lang].format(
-            title=scan["title"][self.lang]))
+        self.kabuk.bildir(UI["deep_running"][self.lang].format(title=scan["title"][self.lang]))
 
         def worker():
-            code, out = run(deep_command(scan["binary"], args),
-                            timeout=scan["timeout"])
+            code, out = run(deep_command(scan["binary"], args), timeout=scan["timeout"])
             GLib.idle_add(self.deep_done, scan, mode, code, out)
-
         threading.Thread(target=worker, daemon=True).start()
 
     def deep_done(self, scan, mode, code, out):
         self.job_end(("deep", scan["id"]))
         title = scan["title"][self.lang]
         if code in (126, 127) and not out:
-            self.status.set_text(UI["fix_cancelled"][self.lang])
+            self.kabuk.bildir(UI["fix_cancelled"][self.lang])
         elif mode == "propupd":
-            key = "deep_propupd_ok" if code == 0 else "deep_propupd_failed"
-            self.status.set_text(UI[key][self.lang].format(title=title))
+            anahtar = "deep_propupd_ok" if code == 0 else "deep_propupd_failed"
+            self.kabuk.bildir(UI[anahtar][self.lang].format(title=title),
+                              "basari" if code == 0 else "hata")
             if code != 0:
                 self.show_output(title, out or "")
         else:
             result = scan["parse"](code, out)
             result["stamp"] = time.strftime("%H:%M")
-            self.deep_state()[scan["id"]] = result
-            self.status.set_text(UI["deep_finished"][self.lang].format(title=title))
+            self.deep[scan["id"]] = result
+            self.kabuk.bildir(UI["deep_finished"][self.lang].format(title=title), "basari")
         if self.current_category == "deep":
             self.show_category("deep")
         return False
 
-    # -- eşzamanlı işler ---------------------------------------------------
-    # Her iş bir anahtarla izlenir: ("scan",), ("fix", denetim_kimligi),
-    # ("deep", tarama_kimligi). Farklı işler aynı anda çalışabilir; aynı
-    # anahtara bağlı düğmeler iş sürerken devre dışı kalır.
+    # -- eşzamanlı işler ----------------------------------------------------
+    def new_bar(self):
+        return SweepBar(tema.AKTIF["vurgu"])
 
     def job_attach(self, key, button, bar=None):
         self.job_ui.setdefault(key, []).append((button, bar))
@@ -2155,13 +1915,15 @@ class HealthWindow(Gtk.Window):
         if bar is not None and running:
             bar.show()
 
-    def new_bar(self):
-        return SweepBar(self.ACCENT)
-
     def apply_jobs(self):
         scanning = ("scan",) in self.jobs
         self.refresh_btn.set_sensitive(not scanning)
         self.root_btn.set_sensitive(not scanning)
+        if scanning:
+            self.bar.show()
+            self.hap.ayarla(UI["scanning"][self.lang], "uyari")
+        else:
+            self.bar.hide()
         for key, items in self.job_ui.items():
             running = key in self.jobs
             for button, bar in items:
@@ -2169,13 +1931,12 @@ class HealthWindow(Gtk.Window):
                     button.set_sensitive(not running)
                     if bar is not None:
                         bar.show() if running else bar.hide()
-                except Exception:
+                except Exception:  # noqa: BLE001
                     pass
 
     def job_begin(self, key):
         self.jobs.add(key)
         self.apply_jobs()
-        self.spinner.start()
         if not self.sweep_id:
             self.sweep_step = 0
             self.sweep_id = GLib.timeout_add(45, self._sweep)
@@ -2183,86 +1944,60 @@ class HealthWindow(Gtk.Window):
     def job_end(self, key):
         self.jobs.discard(key)
         self.apply_jobs()
-        if not self.jobs:
-            self.spinner.stop()
-            self.sweep_stop()
+        if not self.jobs and self.sweep_id:
+            GLib.source_remove(self.sweep_id)
+            self.sweep_id = 0
 
     def _sweep(self):
         if not self.jobs:
             self.sweep_id = 0
             return False
         self.sweep_step += 1
+        self.bar.adim(self.sweep_step)
         for key in self.jobs:
             for _button, bar in self.job_ui.get(key, []):
                 if bar is not None:
                     bar.adim(self.sweep_step)
         return True
 
-    def sweep_stop(self):
-        if self.sweep_id:
-            GLib.source_remove(self.sweep_id)
-            self.sweep_id = 0
-
     def flush_rescan(self):
         if self.rescan_pending:
             self.rescan_pending = False
             self.start_scan(False)
 
-    def fix_done(self, code, out, meta):
-        self.job_end(("fix", meta["id"]))
-        if code == 0:
-            self.status.set_text(UI["fix_ok"][self.lang].format(
-                title=meta["title"][self.lang]))
-            # Yeniden tarama normal yetkiyle yapilir; root gerektiren
-            # denetimlerin onceki sonuclari korunur, boylece parola
-            # ikinci kez sorulmaz.
-            self.start_scan(False)
-        elif code in (126, 127):
-            self.status.set_text(UI["fix_cancelled"][self.lang])
-        else:
-            self.status.set_text(UI["fix_failed"][self.lang].format(
-                title=meta["title"][self.lang]))
-            self.show_output(meta["title"][self.lang], out or "")
-        return False
-
     def show_output(self, title, text):
         dialog = Gtk.Dialog(title=title, transient_for=self, modal=True)
-        dialog.add_button("Kapat" if self.lang == "tr" else "Close",
-                          Gtk.ResponseType.CLOSE)
-        dialog.set_default_size(680, 380)
-        view = Gtk.TextView()
-        view.set_editable(False)
-        view.set_monospace(True)
+        dialog.add_button(UI["kapat"][self.lang], Gtk.ResponseType.CLOSE)
+        dialog.set_default_size(700, 400)
+        tema.sinif(dialog.get_content_area(), "arka")
+        view = Gtk.TextView(editable=False, monospace=True)
         view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
+        view.set_left_margin(10)
+        view.set_right_margin(10)
         view.get_buffer().set_text(text[-8000:] if text else "")
         scroller = Gtk.ScrolledWindow()
-        scroller.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         scroller.add(view)
-        scroller.set_margin_top(10)
-        scroller.set_margin_bottom(10)
-        scroller.set_margin_start(10)
-        scroller.set_margin_end(10)
+        for k in ("top", "bottom", "start", "end"):
+            getattr(scroller, f"set_margin_{k}")(10)
         dialog.get_content_area().pack_start(scroller, True, True, 0)
         dialog.show_all()
         dialog.run()
         dialog.destroy()
 
-    # -- tarama ------------------------------------------------------------
-
+    # -- tarama -------------------------------------------------------------
     def start_scan(self, as_root):
         if ("scan",) in self.jobs:
-            # Devam eden tarama varken istenen yeniden tarama, bitince yapilir
             if not as_root:
                 self.rescan_pending = True
             return
         self.job_begin(("scan",))
-        self.status.set_text(UI["scanning"][self.lang])
+        self.hap.ayarla(UI["scanning"][self.lang], "uyari")
 
         def worker():
             if as_root:
                 script = os.path.abspath(__file__)
-                code, out = run(["pkexec", sys.executable, script,
-                                 "--audit-json"], timeout=180)
+                code, out = run(["pkexec", sys.executable, script, "--audit-json"],
+                                timeout=180)
                 try:
                     data = json.loads(out) if code == 0 else None
                 except ValueError:
@@ -2270,35 +2005,29 @@ class HealthWindow(Gtk.Window):
                 GLib.idle_add(self.scan_done, data, True)
             else:
                 GLib.idle_add(self.scan_done, run_all_checks(), False)
-
         threading.Thread(target=worker, daemon=True).start()
 
     def scan_done(self, data, was_root):
         self.job_end(("scan",))
-
         if data is None:
-            self.status.set_text(UI["audit_failed"][self.lang])
+            self.hap.ayarla(UI["ready"][self.lang], "kapali")
+            self.kabuk.bildir(UI["audit_failed"][self.lang], "hata")
             self.flush_rescan()
             return False
-
         if was_root:
             self.results = data
             self.audited_as_root = True
         else:
             self.results = self.merge_results(data)
-
         stamp = time.strftime("%H:%M")
-        suffix = f" \u00b7 {UI['as_root'][self.lang]}" if self.audited_as_root else ""
-        self.status.set_text(f"{UI['ready'][self.lang]} \u00b7 {stamp}{suffix}")
-
+        suffix = f" · {UI['as_root'][self.lang]}" if self.audited_as_root else ""
+        self.hap.ayarla(f"{UI['ready'][self.lang]} · {stamp}{suffix}", "acik")
         self.update_tallies()
         self.show_category(self.current_category)
         self.flush_rescan()
         return False
 
     def merge_results(self, fresh):
-        """Normal yetkili taramada NEEDROOT donen denetimler icin, daha once
-        root ile elde edilmis sonuc varsa onu korur."""
         if not self.audited_as_root or not self.results:
             return fresh
         previous = {r["id"]: r for r in self.results}
@@ -2312,26 +2041,16 @@ class HealthWindow(Gtk.Window):
         return merged
 
     def update_tallies(self):
-        for row in self.nav_rows:
-            key = row.category_key
-            if key == "summary":
-                percent, _, _, fail = score(self.results)
-                row.tally_label.set_text(
-                    f"{percent}%" if self.results else "\u2014")
+        percent, _, _, fail = score(self.results)
+        self.kabuk.rozet("summary", (f"{percent}%" if self.results else None), sakin=True)
+        for key, _label in CATEGORIES:
+            if key == "deep":
                 continue
             rows = [r for r in self.results if r["category"] == key]
             bad = sum(1 for r in rows if r["status"] in (WARN, FAIL))
-            if not rows:
-                row.tally_label.set_text("\u2014")
-            elif bad:
-                row.tally_label.set_text(
-                    f"{bad} {UI['count_fail'][self.lang]}")
-            else:
-                row.tally_label.set_text(
-                    f"{len(rows)} {UI['count_ok'][self.lang]}")
+            self.kabuk.rozet(key, (bad or None), sakin=False)
 
-    # -- rapor -------------------------------------------------------------
-
+    # -- rapor --------------------------------------------------------------
     def build_report(self):
         percent, ok, warn, fail = score(self.results)
         lines = [
@@ -2357,7 +2076,7 @@ class HealthWindow(Gtk.Window):
                 lines.append(f"                 {result['detail'][self.lang]}")
             lines.append("")
         for scan in DEEP_SCANS:
-            state = getattr(self, "deep", {}).get(scan["id"])
+            state = self.deep.get(scan["id"])
             if not state or "status" not in state:
                 continue
             lines.append(f"[{scan['title'][self.lang]}]")
@@ -2368,178 +2087,29 @@ class HealthWindow(Gtk.Window):
             lines.append("")
         return "\n".join(lines)
 
-    def on_export(self, _button):
+    def on_export(self):
         path = os.path.join(GLib.get_home_dir(),
                             time.strftime("carotos-health-%Y%m%d-%H%M.txt"))
         try:
             with open(path, "w", encoding="utf-8") as fh:
                 fh.write(self.build_report())
-            self.status.set_text(UI["saved"][self.lang].format(path=path))
+            self.kabuk.bildir(UI["saved"][self.lang].format(path=path), "basari")
         except OSError:
-            self.status.set_text(UI["save_failed"][self.lang])
+            self.kabuk.bildir(UI["save_failed"][self.lang], "hata")
 
-    # -- olaylar -----------------------------------------------------------
-
-    def on_category_selected(self, _listbox, row):
-        if row is not None:
-            self.show_category(row.category_key)
-
-    def on_full_audit(self, _button):
+    def on_full_audit(self):
         self.start_scan(True)
 
-    def on_lang_changed(self, combo):
-        chosen = combo.get_active_id()
-        if chosen and chosen != self.lang:
-            self.lang = chosen
-            self.settings["lang"] = chosen
-            save_settings(self.settings)
-            self.retranslate()
-
-    def on_theme_toggled(self, _button):
-        self.theme = "light" if self.theme == "dark" else "dark"
-        self.settings["theme"] = self.theme
-        save_settings(self.settings)
-        self.apply_theme()
-        self.retranslate()
-
-    def retranslate(self):
-        self.set_title(UI["app_title"][self.lang])
-        self.title_label.set_text(UI["header_sub"][self.lang])
-        self.refresh_btn.set_label(UI["refresh"][self.lang])
-        self.root_btn.set_label(UI["full_audit"][self.lang])
-        self.export_btn.set_label(UI["export"][self.lang])
-        self.theme_btn.set_label(
-            UI["theme_light"][self.lang] if self.theme == "dark"
-            else UI["theme_dark"][self.lang])
-        for row in self.nav_rows:
-            row.name_label.set_text(row.label_source[self.lang])
-        self.update_tallies()
-        self.show_category(self.current_category)
-
     def on_destroy(self, _widget):
-        self.sweep_stop()
+        if self.sweep_id:
+            GLib.source_remove(self.sweep_id)
+            self.sweep_id = 0
         Gtk.main_quit()
-
-    # -- tema --------------------------------------------------------------
-
-    def apply_theme(self):
-        if self.theme == "dark":
-            bg = "#1f2325"; side = "#2b2f31"; header = "#2b2f31"; fg = "#e6e6e6"
-            sub = "#9aa4a8"; field = "#2b2f31"
-            card = "#282d2f"; card_border = "#363c3e"; note_bg = "#2c3134"
-            btn_bg = "#343a3c"; btn_hover = "#3f4649"; border = "#454b4e"
-            code_fg = "#8fd6c4"
-        else:
-            bg = "#f2f4f5"; side = "#e4e7e9"; header = "#e4e7e9"; fg = "#1f2325"
-            sub = "#5c666a"; field = "#ffffff"
-            card = "#ffffff"; card_border = "#dde2e4"; note_bg = "#eef1f2"
-            btn_bg = "#ffffff"; btn_hover = "#eef0f1"; border = "#c3c8ca"
-            code_fg = "#1f5f52"
-
-        Gtk.Settings.get_default().set_property(
-            "gtk-application-prefer-dark-theme", self.theme == "dark")
-
-        css = f"""
-        window {{ background-color: {bg}; color: {fg}; }}
-        label {{ color: {fg}; }}
-
-        .header {{ background-color: {header}; border-radius: 10px; }}
-        .header-sub {{ color: {sub}; font-size: 104%; font-weight: bold; }}
-        .sidebar {{ background-color: {side}; }}
-        .nav-title {{ font-weight: bold; }}
-        .nav-sub {{ color: {sub}; font-size: 88%; }}
-        .nav-list row:selected {{ background-color: {self.ACCENT}; }}
-        .nav-list row:selected label {{ color: #ffffff; }}
-        .status-label {{ color: {sub}; font-size: 91%; }}
-
-        .page-title {{ font-size: 152%; font-weight: bold; }}
-        .page-subtitle {{ color: {sub}; font-size: 104%; }}
-        .card {{
-            background-color: {card};
-            border: 1px solid {card_border};
-            border-radius: 8px;
-        }}
-        .card-title {{ font-weight: bold; font-size: 106%; }}
-        .why-text {{ color: {sub}; font-size: 92%; }}
-        .caption-text {{ color: {sub}; font-size: 84%; }}
-        progressbar trough {{ background-color: {btn_bg};
-            border: 1px solid {border}; border-radius: 999px;
-            min-height: 7px; }}
-        progressbar progress {{ background-color: {self.ACCENT};
-            border-radius: 999px; min-height: 7px; }}
-
-        .badge {{
-            color: #ffffff; font-size: 78%; font-weight: bold;
-            border-radius: 4px; padding: 3px 8px;
-        }}
-        .badge-ok {{ background-color: {self.C_OK}; }}
-        .badge-warn {{ background-color: {self.C_WARN}; }}
-        .badge-fail {{ background-color: {self.C_FAIL}; }}
-        .badge-info {{ background-color: {self.C_INFO}; }}
-
-        .score-big {{ font-size: 320%; font-weight: bold; }}
-        .score-ok {{ color: {self.C_OK}; }}
-        .score-warn {{ color: {self.C_WARN}; }}
-        .score-fail {{ color: {self.C_FAIL}; }}
-        .pill {{
-            border-radius: 999px; padding: 4px 14px;
-            font-size: 90%; color: #ffffff;
-        }}
-        .pill-ok {{ background-color: {self.C_OK}; }}
-        .pill-warn {{ background-color: {self.C_WARN}; }}
-        .pill-fail {{ background-color: {self.C_FAIL}; }}
-
-        .note-box {{
-            background-color: {note_bg};
-            border: 1px solid {card_border};
-            border-left: 3px solid {self.ACCENT};
-            border-radius: 8px;
-        }}
-        .note-text {{ color: {sub}; font-size: 94%; }}
-        .code-box {{
-            background-color: {field};
-            border: 1px solid {border};
-            border-radius: 6px;
-        }}
-        .code-text {{ font-family: monospace; color: {code_fg}; }}
-
-        button {{
-            background-image: none; background-color: {btn_bg}; color: {fg};
-            border: 1px solid {border}; border-radius: 6px; padding: 4px 14px;
-        }}
-        button label {{ color: {fg}; }}
-        button:hover {{ background-color: {btn_hover}; }}
-        button:disabled {{ color: {sub}; }}
-        button:disabled label {{ color: {sub}; }}
-        button.suggested-action {{
-            background-color: {self.ACCENT}; border-color: {self.ACCENT};
-            color: #ffffff;
-        }}
-        button.suggested-action label {{ color: #ffffff; }}
-        button.destructive-action {{
-            background-color: {self.C_FAIL}; border-color: {self.C_FAIL};
-            color: #ffffff;
-        }}
-        button.destructive-action label {{ color: #ffffff; }}
-
-        combobox button {{ background-color: {field}; color: {fg}; }}
-        combobox button label {{ color: {fg}; }}
-        menu, .menu, popover, popover.background {{
-            background-color: {field}; color: {fg};
-        }}
-        menuitem label, popover label {{ color: {fg}; }}
-        menuitem:hover {{ background-color: {self.ACCENT}; }}
-        menuitem:hover label {{ color: #ffffff; }}
-        separator {{ background-color: {border}; }}
-        """
-        self.css_provider.load_from_data(css.encode())
 
 
 def main():
     settings = load_settings()
     window = HealthWindow(settings)
-    window.show_all()
-    window.listbox.select_row(window.nav_rows[0])
     window.start_scan(False)
     Gtk.main()
     return 0

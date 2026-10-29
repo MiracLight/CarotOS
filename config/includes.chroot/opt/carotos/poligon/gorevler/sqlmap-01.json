@@ -3,8 +3,8 @@
   "arac": "sqlmap",
   "seviye": "orta",
   "baslik": {
-    "tr": "Gizli Tabloyu Çıkar",
-    "en": "Extract the Hidden Table"
+    "tr": "SQL Enjeksiyonu",
+    "en": "SQL Injection"
   },
   "senaryo": {
     "tr": "127.0.0.1:8899/urun?id=1 adresindeki ürün sayfası SQL enjeksiyonuna açık. Bu sayfanın gösterdiği tablonun dışında, 'gizli' adında ayrı bir tablo daha var. sqlmap ile enjeksiyonu bulup 'gizli' tablosundaki 'deger' sütununu çıkar.",

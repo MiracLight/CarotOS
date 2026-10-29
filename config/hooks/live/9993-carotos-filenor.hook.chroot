@@ -1,0 +1,43 @@
+#!/bin/sh
+set -e
+
+# Filenor (dosya donusturucu) bagimliliklari.
+# Cekirdek (arayuz + gorsel + PDF + ses/video + OCR):
+#   ffmpeg            ses/video/GIF
+#   poppler-utils     PDF -> gorsel/metin
+#   qpdf              PDF birlestir/bol/kilitle
+#   python3-pil       gorsel donusumleri
+#   python3-reportlab metin -> PDF (Turkce karakter, cok sayfa)
+#   python3-fonttools, python3-brotli  yazi tipi (WOFF/WOFF2)
+#   python3-cairosvg  SVG gorselleri
+#   tesseract-ocr(+tur) OCR
+# LibreOffice (ofis belgeleri) bilincli olarak EKLENMEZ: Magaza'dan kurulur;
+# kurulu degilse Filenor ilgili donusumleri soluk gosterir ve nasil kurulacagini soyler.
+# Turkce dil ayari bazi paket betiklerini bozdugu icin LC_ALL=C ile kurulur.
+export LC_ALL=C DEBIAN_FRONTEND=noninteractive
+apt-get install -y --no-install-recommends \
+    ffmpeg poppler-utils qpdf python3-pil python3-reportlab python3-fonttools \
+    python3-brotli python3-cairosvg python3-gi-cairo
+
+# Istege bagli: bulunamazsa derleme durmasin.
+apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-tur tesseract-ocr-eng || \
+    echo "CarotOS: tesseract kurulamadi (OCR araci soluk gorunecek)."
+apt-get install -y --no-install-recommends python3-pillow-heif || \
+    echo "CarotOS: python3-pillow-heif yok (HEIC desteklenmeyecek)."
+
+chmod 755 /opt/carotos/filenor/filenor_uygulama.py /opt/carotos/filenor/filenor-cli
+find /opt/carotos/filenor -name '*.py' ! -name 'filenor_uygulama.py' -exec chmod 644 {} +
+# PNG simgeler yama icinde metin (base64) olarak tasinir; burada acilir.
+# (Satir bicimi: "<boyut> <base64>"; vektor surum scalable/ altinda hazir durur.)
+while read -r boyut veri; do
+    [ -n "$boyut" ] || continue
+    mkdir -p "/usr/share/icons/hicolor/${boyut}x${boyut}/apps"
+    printf '%s' "$veri" | base64 -d > "/usr/share/icons/hicolor/${boyut}x${boyut}/apps/filenor.png"
+done < /opt/carotos/filenor/ikonlar.b64
+rm -f /opt/carotos/filenor/ikonlar.b64
+chmod 644 /usr/share/applications/carotos-filenor.desktop /usr/share/icons/hicolor/*/apps/filenor.png /usr/share/icons/hicolor/scalable/apps/filenor.svg
+ln -sf /opt/carotos/filenor/filenor-cli /usr/local/bin/filenor-cli
+ln -sf /opt/carotos/filenor/filenor_uygulama.py /usr/local/bin/filenor
+gtk-update-icon-cache -f -t /usr/share/icons/hicolor || true
+update-desktop-database /usr/share/applications || true
+echo "CarotOS: Filenor yerlestirildi."

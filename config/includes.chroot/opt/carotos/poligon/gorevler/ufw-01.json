@@ -6,8 +6,8 @@
   "seviye": "orta",
 
   "baslik": {
-    "tr": "Portu Kapat",
-    "en": "Close the Port"
+    "tr": "Güvenlik Duvarı ile Port Kapatma",
+    "en": "Closing a Port with a Firewall"
   },
 
   "senaryo": {

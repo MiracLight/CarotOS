@@ -3,8 +3,8 @@
   "arac": "nmap",
   "seviye": "baslangic",
   "baslik": {
-    "tr": "Gizli Portu Bul",
-    "en": "Find the Hidden Port"
+    "tr": "Açık Port Keşfi",
+    "en": "Open Port Discovery"
   },
   "senaryo": {
     "tr": "127.0.0.1 üzerinde birkaç yaygın servis ve bir de standart dışı, gizli bir servis çalışıyor. nmap ile {aralik} aralığını tarayarak gizli portu bul.",

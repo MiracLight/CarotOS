@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- USB Denetimi simgesi: tarama cercevesi icinde bellek ve tarama isigi -->
+  <defs>
+    <linearGradient id="zemin" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#112a2c"/>
+      <stop offset="1" stop-color="#0a1517"/>
+    </linearGradient>
+    <linearGradient id="isik" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3ee8df" stop-opacity="0"/>
+      <stop offset="1" stop-color="#3ee8df" stop-opacity="0.45"/>
+    </linearGradient>
+  </defs>
+  <rect x="14" y="14" width="228" height="228" rx="48" fill="url(#zemin)"/>
+  <!-- tarama cercevesi -->
+  <path d="M54 80 v-26 a8 8 0 0 1 8 -8 h26 M202 80 v-26 a8 8 0 0 0 -8 -8 h-26
+           M54 176 v26 a8 8 0 0 0 8 8 h26 M202 176 v26 a8 8 0 0 1 -8 8 h-26"
+        fill="none" stroke="#3ee8df" stroke-opacity="0.9" stroke-width="6" stroke-linecap="round"/>
+  <!-- bellek -->
+  <rect x="104" y="58" width="48" height="40" rx="7" fill="none" stroke="#3ee8df" stroke-opacity="0.9" stroke-width="6"/>
+  <rect x="115" y="70" width="8" height="14" rx="2" fill="#3ee8df" fill-opacity="0.9"/>
+  <rect x="133" y="70" width="8" height="14" rx="2" fill="#3ee8df" fill-opacity="0.9"/>
+  <rect x="88" y="98" width="80" height="102" rx="18" fill="#3ee8df" fill-opacity="0.1" stroke="#3ee8df" stroke-opacity="0.9" stroke-width="6"/>
+  <!-- tarama isigi: cerceveden cerceveye -->
+  <rect x="60" y="106" width="136" height="38" fill="url(#isik)"/>
+  <line x1="60" y1="144" x2="196" y2="144" stroke="#3ee8df" stroke-width="5" stroke-linecap="round"/>
+</svg>

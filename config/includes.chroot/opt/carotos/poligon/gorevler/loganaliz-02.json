@@ -1,0 +1,55 @@
+{
+  "id": "loganaliz-02",
+  "arac": "grep",
+  "seviye": "orta",
+  "baslik": {
+    "tr": "Ele Geçirilen Hesap Tespiti",
+    "en": "Compromised Account Identification"
+  },
+  "senaryo": {
+    "tr": "Sunucunun SSH günlüğü ({bicim_tr}) şu dosyada: {dosya}. Bir saldırgan hesapları denedi ve sonunda birine girmeyi başardı. {soru_tr}",
+    "en": "The server's SSH log ({bicim_en}) is in this file: {dosya}. An attacker tried several accounts and finally got into one. {soru_en}"
+  },
+  "ipucu": {
+    "tr": "{ipucu_tr}",
+    "en": "{ipucu_en}"
+  },
+  "hedef": {
+    "tur": "statik_dosya",
+    "servis_modulu": "uretilen_gorevler",
+    "_not": "Yalnız yerel geçici dosya; ağ bağlantısı yok."
+  },
+  "flag_uretimi": {
+    "yontem": "uretec",
+    "uretec": "ssh_giren",
+    "_not": "İçerik her açılışta rastgele üretilir (uretilen_gorevler.ssh_giren)."
+  },
+  "dogrulama": {
+    "tur": "kullanici_girdisi",
+    "karsilastirma": "birebir",
+    "deneme_siniri": null
+  },
+  "zorluklar": {
+    "kolay": {
+      "satir_sayisi": 250,
+      "saldirgan_sayisi": 1
+    },
+    "orta": {
+      "satir_sayisi": 700,
+      "saldirgan_sayisi": 3
+    },
+    "zor": {
+      "satir_sayisi": 2000,
+      "saldirgan_sayisi": 5,
+      "yakin_rakip": 1,
+      "sahte_basari": 1
+    }
+  },
+  "puan": {
+    "kolay": 60,
+    "orta": 120,
+    "zor": 240
+  },
+  "sure_siniri_dk": null,
+  "savunma_gorevi_id": null
+}

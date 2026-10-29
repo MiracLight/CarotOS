@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="zemin" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1c2030"/><stop offset="1" stop-color="#12141c"/>
+    </linearGradient>
+    <linearGradient id="dolu" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8e95f5"/><stop offset="1" stop-color="#6366f1"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#zemin)"/>
+  <rect x="9" y="9" width="238" height="238" rx="55" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="2"/>
+  <!-- acik kitap (sozluk) -->
+  <path d="M118 70 c-14 -11 -34 -16 -54 -16 c-6 0 -10 4 -10 10 v96 c0 6 4 10 10 10 c20 0 38 5 50 15
+           c3 2.5 4 2.5 4 -2 v-113 z"
+        fill="none" stroke="#9aa0f8" stroke-width="9" stroke-linejoin="round" stroke-opacity="0.7"/>
+  <path d="M118 70 c14 -11 32 -16 50 -16 c6 0 10 4 10 10 v96 c0 6 -4 10 -10 10 c-18 0 -34 5 -46 15
+           c-3 2.5 -4 2.5 -4 -2 v-113 z"
+        fill="none" stroke="#9aa0f8" stroke-width="9" stroke-linejoin="round" stroke-opacity="0.7"/>
+  <path d="M74 90 h28 m-28 20 h28 m-28 20 h20" fill="none" stroke="#9aa0f8" stroke-width="6"
+        stroke-linecap="round" stroke-opacity="0.45"/>
+  <!-- buyutec rozeti (arama) -->
+  <rect x="118" y="118" width="106" height="106" rx="24" fill="url(#dolu)"/>
+  <circle cx="162" cy="162" r="20" fill="none" stroke="#ffffff" stroke-width="9"/>
+  <line x1="177" y1="177" x2="198" y2="198" stroke="#ffffff" stroke-width="10" stroke-linecap="round"/>
+</svg>

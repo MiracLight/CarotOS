@@ -15,7 +15,8 @@ ZORUNLU_ALANLAR = ["id", "arac", "seviye", "baslik", "senaryo", "hedef",
 
 GECERLI_SEVIYELER = {"baslangic", "orta", "ileri"}
 GECERLI_HEDEF_TURLERI = {"canli_servis", "statik_dosya", "sistem_araci"}
-GECERLI_DOGRULAMA_TURLERI = {"kullanici_girdisi", "ufw_engeli", "fail2ban_durumu"}
+GECERLI_DOGRULAMA_TURLERI = {"kullanici_girdisi", "ufw_engeli", "fail2ban_durumu",
+                             "carotpot_kaydi"}
 
 
 def dogrula(dosya_yolu: Path) -> list[str]:
@@ -90,6 +91,47 @@ def dogrula(dosya_yolu: Path) -> list[str]:
 
     if dogrulama_turu == "fail2ban_durumu" and not hedef.get("jail"):
         hatalar.append("dogrulama.tur == 'fail2ban_durumu' için hedef.jail zorunlu (örn. 'sshd')")
+
+    fu = veri.get("flag_uretimi", {})
+    if fu.get("yontem") == "uretec":
+        import uretilen_gorevler as _ug
+        ad = fu.get("uretec")
+        if ad not in _ug.URETECLER:
+            hatalar.append(f"bilinmeyen üreteç: '{ad}' (izinli: {sorted(_ug.URETECLER)})")
+        elif (ad in _ug.AG_URETECLERI) != (tur == "canli_servis"):
+            hatalar.append(f"üreteç '{ad}' için hedef.tur "
+                           f"{'canli_servis' if ad in _ug.AG_URETECLERI else 'statik_dosya'} olmalı")
+        if dogrulama_turu != "kullanici_girdisi":
+            hatalar.append("uretec görevleri dogrulama.tur = 'kullanici_girdisi' kullanır")
+        sp = fu.get("sabit_parametreler")
+        if sp is not None and not isinstance(sp, dict):
+            hatalar.append("flag_uretimi.sabit_parametreler bir sözlük olmalı")
+
+    if dogrulama_turu == "carotpot_kaydi":
+        # CarotPot laboratuvari: her zorlukta hangi tuzaklarin acilacagi ve
+        # kac giris denemesi gerektigi bellidir; hizmetler ve port araligi
+        # tuzak_laboratuvari.py'nin destekledigiyle uyumlu olmalidir.
+        from tuzak_laboratuvari import DESTEKLENEN_HIZMETLER
+        zl = veri.get("zorluklar")
+        if not isinstance(zl, dict) or not zl:
+            hatalar.append("carotpot_kaydi için 'zorluklar' zorunlu")
+        else:
+            for seviye, p in zl.items():
+                if not isinstance(p, dict):
+                    continue
+                hz = p.get("hizmetler")
+                if (not isinstance(hz, list) or not hz
+                        or set(hz) - set(DESTEKLENEN_HIZMETLER)):
+                    hatalar.append(f"zorluklar['{seviye}'].hizmetler geçersiz "
+                                   f"(izinli: {sorted(DESTEKLENEN_HIZMETLER)})")
+                ar = p.get("tuzak_port_araligi")
+                if (not isinstance(ar, list) or len(ar) != 2
+                        or not all(isinstance(x, int) for x in ar)
+                        or not 1024 <= ar[0] <= ar[1] <= 65535):
+                    hatalar.append(f"zorluklar['{seviye}'].tuzak_port_araligi geçersiz")
+                g = p.get("gerekli_giris", 1)
+                if not isinstance(g, int) or isinstance(g, bool) or not 1 <= g <= 20:
+                    hatalar.append(f"zorluklar['{seviye}'].gerekli_giris 1-20 arası olmalı")
 
     puan = veri.get("puan")
     if isinstance(puan, dict):

@@ -1,0 +1,79 @@
+{
+  "id": "carotpot-02",
+  "arac": "carotpot",
+  "seviye": "orta",
+  "baslik": {
+    "tr": "Honeypot Raporu Okuma",
+    "en": "Reading a Honeypot Report"
+  },
+  "senaryo": {
+    "tr": "Bilgisayarında senin için ayrı bir CarotPot tuzağı ({tuzaklar}) çalışıyor ve içine birkaç 'saldırgan' girmeye çalıştı. CarotPot'un raporunu aç ve en çok olay üreten kaynak IP adresini yaz.",
+    "en": "A separate CarotPot trap ({tuzaklar}) is running on your computer and a few 'attackers' tried to get in. Open CarotPot's report and enter the source IP that produced the most events."
+  },
+  "ipucu": {
+    "tr": "{rapor_komutu}",
+    "en": "{rapor_komutu}"
+  },
+  "hedef": {
+    "tur": "canli_servis",
+    "servis_modulu": "tuzak_laboratuvari.TuzakLab",
+    "bind_adres": "127.0.0.1",
+    "coklu_port": true,
+    "_kural": "bind_adres HER ZAMAN loopback; üreteç ag_guvenlik ile ayrıca denetler."
+  },
+  "flag_uretimi": {
+    "yontem": "uretec",
+    "uretec": "tuzak_kayit_oku",
+    "_not": "Ayrı bir CarotPot laboratuvarı kurulur; benzetilmiş saldırganlar 127.x kaynak adreslerinden tuzağa girer, cevap tuzağın kendi kaydından hesaplanır."
+  },
+  "dogrulama": {
+    "tur": "kullanici_girdisi",
+    "karsilastirma": "birebir",
+    "deneme_siniri": null
+  },
+  "zorluklar": {
+    "kolay": {
+      "saldirgan_sayisi": 2,
+      "hizmetler": [
+        "ftp"
+      ],
+      "en_cok_deneme": 8,
+      "tuzak_port_araligi": [
+        21000,
+        21999
+      ]
+    },
+    "orta": {
+      "saldirgan_sayisi": 4,
+      "hizmetler": [
+        "ftp",
+        "telnet"
+      ],
+      "en_cok_deneme": 10,
+      "tuzak_port_araligi": [
+        21000,
+        21999
+      ]
+    },
+    "zor": {
+      "saldirgan_sayisi": 6,
+      "hizmetler": [
+        "ftp",
+        "telnet",
+        "http"
+      ],
+      "en_cok_deneme": 14,
+      "tuzak_port_araligi": [
+        21000,
+        21999
+      ]
+    }
+  },
+  "puan": {
+    "kolay": 60,
+    "orta": 130,
+    "zor": 240
+  },
+  "sure_siniri_dk": null,
+  "savunma_gorevi_id": null
+}

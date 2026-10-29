@@ -38,6 +38,10 @@ class OdaDurumu:
         # "Soru Olustur" ile atanan OZEL parametreler: gorev_id -> param sozlugu.
         # Isimli zorluk yerine dogrudan bu parametreler ogrenciye tasinir.
         self.gorev_parametreleri: dict[str, dict] = {}
+        # Atanan soru varyanti (gorev_id -> numara) ve gorev basina kullanilmis
+        # varyantlar (otomatik secim ayni soruyu arka arkaya vermesin).
+        self.gorev_varyantlari: dict[str, int] = {}
+        self._varyant_gecmisi: dict[str, list[int]] = {}
         # Siniftaki "N. soru" sayaci. 0 = henuz soru atanmadi. Ogretmen her
         # "Soruyu Ata" dediginde (gorev_ata / ozel_soru_ata) 1 artar.
         self.aktif_soru_no = 0
@@ -74,18 +78,39 @@ class OdaDurumu:
         with self._kilit:
             self.acik_gorevler.discard(gorev_id)
             self.gorev_zorluklari.pop(gorev_id, None)
+            self.gorev_varyantlari.pop(gorev_id, None)
 
-    def gorev_ata(self, gorev_id: str, zorluk: str = "orta") -> int:
+    def varyant_oner(self, gorev_id: str, zorluk: str = "orta") -> int:
+        """Gorev icin SIRADAKI soru varyantini secer: ayni gorevde daha once
+        kullanilmamis olanlardan, zorluga uygun rastgele biri; hepsi
+        kullanildiysa dongu yeniden baslar. Varyanti olmayan gorevde 0."""
+        import varyantlar as _vy
+        with self._kilit:
+            kullanilan = self._varyant_gecmisi.setdefault(gorev_id, [])
+            no = _vy.gorev_varyant_sec(gorev_id, zorluk, kullanilan)
+            if no and no in kullanilan:
+                # tum varyantlar bitti: yeni tur; son verilen yine de elenir ki
+                # tur sinirinda ayni soru art arda gelmesin
+                kullanilan[:] = kullanilan[-1:]
+                no = _vy.gorev_varyant_sec(gorev_id, zorluk, kullanilan)
+            if no:
+                kullanilan.append(no)
+            return no
+
+    def gorev_ata(self, gorev_id: str, zorluk: str = "orta", varyant: int | None = None) -> int:
         """Ogretmen 'Soruyu Ata' dediginde cagrilir: acik gorevi (ve
         zorlugunu) bununla DEGISTIRIR ve sira numarasini bir artirir.
         Siniftaki 'N. soru' kavraminin kaynagi budur. Atanan soru
         numarasini doner."""
         if zorluk not in ("kolay", "orta", "zor"):
             zorluk = "orta"
+        if varyant is None:                      # otomatik: bilgisayar secer
+            varyant = self.varyant_oner(gorev_id, zorluk)
         with self._kilit:
             self.acik_gorevler = {gorev_id}
             self.gorev_zorluklari = {gorev_id: zorluk}
             self.gorev_parametreleri = {}  # hazir soru -> ozel parametre yok
+            self.gorev_varyantlari = {gorev_id: int(varyant)} if varyant else {}
             self.aktif_soru_no += 1
             return self.aktif_soru_no
 
@@ -93,10 +118,18 @@ class OdaDurumu:
         """'Soru Olustur': ogretmenin KENDI belirledigi parametrelerle bir
         soru atar. Isimli zorluk yerine parametreler dogrudan ogrenciye
         tasinir; makine cevabi bunlara gore uretilir. Soru numarasini doner."""
+        parametreler = dict(parametreler)
+        try:
+            varyant = int(parametreler.pop("varyant", 0) or 0)
+        except (TypeError, ValueError):
+            varyant = 0
+        if varyant < 1:                          # 0 / bos: bilgisayar secer
+            varyant = self.varyant_oner(gorev_id, "orta")
         with self._kilit:
             self.acik_gorevler = {gorev_id}
             self.gorev_zorluklari = {}          # ozel soruda isimli zorluk yok
-            self.gorev_parametreleri = {gorev_id: dict(parametreler)}
+            self.gorev_parametreleri = {gorev_id: parametreler}
+            self.gorev_varyantlari = {gorev_id: varyant} if varyant else {}
             self.aktif_soru_no += 1
             return self.aktif_soru_no
 
@@ -230,6 +263,7 @@ class OdaDurumu:
                 "acik_gorevler": sorted(self.acik_gorevler),
                 "zorluklar": dict(self.gorev_zorluklari),
                 "parametreler": dict(self.gorev_parametreleri),
+                "varyantlar": dict(self.gorev_varyantlari),
                 "hedef_adres": self.hedef_adres,
                 "ayar_surumu": self.ayar_surumu,
                 "aktif_soru_no": self.aktif_soru_no,
@@ -292,6 +326,7 @@ def _sunucu_sinifi_olustur(oda: OdaDurumu):
                     "acik_gorevler": sorted(oda.acik_gorevler),
                     "zorluklar": dict(oda.gorev_zorluklari),
                     "parametreler": dict(oda.gorev_parametreleri),
+                    "varyantlar": dict(oda.gorev_varyantlari),
                     "hedef_adres": oda.hedef_adres,
                     "ayar_surumu": oda.ayar_surumu,
                     "aktif_soru_no": oda.aktif_soru_no,

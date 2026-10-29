@@ -19,7 +19,17 @@ import subprocess
 import os
 import sys
 
-APP_VERSION = "1.2"
+# Ortak grafit tema: kurulu sistemde /opt/carotos/ortak, depoda kardes klasor
+sys.dont_write_bytecode = True      # ortak klasore __pycache__ yazilmasin
+ORTAK = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                     "ortak")
+if ORTAK not in sys.path:
+    sys.path.insert(0, ORTAK)
+import tema  # noqa: E402
+
+VURGU = "karsilama"                 # ortak/tema.py: marka mavisi
+
+APP_VERSION = "1.3"
 APP_CODENAME = "Eggshell"
 
 CONFIG_DIR = os.path.join(GLib.get_user_config_dir(), "carotos-welcome")
@@ -70,6 +80,10 @@ UI = {
 #   ("pairs",   [ (sol, {tr, en}), ... ])      iki sutunlu tablo
 #   ("code",    "metin")                       tek satirlik komut kutusu
 #   ("note",    {tr, en})                      vurgulu not kutusu
+#   ("links",   [ (metin, url, {tr, en}), ... ]) tiklanabilir web baglantilari
+#   ("grid",    [ (baslik, {tr, en}), ... ])   iki sutunlu kutu izgarasi
+#   ("action",  ({tr, en} baslik, {tr, en} alt, [komut, ...]))
+#                                               tiklandiginda bir uygulama acan buyuk kutu
 
 PAGES = [
     {
@@ -437,6 +451,201 @@ PAGES = [
         ],
     },
     {
+        "id": "carotpot",
+        "title": {"tr": "CarotOS CarotPot", "en": "CarotOS CarotPot"},
+        "subtitle": {
+            "tr": "Ağınızı tarayan ya da saldıran cihazları yakalayın",
+            "en": "Catch devices that scan or attack your network",
+        },
+        "image": "carotpot.png",
+        "body": [
+            ("p", {
+                "tr": "CarotPot, yerel ağınızda sahte bir hedef gibi davranan bir "
+                      "bal küpü (honeypot) uygulamasıdır. Gerçek sistemlerinize "
+                      "dokunmadan, ağınızı tarayan ya da ona saldırmaya çalışan "
+                      "cihazları tespit eder.",
+                "en": "CarotPot is a honeypot that behaves like a fake target on "
+                      "your local network. Without touching your real systems, it "
+                      "detects devices that scan or try to attack your network.",
+            }),
+            ("bullets", [
+                {"tr": "Port tarama, kaba kuvvet denemesi gibi şüpheli davranışları "
+                       "canlı olarak yakalar.",
+                 "en": "Catches suspicious behaviour such as port scans and "
+                       "brute-force attempts live."},
+                {"tr": "Saldıran cihazın IP adresini, zamanını ve ne yaptığını "
+                       "kaydeder.",
+                 "en": "Logs the attacking device's IP address, time and what it "
+                       "did."},
+                {"tr": "Tamamen yereldir; hiçbir veri dışarı gönderilmez.",
+                 "en": "Entirely local; no data is sent anywhere."},
+            ]),
+        ],
+    },
+    {
+        "id": "carotene",
+        "title": {"tr": "CarotOS Carotene", "en": "CarotOS Carotene"},
+        "subtitle": {
+            "tr": "ClamAV ile dosyalarınızı bilinen zararlı yazılımlara karşı tarayın",
+            "en": "Scan your files for known malware with ClamAV",
+        },
+        "image": "carotene.png",
+        "body": [
+            ("p", {
+                "tr": "Carotene, ClamAV motorunu kullanan basit bir antivirüs "
+                      "uygulamasıdır. Seçtiğiniz dosya ya da klasörleri bilinen "
+                      "zararlı yazılım imzalarına karşı tarar.",
+                "en": "Carotene is a simple antivirus application built on the "
+                      "ClamAV engine. It scans the files or folders you choose "
+                      "against known malware signatures.",
+            }),
+            ("bullets", [
+                {"tr": "Tek dosya, bir klasör ya da tüm ev dizininizi "
+                       "tarayabilirsiniz.",
+                 "en": "Scan a single file, a folder, or your entire home "
+                       "directory."},
+                {"tr": "Bulunan tehditler karantinaya alınabilir ya da silinebilir.",
+                 "en": "Detected threats can be quarantined or deleted."},
+                {"tr": "İmza veritabanı tek düğmeyle güncellenir.",
+                 "en": "The signature database updates with a single button."},
+            ]),
+        ],
+    },
+    {
+        "id": "health",
+        "title": {"tr": "CarotOS Sistem Sağlığı", "en": "CarotOS System Health"},
+        "subtitle": {
+            "tr": "Sisteminizin güvenlik ve bakım durumunu tek bakışta görün",
+            "en": "See your system's security and maintenance status at a glance",
+        },
+        "image": "health.png",
+        "body": [
+            ("p", {
+                "tr": "CarotOS Sistem Sağlığı, sisteminizi düzenli olarak "
+                      "denetleyerek güvenlik duvarı, güncellemeler, parola "
+                      "politikası gibi önemli ayarların durumunu kontrol eder ve "
+                      "basit bir dille özetler.",
+                "en": "CarotOS System Health audits your system regularly, "
+                      "checking important settings such as the firewall, updates "
+                      "and password policy, and summarises the results in plain "
+                      "language.",
+            }),
+            ("bullets", [
+                {"tr": "Her bulgu, ne anlama geldiği ve nasıl düzeltileceğiyle "
+                       "birlikte açıklanır.",
+                 "en": "Every finding is explained, along with what it means and "
+                       "how to fix it."},
+                {"tr": "Denetimler düşük, orta ve yüksek önem derecesine göre "
+                       "sıralanır.",
+                 "en": "Checks are ranked by low, medium and high severity."},
+                {"tr": "Tek düğmeyle yeniden tarama yapılabilir.",
+                 "en": "A single button re-runs the scan."},
+            ]),
+        ],
+    },
+    {
+        "id": "filenor",
+        "title": {"tr": "CarotOS Filenor", "en": "CarotOS Filenor"},
+        "subtitle": {
+            "tr": "Görsel, ses, video ve belgeleri terminale gerek kalmadan "
+                  "dönüştürün",
+            "en": "Convert images, audio, video and documents without the "
+                  "terminal",
+        },
+        "image": "filenor.png",
+        "body": [
+            ("p", {
+                "tr": "Filenor, günlük dosya işlerini tek bir pencerede toplayan "
+                      "bir dönüştürücüdür. Görsel, ses, video, belge ve yazı tipi "
+                      "biçimleri arasında dönüştürme yapar.",
+                "en": "Filenor brings everyday file tasks into a single window. "
+                      "It converts between image, audio, video, document and "
+                      "font formats.",
+            }),
+            ("bullets", [
+                {"tr": "PDF'leri birleştirir, böler ve parola ile kilitler.",
+                 "en": "Merges, splits and password-locks PDFs."},
+                {"tr": "Taranmış belgelerden OCR ile metin çıkarır.",
+                 "en": "Extracts text from scanned documents with OCR."},
+                {"tr": "Birden fazla dosyayı aynı anda, toplu olarak dönüştürür.",
+                 "en": "Converts many files at once, in batch."},
+            ]),
+        ],
+    },
+    {
+        "id": "former",
+        "title": {"tr": "CarotOS Former", "en": "CarotOS Former"},
+        "subtitle": {
+            "tr": "Güvenlik araçlarını canlandırmalı, adım adım bir rehberle "
+                  "öğrenin",
+            "en": "Learn the security tools with an animated, step-by-step "
+                  "guide",
+        },
+        "image": "former.png",
+        "body": [
+            ("p", {
+                "tr": "Former, Güvenlik Paneli'ndeki her aracı, CarotPot'u ve "
+                      "Carotene'i canlandırmalı ekranlarla adım adım anlatan bir "
+                      "rehberdir. Kendi hızınızda, dokunmadan önce ne olacağını "
+                      "görerek ilerlersiniz.",
+                "en": "Former is a guide that walks through every Security Panel "
+                      "tool, plus CarotPot and Carotene, with animated, "
+                      "step-by-step screens. You move at your own pace, seeing "
+                      "what happens before you try it yourself.",
+            }),
+            ("bullets", [
+                {"tr": "Her araç için ne işe yaradığı, ne zaman kullanılacağı ve "
+                       "örnek bir çalıştırma gösterilir.",
+                 "en": "For each tool it shows what it does, when to use it, and "
+                       "an example run."},
+                {"tr": "Adımlar arasında istediğiniz zaman ileri geri "
+                       "gidebilirsiniz.",
+                 "en": "You can move back and forth between steps at any time."},
+                {"tr": "Yeni başlayanlar için gerçek araçları çalıştırmadan "
+                       "önceki en güvenli durak.",
+                 "en": "The safest stop for beginners before running the real "
+                       "tools."},
+            ]),
+        ],
+    },
+    {
+        "id": "gsd",
+        "title": {"tr": "CarotOS GSD", "en": "CarotOS GSD"},
+        "subtitle": {
+            "tr": "Linux, ağ, güvenlik ve kriptografi terimleri için aranabilir "
+                  "bir sözlük",
+            "en": "A searchable dictionary of Linux, networking, security and "
+                  "cryptography terms",
+        },
+        "image": "gsd.png",
+        "body": [
+            ("p", {
+                "tr": "GSD (Genel Sistem Sözlüğü), bu turda ve Güvenlik "
+                      "Paneli'nde karşınıza çıkan terimleri açıklayan, iki dilli "
+                      "bir başvuru kaynağıdır. 150'den fazla terim; kategoriye "
+                      "göre süzebilir ya da arayabilirsiniz.",
+                "en": "GSD (General System Dictionary) is a bilingual reference "
+                      "that explains the terms you encounter in this tour and in "
+                      "the Security Panel. Over 150 terms, filterable by "
+                      "category or searchable directly.",
+            }),
+            ("bullets", [
+                {"tr": "Linux, ağ, güvenlik, kriptografi ve algoritma "
+                       "kategorilerine ayrılmıştır.",
+                 "en": "Organised into Linux, networking, security, "
+                       "cryptography and algorithms categories."},
+                {"tr": "Her terim kısa bir tanım, ayrıntılı açıklama ve çoğu "
+                       "zaman bir örnekle anlatılır.",
+                 "en": "Each term comes with a short definition, a detailed "
+                       "explanation and often an example."},
+                {"tr": "İlgili terimler birbirine bağlıdır; biri okurken "
+                       "diğerine tek tıkla geçebilirsiniz.",
+                 "en": "Related terms are cross-linked; jump from one to another "
+                       "with a single click."},
+            ]),
+        ],
+    },
+    {
         "id": "terminal",
         "title": {"tr": "Terminale ilk adım", "en": "First steps in the terminal"},
         "subtitle": {
@@ -485,6 +694,17 @@ PAGES = [
                  {"tr": "Ağ taramanın kaynak kitabı, ücretsiz okunabilir.",
                   "en": "The reference book on network scanning, free to read."}),
             ]),
+            ("action", (
+                {"tr": "CarotOS Former'ı aç", "en": "Open CarotOS Former"},
+                {"tr": "Güvenlik Paneli'ndeki her araç, CarotPot ve Carotene için "
+                       "canlandırmalı, adım adım bir rehber. Burada gördüklerinizi "
+                       "biraz daha ayrıntılı, kendi hızınızda öğrenmek isterseniz "
+                       "başlamak için en iyi yer.",
+                 "en": "A live, step-by-step walkthrough for every Security Panel "
+                       "tool, CarotPot and Carotene. The best place to start if you "
+                       "want to go a little deeper, at your own pace."},
+                ["python3", "/opt/carotos/former/carotos-former.py"],
+            )),
             ("p", {
                 "tr": "CarotOS açık kaynaklıdır. Hata bildirebilir, öneride "
                       "bulunabilir veya katkı verebilirsiniz.",
@@ -602,6 +822,7 @@ SIBLING_CONFIGS = [
     ("carotos-panel", "settings.json"),
     ("carotos-health", "settings.json"),
     ("carotos-usb", "settings.json"),
+    ("carotos-former", "settings.json"),
 ]
 
 # Koyu ve acik tema adaylari — sistemde bulunan ilki kullanilir.
@@ -609,7 +830,7 @@ DARK_THEMES = ["Arc-Dark", "Materia-dark", "Greybird-dark",
                "Adwaita-dark", "Numix-Dark", "Adwaita"]
 LIGHT_THEMES = ["Arc", "Materia", "Greybird", "Adwaita", "Default"]
 
-# Simge temasi adaylari (CarotOS 1.2: Papirus). Sistemde bulunan ilki kullanilir.
+# Simge temasi adaylari (CarotOS 1.3: Papirus). Sistemde bulunan ilki kullanilir.
 DARK_ICON_THEMES = ["Papirus-Dark", "Papirus", "gnome"]
 LIGHT_ICON_THEMES = ["Papirus-Light", "Papirus", "gnome"]
 
@@ -788,11 +1009,15 @@ def apply_sibling_settings(lang, theme):
         except (OSError, ValueError):
             pass
         data["lang"] = lang
+        data["theme"] = theme
         if folder == "carotos-panel":
             # Guvenlik Paneli dil anahtarini "language" diye okur; "lang"
             # yazmak onu hic etkilemiyordu.
             data["language"] = lang
-        data["theme"] = theme
+        elif folder == "carotos-former":
+            # Former dil/tema anahtarlarini "dil"/"tema" diye okur.
+            data["dil"] = lang
+            data["tema"] = theme
         try:
             os.makedirs(os.path.dirname(path), exist_ok=True)
             with open(path, "w", encoding="utf-8") as fh:
@@ -926,8 +1151,6 @@ def find_logo():
 
 class WelcomeWindow(Gtk.Window):
 
-    ACCENT = "#87979B"
-
     def __init__(self, settings):
         super().__init__(title=UI["window_title"][settings["lang"]])
 
@@ -949,11 +1172,14 @@ class WelcomeWindow(Gtk.Window):
                 pass
         self.connect("destroy", self.on_destroy)
 
+        # Ortak grafit tema (tema.uygula); asagidaki saglayici yalnizca
+        # sihirbaza ozgu siniflari boyar ve ortak temanin ustunde durur.
+        tema.uygula(self.theme, VURGU)
         self.css_provider = Gtk.CssProvider()
         Gtk.StyleContext.add_provider_for_screen(
             Gdk.Screen.get_default(),
             self.css_provider,
-            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 1,
         )
 
         root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -981,7 +1207,7 @@ class WelcomeWindow(Gtk.Window):
     def build_header(self):
         box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         box.get_style_context().add_class("header")
-        box.set_border_width(14)
+        box.get_style_context().add_class("pad-header")
 
         # Ust bantta logo yok: pencere kenarindaki simgeyle tekrar oluyordu.
         wordmark = Gtk.Label(label="CarotOS", xalign=0.0)
@@ -1025,7 +1251,11 @@ class WelcomeWindow(Gtk.Window):
         for i in range(len(PAGES)):
             dot = Gtk.Label(label="")
             dot.get_style_context().add_class("dot")
-            self.dots.pack_start(dot, False, False, 0)
+            dot_box = Gtk.EventBox()
+            dot_box.add(dot)
+            dot_box.connect("button-press-event", self.on_dot_clicked, i)
+            dot_box.connect("realize", self._el_isaretci_yap)
+            self.dots.pack_start(dot_box, False, False, 0)
         box.set_center_widget(self.dots)
 
         self.next_btn = Gtk.Button()
@@ -1356,7 +1586,7 @@ class WelcomeWindow(Gtk.Window):
         frame.get_style_context().add_class("pick-card")
         # Ic bosluk: onizleme gorseli kartin yuvarlak kenarina yapismasin,
         # kosesinden tasmasin.
-        frame.set_border_width(10)
+        frame.get_style_context().add_class("pad-xs")
         event.add(frame)
 
         try:
@@ -1468,7 +1698,7 @@ class WelcomeWindow(Gtk.Window):
         yerlestirir (iki yaninda bosluk kalir)."""
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         box.get_style_context().add_class(style)
-        box.set_border_width(20)
+        box.get_style_context().add_class("pad")
         box.set_halign(Gtk.Align.CENTER)
         box.set_size_request(cls.CARD_WIDTH, -1)
         box.pack_start(child, True, True, 0)
@@ -1510,7 +1740,7 @@ class WelcomeWindow(Gtk.Window):
             inner.pack_start(label, True, True, 0)
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
             box.get_style_context().add_class("note-box")
-            box.set_border_width(16)
+            box.get_style_context().add_class("pad-sm")
             box.set_halign(Gtk.Align.CENTER)
             box.set_size_request(self.CARD_WIDTH, -1)
             box.pack_start(inner, True, True, 0)
@@ -1522,7 +1752,7 @@ class WelcomeWindow(Gtk.Window):
             label.get_style_context().add_class("code-text")
             box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
             box.get_style_context().add_class("code-box")
-            box.set_border_width(11)
+            box.get_style_context().add_class("pad-sm")
             box.set_halign(Gtk.Align.CENTER)
             box.set_size_request(self.CARD_WIDTH, -1)
             box.pack_start(label, True, True, 0)
@@ -1608,7 +1838,7 @@ class WelcomeWindow(Gtk.Window):
             for i, (key, value) in enumerate(payload):
                 cell = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
                 cell.get_style_context().add_class("tile")
-                cell.set_border_width(13)
+                cell.get_style_context().add_class("pad-sm")
 
                 name = Gtk.Label(label=key, xalign=0.0)
                 name.get_style_context().add_class("tile-title")
@@ -1624,7 +1854,34 @@ class WelcomeWindow(Gtk.Window):
                 grid.attach(cell, i % 2, i // 2, 1, 1)
             return grid
 
+        if kind == "action":
+            baslik, alt_metin, komut = payload
+            inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+            title = Gtk.Label(label=baslik[self.lang], xalign=0.0)
+            title.get_style_context().add_class("action-title")
+            inner.pack_start(title, False, False, 0)
+            sub = Gtk.Label(label=alt_metin[self.lang], xalign=0.0)
+            sub.set_line_wrap(True)
+            sub.set_max_width_chars(58)
+            sub.get_style_context().add_class("action-sub")
+            inner.pack_start(sub, False, False, 0)
+
+            btn = Gtk.Button()
+            btn.get_style_context().add_class("action-card")
+            btn.add(inner)
+            btn.set_halign(Gtk.Align.CENTER)
+            btn.set_size_request(self.CARD_WIDTH, -1)
+            btn.connect("clicked", self.on_action_clicked, komut)
+            return btn
+
         return None
+
+    def on_action_clicked(self, _button, komut):
+        """'action' turundeki bir kutuya tiklandiginda ilgili uygulamayi acar."""
+        try:
+            subprocess.Popen(komut)
+        except OSError:
+            pass
 
     # -- durum yenileme ----------------------------------------------------
 
@@ -1647,8 +1904,8 @@ class WelcomeWindow(Gtk.Window):
 
         self._sync_selection()
 
-        for i, dot in enumerate(self.dots.get_children()):
-            ctx = dot.get_style_context()
+        for i, dot_box in enumerate(self.dots.get_children()):
+            ctx = dot_box.get_child().get_style_context()
             if i == self.index:
                 ctx.add_class("dot-active")
             else:
@@ -1703,6 +1960,24 @@ class WelcomeWindow(Gtk.Window):
             self.index -= 1
             self.refresh()
 
+    def _el_isaretci_yap(self, widget):
+        pencere = widget.get_window()
+        if pencere:
+            pencere.set_cursor(
+                Gdk.Cursor.new_from_name(widget.get_display(), "pointer"))
+
+    def on_dot_clicked(self, _widget, _event, index):
+        if index == self.index:
+            return
+        if index > self.index:
+            self.stack.set_transition_type(
+                Gtk.StackTransitionType.SLIDE_LEFT)
+        else:
+            self.stack.set_transition_type(
+                Gtk.StackTransitionType.SLIDE_RIGHT)
+        self.index = index
+        self.refresh()
+
     def on_lang_changed(self, combo):
         chosen = combo.get_active_id()
         if not chosen or chosen == self.lang:
@@ -1734,151 +2009,88 @@ class WelcomeWindow(Gtk.Window):
     # -- tema --------------------------------------------------------------
 
     def apply_theme(self):
-        if self.theme == "dark":
-            bg = "#1f2325"; header = "#2b2f31"; fg = "#e6e6e6"
-            sub = "#9aa4a8"; field = "#2b2f31"
-            card = "#282d2f"; card_border = "#363c3e"
-            note_bg = "#2c3134"; row_sep = "#363c3e"
-            btn_bg = "#343a3c"; btn_hover = "#3f4649"; border = "#454b4e"
-            dot = "#4a5154"; code_fg = "#8fd6c4"; tile = "#2c3133"
-        else:
-            bg = "#f2f4f5"; header = "#e4e7e9"; fg = "#1f2325"
-            sub = "#5c666a"; field = "#ffffff"
-            card = "#ffffff"; card_border = "#dde2e4"
-            note_bg = "#eef1f2"; row_sep = "#e6eaeb"
-            btn_bg = "#ffffff"; btn_hover = "#eef0f1"; border = "#c3c8ca"
-            dot = "#c3c8ca"; code_fg = "#1f5f52"; tile = "#ffffff"
-
-        Gtk.Settings.get_default().set_property(
-            "gtk-application-prefer-dark-theme", self.theme == "dark")
+        p = tema.uygula(self.theme, VURGU)
+        vz = tema.rgba_metni(p["vurgu"], 0.14)
 
         css = f"""
-        window {{ background-color: {bg}; color: {fg}; }}
-        label {{ color: {fg}; }}
+        .header {{ background-color: {p['yan']}; }}
+        .pad {{ padding: 18px 22px; }}
+        .pad-sm {{ padding: 14px 16px; }}
+        .pad-xs {{ padding: 10px; }}
+        .pad-header {{ padding: 12px 16px; }}
+        .wordmark {{ font-size: 132%; font-weight: 800; letter-spacing: 1px; }}
+        .version-tag {{ color: {p['soluk']}; font-size: 85%;
+                        background-color: {p['kart2']}; border-radius: 999px;
+                        padding: 2px 10px; }}
 
-        .header {{ background-color: {header}; }}
-        .wordmark {{ font-size: 132%; font-weight: bold; letter-spacing: 1px; }}
-        .version-tag {{ color: {sub}; font-size: 88%; }}
-
-        .page-title {{ font-size: 176%; font-weight: bold; }}
-        .title-rule {{ background-color: {self.ACCENT}; border-radius: 2px; }}
-        .page-subtitle {{ color: {sub}; font-size: 106%; }}
+        .page-title {{ font-size: 182%; font-weight: 800; }}
+        .title-rule {{ background-color: {p['vurgu']}; border-radius: 2px; }}
+        .page-subtitle {{ color: {p['soluk']}; font-size: 106%; }}
         .body-text {{ font-size: 100%; }}
 
-        .card {{
-            background-color: {card};
-            border: 1px solid {card_border};
-            border-radius: 8px;
-        }}
-        .row-sep {{ background-color: {row_sep}; }}
-        .pair-key {{ font-weight: bold; color: {self.ACCENT}; }}
+        .card {{ background-color: {p['kart']}; border: 1px solid {p['cizgi']};
+                 border-radius: 12px; }}
+        .row-sep {{ background-color: {tema.rgba_metni(p['cizgi'], 0.7)}; }}
+        .pair-key {{ font-weight: bold; color: {p['vurgu_yazi']}; }}
         .link-key {{ font-weight: bold; }}
-        .link-key a {{ color: {self.ACCENT}; text-decoration: none; }}
+        .link-key a {{ color: {p['vurgu_yazi']}; text-decoration: none; }}
         .link-key a:hover {{ text-decoration: underline; }}
-        .bullet-marker {{ color: {self.ACCENT}; font-size: 100%; }}
+        .bullet-marker {{ color: {p['vurgu_yazi']}; font-size: 100%; }}
 
-        .tile {{
-            background-color: {tile};
-            border: 1px solid {card_border};
-            border-radius: 8px;
-        }}
-        .tile-title {{ font-weight: bold; color: {self.ACCENT}; font-size: 103%; }}
-        .tile-text {{ color: {sub}; font-size: 92%; }}
+        .tile {{ background-color: {p['kart']}; border: 1px solid {p['cizgi']};
+                 border-radius: 12px; }}
+        .tile-title {{ font-weight: bold; color: {p['vurgu_yazi']}; font-size: 103%; }}
+        .tile-text {{ color: {p['soluk']}; font-size: 92%; }}
 
-        .note-box {{
-            background-color: {note_bg};
-            border: 1px solid {card_border};
-            border-left: 3px solid {self.ACCENT};
-            border-radius: 8px;
-        }}
-        .note-mark {{
-            color: #ffffff;
-            background-color: {self.ACCENT};
-            font-weight: bold;
-            font-size: 88%;
-            border-radius: 999px;
-            min-width: 19px; min-height: 19px;
-        }}
-        .note-text {{ color: {sub}; font-size: 95%; }}
+        .note-box {{ background-color: {tema.rgba_metni(p['vurgu'], 0.10)};
+                     border: 1px solid {tema.rgba_metni(p['vurgu'], 0.35)};
+                     border-radius: 10px; }}
+        .note-mark {{ color: #ffffff; background-color: {p['vurgu']};
+                      font-weight: bold; font-size: 88%; border-radius: 999px;
+                      min-width: 19px; min-height: 19px; }}
+        .note-text {{ color: {p['yazi']}; font-size: 95%; }}
 
-        .code-box {{
-            background-color: {field};
-            border: 1px solid {border};
-            border-radius: 6px;
-        }}
-        .code-text {{ font-family: monospace; color: {code_fg}; }}
+        .code-box {{ background-color: {p['kart2']}; border: 1px solid {p['cizgi']};
+                     border-radius: 8px; }}
+        .code-text {{ font-family: monospace; color: {p['vurgu_yazi']}; }}
 
-        .shot-frame {{
-            border: 1px solid {card_border};
-            border-radius: 8px;
-            background-color: {card};
-        }}
+        .shot-frame {{ border: 1px solid {p['cizgi']}; border-radius: 12px;
+                       background-color: {p['kart']}; }}
 
-        .scope-note {{ color: {sub}; font-size: 84%; }}
-        .pick-card {{
-            background-color: {card}; border: 2px solid {card_border};
-            border-radius: 10px;
-        }}
-        .pick-card:hover {{ border-color: {sub}; }}
-        .pick-selected {{ border-color: {self.ACCENT}; }}
+        .scope-note {{ color: {p['soluk']}; font-size: 84%; }}
+        .pick-card {{ background-color: {p['kart']};
+                      border: 2px solid {p['cizgi']}; border-radius: 12px; }}
+        .pick-card:hover {{ border-color: {p['silik']}; }}
+        .pick-selected, .pick-selected:hover {{ border-color: {p['vurgu']};
+                                                background-color: {vz}; }}
         .pick-title {{ font-size: 108%; font-weight: bold; }}
-        .pick-sub {{ color: {sub}; font-size: 85%; }}
+        .pick-sub {{ color: {p['soluk']}; font-size: 85%; }}
         .section-title {{ font-size: 106%; font-weight: bold; }}
-        .wp-thumb {{ border-radius: 5px; }}
+        .wp-thumb {{ border-radius: 6px; }}
 
-        .preview-light {{
-            background-color: #f4f5f6; border: 1px solid #d4d9db;
-            border-radius: 6px;
-        }}
-        .preview-dark {{
-            background-color: #23282a; border: 1px solid #3a4042;
-            border-radius: 6px;
-        }}
+        .preview-light {{ background-color: #f4f5f6; border: 1px solid #d4d9db;
+                          border-radius: 6px; }}
+        .preview-dark {{ background-color: #23282a; border: 1px solid #3a4042;
+                         border-radius: 6px; }}
         .preview-bar-light {{ background-color: #e2e6e8; }}
         .preview-bar-dark {{ background-color: #2e3436; }}
-        .preview-dot {{ background-color: {self.ACCENT}; border-radius: 999px; }}
+        .preview-dot {{ background-color: {p['vurgu']}; border-radius: 999px; }}
         .preview-line-light {{ background-color: #ccd2d4; border-radius: 3px; }}
         .preview-line-dark {{ background-color: #3d4446; border-radius: 3px; }}
-        .preview-chip {{ background-color: {self.ACCENT}; border-radius: 4px; }}
+        .preview-chip {{ background-color: {p['vurgu']}; border-radius: 4px; }}
 
-        .dot {{
-            min-width: 8px; min-height: 8px;
-            border-radius: 999px;
-            background-color: {dot};
-        }}
-        .dot-active {{ background-color: {self.ACCENT}; min-width: 22px; }}
+        .dot {{ min-width: 8px; min-height: 8px; border-radius: 999px;
+                background-color: {p['cizgi']}; }}
+        .dot-active {{ background-color: {p['vurgu']}; min-width: 22px; }}
 
-        button {{
-            background-image: none;
-            background-color: {btn_bg};
-            color: {fg};
-            border: 1px solid {border};
-            border-radius: 6px;
-            padding: 5px 18px;
-        }}
-        button label {{ color: {fg}; }}
-        button:hover {{ background-color: {btn_hover}; }}
-        button:disabled {{ color: {sub}; }}
-        button:disabled label {{ color: {sub}; }}
+        .action-card {{ background-color: {vz}; border: 2px solid {p['vurgu']};
+                        border-radius: 12px; padding: 16px 20px; }}
+        .action-card:hover {{ background-color: {tema.rgba_metni(p['vurgu'], 0.22)}; }}
+        .action-title {{ font-size: 110%; font-weight: 800; color: {p['vurgu_yazi']}; }}
+        .action-sub {{ color: {p['yazi']}; font-size: 94%; }}
 
-        button.suggested-action {{
-            background-color: {self.ACCENT};
-            border-color: {self.ACCENT};
-            color: #ffffff;
-        }}
-        button.suggested-action label {{ color: #ffffff; }}
-
-        combobox button {{ background-color: {field}; color: {fg}; }}
-        combobox button label {{ color: {fg}; }}
-        menu, .menu, popover, popover.background {{
-            background-color: {field}; color: {fg};
-        }}
-        menuitem label, popover label {{ color: {fg}; }}
-        menuitem:hover {{ background-color: {self.ACCENT}; }}
-        menuitem:hover label {{ color: #ffffff; }}
-
-        checkbutton label {{ color: {sub}; font-size: 94%; }}
-        separator {{ background-color: {border}; }}
+        button {{ padding: 6px 20px; }}
+        checkbutton label {{ color: {p['soluk']}; font-size: 94%; }}
         """
         self.css_provider.load_from_data(css.encode())
 

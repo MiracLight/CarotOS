@@ -17,6 +17,7 @@ Mimari:
 from __future__ import annotations
 
 import json
+import secrets
 import sys
 import subprocess
 import time
@@ -37,6 +38,8 @@ from servisler.sahte_web import SahteWebServisi
 from servisler.sahte_trafik import SahteTrafik  # noqa: E402
 from servisler.sahte_savunma_hedefi import BasitDinleyici  # noqa: E402
 import gecmis_defteri  # noqa: E402
+from tuzak_laboratuvari import TuzakLab  # noqa: E402
+import uretilen_gorevler  # noqa: E402
 
 GOREVLER_DIZINI = Path(__file__).resolve().parent / "gorevler"
 
@@ -117,6 +120,12 @@ class PoligonIstemci:
         self._baslangic_zamani: float | None = None
         self.dosya_yolu: str | None = None  # 'statik_dosya' görevlerinde dolar (örn. john)
         self.gercek_port: int | None = None  # port çakışması olursa değişebilir, arayüz bunu gösterir
+        # 'tuzak_kaydi' görevleri (CarotPot laboratuvarı): öğrenciye özgü kullanıcı
+        # adı ve tuzak başına gereken giriş denemesi sayısı.
+        self.tuzak_kullanici: str | None = None
+        self.tuzak_gerekli = 1
+        # 'uretec' görevleri: senaryo/ipucu yer tutucuları ({dosya}, {port}...)
+        self.uretim_degiskenleri: dict[str, str] = {}
         self._son_mesaj_no = 0  # sohbette en son görülen mesaj numarası
         # Bireysel mod: öğretmen adresi boşsa hiçbir ağ isteği YAPILMAZ.
         # Bireysel pratik hiçbir zaman öğretmen sunucusuna bağımlı olmamalı.
@@ -129,6 +138,11 @@ class PoligonIstemci:
         self._acik_zorluklar: dict[str, str] = {}
         # "Soru Olustur" ozel parametreleri: gorev_id -> param sozlugu (onbellek).
         self._acik_ozel: dict[str, dict] = {}
+        # Ogretmenin her goreve atadigi SORU VARYANTI (gorev_id -> numara); sinifta
+        # herkes ayni varyanti cozer. Aktif gorevin varyanti: bos/None ise
+        # (bireysel calisma) uretec zorluga uygun rastgele bir varyant secer.
+        self._acik_varyantlar: dict[str, int] = {}
+        self.varyant: int | None = None
         # Aktif gorevin ozel parametreleri (None ise isimli zorluk kullanilir).
         self.ozel_parametreler = None
         # "IP ve Adres": ogretmenin sinifa uyguladigi hedef loopback adresi
@@ -177,10 +191,42 @@ class PoligonIstemci:
         """Senaryo/ipucu metnindeki {aralik} yer tutucusu icin secili
         zorlugun port araligini 'lo-hi' olarak doner (nmap gibi gorevler).
         Uygun degilse bos string."""
-        ar = self._zorluk_parametreleri().get("gizli_port_araligi")
+        p = self._zorluk_parametreleri()
+        ar = (p.get("gizli_port_araligi") or p.get("tuzak_port_araligi")
+              or p.get("port_araligi"))
         if ar and len(ar) == 2:
             return f"{ar[0]}-{ar[1]}"
         return ""
+
+    def metin_degiskenleri(self) -> dict[str, str]:
+        """Senaryo/ipucu metinlerindeki ek yer tutucular. Şu an yalnızca
+        CarotPot laboratuvarı görevleri doldurur ({kullanici}, {tuzaklar},
+        {sayi}); diğer görevlerde boş sözlük döner."""
+        d: dict[str, str] = {}
+        if self.tuzak_kullanici:
+            hizmetler = self._zorluk_parametreleri().get("hizmetler") or []
+            d.update({
+                "{kullanici}": self.tuzak_kullanici,
+                "{tuzaklar}": ", ".join(str(h).upper() for h in hizmetler),
+                "{sayi}": str(self.tuzak_gerekli),
+            })
+        if self.dosya_yolu:
+            # john-01 ipucundaki <dosya_yolu> ve üreteç görevlerinin {dosya}'sı
+            d["<dosya_yolu>"] = self.dosya_yolu
+            d["<file_path>"] = self.dosya_yolu
+        d.update(self.uretim_degiskenleri)
+        return d
+
+    def metni_doldur(self, metin: str) -> str:
+        """Senaryo/ipucu metnindeki tüm yer tutucuları ({aralik}, {dosya},
+        {port}...) doldurur. Arayüz aynı adımları kendi içinde uygular; bu
+        yöntem GTK'siz testler ve ileride tek kaynağa geçiş içindir."""
+        aralik = self.aralik_metni()
+        if aralik:
+            metin = metin.replace("{aralik}", aralik)
+        for anahtar, deger in self.metin_degiskenleri().items():
+            metin = metin.replace(anahtar, deger)
+        return metin
 
     def aktif_ipucu(self, dil: str) -> str | None:
         """Zorluğa özgü ipucu metni (varsa). sqlmap gibi görevlerde zorluk
@@ -210,6 +256,10 @@ class PoligonIstemci:
         """
         if self.gorev is None:
             raise RuntimeError("önce gorevi_yukle() çağrılmalı")
+        # önceki görevden kalan metin değişkenlerini temizle
+        self.tuzak_kullanici = None
+        self.uretim_degiskenleri = {}
+        self.dosya_yolu = None
 
         hedef = dict(self.gorev["hedef"])  # kopya -- orijinal gorev bozulmasin
         yontem = self.gorev["flag_uretimi"]["yontem"]
@@ -303,6 +353,37 @@ class PoligonIstemci:
             )
             self._servis.baslat()
 
+        elif yontem == "uretec":
+            # Üreteç görevleri (günlük analizi, kodlama, adli analiz, web/banner
+            # keşfi...): içerik her açılışta rastgele üretilir, doğru cevap
+            # üretimle birlikte hesaplanır (bkz. uretilen_gorevler.py).
+            fu = self.gorev["flag_uretimi"]
+            parametreler = dict(self._zorluk_parametreleri())
+            parametreler["_zorluk"] = self.zorluk
+            if self.varyant and "varyant" not in parametreler:
+                parametreler["varyant"] = self.varyant
+            uretim = uretilen_gorevler.uret(
+                fu["uretec"], parametreler,
+                fu.get("sabit_parametreler"), hedef["bind_adres"])
+            self._servis = uretim
+            self._dogru_cevap = uretim.dogru_cevap
+            self.dosya_yolu = uretim.dosya_yolu
+            self.uretim_degiskenleri = dict(uretim.degiskenler)
+
+        elif yontem == "tuzak_kaydi":
+            # carotpot-01: öğrencinin makinesinde AYRI bir CarotPot örneği
+            # yalnızca loopback'te açılır. Doğrulama onun olay kayıtlarından
+            # yapılır (tuzak_kaydini_dogrula); doğru cevap kutusu YOKTUR.
+            p = self._zorluk_parametreleri()
+            self.tuzak_kullanici = "ziyaretci-" + secrets.token_hex(2)
+            self.tuzak_gerekli = int(p.get("gerekli_giris", 1))
+            self._servis = TuzakLab(
+                bind_adres=hedef["bind_adres"],
+                hizmetler=p.get("hizmetler") or ["ftp"],
+                port_araligi=tuple(p.get("tuzak_port_araligi") or (21000, 21999)),
+            )
+            self._servis.baslat()
+
         elif yontem == "sistem_kontrolu":
             # fail2ban-01: hiç yerel servis YOK, gerçek sistem aracının
             # (fail2ban) durumu okunur. Doğrulama fail2ban_durumunu_dogrula()
@@ -339,6 +420,12 @@ class PoligonIstemci:
     # Savunma görevleri (ufw-01, fail2ban-01) doğrulaması -- root
     # gerektirir, "kullanici_girdisi" yöntemine göre AYRI ele alınır.
     # ------------------------------------------------------------------
+    def _otomatik_tamamla(self, gecen_sure: int, ozet: str) -> None:
+        """Cevap kutusu olmayan görevler (ufw, fail2ban, CarotPot laboratuvarı)
+        için 'tamamlandi' bildirimi. Puan ve soru numarası öğretmen skoruna
+        yansısın diye cevap alanı kısa bir özetle gönderilir."""
+        self._bildir("tamamlandi", gecen_sure, cevap=ozet, puan=self.aktif_puan())
+
     def ufw_kuralini_dogrula(self, sudo_parolasi: str) -> tuple[bool, str]:
         """ufw-01: `sudo ufw status` çıktısını okur, hedef port için bir
         DENY/REJECT kuralı var mı diye bakar. Bilinçli tasarım: gerçek
@@ -360,7 +447,7 @@ class PoligonIstemci:
         )
         if kural_var:
             gecen_sure = int(time.time() - (self._baslangic_zamani or time.time()))
-            self._bildir("tamamlandi", gecen_sure)
+            self._otomatik_tamamla(gecen_sure, f"ufw: {port_str} engellendi")
             return True, "Kural bulundu: port engellenmiş."
         self._bildir("yanlis_denedi")
         return False, (
@@ -379,13 +466,42 @@ class PoligonIstemci:
         )
         if basarili and "status for the jail" in cikti.lower():
             gecen_sure = int(time.time() - (self._baslangic_zamani or time.time()))
-            self._bildir("tamamlandi", gecen_sure)
+            self._otomatik_tamamla(gecen_sure, f"fail2ban: {jail}")
             return True, cikti.strip()
         self._bildir("yanlis_denedi")
         return False, hata or (
             f"'{jail}' jail'inin durumu okunamadı. fail2ban kurulu ve "
             f"'{jail}' jail'i etkin mi?"
         )
+
+    def tuzak_kaydini_dogrula(self, dil: str = "tr") -> tuple[bool, str]:
+        """carotpot-01: laboratuvar CarotPot'unun olay kayıtlarında, öğrencinin
+        kullanıcı adıyla her tuzak için yeterli sayıda giriş denemesi var mı?
+        (basarili, mesaj) döner. Cevap ağa gitmez, kayıtlar yerel okunur."""
+        lab = self._servis
+        if not isinstance(lab, TuzakLab) or not self.tuzak_kullanici:
+            return False, ("Laboratuvar çalışmıyor." if dil == "tr"
+                           else "The lab is not running.")
+        if not lab.calisiyor_mu():
+            return False, ("Laboratuvar durmuş; görevi yeniden başlat." if dil == "tr"
+                           else "The lab has stopped; restart the task.")
+        sayim = {ad: 0 for ad in lab.hizmetler}
+        for o in lab.olaylar(tur="giris", kullanici=self.tuzak_kullanici):
+            if o["hizmet"] in sayim:
+                sayim[o["hizmet"]] += 1
+        ozet = ", ".join(f"{ad.upper()} {min(n, self.tuzak_gerekli)}/{self.tuzak_gerekli}"
+                         for ad, n in sayim.items())
+        if all(n >= self.tuzak_gerekli for n in sayim.values()):
+            gecen_sure = int(time.time() - (self._baslangic_zamani or time.time()))
+            self._otomatik_tamamla(gecen_sure, ozet)
+            return True, (f"CarotPot kayıtlarında bulundu: {ozet}" if dil == "tr"
+                          else f"Found in the CarotPot records: {ozet}")
+        self._bildir("yanlis_denedi", cevap=ozet)
+        return False, (f"Henüz yeterli kayıt yok ({ozet}). Tuzaklara "
+                       f"'{self.tuzak_kullanici}' kullanıcı adıyla giriş dene."
+                       if dil == "tr" else
+                       f"Not enough records yet ({ozet}). Try logging in to the "
+                       f"traps as '{self.tuzak_kullanici}'.")
 
     # ------------------------------------------------------------------
     # Öğretmen sunucusuyla iletişim
@@ -474,6 +590,7 @@ class PoligonIstemci:
         _, cevap = self._istek("/gorevler", {}, "GET")
         self._acik_zorluklar = cevap.get("zorluklar", {}) or {}
         self._acik_ozel = cevap.get("parametreler", {}) or {}
+        self._acik_varyantlar = {k: int(v) for k, v in (cevap.get("varyantlar", {}) or {}).items()}
         self.sinif_hedef_adres = cevap.get("hedef_adres") or None
         self.ayar_surumu = int(cevap.get("ayar_surumu", 0) or 0)
         self.aktif_soru_no = int(cevap.get("aktif_soru_no", 0) or 0)
@@ -484,6 +601,12 @@ class PoligonIstemci:
         en son cagrildiginda alinan bilgiye dayanir; bilinmiyorsa 'orta'."""
         z = self._acik_zorluklar.get(gorev_id, "orta")
         return z if z in ("kolay", "orta", "zor") else "orta"
+
+    def atanan_varyant(self, gorev_id: str) -> int | None:
+        """Ogretmenin bu goreve atadigi soru varyanti (yoksa None).
+        acik_gorevleri_getir() en son cagrildiginda alinan bilgiye dayanir."""
+        v = self._acik_varyantlar.get(gorev_id)
+        return v if v else None
 
     def atanan_parametreler(self, gorev_id: str):
         """Ogretmenin bu goreve 'Soru Olustur' ile atadigi OZEL parametreler.

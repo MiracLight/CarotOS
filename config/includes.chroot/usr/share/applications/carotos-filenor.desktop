@@ -1,0 +1,17 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Filenor
+Name[tr]=Filenor
+GenericName=File and Media Converter
+GenericName[tr]=Dosya ve Medya Dönüştürücü
+Comment=Convert images, audio, video, documents and fonts; merge, split and lock PDFs; OCR
+Comment[tr]=Görsel, ses, video, belge ve yazı tiplerini dönüştürün; PDF birleştirin, bölün, kilitleyin; OCR
+Exec=python3 /opt/carotos/filenor/filenor_uygulama.py %F
+Icon=filenor
+Terminal=false
+StartupWMClass=filenor
+Categories=Utility;Graphics;AudioVideo;Office;
+MimeType=image/jpeg;image/png;image/webp;image/gif;image/bmp;image/tiff;image/avif;image/heic;image/svg+xml;application/pdf;audio/mpeg;audio/x-wav;audio/flac;audio/ogg;audio/mp4;video/mp4;video/x-matroska;video/webm;video/quicktime;video/x-msvideo;text/plain;text/html;text/csv;application/vnd.openxmlformats-officedocument.wordprocessingml.document;application/vnd.oasis.opendocument.text;application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;application/vnd.oasis.opendocument.spreadsheet;application/vnd.openxmlformats-officedocument.presentationml.presentation;application/vnd.oasis.opendocument.presentation;font/ttf;font/otf;font/woff;font/woff2;
+Keywords=convert;converter;pdf;image;audio;video;merge;split;ocr;font;
+Keywords[tr]=dönüştür;dönüştürücü;pdf;görsel;ses;video;birleştir;böl;ocr;yazı tipi;

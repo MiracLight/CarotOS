@@ -22,7 +22,7 @@ fi
 rm -f /var/lib/clamav/freshclam.dat /var/log/clamav/freshclam.log
 
 chmod 755 /opt/carotos/carotene/carotene.py
-chmod 644 /opt/carotos/ortak/tarama_motoru.py /opt/carotos/ortak/bekleme_cubugu.py
+chmod 644 /opt/carotos/ortak/tarama_motoru.py /opt/carotos/ortak/bekleme_cubugu.py /opt/carotos/ortak/tema.py
 chmod 644 /usr/share/applications/carotos-carotene.desktop
 chmod 644 /usr/share/icons/hicolor/*/apps/carotene.png
 chmod 644 /etc/skel/.config/Thunar/uca.xml

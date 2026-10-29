@@ -334,8 +334,9 @@ def _uygulamayi_yukle():
     gi = types.ModuleType("gi")
     gi.require_version = lambda *a, **k: None
     gi.repository = repo
-    eski = {k: sys.modules.get(k) for k in ("gi", "gi.repository")}
+    eski = {k: sys.modules.get(k) for k in ("gi", "gi.repository", "tema")}
     sys.modules["gi"], sys.modules["gi.repository"] = gi, repo
+    sys.modules["tema"] = types.ModuleType("tema")      # ortak tema GTK ister
     try:
         yol = os.path.join(KOK, "config/includes.chroot/opt/carotos/carotene/carotene.py")
         spec = importlib.util.spec_from_file_location("carotene_test", yol)

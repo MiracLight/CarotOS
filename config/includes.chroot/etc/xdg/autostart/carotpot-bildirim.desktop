@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=CarotPot notifications
+Name[tr]=CarotPot bildirimleri
+Comment=Shows CarotPot alerts while the trap is running
+Comment[tr]=Tuzak açıkken CarotPot uyarılarını gösterir
+Exec=/usr/bin/python3 -I /opt/carotos/carotpot/carotpot.py bildir
+NoDisplay=true
+X-GNOME-Autostart-enabled=true

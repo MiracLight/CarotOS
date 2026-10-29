@@ -1,0 +1,16 @@
+[Unit]
+Description=CarotPot - suresi dolmus engelleri kaldir
+Documentation=file:///opt/carotos/carotpot/carotpot-yonet
+# Sureli engeller gecici bir zamanlayiciyla kaldirilir; bilgisayar o sure
+# dolmadan kapanirsa zamanlayici kaybolur. Bu birim acilista bir kez calisir
+# ve suresi dolmus engelleri kaldirir. Engel listesi yoksa hicbir sey yapmaz.
+ConditionPathExists=/var/log/carotpot/engelliler.json
+After=ufw.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 -I /opt/carotos/carotpot/carotpot-yonet sure-denetle
+SuccessExitStatus=1
+
+[Install]
+WantedBy=multi-user.target

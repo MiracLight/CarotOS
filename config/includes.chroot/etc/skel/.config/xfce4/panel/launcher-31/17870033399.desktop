@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=CarotOS Former
+Name[tr]=CarotOS Former
+Comment=Animated, step-by-step guide to CarotOS's security tools for beginners
+Comment[tr]=CarotOS güvenlik araçları için adım adım, canlandırmalı başlangıç rehberi
+Exec=python3 /opt/carotos/former/carotos-former.py
+Icon=carotos-former
+Terminal=false
+Categories=Education;System;Security;
+Keywords=guide;tutorial;security;learn;nmap;panel;carotpot;carotene;
+Keywords[tr]=rehber;eğitim;güvenlik;öğren;nmap;panel;carotpot;carotene;
+X-XFCE-Source=file:///usr/share/applications/carotos-former.desktop
+Path=
+StartupNotify=false

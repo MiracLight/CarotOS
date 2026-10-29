@@ -1,7 +1,7 @@
-PRETTY_NAME="CarotOS 1.2 (Eggshell)"
+PRETTY_NAME="CarotOS 1.3 (Eggshell)"
 NAME="CarotOS"
-VERSION_ID="1.2"
-VERSION="1.2 (Eggshell)"
+VERSION_ID="1.3"
+VERSION="1.3 (Eggshell)"
 VERSION_CODENAME=trixie
 ID=carotos
 ID_LIKE=debian

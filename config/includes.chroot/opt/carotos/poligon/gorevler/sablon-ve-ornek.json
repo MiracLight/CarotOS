@@ -6,8 +6,8 @@
   "seviye": "baslangic",
 
   "baslik": {
-    "tr": "Zayıf Parolayı Bul",
-    "en": "Find the Weak Password"
+    "tr": "Parola Deneme Saldırısı",
+    "en": "Password Guessing Attack"
   },
 
   "senaryo": {

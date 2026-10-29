@@ -3,8 +3,8 @@
   "arac": "john",
   "seviye": "baslangic",
   "baslik": {
-    "tr": "Hash'i Kır",
-    "en": "Crack the Hash"
+    "tr": "Parola Özeti Kırma",
+    "en": "Password Hash Cracking"
   },
   "senaryo": {
     "tr": "Yerel bir hash dosyasında kullanıcının parolası md5crypt biçiminde saklanıyor. john ile yaygın parola listesini deneyerek gerçek parolayı bul. Dosya yolu: aşağıda gösteriliyor.",

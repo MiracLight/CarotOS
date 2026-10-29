@@ -1,0 +1,14 @@
+#!/bin/bash
+# CarotOS: simge onbellegi eksik ya da eskiyse uretir.
+# GTK, tema dizini onbellekten yeniyse onbellegi yok sayar ve tum simgeleri
+# her surecte bellekte tarar (~100 MB x GTK sureci). Kurulum sirasinda
+# tarihler degisebildigi icin her acilista bir stat ile dogrulanir.
+for t in Papirus Papirus-Dark Papirus-Light hicolor; do
+    d="/usr/share/icons/$t"
+    [ -d "$d" ] || continue
+    c="$d/icon-theme.cache"
+    if [ ! -f "$c" ] || [ "$d" -nt "$c" ]; then
+        gtk-update-icon-cache -f -t "$d" || true
+    fi
+done
+exit 0

@@ -3,8 +3,8 @@
   "arac": "tshark",
   "seviye": "orta",
   "baslik": {
-    "tr": "Trafiği Yakala",
-    "en": "Capture the Traffic"
+    "tr": "Ağ Trafiği Yakalama",
+    "en": "Network Traffic Capture"
   },
   "senaryo": {
     "tr": "Bilgisayarında, loopback (lo) arayüzü üzerinden port 15900'e periyodik bağlantılar kuran bir program çalışıyor. Bu bağlantılar düz metin bir mesaj taşıyor. tshark ile trafiği yakalayıp içindeki flag'i oku.",

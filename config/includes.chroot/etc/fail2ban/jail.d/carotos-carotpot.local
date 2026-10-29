@@ -1,0 +1,12 @@
+# CarotOS CarotPot: otomatik engelleme (Carotpot uygulamasi yonetir).
+# Kapali gelir (karar D8). Kendi adresleri ve ag gecitleri ignoreip'tedir.
+[carotos-carotpot]
+enabled = false
+filter = carotos-carotpot
+logpath = /var/log/carotpot/olaylar.log
+backend = auto
+maxretry = 3
+findtime = 10m
+bantime = 1h
+banaction = ufw
+ignoreip = 127.0.0.0/8 ::1

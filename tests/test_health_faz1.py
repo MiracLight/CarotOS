@@ -31,9 +31,22 @@ def modulu_yukle():
     gi.repository = repo
     sys.modules["gi"] = gi
     sys.modules["gi.repository"] = repo
-    spec = importlib.util.spec_from_file_location("carotos_health", YOL)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
+    # Arayuz katmani (ortak tema, SweepBar) bu mantik testlerinde gerekmez:
+    # sahte modullerle degistirilir, gercek Gtk/cairo yuklenmez.
+    from unittest import mock
+    eski_mod = {a: sys.modules.get(a) for a in ("tema", "bekleme_cubugu")}
+    sys.modules["tema"] = mock.MagicMock()
+    sys.modules["bekleme_cubugu"] = types.SimpleNamespace(SweepBar=_Pencere)
+    try:
+        spec = importlib.util.spec_from_file_location("carotos_health", YOL)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+    finally:
+        for a, m in eski_mod.items():
+            if m is None:
+                sys.modules.pop(a, None)
+            else:
+                sys.modules[a] = m
     return mod
 
 

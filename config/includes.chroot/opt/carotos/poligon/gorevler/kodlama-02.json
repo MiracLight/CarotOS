@@ -1,0 +1,50 @@
+{
+  "id": "kodlama-02",
+  "arac": "tr",
+  "seviye": "baslangic",
+  "baslik": {
+    "tr": "Sezar Şifresi",
+    "en": "Caesar Cipher"
+  },
+  "senaryo": {
+    "tr": "{soru_tr}",
+    "en": "{soru_en}"
+  },
+  "ipucu": {
+    "tr": "{ipucu_tr}",
+    "en": "{ipucu_en}"
+  },
+  "hedef": {
+    "tur": "statik_dosya",
+    "servis_modulu": "uretilen_gorevler",
+    "_not": "Yalnız yerel geçici dosya; ağ bağlantısı yok."
+  },
+  "flag_uretimi": {
+    "yontem": "uretec",
+    "uretec": "sezar",
+    "_not": "İçerik her açılışta rastgele üretilir (uretilen_gorevler.sezar)."
+  },
+  "dogrulama": {
+    "tur": "kullanici_girdisi",
+    "karsilastirma": "birebir",
+    "deneme_siniri": null
+  },
+  "zorluklar": {
+    "kolay": {
+      "varyant_zorlugu": "kolay"
+    },
+    "orta": {
+      "varyant_zorlugu": "orta"
+    },
+    "zor": {
+      "varyant_zorlugu": "zor"
+    }
+  },
+  "puan": {
+    "kolay": 40,
+    "orta": 100,
+    "zor": 220
+  },
+  "sure_siniri_dk": null,
+  "savunma_gorevi_id": null
+}

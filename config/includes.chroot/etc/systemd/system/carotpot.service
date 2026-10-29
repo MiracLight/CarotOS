@@ -1,0 +1,54 @@
+[Unit]
+Description=CarotPot - CarotOS yerel ag tuzagi (bal kupu)
+Documentation=file:///opt/carotos/carotpot/carotpot.py
+After=network-online.target
+Wants=network-online.target
+
+# Acilista kendiliginden BASLAMAZ (karar D5): hook bu birimi etkinlestirmez.
+# Kullanici CarotPot uygulamasindan tek tikla acar ve kapatir.
+
+[Service]
+Type=simple
+User=carotpot
+Group=carotpot
+ExecStart=/usr/bin/python3 -I /opt/carotos/carotpot/carotpot.py \
+    --ayar /etc/carotpot/ayarlar.json --durum-dizini /var/lib/carotpot \
+    --gunluk /var/log/carotpot/olaylar.log --durum-dosyasi /run/carotpot/durum.json run
+Restart=on-failure
+RestartSec=5
+UMask=0022
+
+StateDirectory=carotpot
+StateDirectoryMode=0700
+LogsDirectory=carotpot
+LogsDirectoryMode=0755
+RuntimeDirectory=carotpot
+RuntimeDirectoryMode=0755
+
+# Kisitlamalar: yuksek portlar kullanildigi icin hicbir yetki gerekmez
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+MemoryMax=200M
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target

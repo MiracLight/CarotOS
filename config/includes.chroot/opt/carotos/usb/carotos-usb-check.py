@@ -559,7 +559,15 @@ def _gtk_araclari():
     from gi.repository import Gtk as _Gtk, Gdk as _Gdk
     Gtk, Gdk = _Gtk, _Gdk
 
-    _ResultWindowClass = _tanimla_result_window(Gtk, Gdk)
+    # Ortak grafit tema yalnizca pencere gerektiginde yuklenir; izleme modu
+    # (--monitor) Gtk'ye hic dokunmaz.
+    sys.dont_write_bytecode = True       # ortak klasore __pycache__ yazilmasin
+    if ORTAK_DIZIN not in sys.path:
+        sys.path.insert(0, ORTAK_DIZIN)
+    import tema
+    from bekleme_cubugu import SweepBar
+
+    _ResultWindowClass = _tanimla_result_window(Gtk, Gdk, tema, SweepBar)
     return _ResultWindowClass
 
 
@@ -609,14 +617,46 @@ def _varsayilan_dil():
 
 DEFAULTS = {"lang": _varsayilan_dil(), "theme": "dark", "notify_when_clean": True}
 
-ACCENT = "#87979B"
-C_HIGH = "#c2554f"
-C_MED = "#c8952a"
-C_LOW = "#6d7a7e"
-C_OK = "#4c9a6a"
+VURGU = "usb"             # ortak/tema.py: camgobegi
+
+# Ortak modullerin klasoru: kurulu sistemde /opt/carotos/ortak, depoda kardes
+ORTAK_DIZIN = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                           "ortak")
+_KOK = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                    "..", "..", ".."))
+LOGO_CANDIDATES = [
+    os.path.join(_KOK, "usr/share/icons/hicolor/256x256/apps/carotos-usb-check.png"),
+    "/usr/share/icons/hicolor/256x256/apps/carotos-usb-check.png",
+    os.path.join(_KOK, "usr/share/carotos/welcome/logo.png"),
+    "/usr/share/carotos/welcome/logo.png",
+]
+
+
+def find_logo():
+    for yol in LOGO_CANDIDATES:
+        if os.path.isfile(yol):
+            return yol
+    return None
+
 
 UI = {
     "app_title": {"tr": "CarotOS USB Denetimi", "en": "CarotOS USB Check"},
+    "header_sub": {"tr": "Çıkarılabilir aygıt denetimi", "en": "Removable device check"},
+    "status_clean": {"tr": "Temiz", "en": "Clean"},
+    "status_found": {"tr": "Şüpheli", "en": "Suspicious"},
+    "sec_check": {"tr": "Kontrol", "en": "Check"},
+    "sec_scan": {"tr": "Tarama", "en": "Scan"},
+    "page_result": {"tr": "Özet", "en": "Summary"},
+    "page_deep": {"tr": "Ayrıntılı tarama", "en": "Detailed scan"},
+    "k_files": {"tr": "Dosya", "en": "Files"},
+    "k_dirs": {"tr": "Klasör", "en": "Folders"},
+    "k_size": {"tr": "Boyut", "en": "Size"},
+    "k_time": {"tr": "Süre", "en": "Time"},
+    "k_scanned": {"tr": "Taranan dosya", "en": "Files scanned"},
+    "k_found": {"tr": "Bulgu", "en": "Findings"},
+    "cancel": {"tr": "Vazgeç", "en": "Cancel"},
+    "pick_ok": {"tr": "Seç", "en": "Select"},
+    "ok_btn": {"tr": "Tamam", "en": "OK"},
     "clean_title": {"tr": "USB kontrol edildi", "en": "USB checked"},
     "clean_body": {"tr": "{label}: şüpheli bir şey bulunmadı.",
                    "en": "{label}: nothing suspicious found."},
@@ -698,10 +738,11 @@ UI = {
                    "en": "No known threat was found. {n} files scanned in "
                          "{s} s."},
     "deep_found": {"tr": "{b} dosyada bilinen tehdit bulundu. {n} dosya "
-                         "tarandı, {s} sn sürdü. Bulgular yukarıda "
-                         "listelenmiştir.",
+                         "tarandı, {s} sn sürdü. Bulgular Özet "
+                         "sayfasında listelenmiştir.",
                    "en": "A known threat was found in {b} files. {n} files "
-                         "scanned in {s} s. The findings are listed above."},
+                         "scanned in {s} s. The findings are listed on the "
+                         "Summary page."},
     "deep_cancelled": {"tr": "Tarama durduruldu. Sonuç eksiktir.",
                        "en": "The scan was stopped. The result is incomplete."},
     "deep_removed": {"tr": "Aygıt tarama sırasında çıkarıldı; tarama "
@@ -795,352 +836,328 @@ def build_report(result, lang):
     return "\n".join(lines)
 
 
-def _tanimla_result_window(Gtk, Gdk):
-    """ResultWindow sinifini Gtk/Gdk hazir olduktan sonra tanimlar."""
-    class ResultWindow(Gtk.Window):
-        """Bulgu penceresi.
+def _tanimla_result_window(Gtk, Gdk, tema, SweepBar):
+    """ResultWindow sinifini Gtk/Gdk ve ortak tema hazir olduktan sonra
+    tanimlar."""
+    from gi.repository import Pango
 
-        Icerik `self.body` icinde yeniden kurulabilir; yeniden tarama yeni bir
-        pencere acmaz, ayni pencereyi tazeler. (Eski surumde yeni pencere acilip
-        eskisi kapatiliyordu ve kapanma olayi uygulamayi sonlandiriyordu.)
+    class ResultWindow(Gtk.Window):
+        """Bulgu penceresi: sol menude iki sayfa (Ozet, Ayrintili tarama).
+
+        Icerik yeniden kurulabilir; yeniden tarama yeni bir pencere acmaz,
+        ayni pencereyi tazeler. (Eski surumde yeni pencere acilip eskisi
+        kapatiliyordu ve kapanma olayi uygulamayi sonlandiriyordu.)
         """
 
         def __init__(self, result, settings, on_destroy=None):
             self.settings = settings
             self.lang = settings["lang"]
-            self.theme = settings["theme"]
+            self.theme = settings["theme"] if settings["theme"] in ("dark", "light") else "dark"
             self.result = result
             self.on_destroy_cb = on_destroy
             self.scan_thread = None
             self.cancel = None
+            self.page = "sonuc"
             # ayrintili tarama durumu
             self.deep = {"durum": None}
             self.tarama = None
             self.deep_sayac = {"n": 0, "b": 0, "son": ""}
             self.deep_ui_bekliyor = False
-            self.deep_bar = None
             self.deep_count = None
+            self.deep_found = None
             self.deep_path = None
+            self.deep_bar = None
             self.sweep_id = 0
             self.sweep_step = 0
             self.watch_id = 0
             self.deep_bagli_mi = False
+            self.deep_cikarildi = False
 
             super().__init__(title=UI["app_title"][self.lang])
-            self.set_default_size(780, 580)
-            self.set_size_request(660, 460)
+            self.set_default_size(1000, 660)
+            self.set_size_request(860, 540)
             self.set_position(Gtk.WindowPosition.CENTER)
             self.connect("destroy", self._destroyed)
             self.connect("key-press-event", self._on_key)
 
-            self.provider = Gtk.CssProvider()
-            Gtk.StyleContext.add_provider_for_screen(
-                Gdk.Screen.get_default(), self.provider,
-                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-            self.apply_theme()
+            tema.uygula(self.theme, VURGU)
+            logo = find_logo()
+            if logo:
+                try:
+                    self.set_icon_from_file(logo)
+                except Exception:  # noqa: BLE001
+                    pass
 
-            root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-            self.add(root)
+            bolumler = [("kontrol", [("sonuc", "kalkan")]),
+                        ("tarama", [("deep", "hedef")])]
+            self.kabuk = tema.Kabuk(logo, bolumler, self._sayfa_secildi)
+            self.add(self.kabuk)
 
-            self.header_holder = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-            self.header_holder.get_style_context().add_class("header")
-            root.pack_start(self.header_holder, False, False, 0)
-            root.pack_start(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL),
-                            False, False, 0)
+            self.hap = tema.DurumHapi()
+            self.open_btn = tema.dugme("", None, self.on_open_device)
+            self.rescan_btn = tema.dugme("", "ana", self.on_rescan)
+            self.save_btn = tema.dugme("", None, self.on_save)
+            for parca in (self.hap, self.open_btn, self.save_btn, self.rescan_btn):
+                self.kabuk.ust_sag.pack_start(parca, False, False, 0)
 
-            scroller = Gtk.ScrolledWindow()
-            scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-            root.pack_start(scroller, True, True, 0)
-            self.body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
-            self.body.set_margin_top(22); self.body.set_margin_bottom(22)
-            self.body.set_margin_start(24); self.body.set_margin_end(24)
-            scroller.add(self.body)
-
-            root.pack_start(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL),
-                            False, False, 0)
-            root.pack_start(self._build_footer(), False, False, 0)
+            # sol alt: dil ve gorunum
+            alt = Gtk.Box(spacing=8)
+            self.lang_combo = Gtk.ComboBoxText()
+            self.lang_combo.append("tr", "Türkçe")
+            self.lang_combo.append("en", "English")
+            self.lang_combo.set_active_id(self.lang)
+            self.lang_combo.connect("changed", self.on_lang_changed)
+            alt.pack_start(self.lang_combo, True, True, 0)
+            self.theme_btn = tema.dugme("", None, self.on_theme_toggled)
+            alt.pack_start(self.theme_btn, False, False, 0)
+            self.kabuk.yan_alt.pack_start(alt, False, False, 0)
 
             self.refresh()
+            self.kabuk.sec("sonuc")
 
-        # -- yapim ------------------------------------------------------------
+        # -- yardimcilar -------------------------------------------------------
 
-        def _build_footer(self):
-            footer = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=9)
-            footer.set_border_width(13)
+        def bildir(self, metin, tur="bilgi"):
+            self.kabuk.bildir(metin, tur)
 
-            self.open_btn = Gtk.Button(label=UI["open_device"][self.lang])
-            self.open_btn.connect("clicked", self.on_open_device)
-            footer.pack_start(self.open_btn, False, False, 0)
+        def _mesgul(self):
+            return self.tarama is not None or bool(
+                self.scan_thread and self.scan_thread.is_alive())
 
-            self.rescan_btn = Gtk.Button(label=UI["rescan"][self.lang])
-            self.rescan_btn.connect("clicked", self.on_rescan)
-            footer.pack_start(self.rescan_btn, False, False, 0)
+        def _mesgul_guncelle(self):
+            """Bekleme cubugunu ve dugmeleri duruma gore ayarlar."""
+            mesgul = self._mesgul()
+            if self.tarama is not None and not self.sweep_id:
+                self.sweep_id = GLib.timeout_add(45, self._sweep)
+            self.rescan_btn.set_sensitive(not mesgul)
+            self.save_btn.set_sensitive(not (self.scan_thread and self.scan_thread.is_alive()))
+            self._hap_guncelle()
 
-            self.save_btn = Gtk.Button(label=UI["save_report"][self.lang])
-            self.save_btn.connect("clicked", self.on_save)
-            footer.pack_start(self.save_btn, False, False, 0)
+        def _hap_guncelle(self):
+            findings = self.result["findings"]
+            if self._mesgul():
+                self.hap.ayarla(UI["scanning"][self.lang], "acik")
+                return
+            worst = worst_level(findings)
+            if worst is None:
+                self.hap.ayarla(UI["status_clean"][self.lang], "acik")
+            else:
+                self.hap.ayarla(UI["status_found"][self.lang],
+                                "hata" if worst == HIGH else "uyari")
 
-            self.status = Gtk.Label(xalign=0.0)
-            self.status.get_style_context().add_class("sub-text")
-            self.status.set_ellipsize(3)  # PANGO_ELLIPSIZE_END
-            footer.pack_start(self.status, True, True, 6)
+        def _sweep(self):
+            if self.tarama is None:
+                self.sweep_id = 0
+                return False
+            self.sweep_step += 1
+            if self.deep_bar is not None:
+                self.deep_bar.adim(self.sweep_step)
+            return True
 
-            self.spinner = Gtk.Spinner()
-            footer.pack_end(self.spinner, False, False, 0)
+        # -- sayfa kurulumu ----------------------------------------------------
 
-            close = Gtk.Button(label=UI["close"][self.lang])
-            close.get_style_context().add_class("suggested-action")
-            close.connect("clicked", lambda *_: self.destroy())
-            footer.pack_end(close, False, False, 0)
-            return footer
-
-        def _clear(self, container):
-            for child in container.get_children():
-                container.remove(child)
+        def _sayfa_secildi(self, anahtar):
+            self.page = anahtar
+            self.refresh()
 
         def refresh(self):
-            """Basligi ve bulgu listesini mevcut sonuca gore yeniden kurar."""
-            self._clear(self.header_holder)
-            self._clear(self.body)
-            self.header_holder.pack_start(self._build_header(), True, True, 0)
-
+            """Menuyu, basligi ve gecerli sayfanin icerigini sonuca gore
+            yeniden kurar."""
             findings = self.result["findings"]
-            if not findings:
-                self.body.pack_start(self._build_clean_card(), False, False, 0)
-            for finding in findings:
-                self.body.pack_start(self._build_card(finding), False, False, 0)
-            self.body.pack_start(self._build_deep_card(), False, False, 0)
-            self.body.pack_start(self._build_note(), False, False, 0)
+            self.kabuk.marka_ayarla(UI["app_title"][self.lang], UI["header_sub"][self.lang])
+            self.kabuk.bolum_metni("kontrol", UI["sec_check"][self.lang])
+            self.kabuk.bolum_metni("tarama", UI["sec_scan"][self.lang])
+            self.kabuk.menu_metni("sonuc", UI["page_result"][self.lang])
+            self.kabuk.menu_metni("deep", UI["page_deep"][self.lang])
+            self.kabuk.rozet("sonuc", str(len(findings)) if findings else None)
+            self.kabuk.rozet("deep", "…" if self.tarama is not None else None, sakin=True)
+            self.open_btn.set_label(UI["open_device"][self.lang])
+            self.rescan_btn.set_label(UI["rescan"][self.lang])
+            self.save_btn.set_label(UI["save_report"][self.lang])
+            self.theme_btn.set_label("☀" if self.theme == "dark" else "☾")
+            self.set_title(UI["app_title"][self.lang])
 
-            self.header_holder.show_all()
-            self.body.show_all()
+            if self.page == "deep":
+                self.kabuk.baslik_ayarla(UI["page_deep"][self.lang], self._aygit_metni())
+                govde = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+                govde.pack_start(self._build_deep_card(), False, False, 0)
+            else:
+                if findings:
+                    baslik = UI["summary_found"][self.lang].format(n=len(findings))
+                else:
+                    baslik = UI["summary_clean"][self.lang]
+                self.kabuk.baslik_ayarla(self.result.get("label") or "?",
+                                         baslik + "  ·  " + self._aygit_ayrinti())
+                govde = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+                self._build_result(govde)
+            self.kabuk.icerik(govde)
+            self._mesgul_guncelle()
 
-        def _build_header(self):
+        def _aygit_ayrinti(self):
+            parcalar = []
+            if self.result.get("device"):
+                parcalar.append(self.result["device"])
+            if self.result.get("fstype"):
+                parcalar.append(self.result["fstype"])
+            return "  ·  ".join(parcalar) or "—"
+
+        def _aygit_metni(self):
+            return "  ·  ".join([self.result.get("label") or "?", self._aygit_ayrinti()])
+
+        def _build_result(self, govde):
             findings = self.result["findings"]
             stats = self.result["stats"]
 
-            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-            box.set_margin_top(20); box.set_margin_bottom(20)
-            box.set_margin_start(24); box.set_margin_end(24)
-
-            worst = worst_level(findings)
-            if worst is None:
-                heading = UI["summary_clean"][self.lang]
-                title_css, band_css = "title-ok", "band-ok"
-            else:
-                heading = UI["summary_found"][self.lang].format(n=len(findings))
-                title_css = {HIGH: "title-high", MEDIUM: "title-med",
-                             LOW: "title-low"}[worst]
-                band_css = {HIGH: "band-high", MEDIUM: "band-med",
-                            LOW: "band-low"}[worst]
-
-            row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=14)
-            stripe = Gtk.Box()
-            stripe.set_size_request(4, -1)
-            stripe.get_style_context().add_class(band_css)
-            row.pack_start(stripe, False, False, 0)
-
-            col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-            title = Gtk.Label(label=heading, xalign=0.0)
-            title.get_style_context().add_class("big-title")
-            title.get_style_context().add_class(title_css)
-            title.set_line_wrap(True)
-            col.pack_start(title, False, False, 0)
-
-            pieces = [self.result.get("label") or "?"]
-            if self.result.get("device"):
-                pieces.append(self.result["device"])
-            if self.result.get("fstype"):
-                pieces.append(self.result["fstype"])
-            device = Gtk.Label(label="  ·  ".join(pieces), xalign=0.0)
-            device.get_style_context().add_class("sub-text")
-            device.set_line_wrap(True)
-            col.pack_start(device, False, False, 0)
-            row.pack_start(col, True, True, 0)
-            box.pack_start(row, False, False, 0)
-
-            counts = {level: sum(1 for f in findings if f["level"] == level)
-                      for level in (HIGH, MEDIUM, LOW)}
-            if findings:
-                pills = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=9)
-                pills.set_margin_start(18)
-                for level, key, css in ((HIGH, "count_high", "pill-high"),
-                                        (MEDIUM, "count_medium", "pill-med"),
-                                        (LOW, "count_low", "pill-low")):
-                    if counts[level]:
-                        pill = Gtk.Label(label=f"{counts[level]} {UI[key][self.lang]}")
-                        pill.get_style_context().add_class("pill")
-                        pill.get_style_context().add_class(css)
-                        pills.pack_start(pill, False, False, 0)
-                box.pack_start(pills, False, False, 0)
-
-            info = Gtk.Label(
-                label=UI["files_dirs"][self.lang].format(
-                    files=stats["files"], dirs=stats["dirs"],
-                    size=human_size(stats["size"])) + "  ·  " +
-                      UI["duration"][self.lang].format(seconds=stats["seconds"]),
-                xalign=0.0)
-            info.get_style_context().add_class("sub-text")
-            info.set_margin_start(18)
-            info.set_line_wrap(True)
-            box.pack_start(info, False, False, 0)
+            ozet = Gtk.Box(spacing=12)
+            ozet.set_homogeneous(True)
+            for anahtar, deger, orta in (
+                    ("k_files", f"{stats['files']:,}".replace(
+                        ",", "." if self.lang == "tr" else ","), False),
+                    ("k_dirs", f"{stats['dirs']:,}".replace(
+                        ",", "." if self.lang == "tr" else ","), False),
+                    ("k_size", human_size(stats["size"]), True),
+                    ("k_time", f"{stats['seconds']} s", True)):
+                kpi = tema.KpiKutusu(UI[anahtar][self.lang])
+                kpi.ayarla(deger, orta=orta)
+                ozet.pack_start(kpi, True, True, 0)
+            govde.pack_start(ozet, False, False, 0)
 
             if stats.get("truncated"):
-                warn = Gtk.Label(label=UI["truncated"][self.lang], xalign=0.0)
-                warn.get_style_context().add_class("warn-text")
-                warn.set_margin_start(18)
-                warn.set_line_wrap(True)
-                warn.set_max_width_chars(80)
-                box.pack_start(warn, False, False, 0)
+                kutu, _ = tema.not_kutusu(UI["truncated"][self.lang], "uyari")
+                govde.pack_start(kutu, False, False, 0)
 
-            return box
+            sayilar = {level: sum(1 for f in findings if f["level"] == level)
+                       for level in (HIGH, MEDIUM, LOW)}
+            if findings:
+                pill = Gtk.Box(spacing=8)
+                for level, anahtar, renk in ((HIGH, "count_high", "kirmizi"),
+                                             (MEDIUM, "count_medium", "sari"),
+                                             (LOW, "count_low", "gri")):
+                    if sayilar[level]:
+                        pill.pack_start(tema.rozet(
+                            f"{sayilar[level]} {UI[anahtar][self.lang]}", renk),
+                            False, False, 0)
+                govde.pack_start(pill, False, False, 0)
+            else:
+                govde.pack_start(self._build_clean_card(), False, False, 0)
+            for finding in findings:
+                govde.pack_start(self._build_card(finding), False, False, 0)
 
-        def _card_shell(self):
-            card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-            card.get_style_context().add_class("card")
-            inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-            inner.set_margin_top(18); inner.set_margin_bottom(18)
-            inner.set_margin_start(22); inner.set_margin_end(22)
-            card.pack_start(inner, True, True, 0)
-            return card, inner
+            kutu, _ = tema.not_kutusu(UI["note"][self.lang], "bilgi")
+            govde.pack_start(kutu, False, False, 0)
 
         def _build_clean_card(self):
-            card, inner = self._card_shell()
-            text = (UI["empty_device"][self.lang]
-                    if self.result["stats"].get("empty")
-                    else UI["clean_detail"][self.lang])
-            label = Gtk.Label(label=text, xalign=0.0)
-            label.set_line_wrap(True)
-            label.set_max_width_chars(84)
-            inner.pack_start(label, False, False, 0)
-            return card
+            bos = self.result["stats"].get("empty")
+            dis, ic = tema.kart(18, 10)
+            satir = Gtk.Box(spacing=14)
+            satir.pack_start(tema.ikon_kutusu("onay", "yesil", 44), False, False, 0)
+            satir.pack_start(tema.etiket(
+                UI["empty_device"][self.lang] if bos else UI["clean_detail"][self.lang],
+                None, sar=True, genislik=80), True, True, 0)
+            ic.pack_start(satir, False, False, 0)
+            return dis
 
         def _build_card(self, finding):
             level = finding["level"]
-            badge_css = {HIGH: "badge-high", MEDIUM: "badge-med",
-                         LOW: "badge-low"}[level]
-            badge_text = {HIGH: UI["level_high"], MEDIUM: UI["level_medium"],
-                          LOW: UI["level_low"]}[level][self.lang]
-
-            card, inner = self._card_shell()
-
-            top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=11)
-            badge = Gtk.Label(label=badge_text)
-            badge.get_style_context().add_class("badge")
-            badge.get_style_context().add_class(badge_css)
-            badge.set_valign(Gtk.Align.CENTER)
-            top.pack_start(badge, False, False, 0)
-
-            title = Gtk.Label(label=metin(finding["title"], self.lang), xalign=0.0)
-            title.get_style_context().add_class("card-title")
-            title.set_line_wrap(True)
-            title.set_valign(Gtk.Align.CENTER)
-            top.pack_start(title, True, True, 0)
-
+            renk = {HIGH: "kirmizi", MEDIUM: "sari", LOW: "gri"}[level]
+            etiket = {HIGH: UI["level_high"], MEDIUM: UI["level_medium"],
+                      LOW: UI["level_low"]}[level][self.lang]
+            dis, ic = tema.kart(16, 8, "tehlikeli" if level == HIGH else "")
+            ust = Gtk.Box(spacing=11)
+            ust.pack_start(tema.rozet(etiket, renk), False, False, 0)
+            ust.pack_start(tema.etiket(metin(finding["title"], self.lang), "kart-baslik",
+                                       sar=True), True, True, 0)
             if finding.get("path"):
-                btn = Gtk.Button(label=UI["open_location"][self.lang])
-                btn.set_valign(Gtk.Align.CENTER)
-                btn.connect("clicked", self.on_open_path, finding["path"])
-                top.pack_end(btn, False, False, 0)
-            inner.pack_start(top, False, False, 0)
-
-            detail = Gtk.Label(label=metin(finding["detail"], self.lang), xalign=0.0)
-            detail.set_line_wrap(True)
-            detail.set_max_width_chars(84)
-            inner.pack_start(detail, False, False, 0)
-
+                ust.pack_end(tema.dugme(UI["open_location"][self.lang], "kucuk",
+                                        self.on_open_path, finding["path"]),
+                             False, False, 0)
+            ic.pack_start(ust, False, False, 0)
+            ic.pack_start(tema.etiket(metin(finding["detail"], self.lang), "soluk",
+                                      sar=True, genislik=90), False, False, 0)
             if finding.get("path"):
-                path = Gtk.Label(label=finding["path"], xalign=0.0)
-                path.set_selectable(True)
-                path.set_line_wrap(True)
-                path.set_max_width_chars(84)
-                path.get_style_context().add_class("path-text")
-                inner.pack_start(path, False, False, 0)
-
-            return card
+                ic.pack_start(tema.etiket(finding["path"], "mono", sar=True, sec=True),
+                              False, False, 0)
+            return dis
 
         # -- ayrintili tarama (ClamAV) ----------------------------------------
 
-        def _label(self, text, css=None, wrap=True):
-            lab = Gtk.Label(label=text, xalign=0.0)
-            if wrap:
-                lab.set_line_wrap(True)
-                lab.set_max_width_chars(84)
-            if css:
-                lab.get_style_context().add_class(css)
-            return lab
-
         def _build_deep_card(self):
-            card, inner = self._card_shell()
-            top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=11)
-            title = self._label(UI["deep_title"][self.lang], "card-title")
-            title.set_valign(Gtk.Align.CENTER)
-            top.pack_start(title, True, True, 0)
+            dis, ic = tema.kart(18, 12, "vurgulu" if self.tarama is not None else "")
             self.deep_bar = None
             if self.tarama is not None:
-                stop = Gtk.Button(label=UI["deep_stop"][self.lang])
-                stop.set_valign(Gtk.Align.CENTER)
-                stop.connect("clicked", lambda *_: self.tarama and self.tarama.iptal())
-                top.pack_end(stop, False, False, 0)
-                from bekleme_cubugu import SweepBar
-                self.deep_bar = SweepBar(ACCENT)
+                sag = Gtk.Box(spacing=14)
+                self.deep_bar = SweepBar(tema.AKTIF["vurgu"])
                 self.deep_bar.show()
-                top.pack_end(self.deep_bar, False, False, 0)
+                sag.pack_start(self.deep_bar, False, False, 0)
+                sag.pack_start(tema.dugme(UI["deep_stop"][self.lang], "tehlike",
+                                          lambda: self.tarama and self.tarama.iptal()),
+                               False, False, 0)
             else:
-                etkin = not (self.scan_thread and self.scan_thread.is_alive())
-                tum = Gtk.Button(label=UI["deep_all"][self.lang])
-                tum.get_style_context().add_class("suggested-action")
-                tum.connect("clicked", lambda *_: self.start_deep(None))
-                sec = Gtk.Button(label=UI["deep_pick"][self.lang])
-                sec.connect("clicked", self.on_deep_pick)
-                for btn in (tum, sec):
-                    btn.set_valign(Gtk.Align.CENTER)
+                etkin = not self._mesgul()
+                sag = Gtk.Box(spacing=8)
+                tum = tema.dugme(UI["deep_all"][self.lang], "ana", self.start_deep, None)
+                sec = tema.dugme(UI["deep_pick"][self.lang], None, self.on_deep_pick)
+                for btn in (sec, tum):
                     btn.set_sensitive(etkin)
-                    top.pack_end(btn, False, False, 0)
-            inner.pack_start(top, False, False, 0)
-            inner.pack_start(self._label(UI["deep_desc"][self.lang], "sub-text"),
-                             False, False, 0)
+                    sag.pack_start(btn, False, False, 0)
+            tema.kart_basligi(ic, UI["deep_title"][self.lang], None, sag)
+            ic.pack_start(tema.etiket(UI["deep_desc"][self.lang], "soluk", sar=True,
+                                      genislik=90), False, False, 0)
 
             durum = self.deep.get("durum")
+            self.deep_count = self.deep_found = self.deep_path = None
             if self.tarama is not None:
-                self.deep_count = self._label("")
-                self.deep_path = self._label("", "path-text", wrap=False)
-                self.deep_path.set_ellipsize(2)   # PANGO_ELLIPSIZE_MIDDLE
-                inner.pack_start(self.deep_count, False, False, 0)
-                inner.pack_start(self.deep_path, False, False, 0)
+                sayilar = Gtk.Box(spacing=48)
+                kolonlar = []
+                for anahtar in ("k_scanned", "k_found"):
+                    kolon = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+                    deger = tema.etiket("0", "kpi-deger")
+                    kolon.pack_start(deger, False, False, 0)
+                    kolon.pack_start(tema.etiket(UI[anahtar][self.lang], "kpi-ad"),
+                                     False, False, 0)
+                    sayilar.pack_start(kolon, False, False, 0)
+                    kolonlar.append(deger)
+                self.deep_count, self.deep_found = kolonlar
+                ic.pack_start(sayilar, False, False, 0)
+                self.deep_path = tema.etiket("", "mono")
+                self.deep_path.set_ellipsize(Pango.EllipsizeMode.MIDDLE)
+                ic.pack_start(self.deep_path, False, False, 0)
                 self._deep_sayac_yaz()
             elif durum:
-                inner.pack_start(self._label(self.deep["mesaj"],
-                                             "warn-text" if durum != "temiz" else None),
-                                 False, False, 0)
+                tur = {"temiz": "basari", "bulgu": "hata"}.get(durum, "uyari")
+                mesaj = UI[self.deep["anahtar"]][self.lang].format(**self.deep["kw"])
+                kutu, _ = tema.not_kutusu(mesaj, tur)
+                ic.pack_start(kutu, False, False, 0)
             uyari = self.deep.get("tanim_uyarisi")
             if uyari and self.tarama is None:
-                inner.pack_start(self._label(uyari, "warn-text"), False, False, 0)
-            return card
+                kutu, _ = tema.not_kutusu(uyari, "uyari")
+                ic.pack_start(kutu, False, False, 0)
+            return dis
 
         def _deep_sayac_yaz(self):
             self.deep_ui_bekliyor = False
             if self.tarama is None or self.deep_count is None:
                 return False
             try:
-                self.deep_count.set_text(UI["deep_running"][self.lang].format(
-                    n=self.deep_sayac["n"], b=self.deep_sayac["b"]))
+                self.deep_count.set_text(f"{self.deep_sayac['n']:,}".replace(
+                    ",", "." if self.lang == "tr" else ","))
+                self.deep_found.set_text(str(self.deep_sayac["b"]))
                 self.deep_path.set_text(self.deep_sayac["son"]
                                         or UI["deep_loading"][self.lang])
             except Exception:  # noqa: BLE001
                 pass
             return False
 
-        def on_deep_pick(self, _button):
+        def on_deep_pick(self):
             root = self.result.get("root")
             if not self._device_present():
-                self.status.set_text(UI["gone"][self.lang])
+                self.bildir(UI["gone"][self.lang], "hata")
                 return
             dialog = Gtk.FileChooserDialog(
                 title=UI["deep_pick"][self.lang], transient_for=self,
                 action=Gtk.FileChooserAction.SELECT_FOLDER)
-            dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-                               Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
+            dialog.add_buttons(UI["cancel"][self.lang], Gtk.ResponseType.CANCEL,
+                               UI["pick_ok"][self.lang], Gtk.ResponseType.OK)
             dialog.set_current_folder(root)
             secilen = (dialog.get_filename()
                        if dialog.run() == Gtk.ResponseType.OK else None)
@@ -1150,7 +1167,7 @@ def _tanimla_result_window(Gtk, Gdk):
             gercek = os.path.realpath(secilen)
             kok = os.path.realpath(root)
             if gercek != kok and not gercek.startswith(kok + os.sep):
-                self.status.set_text(UI["deep_outside"][self.lang])
+                self.bildir(UI["deep_outside"][self.lang], "hata")
                 return
             self.start_deep([gercek])
 
@@ -1161,32 +1178,25 @@ def _tanimla_result_window(Gtk, Gdk):
                 return
             root = self.result.get("root")
             if not self._device_present():
-                self.status.set_text(UI["gone"][self.lang])
+                self.bildir(UI["gone"][self.lang], "hata")
                 return
             motor = tarama_motoru()
             if motor is None or not motor.clamscan_yolu():
-                self.status.set_text(UI["deep_no_clamav"][self.lang])
+                self.bildir(UI["deep_no_clamav"][self.lang], "hata")
                 return
             bilgi = motor.tanim_bilgisi()
             if bilgi["durum"] == motor.TANIM_YOK:
-                self.status.set_text(UI["deep_no_defs"][self.lang])
+                self.bildir(UI["deep_no_defs"][self.lang], "hata")
                 return
             self.deep["tanim_uyarisi"] = (
                 UI["deep_old_defs"][self.lang].format(gun=bilgi["yas_gun"])
                 if bilgi["durum"] == motor.TANIM_ESKI else None)
             yeterli, mb = motor.bellek_yeterli()
-            if not yeterli:
-                dialog = Gtk.MessageDialog(
-                    transient_for=self, modal=True,
-                    message_type=Gtk.MessageType.QUESTION,
-                    buttons=Gtk.ButtonsType.OK_CANCEL,
-                    text=UI["deep_mem_title"][self.lang])
-                dialog.format_secondary_text(
-                    UI["deep_mem_body"][self.lang].format(mb=mb))
-                yanit = dialog.run()
-                dialog.destroy()
-                if yanit != Gtk.ResponseType.OK:
-                    return
+            if not yeterli and not tema.onay_sor(
+                    self, UI["deep_mem_title"][self.lang],
+                    UI["deep_mem_body"][self.lang].format(mb=mb),
+                    UI["ok_btn"][self.lang], UI["cancel"][self.lang]):
+                return
             # Tarama suresince aygitin cikarilip cikarilmadigi izlenir
             self.deep_bagli_mi = os.path.ismount(root)
             self.deep_sayac = {"n": 0, "b": 0, "son": ""}
@@ -1194,13 +1204,11 @@ def _tanimla_result_window(Gtk, Gdk):
                          "tanim_uyarisi": self.deep.get("tanim_uyarisi")}
             self.deep_cikarildi = False
             self.tarama = motor.Tarama(yollar or [root], olay=self._deep_olay)
-            self.rescan_btn.set_sensitive(False)
-            self.spinner.start()
-            self.status.set_text("")
             threading.Thread(target=self._deep_isi, args=(self.tarama,),
                              daemon=True).start()
-            self.sweep_id = GLib.timeout_add(45, self._sweep)
             self.watch_id = GLib.timeout_add(1000, self._aygit_izle)
+            self.page = "deep"
+            self.kabuk.sec("deep")
             self.refresh()
 
         def _deep_olay(self, tur, veri):
@@ -1217,15 +1225,6 @@ def _tanimla_result_window(Gtk, Gdk):
         def _deep_isi(self, tarama):
             sonuc = tarama.calistir()
             GLib.idle_add(self._deep_done, tarama, sonuc)
-
-        def _sweep(self):
-            if self.tarama is None:
-                self.sweep_id = 0
-                return False
-            self.sweep_step += 1
-            if self.deep_bar is not None:
-                self.deep_bar.adim(self.sweep_step)
-            return True
 
         def _aygit_izle(self):
             if self.tarama is None:
@@ -1245,48 +1244,30 @@ def _tanimla_result_window(Gtk, Gdk):
             if tarama is not self.tarama:
                 return False
             self.tarama = None
-            for kaynak in ("sweep_id", "watch_id"):
-                if getattr(self, kaynak):
-                    GLib.source_remove(getattr(self, kaynak))
-                    setattr(self, kaynak, 0)
-            self.spinner.stop()
-            self.rescan_btn.set_sensitive(True)
+            if self.watch_id:
+                GLib.source_remove(self.watch_id)
+                self.watch_id = 0
             motor = tarama_motoru()
             durum = sonuc["durum"]
             n, sure = sonuc["taranan"], sonuc["sure"]
             if self.deep_cikarildi:
-                self.deep.update(durum="cikarildi", mesaj=UI["deep_removed"][self.lang])
+                self.deep.update(durum="cikarildi", anahtar="deep_removed", kw={})
             elif durum == motor.IPTAL:
-                self.deep.update(durum="iptal", mesaj=UI["deep_cancelled"][self.lang])
+                self.deep.update(durum="iptal", anahtar="deep_cancelled", kw={})
             elif durum == motor.BULGU:
-                self.deep.update(durum="bulgu", mesaj=UI["deep_found"][self.lang].format(
-                    b=len(sonuc["bulgular"]), n=n, s=sure))
+                self.deep.update(durum="bulgu", anahtar="deep_found",
+                                 kw={"b": len(sonuc["bulgular"]), "n": n, "s": sure})
             elif durum == motor.TEMIZ:
-                self.deep.update(durum="temiz", mesaj=UI["deep_clean"][self.lang].format(
-                    n=n, s=sure))
+                self.deep.update(durum="temiz", anahtar="deep_clean",
+                                 kw={"n": n, "s": sure})
             else:
-                self.deep.update(durum="hata", mesaj=UI["deep_error"][self.lang])
+                self.deep.update(durum="hata", anahtar="deep_error", kw={})
             # Yeni ClamAV bulgulari mevcut listeye eklenir (eskileri yenilenir)
             bulgular = [f for f in self.result["findings"] if f.get("kind") != "clamav"]
             bulgular = [clamav_bulgusu(b) for b in sonuc["bulgular"]] + bulgular
             self.result["findings"] = bulgular
-            self.status.set_text(self.deep["mesaj"])
             self.refresh()
             return False
-
-        def _build_note(self):
-            note = Gtk.Label(label=UI["note"][self.lang], xalign=0.0)
-            note.set_line_wrap(True)
-            note.set_max_width_chars(86)
-            note.get_style_context().add_class("sub-text")
-            inner = Gtk.Box()
-            inner.set_margin_top(15); inner.set_margin_bottom(15)
-            inner.set_margin_start(20); inner.set_margin_end(20)
-            inner.pack_start(note, True, True, 0)
-            box = Gtk.Box()
-            box.get_style_context().add_class("note-box")
-            box.pack_start(inner, True, True, 0)
-            return box
 
         # -- olaylar -----------------------------------------------------------
 
@@ -1301,13 +1282,10 @@ def _tanimla_result_window(Gtk, Gdk):
                 self.cancel.set()
             if self.tarama is not None:
                 self.tarama.iptal()
-            # Pencereye ozel CSS saglayicisini ekrandan kaldir; izleme modunda
-            # her takista yeni pencere acildigi icin saglayicilar birikmesin.
-            try:
-                Gtk.StyleContext.remove_provider_for_screen(
-                    Gdk.Screen.get_default(), self.provider)
-            except Exception:  # noqa: BLE001
-                pass
+            for kaynak in ("sweep_id", "watch_id"):
+                if getattr(self, kaynak):
+                    GLib.source_remove(getattr(self, kaynak))
+                    setattr(self, kaynak, 0)
             if self.on_destroy_cb:
                 self.on_destroy_cb(self)
 
@@ -1322,42 +1300,36 @@ def _tanimla_result_window(Gtk, Gdk):
             root = self.result.get("root")
             return bool(root) and os.path.isdir(root)
 
-        def on_open_device(self, _button):
+        def on_open_device(self):
             root = self.result.get("root")
             if not self._device_present():
-                self.status.set_text(UI["gone"][self.lang])
+                self.bildir(UI["gone"][self.lang], "hata")
                 return
             try:
                 subprocess.Popen(["xdg-open", root])
             except OSError:
                 pass
 
-        def on_open_path(self, _button, path):
+        def on_open_path(self, path):
             folder = path if os.path.isdir(path) else os.path.dirname(path)
             if not os.path.isdir(folder):
-                self.status.set_text(UI["gone"][self.lang])
+                self.bildir(UI["gone"][self.lang], "hata")
                 return
             try:
                 subprocess.Popen(["xdg-open", folder])
             except OSError:
                 pass
 
-        def on_rescan(self, _button):
+        def on_rescan(self):
             """Ayni pencerede yeniden tarar; yeni pencere ACMAZ."""
-            if self.scan_thread and self.scan_thread.is_alive():
-                return
-            if self.tarama is not None:
+            if self._mesgul():
                 return
             root = self.result.get("root")
             if not self._device_present():
-                self.status.set_text(UI["gone"][self.lang])
+                self.bildir(UI["gone"][self.lang], "hata")
                 return
 
             self.cancel = threading.Event()
-            self.rescan_btn.set_sensitive(False)
-            self.save_btn.set_sensitive(False)
-            self.status.set_text(UI["scanning"][self.lang])
-            self.spinner.start()
 
             def worker():
                 fresh = enrich(scan_path(root, self.cancel), root)
@@ -1365,99 +1337,43 @@ def _tanimla_result_window(Gtk, Gdk):
 
             self.scan_thread = threading.Thread(target=worker, daemon=True)
             self.scan_thread.start()
+            self._mesgul_guncelle()
 
         def _scan_done(self, fresh):
-            self.spinner.stop()
-            self.rescan_btn.set_sensitive(True)
-            self.save_btn.set_sensitive(True)
-            self.status.set_text("")
+            self.scan_thread = None
             if not fresh["stats"].get("cancelled"):
                 # Hizli kontrol yenilendi; onceki ayrintili tarama sonucu
                 # artik bu listeye ait degil
                 self.result = fresh
                 self.deep = {"durum": None}
-                self.refresh()
+            self.refresh()
             return False
 
-        def on_save(self, _button):
+        def on_save(self):
             path = os.path.join(
                 GLib.get_home_dir(),
                 time.strftime("carotos-usb-%Y%m%d-%H%M.txt"))
             try:
                 with open(path, "w", encoding="utf-8") as fh:
                     fh.write(build_report(self.result, self.lang))
-                self.status.set_text(UI["saved"][self.lang].format(path=path))
+                self.bildir(UI["saved"][self.lang].format(path=path), "basari")
             except OSError:
-                self.status.set_text(UI["save_failed"][self.lang])
+                self.bildir(UI["save_failed"][self.lang], "hata")
 
-        # -- tema --------------------------------------------------------------
+        def on_lang_changed(self, combo):
+            secilen = combo.get_active_id()
+            if secilen and secilen != self.lang:
+                self.lang = self.settings["lang"] = secilen
+                save_settings(self.settings)
+                self.refresh()
 
-        def apply_theme(self):
-            if self.theme == "dark":
-                bg = "#1f2325"; head = "#2b2f31"; fg = "#e6e6e6"; sub = "#9aa4a8"
-                card = "#282d2f"; border = "#363c3e"; note = "#2c3134"
-                btn = "#343a3c"; btn_h = "#3f4649"; bd = "#454b4e"; mono = "#8fd6c4"
-            else:
-                bg = "#f2f4f5"; head = "#e4e7e9"; fg = "#1f2325"; sub = "#5c666a"
-                card = "#ffffff"; border = "#dde2e4"; note = "#eef1f2"
-                btn = "#ffffff"; btn_h = "#eef0f1"; bd = "#c3c8ca"; mono = "#1f5f52"
-
-            Gtk.Settings.get_default().set_property(
-                "gtk-application-prefer-dark-theme", self.theme == "dark")
-
-            css = f"""
-            window {{ background-color: {bg}; color: {fg}; }}
-            label {{ color: {fg}; }}
-            .header {{ background-color: {head}; }}
-            .big-title {{ font-size: 142%; font-weight: bold; }}
-            .title-ok {{ color: {C_OK}; }}
-            .title-high {{ color: {C_HIGH}; }}
-            .title-med {{ color: {C_MED}; }}
-            .title-low {{ color: {sub}; }}
-            .sub-text {{ color: {sub}; font-size: 92%; }}
-            .warn-text {{ color: {C_MED}; font-size: 92%; }}
-            .path-text {{ font-family: monospace; font-size: 88%; color: {mono}; }}
-            .card {{
-                background-color: {card}; border: 1px solid {border};
-                border-radius: 8px;
-            }}
-            .card-title {{ font-weight: bold; font-size: 106%; }}
-            .badge {{
-                color: #ffffff; font-size: 78%; font-weight: bold;
-                border-radius: 4px; padding: 3px 8px;
-            }}
-            .badge-high {{ background-color: {C_HIGH}; }}
-            .badge-med {{ background-color: {C_MED}; }}
-            .badge-low {{ background-color: {C_LOW}; }}
-            .band-ok {{ background-color: {C_OK}; border-radius: 2px; }}
-            .band-high {{ background-color: {C_HIGH}; border-radius: 2px; }}
-            .band-med {{ background-color: {C_MED}; border-radius: 2px; }}
-            .band-low {{ background-color: {C_LOW}; border-radius: 2px; }}
-            .pill {{
-                border-radius: 999px; padding: 3px 13px;
-                font-size: 88%; color: #ffffff;
-            }}
-            .pill-high {{ background-color: {C_HIGH}; }}
-            .pill-med {{ background-color: {C_MED}; }}
-            .pill-low {{ background-color: {C_LOW}; }}
-            .note-box {{
-                background-color: {note}; border: 1px solid {border};
-                border-left: 3px solid {ACCENT}; border-radius: 8px;
-            }}
-            button {{
-                background-image: none; background-color: {btn}; color: {fg};
-                border: 1px solid {bd}; border-radius: 6px; padding: 4px 14px;
-            }}
-            button label {{ color: {fg}; }}
-            button:hover {{ background-color: {btn_h}; }}
-            button:disabled label {{ color: {sub}; }}
-            button.suggested-action {{
-                background-color: {ACCENT}; border-color: {ACCENT}; color: #ffffff;
-            }}
-            button.suggested-action label {{ color: #ffffff; }}
-            separator {{ background-color: {bd}; }}
-            """
-            self.provider.load_from_data(css.encode())
+        def on_theme_toggled(self):
+            self.theme = "light" if self.theme == "dark" else "dark"
+            self.settings["theme"] = self.theme
+            save_settings(self.settings)
+            tema.uygula(self.theme, VURGU)
+            self.refresh()
+            self.queue_draw()
 
     return ResultWindow
 

@@ -1,0 +1,5 @@
+#!/bin/sh
+# CarotOS: simge onbellegi dogrulama servisini etkinlestir.
+systemctl enable carotos-ikon-onbellek.service || true
+echo "CarotOS: ikon onbellek servisi etkinlestirildi"
+exit 0

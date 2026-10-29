@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=CarotOS GSD
+Name[tr]=CarotOS GSD
+GenericName=General System Dictionary
+GenericName[tr]=Genel Sistem Sözlüğü
+Comment=Searchable, bilingual dictionary of Linux, networking, cybersecurity, cryptography and algorithm terms
+Comment[tr]=Linux, ağ, siber güvenlik, kriptografi ve algoritma terimleri için aranabilir, iki dilli sözlük
+Exec=python3 /opt/carotos/gsd/carotos-gsd.py
+Icon=carotos-gsd
+Terminal=false
+StartupWMClass=carotos-gsd
+Categories=Education;System;Reference;
+Keywords=dictionary;glossary;linux;network;security;cryptography;algorithm;terms;
+Keywords[tr]=sözlük;terim;linux;ağ;güvenlik;kriptografi;algoritma;

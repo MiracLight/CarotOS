@@ -1,0 +1,14 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Filenor komut satiri baslaticisi. Asil kod filenor_cli.py'dedir
+(boylece Windows'ta .exe olarak paketlenebilir)."""
+import os
+import sys
+
+sys.dont_write_bytecode = True
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+
+from filenor_cli import main  # noqa: E402
+
+if __name__ == "__main__":
+    sys.exit(main())

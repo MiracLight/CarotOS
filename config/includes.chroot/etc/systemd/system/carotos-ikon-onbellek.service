@@ -1,0 +1,12 @@
+[Unit]
+Description=CarotOS: simge onbellegini dogrula (bellek tasarrufu)
+After=local-fs.target
+Before=display-manager.service
+ConditionPathExists=/usr/bin/gtk-update-icon-cache
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/carotos-ikon-onbellek
+
+[Install]
+WantedBy=multi-user.target

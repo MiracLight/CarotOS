@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="zemin" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1c2030"/><stop offset="1" stop-color="#12141c"/>
+    </linearGradient>
+    <linearGradient id="dolu" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7cc8f7"/><stop offset="1" stop-color="#3f9be6"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#zemin)"/>
+  <rect x="9" y="9" width="238" height="238" rx="55" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="2"/>
+  <!-- belge (sol ust): ana hat -->
+  <path d="M44 52 h54 l26 26 v82 a8 8 0 0 1 -8 8 h-72 a8 8 0 0 1 -8 -8 v-100 a8 8 0 0 1 8 -8 z"
+        fill="none" stroke="#3f9be6" stroke-width="9" stroke-linejoin="round" stroke-opacity="0.6"/>
+  <path d="M98 52 v26 h26" fill="none" stroke="#3f9be6" stroke-width="9" stroke-linejoin="round" stroke-opacity="0.6"/>
+  <rect x="56" y="102" width="46" height="8" rx="4" fill="#3f9be6" fill-opacity="0.45"/>
+  <rect x="56" y="122" width="34" height="8" rx="4" fill="#3f9be6" fill-opacity="0.45"/>
+  <!-- medya (sag alt): oynat -->
+  <rect x="112" y="112" width="104" height="104" rx="24" fill="url(#dolu)"/>
+  <path d="M150 144 v40 l36 -20 z" fill="#ffffff" fill-opacity="0.96" stroke="#ffffff" stroke-width="8" stroke-linejoin="round" stroke-opacity="0.96"/>
+  <!-- donusum rozeti -->
+  <circle cx="116" cy="116" r="32" fill="#1c2030" stroke="#3f9be6" stroke-width="7"/>
+  <path d="M100 108 h32 m-10 -10 l10 10 l-10 10" fill="none" stroke="#ffffff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M132 126 h-32 m10 -10 l-10 10 l10 10" fill="none" stroke="#7cc8f7" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

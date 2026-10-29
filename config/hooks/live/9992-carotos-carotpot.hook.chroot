@@ -1,0 +1,29 @@
+#!/bin/sh
+set -e
+
+# CarotPot (bal kupu, Faz 4).
+# - SSH tuzagi icin python3-asyncssh; onerilen paketler olmadan ve LC_ALL=C
+#   ile kurulur (Turkce dil ayari bazi paket betiklerini bozuyor).
+# - Hizmet yetkisiz "carotpot" sistem kullanicisiyla calisir (karar D5).
+# - Birim ETKINLESTIRILMEZ: acilista kendiliginden baslamaz; kullanici
+#   CarotPot uygulamasindan acar.
+# - Arayuzun grafikleri icin python3-gi-cairo (CarotPot 2, ortak tema).
+LC_ALL=C DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends python3-asyncssh python3-gi-cairo
+
+if ! getent passwd carotpot >/dev/null; then
+    adduser --system --group --no-create-home --home /var/lib/carotpot \
+        --shell /usr/sbin/nologin carotpot
+fi
+
+chmod 755 /opt/carotos/carotpot/carotpot.py /opt/carotos/carotpot/carotpot-yonet /opt/carotos/carotpot/carotpot-arayuz.py
+find /opt/carotos/carotpot /opt/carotos/ortak -name '*.py' ! -name 'carotpot*.py' -exec chmod 644 {} +
+chmod 644 /etc/systemd/system/carotpot.service /etc/systemd/system/carotpot-engel-temizle.service
+# Yalniz acilista suresi dolmus engelleri temizleyen birim etkinlestirilir;
+# tuzak hizmetinin kendisi (carotpot.service) etkinlestirilmez.
+systemctl enable carotpot-engel-temizle.service
+chmod 644 /etc/carotpot/ayarlar.json
+chmod 644 /etc/fail2ban/filter.d/carotos-carotpot.conf /etc/fail2ban/jail.d/carotos-carotpot.local
+chmod 644 /etc/xdg/autostart/carotpot-bildirim.desktop
+chmod 644 /usr/share/applications/carotos-carotpot.desktop /usr/share/icons/hicolor/*/apps/carotpot.png
+gtk-update-icon-cache -f -t /usr/share/icons/hicolor || true
+echo "CarotOS: CarotPot yerlestirildi (hizmet kapali)."

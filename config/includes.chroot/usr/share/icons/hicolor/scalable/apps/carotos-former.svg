@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="zemin" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1c2030"/><stop offset="1" stop-color="#12141c"/>
+    </linearGradient>
+    <linearGradient id="dolu" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f5a3a7"/><stop offset="1" stop-color="#f0747a"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#zemin)"/>
+  <rect x="9" y="9" width="238" height="238" rx="55" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="2"/>
+  <!-- acik kitap (rehber): ana hat -->
+  <path d="M128 76 c-14 -12 -34 -18 -56 -18 c-6 0 -10 4 -10 10 v92 c0 6 4 10 10 10 c20 0 38 6 50 16
+           c4 3 6 3 6 -2 v-108 z"
+        fill="none" stroke="#f0747a" stroke-width="9" stroke-linejoin="round" stroke-opacity="0.65"/>
+  <path d="M128 76 c14 -12 34 -18 56 -18 c6 0 10 4 10 10 v92 c0 6 -4 10 -10 10 c-20 0 -38 6 -50 16
+           c-4 3 -6 3 -6 -2 v-108 z"
+        fill="none" stroke="#f0747a" stroke-width="9" stroke-linejoin="round" stroke-opacity="0.65"/>
+  <path d="M82 96 h30 m-30 20 h30 m-30 20 h22" fill="none" stroke="#f0747a" stroke-width="7"
+        stroke-linecap="round" stroke-opacity="0.45"/>
+  <!-- oynatma rozeti (canli animasyon) -->
+  <rect x="120" y="120" width="104" height="104" rx="24" fill="url(#dolu)"/>
+  <path d="M158 152 v40 l36 -20 z" fill="#ffffff" fill-opacity="0.96" stroke="#ffffff" stroke-width="8"
+        stroke-linejoin="round" stroke-opacity="0.96"/>
+</svg>

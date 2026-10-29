@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Filenor
+Name[tr]=Filenor
+Comment=Convert images, audio, video, documents and fonts; merge, split and lock PDFs; OCR
+Comment[tr]=Görsel, ses, video, belge ve yazı tiplerini dönüştürün; PDF birleştirin, bölün, kilitleyin; OCR
+Exec=python3 /opt/carotos/filenor/filenor_uygulama.py %F
+Icon=filenor
+Terminal=false
+Categories=Utility;Graphics;AudioVideo;Office;
+Keywords=convert;converter;pdf;image;audio;video;merge;split;ocr;font;
+Keywords[tr]=dönüştür;dönüştürücü;pdf;görsel;ses;video;birleştir;böl;ocr;yazı tipi;
+X-XFCE-Source=file:///usr/share/applications/carotos-filenor.desktop
+Path=
+StartupNotify=false

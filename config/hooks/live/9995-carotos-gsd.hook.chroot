@@ -1,0 +1,23 @@
+#!/bin/sh
+set -e
+
+# CarotOS GSD (General System Dictionary) -- aranabilir, iki dilli sozluk.
+# - Arayuzdeki kategori/terim simgeleri icin python3-gi-cairo (ortak tema ile
+#   ayni gereksinim: Former, CarotPot 2, Filenor).
+LC_ALL=C DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends python3-gi-cairo
+
+chmod 755 /opt/carotos/gsd/carotos-gsd.py
+find /opt/carotos/gsd -name '*.py' ! -name 'carotos-gsd.py' -exec chmod 644 {} +
+# PNG simgeler yama icinde metin (base64) olarak tasinir; burada acilir.
+# (Satir bicimi: "<boyut> <base64>"; vektor surum scalable/ altinda hazir durur.)
+while read -r boyut veri; do
+    [ -n "$boyut" ] || continue
+    mkdir -p "/usr/share/icons/hicolor/${boyut}x${boyut}/apps"
+    printf '%s' "$veri" | base64 -d > "/usr/share/icons/hicolor/${boyut}x${boyut}/apps/carotos-gsd.png"
+done < /opt/carotos/gsd/ikonlar.b64
+rm -f /opt/carotos/gsd/ikonlar.b64
+chmod 644 /usr/share/applications/carotos-gsd.desktop /usr/share/icons/hicolor/*/apps/carotos-gsd.png /usr/share/icons/hicolor/scalable/apps/carotos-gsd.svg
+ln -sf /opt/carotos/gsd/carotos-gsd.py /usr/local/bin/carotos-gsd
+gtk-update-icon-cache -f -t /usr/share/icons/hicolor || true
+update-desktop-database /usr/share/applications || true
+echo "CarotOS: GSD yerlestirildi."

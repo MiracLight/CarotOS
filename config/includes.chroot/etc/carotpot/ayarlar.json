@@ -1,0 +1,27 @@
+{
+ "portlar": {
+  "ssh": 2222,
+  "http": 8080,
+  "telnet": 2323,
+  "ftp": 2121,
+  "vnc": 5900,
+  "rdp": 3390,
+  "mysql": 3307,
+  "redis": 6380
+ },
+ "personalar": {
+  "ssh": "ubuntu",
+  "http": "modem",
+  "telnet": "kamera",
+  "ftp": "nas",
+  "vnc": "masaustu",
+  "rdp": "sunucu",
+  "mysql": "mysql57",
+  "redis": "onbellek"
+ },
+ "yoksay": [],
+ "bekleme": 300,
+ "sakla_gun": 30,
+ "dakikada_olay": 120,
+ "webhook": ""
+}

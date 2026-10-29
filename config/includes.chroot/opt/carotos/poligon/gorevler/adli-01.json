@@ -1,0 +1,62 @@
+{
+  "id": "adli-01",
+  "arac": "file",
+  "seviye": "orta",
+  "baslik": {
+    "tr": "Dosya Türü Doğrulama",
+    "en": "File Type Verification"
+  },
+  "senaryo": {
+    "tr": "{dosya} adlı dosya bir resim gibi görünüyor ama içinde gizli bir CAROT{...} bayrağı saklı. Dosyanın gerçek türünü bul, gerekirse aç ve bayrağı yaz.",
+    "en": "The file {dosya} looks like a picture but hides a CAROT{...} flag. Find its real type, open it if needed and enter the flag."
+  },
+  "ipucu": {
+    "tr": "file {dosya}   ·   strings {dosya} | grep CAROT   ·   zcat {dosya}   ·   tar tzf {dosya}  ·  tar xzf {dosya}",
+    "en": "file {dosya}   ·   strings {dosya} | grep CAROT   ·   zcat {dosya}   ·   tar tzf {dosya}  ·  tar xzf {dosya}"
+  },
+  "hedef": {
+    "tur": "statik_dosya",
+    "servis_modulu": "uretilen_gorevler",
+    "_not": "Yalnız yerel geçici dosya; ağ bağlantısı yok."
+  },
+  "flag_uretimi": {
+    "yontem": "uretec",
+    "uretec": "dosya_adli",
+    "_not": "İçerik her açılışta rastgele üretilir (uretilen_gorevler.dosya_adli)."
+  },
+  "dogrulama": {
+    "tur": "kullanici_girdisi",
+    "karsilastirma": "birebir",
+    "deneme_siniri": null
+  },
+  "zorluklar": {
+    "kolay": {
+      "gizleme": "strings",
+      "ipucu": {
+        "tr": "strings {dosya} | grep CAROT",
+        "en": "strings {dosya} | grep CAROT"
+      }
+    },
+    "orta": {
+      "gizleme": "gzip",
+      "ipucu": {
+        "tr": "file {dosya}  →  dosya gerçekte ne? Sonra: zcat {dosya}",
+        "en": "file {dosya}  →  what is it really? Then: zcat {dosya}"
+      }
+    },
+    "zor": {
+      "gizleme": "tar",
+      "ipucu": {
+        "tr": "file {dosya}  →  gzip; açınca bir arşiv çıkar: zcat {dosya} | tar tf -  ·  zcat {dosya} | tar xO | grep CAROT",
+        "en": "file {dosya}  →  gzip; inside is an archive: zcat {dosya} | tar tf -  ·  zcat {dosya} | tar xO | grep CAROT"
+      }
+    }
+  },
+  "puan": {
+    "kolay": 50,
+    "orta": 110,
+    "zor": 220
+  },
+  "sure_siniri_dk": null,
+  "savunma_gorevi_id": null
+}

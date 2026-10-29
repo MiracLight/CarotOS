@@ -6,8 +6,8 @@
   "seviye": "orta",
 
   "baslik": {
-    "tr": "Bekçiyi Dinle",
-    "en": "Listen to the Watchdog"
+    "tr": "Otomatik Engelleme Servisi",
+    "en": "Automatic Ban Service"
   },
 
   "senaryo": {
