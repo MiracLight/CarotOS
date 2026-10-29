@@ -1061,7 +1061,17 @@ def main():
     except Exception as exc:  # noqa: BLE001
         print(f"Katalog okunamadi ({KATALOG_YOLU}): {exc}", file=sys.stderr)
         sys.exit(1)
-    MagazaPenceresi(katalog).show_all()
+    pencere = MagazaPenceresi(katalog)
+    pencere.show_all()
+    if "--paket" in sys.argv:
+        try:
+            ad = sys.argv[sys.argv.index("--paket") + 1]
+            uygulama = next((u for u in pencere.uygulamalar
+                             if u.get("paket") == ad), None)
+            if uygulama:
+                pencere.detay_goster(uygulama)
+        except (IndexError, ValueError):
+            pass
     Gtk.main()
 
 

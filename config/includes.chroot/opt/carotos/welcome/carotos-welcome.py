@@ -452,7 +452,7 @@ PAGES = [
     },
     {
         "id": "carotpot",
-        "title": {"tr": "CarotOS CarotPot", "en": "CarotOS CarotPot"},
+        "title": {"tr": "CarotPot", "en": "CarotPot"},
         "subtitle": {
             "tr": "Ağınızı tarayan ya da saldıran cihazları yakalayın",
             "en": "Catch devices that scan or attack your network",
@@ -484,7 +484,7 @@ PAGES = [
     },
     {
         "id": "carotene",
-        "title": {"tr": "CarotOS Carotene", "en": "CarotOS Carotene"},
+        "title": {"tr": "Carotene", "en": "Carotene"},
         "subtitle": {
             "tr": "ClamAV ile dosyalarınızı bilinen zararlı yazılımlara karşı tarayın",
             "en": "Scan your files for known malware with ClamAV",
@@ -545,7 +545,7 @@ PAGES = [
     },
     {
         "id": "filenor",
-        "title": {"tr": "CarotOS Filenor", "en": "CarotOS Filenor"},
+        "title": {"tr": "Filenor", "en": "Filenor"},
         "subtitle": {
             "tr": "Görsel, ses, video ve belgeleri terminale gerek kalmadan "
                   "dönüştürün",

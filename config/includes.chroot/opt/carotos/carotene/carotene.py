@@ -190,6 +190,8 @@ METIN = {
     "no_clamav": {
         "tr": "ClamAV kurulu değildir. Carotene bu sistemde tarama yapamaz.",
         "en": "ClamAV is not installed. Carotene cannot scan on this system."},
+    "install_clamav": {"tr": "Mağaza'da ClamAV'ı kur",
+                       "en": "Install ClamAV in the Store"},
     "defs_note_ok": {"tr": "Virüs tanımları: {tarih} ({yas})",
                      "en": "Virus definitions: {tarih} ({yas})"},
     "defs_note_old": {
@@ -451,6 +453,14 @@ class CaroteneWindow(Gtk.Window):
         a, kw, tur = self.hap_durum
         self.hap.ayarla(self.t(a, **kw), tur)
 
+    def magazada_clamav_kur(self, *_):
+        """CarotOS Mağaza'yı doğrudan ClamAV sayfasında açar."""
+        try:
+            subprocess.Popen(["/opt/carotos/magaza/carotos-magaza.py",
+                              "--paket", "clamav"])
+        except OSError:
+            self.bildir("no_clamav", "hata")
+
     def bildir(self, anahtar_ya_da_metin, tur="bilgi", **kw):
         metin = (self.t(anahtar_ya_da_metin, **kw)
                  if anahtar_ya_da_metin in METIN else anahtar_ya_da_metin)
@@ -542,6 +552,10 @@ class CaroteneWindow(Gtk.Window):
         # tanim durumu notu
         if not clamav_var:
             kutu, _ = tema.not_kutusu(self.t("no_clamav"), "hata")
+            dugme = tema.dugme(self.t("install_clamav"), "ana",
+                               self.magazada_clamav_kur)
+            dugme.set_margin_end(14)
+            kutu.pack_start(dugme, False, False, 0)
         elif bilgi["durum"] == M.TANIM_YOK:
             kutu, _ = tema.not_kutusu(self.t("no_defs_block"), "hata")
         elif bilgi["durum"] == M.TANIM_ESKI:
