@@ -1069,7 +1069,12 @@ def main():
             uygulama = next((u for u in pencere.uygulamalar
                              if u.get("paket") == ad), None)
             if uygulama:
-                pencere.detay_goster(uygulama)
+                # pencere yerleştikten sonra aç; açılış sırasındaki sayfa
+                # kurulumu ayrıntı sayfasının üzerine yazmasın
+                def ac():
+                    pencere.detay_goster(uygulama)
+                    return False
+                GLib.timeout_add(600, ac)
         except (IndexError, ValueError):
             pass
     Gtk.main()

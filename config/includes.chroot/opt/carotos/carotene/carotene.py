@@ -552,7 +552,7 @@ class CaroteneWindow(Gtk.Window):
         # tanim durumu notu
         if not clamav_var:
             kutu, _ = tema.not_kutusu(self.t("no_clamav"), "hata")
-            dugme = tema.dugme(self.t("install_clamav"), "ana",
+            dugme = tema.dugme(self.t("install_clamav"), None,
                                self.magazada_clamav_kur)
             dugme.set_margin_end(14)
             kutu.pack_start(dugme, False, False, 0)
