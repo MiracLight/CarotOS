@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- Sistem Sagligi simgesi: saglik halkasi, nabiz ve bulunan sorun (turuncu nokta) -->
+  <defs>
+    <linearGradient id="zemin" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#132a24"/>
+      <stop offset="1" stop-color="#0a1612"/>
+    </linearGradient>
+  </defs>
+  <rect x="14" y="14" width="228" height="228" rx="48" fill="url(#zemin)"/>
+  <circle cx="128" cy="128" r="84" fill="none" stroke="#4fe0a8" stroke-opacity="0.9" stroke-width="6"/>
+  <circle cx="128" cy="128" r="56" fill="none" stroke="#4fe0a8" stroke-opacity="0.35" stroke-width="4"/>
+  <line x1="128" y1="44" x2="128" y2="212" stroke="#4fe0a8" stroke-opacity="0.18" stroke-width="3"/>
+  <line x1="44" y1="128" x2="212" y2="128" stroke="#4fe0a8" stroke-opacity="0.18" stroke-width="3"/>
+  <path d="M72 128 h32 l12 -28 l18 56 l12 -28 h30" fill="none" stroke="#4fe0a8" stroke-width="6"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="172" cy="128" r="20" fill="#ff7a2f" opacity="0.25"/>
+  <circle cx="172" cy="128" r="12" fill="#ff7a2f"/>
+</svg>
