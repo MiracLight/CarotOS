@@ -33,3 +33,4 @@ __pycache__/
 # config/ klasörü her zaman dahil edilir — projenin asıl kaynağı orasıdır
 !config/**
 /binary.modified_timestamps
+config/**/__pycache__/
