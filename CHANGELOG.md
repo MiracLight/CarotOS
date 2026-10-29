@@ -10,6 +10,41 @@ sayılmamıştır.
 
 ---
 
+## Sürüm 14 — 1.3 "Eggshell": Carotene, CarotPot, Filenor, Former ve GSD
+**Durum:** Yayınlandı (`carotos-1.3-amd64.iso`, 2,53 GB, carotos.org).
+- **Carotene** eklendi: ClamAV ile hızlı, ana klasör ve özel tarama; karantina
+  ve geri alma, SHA-256 izin listesi, virüs tanımı güncelleme, tarama geçmişi,
+  Thunar'da "Carotene ile tara" eylemi. Arka planda hizmet çalıştırmaz,
+  `freshclam` hizmeti kapalıdır; ISO güncel tanımlarla gelir.
+- **CarotPot** eklendi: yerel ağ için sahte SSH, Telnet, web paneli, FTP, VNC,
+  RDP, MySQL ve Redis tuzakları; saatlik etkinlik panosu, saldırgan profili,
+  kanarya dosyaları ve onaylı engelleme. Yalnızca özel ağ adreslerinden gelen
+  bağlantılar kaydedilir, sistem açılışında kendiliğinden başlamaz.
+- **Filenor** eklendi: görsel, ses, video, belge, tablo, sunum ve yazı tipi
+  dönüştürme; PDF birleştirme, bölme, döndürme, küçültme, kilitleme ve OCR.
+  Var olan dosyanın üzerine yazmaz.
+- **CarotOS Former** eklendi: güvenlik araçlarını, CarotPot ve Carotene'i
+  canlandırmalarla adım adım anlatan iki dilli rehber.
+- **CarotOS GSD** eklendi: Linux, ağ, siber güvenlik, kriptografi, algoritma ve
+  genel bilgisayar bilimi alanlarında 161 terimlik, aranabilir ve iki dilli
+  sözlük.
+- **Sistem Sağlığı:** Koruma katmanları kategorisi (AppArmor ve profilleri,
+  virüs tanımlarının güncelliği), AppArmor ve `ufw` aç/kapat anahtarı,
+  `debsums` ve `rkhunter` ile ayrıntılı taramalar, eşzamanlı işler. Denetim
+  sayısı 20'den 23'e, kategori sayısı altıdan yediye çıktı. Türkçe yerelde
+  `rkhunter` yapılandırma hatası düzeltildi (`USE_SYSLOG=none`, kurulum
+  `LC_ALL=C` altında).
+- **USB Denetimi:** yalnızca kullanıcı başlattığında çalışan ayrıntılı ClamAV
+  taraması (aygıtın tamamı ya da bir klasörü); bulunan dosyalara dokunulmaz,
+  yalnızca raporlanır. Hızlı denetim bulguları iki dilli oldu, gizlilik notu
+  güncellendi.
+- **Karşılama Sihirbazı** 21 sayfaya çıktı; yeni uygulamalar için sayfalar
+  eklendi.
+- **CarotOS Mağaza:** katalog 51 uygulamadan 153 uygulamaya, yedi kategoriden
+  on kategoriye çıktı.
+- **Sürüm kaynağı:** `surum.json` ve eşitleme betiği ile sürüm bilgisi tek
+  yerden yönetiliyor.
+
 ## Sürüm 13 — 1.2.2 "Eggshell": ses denetimi, uygulama dili ve Poligon ölçekleme
 **Durum:** Yayınlandı (ISO adı 1.2 olarak kaldı; `carotos-1.2-amd64.iso`
 dosyası güncellendi, carotos.org ve GitHub Release metni yeni sha256 ile
