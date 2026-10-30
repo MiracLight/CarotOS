@@ -31,7 +31,7 @@ anlatılmış.**
 - **On güvenlik aracı**, rehberli bir panelden kullanılabilir
 - **BIOS ve UEFI** desteği, imzalı önyükleyici (Secure Boot)
 - Wi-Fi, ses ve grafik firmware'leri dahil — gerçek dizüstülerde çalışır
-- Boşta yaklaşık **500 MB** bellek kullanımı
+- Boşta yaklaşık **600 MB** bellek kullanımı
 
 ## Ekran görüntüleri
 
