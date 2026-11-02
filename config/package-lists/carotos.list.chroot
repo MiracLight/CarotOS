@@ -35,5 +35,6 @@ bash-completion
 htop
 alsa-utils
 locales
+fonts-noto-cjk
 gir1.2-notify-0.7
 libnotify-bin
