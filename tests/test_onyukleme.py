@@ -54,9 +54,20 @@ class GrubAyariTesti(unittest.TestCase):
         fark = set(preseed_parametreleri()) - set(grub_parametreleri())
         self.assertEqual(fark, set(), "preseed'de olup grub.d'de olmayan: %s" % sorted(fark))
 
-    def test_ana_grub_dosyasi_ile_ayni(self):
-        # iki kaynak da ayni parametreleri tasimali (grub.d olan kazanir)
-        self.assertEqual(grub_parametreleri(GRUB_ANA), grub_parametreleri(GRUB_CFG))
+    def test_etc_default_grub_ship_edilmez(self):
+        # /etc/default/grub grub paketinin yapilandirma dosyasidir (ucf). ISO'ya biz
+        # koyarsak kurucu grub paketini kurarken "yerel degisiklik var, ne yapayim?"
+        # diye sorar (ve her grub guncellemesinde kullanici ayni soruyu gorur).
+        # Ayarlar grub.d altindaki parcada tutulur.
+        self.assertFalse(os.path.exists(GRUB_ANA),
+                         "includes.chroot/etc/default/grub kaldirilmali; ayar grub.d/carotos.cfg'de")
+
+    def test_dagitici_adi_os_release_den(self):
+        # Menu girisleri "Debian GNU/Linux" degil dagitimin adini (CarotOS) tasimali
+        m = re.search(r"^GRUB_DISTRIBUTOR=(.+)$", oku(GRUB_CFG), re.M)
+        self.assertIsNotNone(m, "GRUB_DISTRIBUTOR grub.d/carotos.cfg'de tanimli olmali")
+        self.assertIn("/etc/os-release", m.group(1))
+        self.assertIn("${NAME}", m.group(1))
 
 
 if __name__ == "__main__":
