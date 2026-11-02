@@ -22,6 +22,7 @@ import sys
 import subprocess
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -506,6 +507,13 @@ class PoligonIstemci:
     # ------------------------------------------------------------------
     # Öğretmen sunucusuyla iletişim
     # ------------------------------------------------------------------
+    @staticmethod
+    def _kodla(deger: str) -> str:
+        """URL sorgusuna yazilacak degeri yuzde-kodlar. Kodlanmazsa bosluklu ya da
+        Turkce karakterli bir isim (Sule Ipek) http.client'te InvalidURL /
+        UnicodeEncodeError verir, '&' ve '=' ise sorguyu bozar."""
+        return urllib.parse.quote(deger, safe="")
+
     def _istek(self, yol: str, gövde: dict, yontem: str = "POST") -> tuple[int, dict]:
         veri = json.dumps(gövde).encode("utf-8")
         r = urllib.request.Request(
@@ -632,7 +640,7 @@ class PoligonIstemci:
             return "aktif"
         try:
             _, cevap = self._istek(
-                f"/aktif_mi?ogrenci={self.ogrenci_adi}", {}, "GET",
+                "/aktif_mi?ogrenci=" + self._kodla(self.ogrenci_adi), {}, "GET",
             )
             return "aktif" if cevap.get("aktif", True) else "atildi"
         except OdaKapaliHatasi:
@@ -683,7 +691,8 @@ class PoligonIstemci:
             return []  # bireysel modda öğretmen yok, mesaj gelmez
         try:
             _, cevap = self._istek(
-                f"/sohbet?ogrenci={self.ogrenci_adi}&son_no={self._son_mesaj_no}",
+                "/sohbet?ogrenci=%s&son_no=%d" % (self._kodla(self.ogrenci_adi),
+                                                   self._son_mesaj_no),
                 {}, "GET",
             )
             mesajlar = cevap.get("mesajlar", [])
