@@ -4,6 +4,8 @@ DOSYA="/usr/lib/live/init-config.sh"
 if [ -f "$DOSYA" ]; then
     sed -i 's/LIVE_USER_FULLNAME="Debian Live user"/LIVE_USER_FULLNAME="CarotOS Live User"/' "$DOSYA"
     sed -i 's/LIVE_HOSTNAME="debian"/LIVE_HOSTNAME="carotos"/' "$DOSYA"
+    # sed eslesmese bile 0 doner; sonucu dogrula, yoksa derleme dursun
+    grep -q 'LIVE_HOSTNAME="carotos"' "$DOSYA" || exit 1
     echo "CarotOS: Live User adi guncellendi."
 else
     echo "CarotOS UYARI: $DOSYA bulunamadi, Live User adi degistirilemedi." >&2
