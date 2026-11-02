@@ -40,7 +40,10 @@ KENDISI = os.path.abspath(__file__)
 
 AYAR = CP.AYAR_DOSYASI
 ACILAN = "/etc/carotpot/acilan_portlar.json"
-ENGELLILER = "/var/log/carotpot/engelliler.json"
+# Root'a ait dizin. /var/log/carotpot, carotpot hizmet kullanicisinin dizinidir
+# (LogsDirectory=); orada root'un okuyup yazdigi dosya sembolik bagla
+# yonlendirilebilirdi.
+ENGELLILER = "/var/lib/carotos/carotpot/engelliler.json"
 JAIL = "/etc/fail2ban/jail.d/carotos-carotpot.local"
 ORTAM = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL": "C", "LANG": "C"}
 

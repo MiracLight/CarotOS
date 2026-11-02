@@ -23,7 +23,8 @@ import tuzaklar
 
 BURASI = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 YARDIMCI = os.path.join(BURASI, "carotpot-yonet")
-ENGELLILER = "/var/log/carotpot/engelliler.json"
+# carotpot-yonet ile ayni yol (root'a ait dizin)
+ENGELLILER = "/var/lib/carotos/carotpot/engelliler.json"
 JAIL = "/etc/fail2ban/jail.d/carotos-carotpot.local"
 
 HIZMET_ADI = CP.HIZMET_ADI
