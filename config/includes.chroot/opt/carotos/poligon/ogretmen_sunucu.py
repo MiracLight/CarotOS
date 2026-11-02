@@ -24,6 +24,14 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
+# Sinif agindaki herhangi bir cihaz bu sunucuya baglanabilir; istek boyutu ve
+# yanlis sifre denemesi sinirlanir (6 haneli onaltilik sifre = 24 bit).
+MAKS_GOVDE = 64 * 1024          # bayt
+MAKS_AD = 64                    # ogrenci adi / gorev kimligi / durum uzunlugu
+MAKS_MESAJ = 1000               # sohbet mesaji ve cevap metni uzunlugu
+DENEME_PENCERESI = 60.0         # sn
+DENEME_LIMITI = 10              # pencerede yanlis sifre sayisi
+
 
 class OdaDurumu:
     """Bellek ici oda durumu. Veritabani gerekmez -- ders bitince oda kapanir."""
@@ -31,6 +39,7 @@ class OdaDurumu:
     def __init__(self, oda_kodu: str, sifre: str):
         self.oda_kodu = oda_kodu
         self.sifre = sifre
+        self._basarisiz: dict[str, list[float]] = {}   # adres -> yanlis deneme zamanlari
         self.acik_gorevler: set[str] = set()
         # Her acik gorevin zorlugu: gorev_id -> 'kolay'|'orta'|'zor'.
         # Ogretmen gorevi atarken secer; ogrenci /gorevler'den okur.
@@ -163,13 +172,36 @@ class OdaDurumu:
         with self._kilit:
             self.ogrenciler.pop(ad, None)
 
+    def sifre_dogru(self, sifre) -> bool:
+        """Sabit sureli karsilastirma. ASCII disi ya da str olmayan degerde
+        compare_digest TypeError verirdi (istek isleyicisi cokerdi); bayta cevrilir."""
+        if not isinstance(sifre, str):
+            return False
+        return secrets.compare_digest(sifre.encode("utf-8"), self.sifre.encode("utf-8"))
+
+    def cok_deneme_mi(self, adres: str) -> bool:
+        """Son DENEME_PENCERESI sn'de DENEME_LIMITI yanlis sifre denemesi yapan
+        adres gecici olarak reddedilir."""
+        simdi = time.monotonic()
+        with self._kilit:
+            kayit = [t for t in self._basarisiz.get(adres, []) if simdi - t < DENEME_PENCERESI]
+            if kayit:
+                self._basarisiz[adres] = kayit
+            else:
+                self._basarisiz.pop(adres, None)
+            return len(kayit) >= DENEME_LIMITI
+
+    def basarisiz_kaydet(self, adres: str) -> None:
+        with self._kilit:
+            self._basarisiz.setdefault(adres, []).append(time.monotonic())
+
     def katil(self, ad: str, sifre: str) -> None:
         """Öğrenci odaya katılırken çağrılır. Şifre yanlışsa
         PermissionError, isim zaten kullanımdaysa ValueError fırlatır.
         Aynı isim, önceki sahibi öğretmen tarafından atılana kadar (veya
         oda kapanana kadar) tekrar kullanılamaz -- kalıcı bir yasak
         değil, sadece aynı anda iki öğrencinin aynı adı taşımasını önler."""
-        if not secrets.compare_digest(sifre, self.sifre):
+        if not self.sifre_dogru(sifre):
             raise PermissionError("yanlış oda şifresi")
         with self._kilit:
             if ad in self.ogrenciler:
@@ -185,7 +217,7 @@ class OdaDurumu:
                            durum: str, sure_sn: float,
                            cevap: str | None = None, soru_no: int = 0,
                            puan: int = 0) -> None:
-        if not secrets.compare_digest(sifre, self.sifre):
+        if not self.sifre_dogru(sifre):
             raise PermissionError("yanlış oda şifresi")
         with self._kilit:
             self.ogrenciler[ad] = {
@@ -309,9 +341,39 @@ def _sunucu_sinifi_olustur(oda: OdaDurumu):
             self.wfile.write(govde)
 
         def _json_oku(self) -> dict:
+            """OverflowError: govde cok buyuk; ValueError: gecersiz uzunluk/JSON."""
             uzunluk = int(self.headers.get("Content-Length", 0))
+            if uzunluk < 0:
+                raise ValueError("gecersiz Content-Length")
+            if uzunluk > MAKS_GOVDE:
+                raise OverflowError("govde cok buyuk")
             ham = self.rfile.read(uzunluk) if uzunluk else b"{}"
-            return json.loads(ham.decode("utf-8"))
+            veri = json.loads(ham.decode("utf-8"))
+            if not isinstance(veri, dict):
+                raise ValueError("JSON nesnesi bekleniyordu")
+            return veri
+
+        @staticmethod
+        def _ad(veri: dict):
+            """Gecerli ogrenci adi (1..MAKS_AD karakterlik str) ya da None."""
+            ad = veri.get("ogrenci")
+            if isinstance(ad, str) and 1 <= len(ad) <= MAKS_AD:
+                return ad
+            return None
+
+        def _yetkili_mi(self, sifre) -> bool:
+            """Oda sifresi dogruysa True. Yanlis denemeler adres basina sayilir;
+            cok sayida yanlis denemeden sonra 429 doner. Yanit zaten gonderilmistir."""
+            adres = self.client_address[0]
+            if oda.cok_deneme_mi(adres):
+                self._json_gonder({"hata": "cok_fazla_deneme",
+                                   "mesaj": "Çok fazla yanlış deneme; bir dakika bekleyin"}, 429)
+                return False
+            if oda.sifre_dogru(sifre):
+                return True
+            oda.basarisiz_kaydet(adres)
+            self._json_gonder({"hata": "yanlış şifre"}, 403)
+            return False
 
         def do_GET(self) -> None:  # noqa: N802
             ayristirilan = urlparse(self.path)
@@ -351,15 +413,24 @@ def _sunucu_sinifi_olustur(oda: OdaDurumu):
         def do_POST(self) -> None:  # noqa: N802
             try:
                 veri = self._json_oku()
-            except json.JSONDecodeError:
+            except OverflowError:
+                self._json_gonder({"hata": "gövde çok büyük"}, 413)
+                return
+            except ValueError:   # JSONDecodeError ve UnicodeDecodeError dahil
                 self._json_gonder({"hata": "geçersiz JSON"}, 400)
                 return
 
             ayristirilan = urlparse(self.path)
 
             if ayristirilan.path == "/katil":
+                ad = self._ad(veri)
+                if ad is None:
+                    self._json_gonder({"hata": "geçersiz isim"}, 400)
+                    return
+                if not self._yetkili_mi(veri.get("sifre")):
+                    return
                 try:
-                    oda.katil(ad=veri["ogrenci"], sifre=veri["sifre"])
+                    oda.katil(ad=ad, sifre=veri["sifre"])
                     self._json_gonder({"tamam": True})
                 except PermissionError:
                     self._json_gonder({"hata": "yanlış şifre"}, 403)
@@ -371,12 +442,28 @@ def _sunucu_sinifi_olustur(oda: OdaDurumu):
                 except KeyError as e:
                     self._json_gonder({"hata": f"eksik alan: {e}"}, 400)
             elif ayristirilan.path == "/ilerleme":
+                ad = self._ad(veri)
+                if ad is None:
+                    self._json_gonder({"hata": "geçersiz isim"}, 400)
+                    return
+                if not self._yetkili_mi(veri.get("sifre")):
+                    return
                 try:
+                    gorev_id, durum = veri["gorev_id"], veri["durum"]
+                    sure_sn = veri.get("sure_sn", 0) or 0
+                    cevap = veri.get("cevap")
+                    if not (isinstance(gorev_id, str) and isinstance(durum, str)
+                            and len(gorev_id) <= MAKS_AD and len(durum) <= MAKS_AD
+                            and isinstance(sure_sn, (int, float))
+                            and not isinstance(sure_sn, bool)
+                            and (cevap is None or (isinstance(cevap, str)
+                                                   and len(cevap) <= MAKS_MESAJ))):
+                        raise ValueError("gecersiz alan")
                     oda.ilerleme_guncelle(
-                        ad=veri["ogrenci"], sifre=veri["sifre"],
-                        gorev_id=veri["gorev_id"], durum=veri["durum"],
-                        sure_sn=veri.get("sure_sn", 0),
-                        cevap=veri.get("cevap"),
+                        ad=ad, sifre=veri["sifre"],
+                        gorev_id=gorev_id, durum=durum,
+                        sure_sn=sure_sn,
+                        cevap=cevap,
                         soru_no=int(veri.get("soru_no", 0) or 0),
                         puan=int(veri.get("puan", 0) or 0),
                     )
@@ -385,6 +472,8 @@ def _sunucu_sinifi_olustur(oda: OdaDurumu):
                     self._json_gonder({"hata": "yanlış şifre"}, 403)
                 except KeyError as e:
                     self._json_gonder({"hata": f"eksik alan: {e}"}, 400)
+                except (TypeError, ValueError):
+                    self._json_gonder({"hata": "geçersiz alan"}, 400)
             elif ayristirilan.path == "/mesaj":
                 # Hem öğretmen hem öğrenci mesaj gönderir.
                 # kimden: 'ogretmen' | 'ogrenci'

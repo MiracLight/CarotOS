@@ -52,7 +52,10 @@ class SunucuTabani(unittest.TestCase):
             with urllib.request.urlopen(r, timeout=5) as resp:
                 return resp.status, json.loads(resp.read())
         except urllib.error.HTTPError as e:
-            return e.code, json.loads(e.read())
+            try:
+                return e.code, json.loads(e.read())
+            finally:
+                e.close()
 
     def istemci(self, ad=AD):
         return ogrenci_istemci.PoligonIstemci(self.adres, "1234", SIFRE, ad)
@@ -86,6 +89,70 @@ class TurkceAdUcAdan(SunucuTabani):
         self.assertEqual(ist.sinif_baglanti_durumu(), "aktif")
         self.oda.ogrenciyi_at(AD)
         self.assertEqual(ist.sinif_baglanti_durumu(), "atildi")
+
+
+class SunucuSertlestirmeTesti(SunucuTabani):
+    def ham_istek(self, yontem, yol, basliklar, govde=b""):
+        bag = http.client.HTTPConnection("127.0.0.1", self.port, timeout=3)
+        try:
+            bag.putrequest(yontem, yol)
+            for ad, deger in basliklar.items():
+                bag.putheader(ad, deger)
+            bag.endheaders(govde)
+            yanit = bag.getresponse()
+            return yanit.status, json.loads(yanit.read())
+        finally:
+            bag.close()
+
+    def test_cok_buyuk_govde_reddedilir(self):
+        # Content-Length'e gore sinirsiz okunsaydi tek istek bellegi doldururdu
+        durum, _ = self.ham_istek("POST", "/katil", {"Content-Length": str(10 ** 9)})
+        self.assertEqual(durum, 413)
+
+    def test_gecersiz_content_length(self):
+        for deger in ("abc", "-5"):
+            with self.subTest(deger=deger):
+                durum, _ = self.ham_istek("POST", "/katil", {"Content-Length": deger})
+                self.assertIn(durum, (400, 413))
+
+    def test_json_nesnesi_degilse_400(self):
+        govde = b"[1, 2, 3]"
+        durum, _ = self.ham_istek("POST", "/katil", {"Content-Length": str(len(govde))}, govde)
+        self.assertEqual(durum, 400)
+
+    def test_gecersiz_alanlar_400(self):
+        for govde in ({"ogrenci": ["x"], "sifre": SIFRE}, {"ogrenci": 123, "sifre": SIFRE},
+                      {"ogrenci": "", "sifre": SIFRE}, {"ogrenci": "a" * 65, "sifre": SIFRE}):
+            with self.subTest(govde=govde):
+                durum, _ = self.istek("POST", "/katil", govde)
+                self.assertEqual(durum, 400)
+        self.assertEqual(self.istek("POST", "/katil", {"ogrenci": AD, "sifre": SIFRE})[0], 200)
+        for sure in ("abc", [1], {"a": 1}):
+            with self.subTest(sure_sn=sure):
+                durum, _ = self.istek("POST", "/ilerleme", {
+                    "ogrenci": AD, "sifre": SIFRE, "gorev_id": "ufw-01",
+                    "durum": "basladi", "sure_sn": sure})
+                self.assertEqual(durum, 400)
+
+    def test_ascii_disi_sifre_cokmez(self):
+        # secrets.compare_digest ASCII disi str'de TypeError verirdi (baglanti kopar)
+        durum, _ = self.istek("POST", "/katil", {"ogrenci": AD, "sifre": "şifre"})
+        self.assertEqual(durum, 403)
+
+    def test_yanlis_sifre_denemesi_sinirlanir(self):
+        for _ in range(ogretmen_sunucu.DENEME_LIMITI):
+            durum, _ = self.istek("POST", "/katil", {"ogrenci": AD, "sifre": "yanlis"})
+            self.assertEqual(durum, 403)
+        # sinir asildi: dogru sifre bile gecici olarak reddedilir
+        durum, govde = self.istek("POST", "/katil", {"ogrenci": AD, "sifre": SIFRE})
+        self.assertEqual(durum, 429)
+        self.assertEqual(govde["hata"], "cok_fazla_deneme")
+
+    def test_dogru_sifre_sayac_artirmaz(self):
+        for i in range(ogretmen_sunucu.DENEME_LIMITI + 3):
+            durum, _ = self.istek("POST", "/ilerleme", {
+                "ogrenci": AD, "sifre": SIFRE, "gorev_id": "ufw-01", "durum": "basladi"})
+            self.assertEqual(durum, 200, "deneme %d" % i)
 
 
 if __name__ == "__main__":
