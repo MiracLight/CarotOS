@@ -20,15 +20,21 @@ STAMP=/var/lib/carotos/firstboot.done
 
 if getent group sudo >/dev/null 2>&1; then
     for u in $(awk -F: '$3 >= 1000 && $3 < 65534 {print $1}' /etc/passwd); do
-        usermod -aG sudo "$u" || true
-        logger -t carotos-firstboot "sudo grubuna eklendi: $u"
+        if usermod -aG sudo "$u"; then
+            logger -t carotos-firstboot "sudo grubuna eklendi: $u"
+        else
+            logger -t carotos-firstboot -p user.err "sudo grubuna EKLENEMEDI: $u"
+        fi
     done
 fi
 
 if getent group wireshark >/dev/null 2>&1; then
     for u in $(awk -F: '$3 >= 1000 && $3 < 65534 {print $1}' /etc/passwd); do
-        usermod -aG wireshark "$u" || true
-        logger -t carotos-firstboot "wireshark grubuna eklendi: $u"
+        if usermod -aG wireshark "$u"; then
+            logger -t carotos-firstboot "wireshark grubuna eklendi: $u"
+        else
+            logger -t carotos-firstboot -p user.err "wireshark grubuna EKLENEMEDI: $u"
+        fi
     done
 fi
 

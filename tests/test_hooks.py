@@ -65,6 +65,29 @@ class HookTesti(unittest.TestCase):
                     sonuc.returncode, 0,
                     f"{ad}: sh -n basarisiz: {sonuc.stderr.decode('utf-8', 'replace')}")
 
+    def test_www_browser_ayarlanmaz(self):
+        # firefox-esr www-browser'i saglamaz; --set sessizce/gurultuyle duserdi.
+        veri = dict(hook_listesi())["9999-carotos-setup.hook.chroot"].decode("utf-8")
+        self.assertNotIn("--set www-browser", veri)
+        self.assertIn("--set x-www-browser", veri)
+        for satir in veri.split("\n"):
+            if "x-www-browser" in satir:
+                self.assertNotIn("|| true", satir)
+
+    @unittest.skipIf(SH is None, "sh bulunamadi")
+    def test_firstboot_sozdizimi_ve_gunluk(self):
+        yol = os.path.join(KOK, "config", "includes.chroot", "usr", "local",
+                           "sbin", "carotos-firstboot.sh")
+        with open(yol, "rb") as f:
+            veri = f.read().replace(b"\r\n", b"\n")
+        sonuc = subprocess.run([SH, "-n"], input=veri, capture_output=True, timeout=30)
+        self.assertEqual(sonuc.returncode, 0, sonuc.stderr.decode("utf-8", "replace"))
+        # usermod hatasi gizlenmemeli: "|| true" yok, basari/hata ayri gunluge yazilir
+        for satir in veri.decode("utf-8").split("\n"):
+            if "usermod" in satir:
+                self.assertNotIn("|| true", satir)
+        self.assertIn("EKLENEMEDI", veri.decode("utf-8"))
+
     @unittest.skipIf(SHELLCHECK is None, "shellcheck kurulu degil")
     def test_shellcheck_hata_duzeyi(self):
         for ad, veri in hook_listesi():
