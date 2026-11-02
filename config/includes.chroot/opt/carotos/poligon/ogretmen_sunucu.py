@@ -9,7 +9,11 @@ Bu iki kural birbirine KARISTIRILMAMALI. Buradan saldiri trafigi
 GECMEZ -- sadece ilerleme/skor/ipucu JSON mesajlari.
 
 Protokol (hepsi JSON):
+  POST /katil         {ogrenci, sifre}
   POST /ilerleme      {ogrenci, sifre, gorev_id, durum, sure_sn}
+  POST /mesaj         {ogrenci, sifre, metin}      (ogrenci -> ogretmen sohbeti)
+  GET  /sohbet?ogrenci=AD&sifre=...&son_no=N        (ogrenci kendi sohbetini ceker)
+  GET  /gorevler, /aktif_mi?ogrenci=AD              (sifresiz: gizli bilgi icermez)
   POST /ipucu_gonder  {ogrenci, mesaj}                    (ogretmen kullanir)
   GET  /ipucu?ogrenci=AD                                   (ogrenci sorar, bir kez okunur)
   GET  /durum                                              (ogretmen paneli izler)
@@ -404,8 +408,15 @@ def _sunucu_sinifi_olustur(oda: OdaDurumu):
             elif ayristirilan.path == "/sohbet":
                 # Öğrenci kendi sohbetindeki yeni mesajları çeker.
                 # son_no: en son gördüğü mesaj numarası (0 = tümü).
+                # Sohbet ogretmenle ogrenci arasindadir; oda sifresi olmayan
+                # sinif agi cihazlari okuyamaz.
+                if not self._yetkili_mi(sorgu.get("sifre", [""])[0]):
+                    return
                 ad = sorgu.get("ogrenci", [""])[0]
-                son_no = int(sorgu.get("son_no", ["0"])[0])
+                try:
+                    son_no = int(sorgu.get("son_no", ["0"])[0])
+                except ValueError:
+                    son_no = 0
                 self._json_gonder({"mesajlar": oda.sohbet_getir(ad, son_no)})
             else:
                 self._json_gonder({"hata": "bilinmeyen yol"}, 404)
@@ -475,15 +486,24 @@ def _sunucu_sinifi_olustur(oda: OdaDurumu):
                 except (TypeError, ValueError):
                     self._json_gonder({"hata": "geçersiz alan"}, 400)
             elif ayristirilan.path == "/mesaj":
-                # Hem öğretmen hem öğrenci mesaj gönderir.
-                # kimden: 'ogretmen' | 'ogrenci'
-                # ogrenci: hedef öğrenci adı (öğrenci kendi adını yazar),
-                #          öğretmen 'tum_sinif' da yazabilir.
-                kayit = oda.mesaj_ekle(
-                    ogrenci=veri["ogrenci"],
-                    kimden=veri.get("kimden", "ogretmen"),
-                    metin=veri["metin"],
-                )
+                # Bu yolu yalnizca ogrenci istemcisi kullanir; ogretmen mesajlarini
+                # surec icinden oda.mesaj_ekle ile gonderir. Bu yuzden oda sifresi
+                # zorunludur ve gonderen sunucuda 'ogrenci' olarak sabitlenir;
+                # aksi halde sinif agindaki herkes ogretmen adina ogrencilere
+                # mesaj yazabilirdi.
+                if not self._yetkili_mi(veri.get("sifre")):
+                    return
+                ad = self._ad(veri)
+                metin = veri.get("metin")
+                if (ad is None or not isinstance(metin, str)
+                        or not metin.strip() or len(metin) > MAKS_MESAJ):
+                    self._json_gonder({"hata": "geçersiz mesaj"}, 400)
+                    return
+                if not oda.ogrenci_aktif_mi(ad):
+                    # katilmamis adlara yazilamaz: sohbet sozlugu sisirilemez
+                    self._json_gonder({"hata": "bilinmeyen öğrenci"}, 404)
+                    return
+                kayit = oda.mesaj_ekle(ogrenci=ad, kimden="ogrenci", metin=metin)
                 self._json_gonder({"tamam": True, "no": kayit["no"]})
             else:
                 self._json_gonder({"hata": "bilinmeyen yol"}, 404)

@@ -691,8 +691,9 @@ class PoligonIstemci:
             return []  # bireysel modda öğretmen yok, mesaj gelmez
         try:
             _, cevap = self._istek(
-                "/sohbet?ogrenci=%s&son_no=%d" % (self._kodla(self.ogrenci_adi),
-                                                   self._son_mesaj_no),
+                "/sohbet?ogrenci=%s&son_no=%d&sifre=%s" % (
+                    self._kodla(self.ogrenci_adi), self._son_mesaj_no,
+                    self._kodla(self.oda_sifre)),
                 {}, "GET",
             )
             mesajlar = cevap.get("mesajlar", [])
@@ -705,11 +706,11 @@ class PoligonIstemci:
     def mesaj_gonder(self, metin: str) -> bool:
         """Öğrenci öğretmene mesaj yazar (çift yönlü sohbet)."""
         try:
-            self._istek("/mesaj", {
+            durum, _ = self._istek("/mesaj", {
                 "ogrenci": self.ogrenci_adi,
-                "kimden": "ogrenci",
+                "sifre": self.oda_sifre,
                 "metin": metin,
             })
-            return True
+            return durum == 200   # sifre/oda hatasinda eskiden hep True donerdi
         except BaglantiHatasi:
             return False

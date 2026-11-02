@@ -14,6 +14,7 @@ import os
 import sys
 import unittest
 import urllib.error
+import urllib.parse
 import urllib.request
 from urllib.parse import parse_qs, urlparse
 
@@ -89,6 +90,70 @@ class TurkceAdUcAdan(SunucuTabani):
         self.assertEqual(ist.sinif_baglanti_durumu(), "aktif")
         self.oda.ogrenciyi_at(AD)
         self.assertEqual(ist.sinif_baglanti_durumu(), "atildi")
+
+
+class SohbetKimlikTesti(SunucuTabani):
+    """/mesaj ve /sohbet yalnizca oda sifresini bilenlere acik."""
+
+    def katil(self):
+        self.assertEqual(self.istek("POST", "/katil", {"ogrenci": AD, "sifre": SIFRE})[0], 200)
+
+    def test_mesaj_sifresiz_reddedilir(self):
+        self.katil()
+        durum, _ = self.istek("POST", "/mesaj", {"ogrenci": AD, "metin": "merhaba"})
+        self.assertEqual(durum, 403)
+        self.assertEqual(self.oda.sohbet_getir(AD), [])
+
+    def test_mesaj_gonderen_sunucuda_sabitlenir(self):
+        # LAN'daki biri kimden='ogretmen' diyerek ogrencilere ogretmen adina yazamamali
+        self.katil()
+        durum, _ = self.istek("POST", "/mesaj", {
+            "ogrenci": AD, "sifre": SIFRE, "kimden": "ogretmen", "metin": "komut calistir"})
+        self.assertEqual(durum, 200)
+        self.assertEqual(self.oda.sohbet_getir(AD)[-1]["kimden"], "ogrenci")
+
+    def test_mesaj_katilmamis_ogrenciye_yazilmaz(self):
+        durum, _ = self.istek("POST", "/mesaj", {"ogrenci": "Hayalet", "sifre": SIFRE, "metin": "x"})
+        self.assertEqual(durum, 404)
+        self.assertNotIn("Hayalet", self.oda.sohbetler)      # sozluk sismemeli
+
+    def test_mesaj_gecersiz_metin_400(self):
+        self.katil()
+        for metin in ("", "   ", "a" * 1001, 5, ["x"]):
+            with self.subTest(metin=metin):
+                durum, _ = self.istek("POST", "/mesaj", {"ogrenci": AD, "sifre": SIFRE, "metin": metin})
+                self.assertEqual(durum, 400)
+
+    def test_sohbet_sifresiz_okunamaz(self):
+        self.katil()
+        self.oda.mesaj_ekle(AD, "ogretmen", "ozel mesaj")
+        durum, govde = self.istek("GET", "/sohbet?ogrenci=" + urllib.parse.quote(AD, safe=""))
+        self.assertEqual(durum, 403)
+        self.assertNotIn("mesajlar", govde)
+
+    def test_sohbet_sifreyle_okunur_ve_gecersiz_son_no_cokmez(self):
+        self.katil()
+        self.oda.mesaj_ekle(AD, "ogretmen", "ozel mesaj")
+        yol = "/sohbet?ogrenci=%s&sifre=%s&son_no=%s" % (
+            urllib.parse.quote(AD, safe=""), SIFRE, "abc")
+        durum, govde = self.istek("GET", yol)
+        self.assertEqual(durum, 200)
+        self.assertEqual([m["metin"] for m in govde["mesajlar"]], ["ozel mesaj"])
+
+    def test_istemci_mesajlasma_uctan_uca(self):
+        ist = self.istemci()
+        self.assertEqual(ist.katil(), (True, ""))
+        self.oda.mesaj_ekle(AD, "ogretmen", "selam")
+        self.assertEqual([m["metin"] for m in ist.yeni_mesajlari_getir()], ["selam"])
+        self.assertEqual(ist.yeni_mesajlari_getir(), [])            # her mesaj bir kez gelir
+        self.assertTrue(ist.mesaj_gonder("merhaba hocam"))
+        son = self.oda.sohbet_getir(AD)[-1]
+        self.assertEqual((son["kimden"], son["metin"]), ("ogrenci", "merhaba hocam"))
+
+    def test_istemci_yanlis_sifrede_mesaj_gonderemez(self):
+        self.katil()
+        yanlis = ogrenci_istemci.PoligonIstemci(self.adres, "1234", "yanlis", AD)
+        self.assertFalse(yanlis.mesaj_gonder("merhaba"))             # eskiden hep True donerdi
 
 
 class SunucuSertlestirmeTesti(SunucuTabani):
