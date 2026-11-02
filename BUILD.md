@@ -22,6 +22,9 @@ lb config \
   --debian-installer live \
   --archive-areas "main contrib non-free non-free-firmware" \
   --image-name "carotos-1.3.1" \
+  --iso-application "CarotOS" \
+  --iso-volume "CarotOS 1.3" \
+  --iso-publisher "CarotOS; https://carotos.org" \
   --uefi-secure-boot enable \
   --firmware-chroot true
 sudo lb build 2>&1 | tee build.log
