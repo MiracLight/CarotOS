@@ -16,8 +16,9 @@ chmod 644 /usr/share/applications/carotos-security-panel.desktop
 
 
 # Firefox'u varsayılan tarayıcı yap
-update-alternatives --set www-browser /usr/bin/firefox-esr || true
-update-alternatives --set x-www-browser /usr/bin/firefox-esr || true
+# www-browser metin tarayicilarina ayrilmistir, firefox-esr onu saglamaz;
+# yalnizca x-www-browser ayarlanir. Hata olursa derleme dursun.
+update-alternatives --set x-www-browser /usr/bin/firefox-esr
 
 # fail2ban'ı açılışta otomatik başlat
 systemctl enable fail2ban
