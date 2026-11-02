@@ -421,11 +421,14 @@ def apt_komutu(eylem, *paketler):
         return None
     if eylem == "update":
         return [yetki, "apt-get", "update"]
+    # LC_ALL=C: pkexec yerel ayari korur; Turkce'de bazi paketlerin kurulum
+    # betikleri bozulur (rkhunter: tr '[:upper:]' '[:lower:]' "I" harfini
+    # kucultmez, betik 10 koduyla duser, paket yari kurulu kalir). Bu yuzden
+    # apt dil ayarindan bagimsiz calistirilir (cikti Ingilizce olur).
+    ortam = ["env", "DEBIAN_FRONTEND=noninteractive", "LC_ALL=C"]
     if eylem == "upgrade":
-        return [yetki, "env", "DEBIAN_FRONTEND=noninteractive",
-                "apt-get", "upgrade", "-y"]
-    return [yetki, "env", "DEBIAN_FRONTEND=noninteractive",
-            "apt-get", eylem, "-y", *paketler]
+        return [yetki, *ortam, "apt-get", "upgrade", "-y"]
+    return [yetki, *ortam, "apt-get", eylem, "-y", *paketler]
 
 
 # --- İşlem penceresi (apt çıktısı) ------------------------------------------

@@ -1,0 +1,86 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Magaza testleri (GTK gerektirmez): apt komutu ve metin sozlugu.
+
+Magaza modulu en ustte gi/Gtk iceri aktardigi icin dogrudan import edilmez;
+test, kaynagi ayristirip yalnizca ilgili islevleri / sozlugu cikarir.
+
+Calistirma:  python3 tests/test_magaza.py
+"""
+import ast
+import os
+import shutil
+import sys
+import unittest
+from unittest import mock
+
+sys.dont_write_bytecode = True
+
+KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MAGAZA = os.path.join(KOK, "config", "includes.chroot", "opt", "carotos", "magaza")
+KOD = os.path.join(MAGAZA, "carotos-magaza.py")
+
+
+def kaynak_agaci():
+    with open(KOD, "rb") as f:
+        return ast.parse(f.read().decode("utf-8"))
+
+
+def islevleri_yukle(*adlar):
+    """Modulden yalnizca adi verilen islevleri, gi olmadan calistirilabilir yapar."""
+    secilen = [n for n in kaynak_agaci().body
+               if isinstance(n, ast.FunctionDef) and n.name in adlar]
+    assert {n.name for n in secilen} == set(adlar), "islev bulunamadi"
+    ad_alani = {"shutil": shutil}
+    exec(compile(ast.Module(body=secilen, type_ignores=[]), KOD, "exec"), ad_alani)
+    return ad_alani
+
+
+def metin_sozlugu():
+    for n in kaynak_agaci().body:
+        if isinstance(n, ast.Assign) and any(getattr(t, "id", "") == "METIN" for t in n.targets):
+            return ast.literal_eval(n.value)
+    raise AssertionError("METIN bulunamadi")
+
+
+class AptKomutuTesti(unittest.TestCase):
+    def setUp(self):
+        self.ad_alani = islevleri_yukle("_yetki", "apt_komutu")
+        yama = mock.patch.object(shutil, "which", lambda ad: "/usr/bin/" + ad)
+        yama.start()
+        self.addCleanup(yama.stop)
+
+    def test_yerel_ayar_c_olur(self):
+        # Turkce yerelde rkhunter gibi paketlerin kurulum betigi dusuyordu
+        for eylem in ("install", "remove", "upgrade"):
+            with self.subTest(eylem=eylem):
+                komut = self.ad_alani["apt_komutu"](eylem, "rkhunter")
+                self.assertIn("LC_ALL=C", komut)
+                self.assertIn("DEBIAN_FRONTEND=noninteractive", komut)
+
+    def test_komut_pkexec_ile_baslar_ve_apt_get_cagirir(self):
+        komut = self.ad_alani["apt_komutu"]("install", "nmap")
+        self.assertEqual(komut[0], "/usr/bin/pkexec")
+        self.assertIn("apt-get", komut)
+        self.assertEqual(komut[komut.index("install") + 1:], ["-y", "nmap"])
+
+    def test_birden_cok_paket_tek_komutta(self):
+        komut = self.ad_alani["apt_komutu"]("install", "nmap", "rkhunter", "htop")
+        self.assertEqual(komut[-3:], ["nmap", "rkhunter", "htop"])
+        self.assertEqual(komut.count("apt-get"), 1)
+
+    def test_pkexec_yoksa_none(self):
+        with mock.patch.object(shutil, "which", lambda ad: None):
+            self.assertIsNone(self.ad_alani["apt_komutu"]("install", "nmap"))
+
+
+class MetinSozluguTesti(unittest.TestCase):
+    def test_tr_ve_en_anahtarlari_ayni(self):
+        for anahtar, deger in metin_sozlugu().items():
+            with self.subTest(anahtar=anahtar):
+                self.assertEqual(set(deger), {"tr", "en"})
+                self.assertTrue(deger["tr"] and deger["en"])
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
