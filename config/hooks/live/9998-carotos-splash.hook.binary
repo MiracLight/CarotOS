@@ -20,8 +20,8 @@ do
 done
 
 if [ -z "${SRC}" ]; then
-    echo "CarotOS: UYARI - splash kaynagi bulunamadi, varsayilan kaliyor."
-    exit 0
+    echo "CarotOS: HATA - splash kaynagi bulunamadi, ISO'da Debian gorseli kalirdi." >&2
+    exit 1
 fi
 
 echo "CarotOS: kaynak bulundu -> ${SRC}"
