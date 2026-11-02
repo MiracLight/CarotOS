@@ -84,6 +84,43 @@ class HookTesti(unittest.TestCase):
         self.assertIn("exit 1", veri)
 
     @unittest.skipIf(SH is None, "sh bulunamadi")
+    def test_disk_info_hook_davranisi(self):
+        # live-build binary_disk .disk/info'ya sabit "Debian GNU/Linux ..." yazar;
+        # kurulu sistemdeki APT cdrom yorumu bu dosyadan gelir. Hook yeniden yazar.
+        import tempfile
+        betik = dict(hook_listesi())["9998-carotos-disk-info.hook.binary"]
+        orijinal = 'Debian GNU/Linux 1.3 "Trixie" - Snapshot amd64 LIVE/INSTALL Binary 20261102-20:43\n'
+        with tempfile.TemporaryDirectory() as kok:
+            os.makedirs(os.path.join(kok, "binary", ".disk"))
+            os.makedirs(os.path.join(kok, "chroot", "etc"))
+            bilgi = os.path.join(kok, "binary", ".disk", "info")
+            with open(bilgi, "w", encoding="utf-8", newline="\n") as f:
+                f.write(orijinal)
+            with open(os.path.join(kok, "chroot", "etc", "os-release"), "w", encoding="utf-8",
+                      newline="\n") as f:
+                f.write('VERSION="1.3 (Eggshell)"\n')
+            sonuc = subprocess.run([SH, "-s"], input=betik, cwd=os.path.join(kok, "binary"),
+                                   capture_output=True, timeout=30)
+            self.assertEqual(sonuc.returncode, 0, sonuc.stderr.decode("utf-8", "replace"))
+            with open(bilgi, encoding="utf-8") as f:
+                icerik = f.read()
+            self.assertEqual(
+                icerik,
+                "CarotOS 1.3 (Eggshell) - Snapshot amd64 LIVE/INSTALL Binary 20261102-20:43\n")
+            self.assertNotIn("Debian", icerik)
+
+    @unittest.skipIf(SH is None, "sh bulunamadi")
+    def test_disk_info_hook_dosya_yoksa_sessizce_cikar(self):
+        # iso/iso-hybrid disinda .disk/info olusmaz; hook derlemeyi durdurmamali
+        import tempfile
+        betik = dict(hook_listesi())["9998-carotos-disk-info.hook.binary"]
+        with tempfile.TemporaryDirectory() as kok:
+            os.makedirs(os.path.join(kok, "binary"))
+            sonuc = subprocess.run([SH, "-s"], input=betik, cwd=os.path.join(kok, "binary"),
+                                   capture_output=True, timeout=30)
+            self.assertEqual(sonuc.returncode, 0)
+
+    @unittest.skipIf(SH is None, "sh bulunamadi")
     def test_firstboot_sozdizimi_ve_gunluk(self):
         yol = os.path.join(KOK, "config", "includes.chroot", "usr", "local",
                            "sbin", "carotos-firstboot.sh")

@@ -1,0 +1,52 @@
+#!/bin/sh
+# CarotOS: ISO'daki .disk/info dosyasini yeniden yaz.
+# live-build binary_disk bu dosyaya basligi "Debian GNU/Linux" olarak SABIT yazar
+# (TITLE her modda ayni). Kurulu sistemdeki APT cdrom yorumu
+# (/etc/apt/sources.list: #deb cdrom:[...]) ve disk etiketi buradan gelir.
+# Surum, os-release'ten (VERSION) alinir; geri kalan (mimari, LIVE/INSTALL, tarih)
+# live-build'in yazdigi gibi korunur.
+set -e
+
+# Hook calisma dizini live-build surumune gore binary/ ya da derleme dizini olabilir.
+INFO=""
+for _ADAY in .disk/info binary/.disk/info; do
+    if [ -f "${_ADAY}" ]; then
+        INFO="${_ADAY}"
+        break
+    fi
+done
+
+# iso/iso-hybrid disinda .disk/info olusmaz; yapacak bir sey yok.
+if [ -z "${INFO}" ]; then
+    echo "CarotOS: .disk/info yok, atlandi."
+    exit 0
+fi
+
+OSREL=""
+for _ADAY in ../chroot/etc/os-release chroot/etc/os-release; do
+    if [ -f "${_ADAY}" ]; then
+        OSREL="${_ADAY}"
+        break
+    fi
+done
+if [ -z "${OSREL}" ]; then
+    echo "CarotOS HATA: chroot os-release bulunamadi." >&2
+    exit 1
+fi
+
+SURUM="$( . "${OSREL}" && echo "${VERSION}" )"
+if [ -z "${SURUM}" ]; then
+    echo "CarotOS HATA: os-release VERSION bos." >&2
+    exit 1
+fi
+
+# "<baslik> <surum> "<kod adi>" - <geri kalan>" bicimindeki ilk " - " oncesini degistir
+SON="$(sed -e 's|^.* - ||' "${INFO}")"
+printf 'CarotOS %s - %s\n' "${SURUM}" "${SON}" > "${INFO}"
+
+# Sessiz basarisizlik olmasin: sonuc dogrulanir
+if ! grep -q '^CarotOS ' "${INFO}" || grep -q 'Debian' "${INFO}"; then
+    echo "CarotOS HATA: .disk/info beklenen bicimde degil: $(cat "${INFO}")" >&2
+    exit 1
+fi
+echo "CarotOS: .disk/info yeniden yazildi: $(cat "${INFO}")"
