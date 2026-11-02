@@ -10,9 +10,40 @@ sayılmamıştır.
 
 ---
 
+## Sürüm 16 — 1.3.2 (ara sürüm)
+**Durum:** Derlendi ve sınanıyor. Ana sürüm 1.3 olarak kalır
+(`carotos-1.3-amd64.iso`, 2.597.928.960 bayt).
+- **Mağaza:** Sepet eklendi; birden fazla uygulama tek `apt-get` çağrısıyla,
+  tek parola istemiyle kurulur. `apt` artık `LC_ALL=C` ile çalışır: Türkçe
+  yerelde `rkhunter` gibi paketlerin kurulum betikleri düşüyordu.
+- **Japonca:** `fonts-noto-cjk` ve `ja_JP.UTF-8` eklendi; karakterler kutu
+  olarak görünmez.
+- **Kurulum:** Bilgisayar adı sorulur (öneri `carotos`). `/etc/default/grub`
+  artık ISO'ya konmaz (grub paketi kurulurken "yerel değişiklik" sorusu
+  çıkıyordu); ayarlar `/etc/default/grub.d/carotos.cfg` içindedir. Menü
+  girişleri `CarotOS GNU/Linux` olarak görünür. Açılış mesajları azaltıldı
+  (`systemd.show_status=auto`: hata olursa görünür).
+- **wireshark:** `wireshark-common` `install-setuid` ile kurulur ve
+  `libcap2-bin` eklendi; grup ve `dumpcap` yetkileri hazır gelir.
+- **ISO:** Etiket, yayıncı ve `.disk/info` Debian yerine CarotOS gösterir;
+  yinelenen splash hook'u silindi. Canlı oturum saat dilimi `Europe/Istanbul`.
+- **Karşılama:** Uygulama görselleri gerçek ekran görüntüleriyle değişti;
+  Dosya sistemi ve Ev dizini görselleri iki dilli yeniden çizildi.
+- **Poligon:** Adında boşluk ya da Türkçe karakter olan öğrencilerin durum ve
+  sohbet sorgusu çöküyordu (URL kodlaması). Öğretmen sunucusu: `/mesaj` ve
+  `/sohbet` oda şifresi ister, gönderen sunucuda sabitlenir; istek gövdesi,
+  alan ve yanlış şifre denemesi sınırlandı.
+- **Güvenlik Paneli:** Yönetici yetkisiyle çalıştırırken `-` ile başlayan
+  kullanıcı değerleri reddedilir (`tcpdump -z` gibi).
+- **CarotPot:** Engel listesi `/var/lib/carotos/carotpot` altına (root'a ait)
+  taşındı; `json_yaz` `O_EXCL|O_NOFOLLOW` kullanır; `carotpot-engel-temizle`
+  birimine kısıtlamalar eklendi.
+- **Hook'lar:** firstboot, hostname, splash ve disk bilgisi adımları sessizce
+  geçmez, hata olursa derlemeyi durdurur.
+
 ## Sürüm 15 — 1.3.1 (ara sürüm)
-**Durum:** Derleniyor ve sınanıyor. Ana sürüm 1.3 olarak kalır
-(`carotos-1.3-amd64.iso`).
+**Durum:** Yayınlandı (29 Ekim 2026 yeniden derlemesi). Ana sürüm 1.3 olarak
+kalır (`carotos-1.3-amd64.iso`).
 - **Karşılama:** Carotene, CarotPot ve Filenor sayfa başlıklarından "CarotOS"
   öneki kaldırıldı; Poligon sayfasının görseli gerçek arayüzle yenilendi.
 - **Carotene:** ClamAV kurulu değilse "Mağaza'da ClamAV'ı kur" düğmesi
