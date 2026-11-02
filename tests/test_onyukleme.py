@@ -70,5 +70,21 @@ class GrubAyariTesti(unittest.TestCase):
         self.assertIn("${NAME}", m.group(1))
 
 
+class MakineAdiTesti(unittest.TestCase):
+    """Kurulumda makine adi SORULUR, onerilen deger 'carotos' olur."""
+
+    def test_varsayilan_carotos(self):
+        self.assertRegex(oku(PRESEED), r"(?m)^d-i netcfg/get_hostname string carotos$")
+
+    def test_soru_gosterilir(self):
+        # Onceden cevaplanan sorular kurucuda hic gosterilmez; "seen false" cevabi
+        # varsayilan olarak birakip soruyu yine de gosterir.
+        self.assertRegex(oku(PRESEED), r"(?m)^d-i netcfg/get_hostname seen false$")
+
+    def test_ad_zorlanmaz(self):
+        # netcfg/hostname DHCP'yi ve kullanicinin cevabini ezip soruyu atlatir
+        self.assertNotRegex(oku(PRESEED), r"(?m)^d-i netcfg/hostname ")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
