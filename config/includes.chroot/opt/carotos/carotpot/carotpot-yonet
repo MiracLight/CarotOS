@@ -72,11 +72,23 @@ def json_oku(yol, varsayilan):
 
 def json_yaz(yol, veri, mod=0o644):
     os.makedirs(os.path.dirname(yol), exist_ok=True)
-    gecici = yol + ".yeni"
-    with open(gecici, "w", encoding="utf-8") as fh:
-        json.dump(veri, fh, ensure_ascii=False, indent=1)
-    os.chmod(gecici, mod)
-    os.replace(gecici, yol)
+    gecici = "%s.%d.yeni" % (yol, os.getpid())
+    # O_EXCL | O_NOFOLLOW: onceden birakilmis dosya ya da sembolik bag varsa
+    # hata verir, takip etmez; izin dosya betimleyicisiyle verilir.
+    bayrak = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(gecici, bayrak, mod)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump(veri, fh, ensure_ascii=False, indent=1)
+            fh.flush()
+            os.fchmod(fh.fileno(), mod)
+        os.replace(gecici, yol)
+    except BaseException:
+        try:
+            os.unlink(gecici)
+        except OSError:
+            pass
+        raise
 
 
 # --- ag bilgisi: kendini kilitleme korumasi ---------------------------------

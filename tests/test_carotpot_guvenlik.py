@@ -41,5 +41,46 @@ class EngelListesiYoluTesti(unittest.TestCase):
                 self.assertFalse(deger.startswith("/var/log/"))
 
 
+def yonet_yukle():
+    import importlib.machinery
+    import importlib.util
+    yukleyici = importlib.machinery.SourceFileLoader("carotpot_yonet_guvenlik", YONET)
+    spec = importlib.util.spec_from_loader(yukleyici.name, yukleyici)
+    mod = importlib.util.module_from_spec(spec)
+    yukleyici.exec_module(mod)
+    return mod
+
+
+@unittest.skipUnless(os.name == "posix", "sembolik bag davranisi yalnizca POSIX'te")
+class JsonYazTesti(unittest.TestCase):
+    def setUp(self):
+        import shutil
+        import tempfile
+        self.Y = yonet_yukle()
+        self.dizin = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.dizin, True)
+
+    def test_normal_yazim_izin_ve_artik(self):
+        yol = os.path.join(self.dizin, "e.json")
+        self.Y.json_yaz(yol, [{"ip": "192.0.2.1"}])
+        with open(yol, encoding="utf-8") as fh:
+            self.assertIn("192.0.2.1", fh.read())
+        self.assertEqual(oct(os.stat(yol).st_mode & 0o777), "0o644")
+        self.assertEqual(os.listdir(self.dizin), ["e.json"], "gecici dosya kalmamali")
+
+    def test_sembolik_bagi_takip_etmez(self):
+        kurban = os.path.join(self.dizin, "kurban")
+        with open(kurban, "w") as fh:
+            fh.write("DOKUNMA")
+        os.chmod(kurban, 0o600)
+        yol = os.path.join(self.dizin, "e.json")
+        os.symlink(kurban, "%s.%d.yeni" % (yol, os.getpid()))
+        with self.assertRaises(OSError):
+            self.Y.json_yaz(yol, [{"ip": "192.0.2.1"}])
+        with open(kurban) as fh:
+            self.assertEqual(fh.read(), "DOKUNMA")
+        self.assertEqual(oct(os.stat(kurban).st_mode & 0o777), "0o600")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
