@@ -60,6 +60,10 @@ STRINGS = {
     "sidebar_title": {"tr": "CarotOS", "en": "CarotOS"},
     "run": {"tr": "Çalıştır", "en": "Run"},
     "run_root": {"tr": "Root ile çalıştır", "en": "Run as root"},
+    "root_arg_hata": {
+        "tr": "Yönetici yetkisiyle çalıştırırken alanlarda '-' ile başlayan seçenek olamaz. Seçeneği kaldır ya da yetkisiz çalıştır.",
+        "en": "With administrator rights, fields can't contain options that start with '-'. Remove the option or run without root.",
+    },
     "stop": {"tr": "Durdur", "en": "Stop"},
     "clear": {"tr": "Çıktıyı temizle", "en": "Clear output"},
     "ready": {"tr": "Hazır", "en": "Ready"},
@@ -102,6 +106,17 @@ STRINGS = {
 def T(key, lang, **kw):
     text = STRINGS.get(key, {}).get(lang, key)
     return text.format(**kw) if kw else text
+
+
+def root_icin_guvenli_mi(values):
+    """Yonetici yetkisiyle calisacak komutlarda kullanici metni arguman olarak
+    '-' ile baslayan bir secenek gibi davranmamali. pkexec parola penceresi
+    yalnizca programi gosterir, argumanlari gostermez; ornegin tcpdump filtresine
+    yapistirilmis '-z komut' root olarak calisirdi. Combo indeksleri (int) sayilmaz."""
+    for deger in values.values():
+        if isinstance(deger, str) and any(p.startswith("-") for p in deger.split()):
+            return False
+    return True
 
 
 def _v(values, key, default=""):
@@ -537,6 +552,9 @@ class ToolPage(Gtk.Box):
             if not _v(values, req):
                 self.append(f"[!] {T('needs_target', lang)}\n")
                 return
+        if as_root and not root_icin_guvenli_mi(values):
+            self.append(f"[!] {T('root_arg_hata', lang)}\n")
+            return
         try:
             cmd = self.tool["build"](values)
         except Exception as exc:  # noqa: BLE001
