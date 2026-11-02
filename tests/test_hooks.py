@@ -74,6 +74,15 @@ class HookTesti(unittest.TestCase):
             if "x-www-browser" in satir:
                 self.assertNotIn("|| true", satir)
 
+    def test_wireshark_hook(self):
+        # dumpcap yetkileri ve wireshark grubu olusmali; olusmazsa derleme durmali
+        veri = dict(hook_listesi())["9989-carotos-wireshark.hook.chroot"].decode("utf-8")
+        self.assertIn("wireshark-common/install-setuid boolean true", veri)
+        self.assertIn("libcap2-bin", veri)
+        self.assertIn("dpkg-reconfigure", veri)
+        self.assertIn("getent group wireshark", veri)
+        self.assertIn("exit 1", veri)
+
     @unittest.skipIf(SH is None, "sh bulunamadi")
     def test_firstboot_sozdizimi_ve_gunluk(self):
         yol = os.path.join(KOK, "config", "includes.chroot", "usr", "local",

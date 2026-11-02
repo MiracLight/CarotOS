@@ -1,0 +1,24 @@
+#!/bin/sh
+set -e
+
+# tshark / wireshark-common icin dumpcap yetkileri.
+# - Derleme etkilesimsiz oldugundan "wireshark-common/install-setuid" sorusu
+#   varsayilan (false) ile cevaplanir: wireshark grubu olusmaz, dumpcap
+#   root:root kalir ve root olmayan kullanici tshark ile yakalama yapamaz
+#   ("Couldn't run dumpcap in child process"). carotos-firstboot.sh kullaniciyi
+#   wireshark grubuna ekler ama grup yoksa hicbir sey yapmaz.
+# - Yetkiler (cap_net_raw, cap_net_admin) setcap ile verilir; setcap
+#   libcap2-bin paketindedir, o yoksa paket setuid-root'a duser.
+# - Soru cevaplanip paket yeniden yapilandirilir; grup ve yetki dogrulanir,
+#   olmazsa derleme durur.
+export LC_ALL=C DEBIAN_FRONTEND=noninteractive
+
+apt-get install -y --no-install-recommends libcap2-bin
+
+echo "wireshark-common wireshark-common/install-setuid boolean true" | debconf-set-selections
+dpkg-reconfigure -f noninteractive wireshark-common
+
+getent group wireshark >/dev/null || { echo "CarotOS HATA: wireshark grubu olusmadi." >&2; exit 1; }
+ls -l /usr/bin/dumpcap
+getcap /usr/bin/dumpcap
+echo "CarotOS: wireshark grubu ve dumpcap yetkileri ayarlandi."
