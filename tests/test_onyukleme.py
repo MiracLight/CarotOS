@@ -17,6 +17,7 @@ sys.dont_write_bytecode = True
 
 KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GRUB_CFG = os.path.join(KOK, "config", "includes.chroot", "etc", "default", "grub.d", "carotos.cfg")
+GRUB_ANA = os.path.join(KOK, "config", "includes.chroot", "etc", "default", "grub")
 PRESEED = os.path.join(KOK, "config", "includes.installer", "preseed.cfg")
 
 
@@ -25,8 +26,8 @@ def oku(yol):
         return f.read().replace(b"\r\n", b"\n").decode("utf-8")
 
 
-def grub_parametreleri():
-    m = re.search(r'^GRUB_CMDLINE_LINUX_DEFAULT="([^"]*)"', oku(GRUB_CFG), re.M)
+def grub_parametreleri(yol=GRUB_CFG):
+    m = re.search(r'^GRUB_CMDLINE_LINUX_DEFAULT="([^"]*)"', oku(yol), re.M)
     assert m, "GRUB_CMDLINE_LINUX_DEFAULT tanimli degil"
     return m.group(1).split()
 
@@ -52,6 +53,10 @@ class GrubAyariTesti(unittest.TestCase):
     def test_preseed_ve_grub_ayni_parametreleri_tasir(self):
         fark = set(preseed_parametreleri()) - set(grub_parametreleri())
         self.assertEqual(fark, set(), "preseed'de olup grub.d'de olmayan: %s" % sorted(fark))
+
+    def test_ana_grub_dosyasi_ile_ayni(self):
+        # iki kaynak da ayni parametreleri tasimali (grub.d olan kazanir)
+        self.assertEqual(grub_parametreleri(GRUB_ANA), grub_parametreleri(GRUB_CFG))
 
 
 if __name__ == "__main__":
