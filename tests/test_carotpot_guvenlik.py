@@ -41,6 +41,24 @@ class EngelListesiYoluTesti(unittest.TestCase):
                 self.assertFalse(deger.startswith("/var/log/"))
 
 
+class EngelTemizleServisiTesti(unittest.TestCase):
+    def test_kisitlamalar_var_ve_hata_gizlenmez(self):
+        servis = oku(SERVIS)
+        bolum = servis.split("[Service]", 1)[1].split("[Install]", 1)[0]
+        # yorum satirlari sayilmaz
+        bolum = "\n".join(s for s in bolum.split("\n") if not s.lstrip().startswith("#"))
+        for anahtar in ("NoNewPrivileges=yes", "PrivateTmp=yes", "ProtectHome=yes",
+                        "ProtectKernelModules=yes", "ProtectKernelLogs=yes",
+                        "ProtectControlGroups=yes", "RestrictRealtime=yes",
+                        "RestrictNamespaces=yes", "LockPersonality=yes"):
+            with self.subTest(anahtar=anahtar):
+                self.assertIn(anahtar, bolum.split("\n"))
+        # ufw /etc/ufw ve /lib/ufw'ye yazar; bunlari kapatan ayar birimi bozar
+        self.assertNotIn("ProtectSystem=", bolum)
+        # hata artik basari sayilmaz
+        self.assertNotIn("SuccessExitStatus", bolum)
+
+
 def yonet_yukle():
     import importlib.machinery
     import importlib.util

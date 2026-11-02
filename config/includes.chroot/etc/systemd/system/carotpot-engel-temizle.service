@@ -10,7 +10,18 @@ After=ufw.service
 [Service]
 Type=oneshot
 ExecStart=/usr/bin/python3 -I /opt/carotos/carotpot/carotpot-yonet sure-denetle
-SuccessExitStatus=1
+# Root olarak calisir. ufw'nun yazdigi yollar (/etc/ufw, /lib/ufw) kapatilmadan
+# kalan saldiri yuzeyi daraltilir. Hata durumu artik gizlenmez
+# (SuccessExitStatus kaldirildi).
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
 
 [Install]
 WantedBy=multi-user.target
