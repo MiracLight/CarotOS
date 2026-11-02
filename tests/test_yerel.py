@@ -36,5 +36,30 @@ class JaponcaTesti(unittest.TestCase):
         self.assertIn("en_US.UTF-8 UTF-8", locale_gen)
 
 
+CANLI_AYAR = os.path.join(KOK, "config", "includes.chroot", "etc", "live", "config.conf.d", "carotos.conf")
+
+
+def canli_ayarlar():
+    ayarlar = {}
+    for satir in satirlar(CANLI_AYAR):
+        if "=" in satir:
+            ad, deger = satir.split("=", 1)
+            ayarlar[ad.strip()] = deger.strip().strip('"')
+    return ayarlar
+
+
+class SaatDilimiTesti(unittest.TestCase):
+    """live-config varsayilan saat dilimi UTC'dir: Turkiye'de (UTC+3) saatin saat kismi
+    3 saat geri gorunur, dakika dogru kalir."""
+
+    def test_canli_oturum_saat_dilimi_ayarli(self):
+        ayarlar = canli_ayarlar()
+        self.assertIn("LIVE_TIMEZONE", ayarlar)
+        self.assertEqual(ayarlar["LIVE_TIMEZONE"], "Europe/Istanbul")
+
+    def test_hostname_ayari_korunur(self):
+        self.assertEqual(canli_ayarlar().get("LIVE_HOSTNAME"), "carotos")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
