@@ -74,6 +74,40 @@ class AptKomutuTesti(unittest.TestCase):
             self.assertIsNone(self.ad_alani["apt_komutu"]("install", "nmap"))
 
 
+class SepetTesti(unittest.TestCase):
+    """Birden fazla uygulama tek seferde kurulabilmeli (sepet)."""
+
+    def setUp(self):
+        with open(KOD, "rb") as f:
+            self.kaynak = f.read().decode("utf-8")
+
+    def test_sepet_metinleri_iki_dilde(self):
+        sozluk = metin_sozlugu()
+        for anahtar in ("sepete_ekle", "sepette", "sepeti_kur", "sepet_kuruluyor"):
+            with self.subTest(anahtar=anahtar):
+                self.assertIn(anahtar, sozluk)
+        self.assertIn("{n}", sozluk["sepeti_kur"]["tr"])
+        self.assertIn("{n}", sozluk["sepet_kuruluyor"]["en"])
+
+    def test_sepet_tek_apt_komutuyla_kurulur(self):
+        # Paketler ayri ayri degil, tek apt-get cagrisinda (tek parola istemi)
+        sinif = next(n for n in kaynak_agaci().body
+                     if isinstance(n, ast.ClassDef) and n.name == "MagazaPenceresi")
+        yontem = next(n for n in sinif.body
+                      if isinstance(n, ast.FunctionDef) and n.name == "sepeti_kur")
+        govde = ast.get_source_segment(self.kaynak, yontem)
+        self.assertIn('apt_komutu("install", *paketler)', govde)
+
+    def test_sepet_basarisizlikta_gercek_durum_okunur(self):
+        # Paketlerden biri dusse (ornegin kurulum betigi hatasi) digerleri kurulmus
+        # olabilir; kurulu listesi dpkg'den yeniden okunmali.
+        sinif = next(n for n in kaynak_agaci().body
+                     if isinstance(n, ast.ClassDef) and n.name == "MagazaPenceresi")
+        yontem = next(n for n in sinif.body
+                      if isinstance(n, ast.FunctionDef) and n.name == "sepeti_kur")
+        self.assertIn("kurulu_paketler()", ast.get_source_segment(self.kaynak, yontem))
+
+
 class MetinSozluguTesti(unittest.TestCase):
     def test_tr_ve_en_anahtarlari_ayni(self):
         for anahtar, deger in metin_sozlugu().items():
