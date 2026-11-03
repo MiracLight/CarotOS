@@ -223,6 +223,9 @@ class Girdiler(Temel):
         self.gizli_kalinti_yok()
         self.assertEqual(os.listdir(self.cikti), [])
 
+    # txt -> docx LibreOffice ister ve arac kontrolu klasor kontrolunden ONCE gelir;
+    # LibreOffice CarotOS'ta bilerek kurulu gelmez (Magaza'dan kurulur), yoksa atla.
+    @need("libreoffice")
     def test_yazilamaz_cikti(self):
         if os.geteuid() == 0:
             self.skipTest("root her yere yazar")
