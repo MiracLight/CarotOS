@@ -13,7 +13,7 @@ hydra
 ufw
 fail2ban
 net-tools
-dnsutils
+bind9-dnsutils
 lsb-release
 firefox-esr
 python3-gi

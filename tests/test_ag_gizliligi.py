@@ -113,6 +113,12 @@ class PaketListesiTesti(unittest.TestCase):
         for yasak in ("shim-signed", "grub-efi-amd64-signed"):   # CLAUDE.md: olmamali
             self.assertNotIn(yasak, self.paketler)
 
+    def test_sanal_paket_adi_yok(self):
+        # "dnsutils" Debian 13'te gercek paket degil (bind9-dnsutils'in takma
+        # adi): apt-cache policy "aday yok" der ve derleme oncesi kontrol bozulur.
+        self.assertNotIn("dnsutils", self.paketler)
+        self.assertIn("bind9-dnsutils", self.paketler)
+
     def test_gecerli_paket_adlari(self):
         for ad in self.paketler:
             self.assertRegex(ad, r"^[a-z0-9][a-z0-9+.\-]+$")
