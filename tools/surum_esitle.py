@@ -17,6 +17,7 @@ import sys
 KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 UYG = "config/includes.chroot/opt/carotos"
 OS_RELEASE = "config/includes.chroot/etc/os-release"
+LB_COMMON = "config/common"
 
 # uygulama anahtari -> surum degiskenini iceren dosya
 UYGULAMA_DOSYALARI = {
@@ -36,6 +37,11 @@ def kurallar(veri):
         (OS_RELEASE, r'^VERSION_ID="[^"\n]*"$', f'VERSION_ID="{s}"', "os-release VERSION_ID"),
         (OS_RELEASE, r'^VERSION="[^"\n]*"$', f'VERSION="{s} ({k})"', "os-release VERSION"),
         (UYGULAMA_DOSYALARI["welcome"], r'^APP_CODENAME = "[^"\n]*"$', f'APP_CODENAME = "{k}"', "welcome APP_CODENAME"),
+        # ISO dosya adi ve birim etiketi: derleme komutu her surumde elle
+        # degistirilince "1.3.1" gibi eski adlar kaliyordu.
+        (LB_COMMON, r'^LB_IMAGE_NAME="[^"\n]*"$', f'LB_IMAGE_NAME="carotos-{s}"', "config/common LB_IMAGE_NAME"),
+        ("BUILD.md", r'^  --image-name "[^"\n]*" \\$', f'  --image-name "carotos-{s}" \\', "BUILD.md --image-name"),
+        ("BUILD.md", r'^  --iso-volume "[^"\n]*" \\$', f'  --iso-volume "CarotOS {s}" \\', "BUILD.md --iso-volume"),
     ]
     for ad, dosya in UYGULAMA_DOSYALARI.items():
         if ad not in veri["uygulamalar"]:
@@ -61,6 +67,10 @@ def calistir(uygula):
                 print(f"HATA   {etiket}: dosya okunamadi ({e})")
                 yapisal += 1
                 continue
+        # Windows'ta calisma kopyasi CRLF olabilir ("$" once "\r"yi gormez);
+        # eslesme "\r" harici kismi alir, boylece satir sonu degismeden kalir.
+        if desen.endswith("$"):
+            desen = desen[:-1] + r"(?=\r?$)"
         eslesen = re.findall(desen, icerik[dosya], flags=re.MULTILINE)
         if len(eslesen) != 1:
             print(f"HATA   {etiket}: satir {len(eslesen)} kez bulundu (1 olmali) - {dosya}")
