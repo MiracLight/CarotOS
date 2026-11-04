@@ -1,0 +1,67 @@
+/* CarotOS masaustu gorunumu (Arc-Dark uzerine ince ayar).
+ * Yalnizca CSS: ek surec ya da paket yok, bellek maliyeti yok.
+ * Gecersiz bir kural GTK tarafindan yok sayilir; temayi bozmaz. */
+
+/* Paneller: yari saydam koyu zemin (xfwm4 kompozitoru acik oldugu icin gorunur) */
+.xfce4-panel.panel,
+#XfcePanelWindow {
+  background-color: rgba(30, 33, 41, 0.90);
+  border: none;
+}
+
+/* Panel dugmeleri: yuvarlak koseli, hafif vurgulu */
+.xfce4-panel button {
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background-image: none;
+  box-shadow: none;
+  padding: 2px 4px;
+  transition: background-color 120ms ease;
+}
+.xfce4-panel button:hover {
+  background-color: rgba(255, 255, 255, 0.10);
+}
+.xfce4-panel button:active,
+.xfce4-panel button:checked {
+  background-color: rgba(255, 255, 255, 0.18);
+}
+
+/* Acik pencereler listesinde etkin pencere altta ince vurgu cizgisi alir */
+.xfce4-panel #tasklist-button:checked,
+.xfce4-panel button:checked {
+  border-bottom: 2px solid #f08c28;
+}
+
+/* Menuler ve acilir pencereler: yuvarlak kose */
+menu,
+.menu,
+.popup decoration {
+  border-radius: 8px;
+}
+menuitem {
+  border-radius: 5px;
+  margin: 1px 3px;
+}
+
+/* Dosya yoneticisi (Thunar): yan cubuk ve satirlar daha ferah */
+.thunar .sidebar row,
+.thunar .sidebar .view {
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+.thunar .sidebar row:selected {
+  border-radius: 6px;
+}
+.thunar toolbar {
+  padding: 3px 4px;
+}
+.thunar toolbar button {
+  border-radius: 6px;
+}
+
+/* Kaydirma cubuklari: ince ve yuvarlak */
+scrollbar slider {
+  min-width: 7px;
+  min-height: 7px;
+  border-radius: 6px;
+}

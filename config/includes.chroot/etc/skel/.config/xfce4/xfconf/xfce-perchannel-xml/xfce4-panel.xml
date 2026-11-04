@@ -10,8 +10,8 @@
       <property name="position" type="string" value="p=6;x=0;y=0"/>
       <property name="length" type="double" value="100"/>
       <property name="position-locked" type="bool" value="true"/>
-      <property name="icon-size" type="uint" value="23"/>
-      <property name="size" type="uint" value="29"/>
+      <property name="icon-size" type="uint" value="24"/>
+      <property name="size" type="uint" value="32"/>
       <property name="plugin-ids" type="array">
         <value type="int" value="1"/>
         <value type="int" value="2"/>
@@ -39,7 +39,7 @@
       <property name="autohide-behavior" type="uint" value="0"/>
       <property name="nrows" type="uint" value="1"/>
       <property name="border-width" type="uint" value="1"/>
-      <property name="background-style" type="uint" value="1"/>
+      <property name="background-style" type="uint" value="0"/>
       <property name="enter-opacity" type="uint" value="98"/>
       <property name="leave-opacity" type="uint" value="100"/>
     </property>
