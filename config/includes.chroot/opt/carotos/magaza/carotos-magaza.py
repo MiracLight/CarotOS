@@ -444,13 +444,19 @@ class IslemPenceresi(Gtk.Window):
     def __init__(self, ebeveyn, baslik, komut, bitince, otomatik_kapan=False):
         super().__init__(title=baslik)
         self.set_transient_for(ebeveyn)
-        self.set_modal(True)
+        # Modal DEGIL: kurulum surerken magaza gezilebilir, sepete urun eklenebilir.
+        # Ikinci bir apt islemi MagazaPenceresi.mesgul ile engellenir.
+        self.set_modal(False)
         self.set_default_size(660, 440)
         self.komut = komut
         self.bitince = bitince
         self.otomatik_kapan = otomatik_kapan
         self.surec = None
         self.iptal_edildi = False
+        self._bekleyen = []          # okuyucu is parcaciginin biriktirdigi satirlar
+        self._kilit = threading.Lock()
+        self._bosaltma_sayisi = 0    # test icin: arayuze kac kez yazildi
+        self._zamanlayici = None
 
         dis = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         tema.sinif(dis, "arka")
@@ -472,6 +478,7 @@ class IslemPenceresi(Gtk.Window):
         self.gorunum.set_left_margin(10)
         self.gorunum.set_right_margin(10)
         self.tampon = self.gorunum.get_buffer()
+        self._son_isaret = self.tampon.create_mark("son", self.tampon.get_end_iter(), False)
         kaydir.add(self.gorunum)
         dis.pack_start(kaydir, True, True, 0)
 
@@ -485,6 +492,9 @@ class IslemPenceresi(Gtk.Window):
 
     def baslat(self):
         self.show_all()
+        # apt yuzlerce satir/sn yazabilir: satir basina arayuz guncellemek ana donguyu
+        # bogar ("hicbir sey tiklanmiyor"). Satirlar biriktirilir, 150 ms'de bir yazilir.
+        self._zamanlayici = GLib.timeout_add(150, self._bosalt)
         threading.Thread(target=self._calis, daemon=True).start()
 
     def _calis(self):
@@ -493,20 +503,31 @@ class IslemPenceresi(Gtk.Window):
                 self.komut, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                 text=True, bufsize=1)
             for satir in self.surec.stdout:
-                GLib.idle_add(self._ekle, satir)
+                with self._kilit:
+                    self._bekleyen.append(satir)
             kod = self.surec.wait()
         except Exception as exc:  # noqa: BLE001
-            GLib.idle_add(self._ekle, f"\n[hata] {exc}\n")
+            with self._kilit:
+                self._bekleyen.append(f"\n[hata] {exc}\n")
             kod = 1
         GLib.idle_add(self._bitti, kod)
 
-    def _ekle(self, satir):
-        self.tampon.insert(self.tampon.get_end_iter(), satir)
-        GLib.idle_add(lambda: self.gorunum.scroll_to_iter(
-            self.tampon.get_end_iter(), 0.0, False, 0, 0) and False)
-        return False
+    def _bosalt(self):
+        """Biriken satirlari tek seferde tampona yazar ve bir kez kaydirir."""
+        with self._kilit:
+            parca, self._bekleyen = "".join(self._bekleyen), []
+        if parca:
+            self._bosaltma_sayisi += 1
+            self.tampon.insert(self.tampon.get_end_iter(), parca)
+            self.tampon.move_mark(self._son_isaret, self.tampon.get_end_iter())
+            self.gorunum.scroll_mark_onscreen(self._son_isaret)
+        return self._zamanlayici is not None
 
     def _bitti(self, kod):
+        if self._zamanlayici is not None:
+            GLib.source_remove(self._zamanlayici)
+            self._zamanlayici = None
+        self._bosalt()
         self.spinner.stop()
         basarili = (kod == 0 and not self.iptal_edildi)
         self.durum.get_style_context().add_class("basari-yazi" if basarili else "hata-yazi")
@@ -655,6 +676,7 @@ class MagazaPenceresi(Gtk.Window):
             self.set_icon(pb)
             Gtk.Window.set_default_icon(pb)
         self.connect("destroy", lambda *_: Gtk.main_quit())
+        self.connect("delete-event", self._kapanirken)
 
         bolumler = list(BOLUMLER) + [
             ("kategoriler", [(k["id"], KAT_IKON.get(k["id"], ("liste", "vurgu"))[0])
@@ -736,6 +758,13 @@ class MagazaPenceresi(Gtk.Window):
 
     # -- arama ---------------------------------------------------------------
     def _arama_degisti(self, giris):
+        # Her tus vurusunda 150+ satirlik listeyi yeniden kurmak yazmayi geciktirir: 250 ms bekle.
+        if getattr(self, "_arama_zamani", None):
+            GLib.source_remove(self._arama_zamani)
+        self._arama_zamani = GLib.timeout_add(250, self._arama_uygula, giris)
+
+    def _arama_uygula(self, giris):
+        self._arama_zamani = None
         self.arama = giris.get_text().strip().lower()
         if self.arama:
             self.detay_app = None
@@ -744,6 +773,7 @@ class MagazaPenceresi(Gtk.Window):
             self.kabuk.icerik(self._liste_sayfasi(self._suzulmus()))
         else:
             self.sayfa_secildi(self.aktif)
+        return False
 
     # -- gezinme -------------------------------------------------------------
     def sayfa_secildi(self, anahtar):
@@ -1013,7 +1043,10 @@ class MagazaPenceresi(Gtk.Window):
 
     def sepeti_kur(self):
         """Sepetteki tum paketleri TEK apt-get cagrisiyla kurar (tek parola istemi)."""
-        if self.mesgul or not self.sepet:
+        if self.mesgul:
+            self._mesgul_uyar()
+            return
+        if not self.sepet:
             return
         paketler = sorted(self.sepet)
         komut = apt_komutu("install", *paketler)
@@ -1024,21 +1057,49 @@ class MagazaPenceresi(Gtk.Window):
 
         def bitince(_basarili):
             # Paketlerden biri dusse (ornegin kurulum betigi hatasi) digerleri
-            # kurulmus olabilir; gercek durum dpkg'den okunur. Kurulamayanlar
-            # sepette kalir, kullanici yeniden deneyebilir.
-            self.kurulu = kurulu_paketler()
-            self.sepet -= self.kurulu
-            self._mesgul_ayarla(None)
-            self._sepet_guncelle()
-            self._guncelleme_rozeti()
-            if self.detay_app is not None:
-                self.detay_goster(self.detay_app)
-            else:
-                self.sayfa_secildi(self.aktif)
-        IslemPenceresi(self, M("sepet_kuruluyor", n=len(paketler)), komut, bitince).baslat()
+            # kurulmus olabilir; gercek durum dpkg'den okunur (arka planda: dpkg-query
+            # yavas makinede arayuzu dondurmasin). Kurulamayanlar sepette kalir.
+            def oku_bitti(kurulu):
+                self.kurulu = kurulu
+                self.sepet -= self.kurulu
+                self._mesgul_ayarla(None)
+                self._sepet_guncelle()
+                self._guncelleme_rozeti()
+                if self.detay_app is not None:
+                    self.detay_goster(self.detay_app)
+                else:
+                    self.sayfa_secildi(self.aktif)
+                return False
+            self._kurulu_oku(oku_bitti)
+        self._islem_baslat(M("sepet_kuruluyor", n=len(paketler)), komut, bitince)
+
+    def _islem_baslat(self, baslik, komut, bitince, otomatik_kapan=False):
+        self.islem_penceresi = IslemPenceresi(self, baslik, komut, bitince, otomatik_kapan)
+        self.islem_penceresi.baslat()
+
+    def _kapanirken(self, *_):
+        """Islem suruyorken pencere kapanirsa apt'in cikti borusu kopar ve paket yari kurulu
+        kalabilir. Bu yuzden kapatma engellenir, islem penceresi one getirilir (Iptal orada)."""
+        if self.mesgul:
+            self._mesgul_uyar()
+            return True
+        return False
+
+    def _mesgul_uyar(self):
+        """Is suruyorken yeni bir islem istenirse calisan islemin penceresini one getirir."""
+        p = getattr(self, "islem_penceresi", None)
+        if p is not None and p.get_realized():
+            p.present()
+
+    def _kurulu_oku(self, sonra):
+        """dpkg'den kurulu paketleri arka planda okur; sonuc ana is parcaciginda sonra(kume) ile verilir."""
+        def is_():
+            GLib.idle_add(sonra, kurulu_paketler())
+        threading.Thread(target=is_, daemon=True).start()
 
     def eylem(self, u, islem):
         if self.mesgul:
+            self._mesgul_uyar()
             return
         komut = apt_komutu(islem, u["paket"])
         if komut is None:
@@ -1063,10 +1124,11 @@ class MagazaPenceresi(Gtk.Window):
                 self.detay_goster(u)
             else:
                 self.sayfa_secildi(self.aktif)
-        IslemPenceresi(self, baslik, komut, bitince).baslat()
+        self._islem_baslat(baslik, komut, bitince)
 
     def depoyu_yenile(self):
         if self.mesgul:
+            self._mesgul_uyar()
             return
         komut = apt_komutu("update")
         if komut is None:
@@ -1077,10 +1139,11 @@ class MagazaPenceresi(Gtk.Window):
         def bitince(_b):
             self._mesgul_ayarla(None)
             self._guncelleme_denetle()
-        IslemPenceresi(self, M("yenileniyor"), komut, bitince, otomatik_kapan=True).baslat()
+        self._islem_baslat(M("yenileniyor"), komut, bitince, otomatik_kapan=True)
 
     def tumunu_guncelle(self):
         if self.mesgul:
+            self._mesgul_uyar()
             return
         komut = apt_komutu("upgrade")
         if komut is None:
@@ -1089,11 +1152,14 @@ class MagazaPenceresi(Gtk.Window):
         self._mesgul_ayarla("upgrade")
 
         def bitince(basarili):
-            self._mesgul_ayarla(None)
-            if basarili:
-                self.kurulu = kurulu_paketler()
-            self._guncelleme_denetle()
-        IslemPenceresi(self, M("guncelleniyor"), komut, bitince).baslat()
+            def oku_bitti(kurulu):
+                if basarili:
+                    self.kurulu = kurulu
+                self._mesgul_ayarla(None)
+                self._guncelleme_denetle()
+                return False
+            self._kurulu_oku(oku_bitti)
+        self._islem_baslat(M("guncelleniyor"), komut, bitince)
 
     def _pkexec_yok(self, islem, paket):
         komut = {"update": "sudo apt-get update",
