@@ -105,7 +105,14 @@ class SepetTesti(unittest.TestCase):
                      if isinstance(n, ast.ClassDef) and n.name == "MagazaPenceresi")
         yontem = next(n for n in sinif.body
                       if isinstance(n, ast.FunctionDef) and n.name == "sepeti_kur")
-        self.assertIn("kurulu_paketler()", ast.get_source_segment(self.kaynak, yontem))
+        # dpkg okumasi ana is parcacigini dondurmasin: dogrudan degil, _kurulu_oku (thread) uzerinden
+        govde = ast.get_source_segment(self.kaynak, yontem)
+        self.assertIn("self._kurulu_oku(", govde)
+        self.assertNotIn("kurulu_paketler()", govde)
+        oku = next(n for n in sinif.body if isinstance(n, ast.FunctionDef) and n.name == "_kurulu_oku")
+        oku_govde = ast.get_source_segment(self.kaynak, oku)
+        self.assertIn("kurulu_paketler()", oku_govde)
+        self.assertIn("threading.Thread", oku_govde)
 
 
 class MetinSozluguTesti(unittest.TestCase):
