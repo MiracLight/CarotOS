@@ -7,6 +7,7 @@ from datetime import datetime
 
 from gi.repository import GLib, Gtk, Pango
 
+import dil
 import kanarya
 import tema
 from arayuz import veri as V
@@ -43,7 +44,7 @@ class KanaryaSayfasi(Sayfa):
         akis.set_column_spacing(8)
         akis.set_row_spacing(8)
         for anahtar, s in kanarya.SABLONLAR.items():
-            d = tema.dugme(s[self.p.lang], None, self.ekle, anahtar)
+            d = tema.dugme(dil.metin(s, self.p.lang), None, self.ekle, anahtar)
             d.set_halign(Gtk.Align.START)
             akis.add(d)
         ic.pack_start(akis, False, False, 0)
@@ -140,7 +141,7 @@ class KanaryaSayfasi(Sayfa):
         izgara = Gtk.Grid(column_spacing=12, row_spacing=10)
         sablon_kutu = Gtk.ComboBoxText()
         for anahtar, s in kanarya.SABLONLAR.items():
-            sablon_kutu.append(anahtar, s[p.lang])
+            sablon_kutu.append(anahtar, dil.metin(s, p.lang))
         klasor = Gtk.FileChooserButton(action=Gtk.FileChooserAction.SELECT_FOLDER)
         belgeler = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOCUMENTS) \
             or os.path.expanduser("~")

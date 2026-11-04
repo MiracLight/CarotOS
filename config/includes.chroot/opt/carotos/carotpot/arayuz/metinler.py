@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 """CarotPot arayuz metinleri. Her anahtar Turkce ve Ingilizce icerir;
-yer tutucular ({ad}) iki dilde aynidir (test denetler)."""
+yer tutucular ({ad}) iki dilde aynidir (test denetler). Diger diller ortak/dil.py
+uzerinden dil dosyalarindan gelir; eksik ceviri Ingilizceye duser."""
+
+import dil
 
 M = {
     # --- genel / kabuk ------------------------------------------------------
@@ -458,6 +461,7 @@ M = {
                      "en": "Notification and record settings are saved with administrator "
                            "approval. Language and theme apply immediately."},
 }
+M = dil.zenginlestir(M)          # her dil icin yedekli (eksik ceviri Ingilizceye duser)
 
 # Olay turu -> metin anahtari
 TUR = {"giris": "tur_giris", "baglanti": "tur_baglanti", "istek": "tur_istek",

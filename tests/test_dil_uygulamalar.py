@@ -50,8 +50,8 @@ UYGULAMALAR = {
     "former": "former/carotos-former.py",
 }
 
-# GSD ve Former kendi paketlerini (terimler, konular...) kardes klasorden alir
-for _p in ("gsd", "former"):
+# GSD, Former, CarotPot kendi paketlerini (terimler, konular, arayuz...) kardes klasorden alir
+for _p in ("gsd", "former", "carotpot"):
     if os.path.join(INC, _p) not in sys.path:
         sys.path.insert(0, os.path.join(INC, _p))
 
@@ -322,6 +322,49 @@ class FormerTesti(UygulamaDilTabani):
         pencere = m.Uygulama()
         self.addCleanup(pencere.destroy)
         self.assertEqual(pencere.lang, "en")
+
+
+class CarotPotTesti(UygulamaDilTabani):
+    def _pencere_modulu(self):
+        import importlib
+        return importlib.import_module("arayuz.pencere")
+
+    def test_dokuz_dilde_tum_sayfalar(self):
+        pm = self._pencere_modulu()
+        pencere = pm.Pencere()
+        self.addCleanup(pencere.destroy)
+        anahtarlar = [a for _, sayfalar in pm.BOLUMLER for a, _ in sayfalar]
+        for lang in self.dil.KODLAR:
+            pencere.lang = pencere.ui["lang"] = lang
+            pencere.yeniden_kur()
+            for anahtar in anahtarlar:
+                pencere.sayfa_secildi(anahtar)
+                self.pompala()
+        pencere.lang = "tr"
+
+    def test_olay_ve_bildirim_metinleri_her_dilde(self):
+        import carotpot as CP
+        import kanarya
+        olaylar = [{"tur": "giris", "hizmet": "ssh", "kaynak": "10.0.0.5", "kullanici": "root"},
+                   {"tur": "baglanti", "hizmet": "ftp", "kaynak": "10.0.0.5"},
+                   {"tur": "istek", "hizmet": "http", "kaynak": "10.0.0.5"},
+                   {"tur": "komut", "hizmet": "redis", "kaynak": "10.0.0.5", "ayrinti": "get x"},
+                   {"tur": "tarama", "hizmet": "vnc", "kaynak": "10.0.0.5", "hedef_port": 5900}]
+        for lang in self.dil.KODLAR:
+            for olay in olaylar:
+                self.assertTrue(CP.olay_aciklamasi(olay, lang).strip(), (lang, olay))
+                baslik, govde = CP.bildirim_metni(olay, lang)
+                self.assertTrue(baslik.strip() and govde.strip())
+            for tur in ("acildi", "degisti", "silindi", "tasindi"):
+                baslik, govde = kanarya.bildirim_metni(
+                    {"yol": "/home/x/gizli.txt", "tur": tur, "surec": "cat (12)"}, lang)
+                self.assertTrue(baslik.strip() and govde.strip(), (lang, tur))
+        self.assertEqual(CP.olay_aciklamasi(olaylar[0], "de"), CP.olay_aciklamasi(olaylar[0], "en"))
+
+    def test_bozuk_kayitli_dil(self):
+        pm = self._pencere_modulu()
+        self.ayar_yaz("carotpot", "settings.json", {"lang": "klingon", "theme": "dark"})
+        self.assertEqual(pm.arayuz_ayarlari()["lang"], "en")
 
 
 class KarsilamaTesti(UygulamaDilTabani):

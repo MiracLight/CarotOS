@@ -457,15 +457,20 @@ class Izleyici:
         return yeni
 
 
+def _dilli(sozluk, lang):
+    """{"tr","en"} sozlugunden metin; tr/en disindaki bir dilde Ingilizce (carotpot.py ile ayni)."""
+    return sozluk.get(lang) or sozluk.get("en") or sozluk.get("tr") or ""
+
+
 def bildirim_metni(olay, lang):
     ad = os.path.basename(olay["yol"])
-    tur = {"acildi": {"tr": "açıldı", "en": "was opened"},
-           "degisti": {"tr": "değiştirildi", "en": "was modified"},
-           "silindi": {"tr": "silindi", "en": "was deleted"},
-           "tasindi": {"tr": "taşındı", "en": "was moved"}}[olay["tur"]][lang]
-    baslik = {"tr": "CarotPot: kanarya dosya tetiklendi",
-              "en": "CarotPot: canary file triggered"}[lang]
-    govde = {"tr": f"“{ad}” {tur}.", "en": f"“{ad}” {tur}."}[lang]
+    tur = _dilli({"acildi": {"tr": "açıldı", "en": "was opened"},
+                  "degisti": {"tr": "değiştirildi", "en": "was modified"},
+                  "silindi": {"tr": "silindi", "en": "was deleted"},
+                  "tasindi": {"tr": "taşındı", "en": "was moved"}}[olay["tur"]], lang)
+    baslik = _dilli({"tr": "CarotPot: kanarya dosya tetiklendi",
+                     "en": "CarotPot: canary file triggered"}, lang)
+    govde = f"“{ad}” {tur}."
     if olay.get("surec"):
-        govde += {"tr": f" Süreç: {olay['surec']}", "en": f" Process: {olay['surec']}"}[lang]
+        govde += _dilli({"tr": f" Süreç: {olay['surec']}", "en": f" Process: {olay['surec']}"}, lang)
     return baslik, govde

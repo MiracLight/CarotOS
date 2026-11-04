@@ -17,6 +17,7 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import GLib, Gtk  # noqa: E402
 
+import dil  # noqa: E402  (ortak dil katmani: ortak/dil.py)
 import tema  # noqa: E402
 from bekleme_cubugu import SweepBar  # noqa: E402
 
@@ -39,18 +40,15 @@ def ayar_dosyasi():
 
 
 def dil_varsayilan():
-    for d in ("LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE"):
-        v = os.environ.get(d, "").strip()
-        if v and v not in ("C", "POSIX"):
-            return "tr" if v.lower().startswith("tr") else "en"
-    return "en"
+    """Ilk acilis dili: sistem dili etkin (cevirisi hazir) bir dilse o, degilse 'en'."""
+    return dil.varsayilan_dil()
 
 
 def arayuz_ayarlari():
     veri = {"lang": dil_varsayilan(), "theme": "dark"}
     kayitli = V.json_oku(ayar_dosyasi(), {})
     if isinstance(kayitli, dict):
-        if kayitli.get("lang") in ("tr", "en"):
+        if kayitli.get("lang") in dil.KODLAR:
             veri["lang"] = kayitli["lang"]
         if kayitli.get("theme") in ("dark", "light"):
             veri["theme"] = kayitli["theme"]
@@ -106,8 +104,8 @@ class Pencere(Gtk.Window):
 
         alt = Gtk.Box(spacing=8)
         self.dil_kutu = Gtk.ComboBoxText()
-        self.dil_kutu.append("tr", "Türkçe")
-        self.dil_kutu.append("en", "English")
+        for kod, ad, taslak in dil.etkin_diller():       # yalniz cevirisi hazir diller
+            self.dil_kutu.append(kod, dil.secici_adi(kod, ad, taslak))
         self.dil_kutu.set_active_id(self.lang)
         self.dil_kutu.connect("changed", self.dil_degisti)
         alt.pack_start(self.dil_kutu, True, True, 0)
@@ -127,8 +125,7 @@ class Pencere(Gtk.Window):
 
     # -- metin ve bicim yardimcilari ---------------------------------------------
     def t(self, _anahtar, **kw):
-        m = M[_anahtar][self.lang]
-        return m.format(**kw) if kw else m
+        return dil.T(M.get(_anahtar), self.lang, _anahtar, **kw)
 
     def saat(self, ts):
         d = datetime.fromtimestamp(ts)
@@ -290,7 +287,7 @@ class Pencere(Gtk.Window):
 
     def dil_degisti(self, kutu):
         yeni = kutu.get_active_id()
-        if yeni not in ("tr", "en") or yeni == self.lang:
+        if yeni not in dil.KODLAR or yeni == self.lang:
             return
         self.lang = self.ui["lang"] = yeni
         arayuz_ayarlarini_kaydet(self.ui)

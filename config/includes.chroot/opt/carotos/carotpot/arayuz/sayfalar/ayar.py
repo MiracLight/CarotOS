@@ -8,6 +8,7 @@ import urllib.parse
 from gi.repository import Gtk
 
 import carotpot as CP
+import dil
 import tema
 from arayuz.sayfalar import Sayfa
 
@@ -52,13 +53,13 @@ class AyarSayfasi(Sayfa):
         dis, ic = tema.kart()
         tema.kart_basligi(ic, self.t("gorunum"))
         izgara = Gtk.Grid(column_spacing=14, row_spacing=12)
-        dil = Gtk.ComboBoxText()
-        dil.append("tr", "Türkçe")
-        dil.append("en", "English")
-        dil.set_active_id(p.lang)
-        dil.connect("changed", lambda k: p.dil_kutu.set_active_id(k.get_active_id()))
+        dil_sec = Gtk.ComboBoxText()
+        for kod, ad, taslak in dil.etkin_diller():       # yalniz cevirisi hazir diller
+            dil_sec.append(kod, dil.secici_adi(kod, ad, taslak))
+        dil_sec.set_active_id(p.lang)
+        dil_sec.connect("changed", lambda k: p.dil_kutu.set_active_id(k.get_active_id()))
         izgara.attach(tema.etiket(self.t("dil"), "soluk"), 0, 0, 1, 1)
-        izgara.attach(dil, 1, 0, 1, 1)
+        izgara.attach(dil_sec, 1, 0, 1, 1)
         secim, _ = tema.secim_grubu([("dark", self.t("gorunum_koyu")),
                                      ("light", self.t("gorunum_acik"))], p.ui["theme"],
                                     lambda g: g != p.ui["theme"] and p.tema_degistir(g))

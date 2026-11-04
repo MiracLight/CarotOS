@@ -480,6 +480,13 @@ def hizmet_calisiyor_mu():
 HIZMET_ADI = {ad: tuzaklar.MODULLER[ad].BASLIK for ad in tuzaklar.SIRA}
 
 
+def _dilli(sozluk, lang):
+    """{"tr","en"} sozlugunden metin; tr/en disindaki bir dilde Ingilizce. (Hizmet
+    "python3 -I" ile calistigi icin ortak/dil.py'ye bagimli degil; bildirim
+    metinleri henuz dil dosyalarindan cevrilmez.)"""
+    return sozluk.get(lang) or sozluk.get("en") or sozluk.get("tr") or ""
+
+
 def olay_aciklamasi(olay, lang):
     """Olayi arayuz dilinde aciklar (gunlukteki ozet alani Turkce ve
     yalnizca hizmet icindir)."""
@@ -487,24 +494,24 @@ def olay_aciklamasi(olay, lang):
     tur, port = olay.get("tur"), olay.get("hedef_port")
     kul = olay.get("kullanici")
     if tur == "giris":
-        metin = {"tr": f"{h} giriş denemesi", "en": f"{h} login attempt"}[lang]
+        metin = _dilli({"tr": f"{h} giriş denemesi", "en": f"{h} login attempt"}, lang)
         if kul:
-            metin += {"tr": f", kullanıcı “{kul}”", "en": f", user “{kul}”"}[lang]
+            metin += _dilli({"tr": f", kullanıcı “{kul}”", "en": f", user “{kul}”"}, lang)
         return metin
     if tur == "baglanti":
-        return {"tr": f"{h} bağlantısı", "en": f"{h} connection"}[lang]
+        return _dilli({"tr": f"{h} bağlantısı", "en": f"{h} connection"}, lang)
     if tur == "istek":
-        return {"tr": "Web paneli isteği", "en": "Web panel request"}[lang]
+        return _dilli({"tr": "Web paneli isteği", "en": "Web panel request"}, lang)
     if tur == "komut":
         komut = str(olay.get("ayrinti") or "").split(" ")[0].upper()[:20]
-        return {"tr": f"{h} komutu {komut}".strip(), "en": f"{h} command {komut}".strip()}[lang]
-    return {"tr": f"{h} tuzak portuna bağlantı ({port})",
-            "en": f"Connection to the {h} trap port ({port})"}[lang]
+        return _dilli({"tr": f"{h} komutu {komut}".strip(), "en": f"{h} command {komut}".strip()}, lang)
+    return _dilli({"tr": f"{h} tuzak portuna bağlantı ({port})",
+                   "en": f"Connection to the {h} trap port ({port})"}, lang)
 
 
 def bildirim_metni(olay, lang):
-    baslik = {"tr": "CarotPot: ağda şüpheli hareket",
-              "en": "CarotPot: suspicious activity on the network"}[lang]
+    baslik = _dilli({"tr": "CarotPot: ağda şüpheli hareket",
+                     "en": "CarotPot: suspicious activity on the network"}, lang)
     return baslik, f"{olay['kaynak']}: {olay_aciklamasi(olay, lang)}"
 
 

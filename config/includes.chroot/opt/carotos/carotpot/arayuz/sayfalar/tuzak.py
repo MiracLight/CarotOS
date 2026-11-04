@@ -7,6 +7,7 @@ import time
 
 from gi.repository import Gtk, Pango
 
+import dil
 import tema
 import tuzaklar
 from arayuz import veri as V
@@ -83,7 +84,7 @@ class TuzakSayfasi(Sayfa):
         anahtar.connect("notify::active", self.anahtar_degisti, ad)
         u.pack_end(anahtar, False, False, 0)
         ic.pack_start(u, False, False, 0)
-        ic.pack_start(tema.etiket(m.ACIKLAMA[self.p.lang], "kart-alt", sar=True, genislik=40),
+        ic.pack_start(tema.etiket(dil.metin(m.ACIKLAMA, self.p.lang), "kart-alt", sar=True, genislik=40),
                       False, False, 0)
         satir = Gtk.Box(spacing=8)
         satir.pack_start(tema.etiket(self.t("port"), "soluk"), False, False, 0)
@@ -100,7 +101,7 @@ class TuzakSayfasi(Sayfa):
         for hucre in persona.get_cells():
             hucre.set_property("ellipsize", Pango.EllipsizeMode.END)
         for anahtar_, bilgi in m.PERSONALAR.items():
-            persona.append(anahtar_, f"{self.t('kimlik')}: {bilgi[self.p.lang]}")
+            persona.append(anahtar_, f"{self.t('kimlik')}: {dil.metin(bilgi, self.p.lang)}")
         persona.connect("changed", self.persona_degisti, ad)
         ic.pack_start(persona, False, False, 0)
         self.kartlar[ad] = {"anahtar": anahtar, "port": port, "sayi": sayi, "durum": durum,
