@@ -46,7 +46,14 @@ UYGULAMALAR = {
     "magaza": "magaza/carotos-magaza.py",
     "carotene": "carotene/carotene.py",
     "welcome": "welcome/carotos-welcome.py",
+    "gsd": "gsd/carotos-gsd.py",
+    "former": "former/carotos-former.py",
 }
+
+# GSD ve Former kendi paketlerini (terimler, konular...) kardes klasorden alir
+for _p in ("gsd", "former"):
+    if os.path.join(INC, _p) not in sys.path:
+        sys.path.insert(0, os.path.join(INC, _p))
 
 
 @unittest.skipUnless(EKRAN, "ekran yok (xvfb-run ile calistirin)")
@@ -241,6 +248,80 @@ class CaroteneTesti(UygulamaDilTabani):
         m = self.modul("carotene")
         self.ayar_yaz("carotene", "settings.json", {"lang": "klingon", "theme": "dark"})
         self.assertEqual(m.load_settings()["lang"], "en")
+
+
+class GsdTesti(UygulamaDilTabani):
+    def test_dokuz_dilde_terimler(self):
+        m = self.modul("gsd")
+        pencere = m.Uygulama()
+        self.addCleanup(pencere.destroy)
+        ornek = [t["id"] for t in pencere.tumu][::12]
+        for lang in self.dil.KODLAR:
+            pencere.lang = lang
+            pencere._arama_indeksi_kur()
+            pencere._metinleri_uygula()
+            for tid in ornek:
+                pencere._detay_goster(tid)
+            pencere._bos_goster()
+            self.pompala()
+        pencere.lang = "tr"
+
+    def test_arama_secili_dilin_cevirisini_de_bulur(self):
+        m = self.modul("gsd")
+        pencere = m.Uygulama()
+        self.addCleanup(pencere.destroy)
+        tid = pencere.tumu[0]["id"]
+        baslik_en = m.metin_al(pencere.tumu[0]["baslik"], "en")
+        self.dil_dosyasi("de", {baslik_en: "Zzyzx-Begriff"})
+        pencere.lang = "de"
+        pencere._arama_indeksi_kur()
+        self.assertIn("zzyzx-begriff", pencere._arama_metni[tid])
+        pencere.lang = "tr"
+        pencere._arama_indeksi_kur()
+        self.assertNotIn("zzyzx-begriff", pencere._arama_metni[tid])
+
+    def test_bozuk_kayitli_dil_ve_secici(self):
+        m = self.modul("gsd")
+        self.ayar_yaz("carotos-gsd", "settings.json", {"dil": "klingon", "tema": "dark"})
+        pencere = m.Uygulama()
+        self.addCleanup(pencere.destroy)
+        self.assertEqual(pencere.lang, "en")
+        self.assertEqual([r[0] for r in pencere.dil_kutu.get_model()], ["Türkçe", "English"])
+
+
+class FormerTesti(UygulamaDilTabani):
+    def test_dokuz_dilde_konular(self):
+        m = self.modul("former")
+        pencere = m.Uygulama()
+        self.addCleanup(pencere.destroy)
+        konular = list(pencere.konular)
+        self.assertGreater(len(konular), 10)
+        for lang in self.dil.KODLAR:
+            pencere.lang = lang
+            pencere._metinleri_uygula()
+            for kid in konular[::3]:
+                pencere._aktif_id = kid
+                pencere._sayfayi_yeniden_kur(kid)
+            pencere._bos_goster()
+            self.pompala()
+        pencere.lang = "tr"
+
+    def test_zaman_cizelgesi_her_dilde(self):
+        m = self.modul("former")
+        pencere = m.Uygulama()
+        self.addCleanup(pencere.destroy)
+        for lang in self.dil.KODLAR:
+            for kid, konu in list(pencere.konular.items())[::4]:
+                cz = m.fz.derle(konu["sahne"], konu["adimlar"], lang)
+                cz.durum(0)
+                cz.durum(5000)
+
+    def test_bozuk_kayitli_dil(self):
+        m = self.modul("former")
+        self.ayar_yaz("carotos-former", "settings.json", {"dil": "klingon", "tema": "dark"})
+        pencere = m.Uygulama()
+        self.addCleanup(pencere.destroy)
+        self.assertEqual(pencere.lang, "en")
 
 
 class KarsilamaTesti(UygulamaDilTabani):

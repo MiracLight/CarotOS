@@ -22,6 +22,8 @@ from __future__ import annotations
 
 import math
 
+import dil as dilkat    # ortak dil katmani (ortak/dil.py); "dil" adi parametrelerle cakisir
+
 # ---------------------------------------------------------------------------
 # Sureler (milisaniye)
 # ---------------------------------------------------------------------------
@@ -36,13 +38,14 @@ BITIS_BEKLEME_MS = 2200
 
 
 def T(tr: str, en: str) -> dict:
-    """Iki dilli metin."""
-    return {"tr": tr, "en": en}
+    """Iki dilli metin (diger diller dil dosyalarindan gelir, eksikse yedek)."""
+    return dilkat.Metin({"tr": tr, "en": en})
 
 
 def metin_al(m, dil: str) -> str:
+    """Iki dilli sozlukten 'dil' metni; eksikse en, sonra tr (ortak/dil.py)."""
     if isinstance(m, dict):
-        return m.get(dil) or m.get("tr") or ""
+        return dilkat.metin(m, dil)
     return "" if m is None else str(m)
 
 

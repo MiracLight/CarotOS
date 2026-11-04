@@ -16,6 +16,7 @@ from gi.repository import Gtk, Gdk, GLib, Pango  # noqa: E402
 sys.path.insert(0, "/opt/carotos/ortak")
 sys.path.insert(0, "/opt/carotos/gsd")
 
+import dil as dilkat  # noqa: E402  (ortak dil katmani; "dil" adi parametrelerle cakisir)
 import tema  # noqa: E402
 import terimler  # noqa: E402
 
@@ -39,13 +40,9 @@ LOGO = logo_bul()
 
 
 def _varsayilan_dil():
-    """Ilk acilis dili: sistem dili Turkce ise 'tr', baska herhangi bir
-    dilse 'en'. Kayitli bir ayar varsa o oncelik tasir."""
-    for degisken in ("LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE"):
-        deger = os.environ.get(degisken, "").strip()
-        if deger and deger not in ("C", "POSIX"):
-            return "tr" if deger.lower().startswith("tr") else "en"
-    return "en"
+    """Ilk acilis dili: sistem dili etkin (cevirisi hazir) bir dilse o, degilse
+    'en'. Kayitli bir ayar varsa o oncelik tasir (bkz. ortak/dil.py)."""
+    return dilkat.varsayilan_dil()
 
 
 DEFAULT_SETTINGS = {"dil": _varsayilan_dil(), "tema": "dark"}
@@ -70,13 +67,14 @@ def ayar_yaz(ayar):
 
 
 def T(tr, en):
-    """Iki dilli metin."""
-    return {"tr": tr, "en": en}
+    """Iki dilli metin (diger diller dil dosyalarindan gelir, eksikse yedek)."""
+    return dilkat.Metin({"tr": tr, "en": en})
 
 
 def metin_al(m, dil):
+    """Iki dilli sozlukten 'dil' metni; eksikse en, sonra tr (ortak/dil.py)."""
     if isinstance(m, dict):
-        return m.get(dil) or m.get("tr") or ""
+        return dilkat.metin(m, dil)
     return "" if m is None else str(m)
 
 
@@ -146,7 +144,7 @@ class Uygulama(Gtk.Window):
     def __init__(self, terim_id=None):
         super().__init__()
         self.ayar = ayar_oku()
-        if self.ayar.get("dil") not in ("tr", "en"):
+        if self.ayar.get("dil") not in dilkat.KODLAR:
             self.ayar["dil"] = _varsayilan_dil()
         if self.ayar.get("tema") not in ("dark", "light"):
             self.ayar["tema"] = "dark"
@@ -169,16 +167,7 @@ class Uygulama(Gtk.Window):
         # -- veri --------------------------------------------------------
         self.tumu = terimler.tumu()
         self.terimler = {t["id"]: t for t in self.tumu}
-        self._arama_metni = {}
-        for t in self.tumu:
-            parcalar = [
-                t["id"],
-                metin_al(t.get("baslik"), "tr"), metin_al(t.get("baslik"), "en"),
-                metin_al(t.get("kisa"), "tr"), metin_al(t.get("kisa"), "en"),
-                metin_al(t.get("aciklama"), "tr"), metin_al(t.get("aciklama"), "en"),
-                t.get("ornek") or "",
-            ]
-            self._arama_metni[t["id"]] = _kucult(" ".join(parcalar))
+        self._arama_indeksi_kur()
 
         self.kategori_filtre = "tumu"
         self._arama_sorgu = ""
@@ -203,9 +192,21 @@ class Uygulama(Gtk.Window):
             self._bos_goster()
 
     # -- genel ---------------------------------------------------------------
+    def _arama_indeksi_kur(self):
+        """Arama metni: tr + en + secili dilin metinleri (cevrilmis dilde de
+        o dildeki baslikla aranabilsin). Dil degisince yeniden kurulur."""
+        self._arama_metni = {}
+        for t in self.tumu:
+            parcalar = [t["id"]]
+            for alan in ("baslik", "kisa", "aciklama"):
+                parcalar += [metin_al(t.get(alan), "tr"), metin_al(t.get(alan), "en")]
+                if self.lang not in ("tr", "en"):
+                    parcalar.append(metin_al(t.get(alan), self.lang))
+            parcalar.append(t.get("ornek") or "")
+            self._arama_metni[t["id"]] = _kucult(" ".join(parcalar))
+
     def t(self, anahtar, **kw):
-        m = metin_al(STRINGS[anahtar], self.lang)
-        return m.format(**kw) if kw else m
+        return dilkat.T(STRINGS.get(anahtar), self.lang, anahtar, **kw)
 
     def _kapaniyor(self, *_):
         if Gtk.main_level() > 0:
@@ -274,8 +275,8 @@ class Uygulama(Gtk.Window):
         alt.set_margin_bottom(16)
         alt.set_margin_top(4)
         self.dil_kutu = Gtk.ComboBoxText()
-        self.dil_kutu.append("tr", "Türkçe")
-        self.dil_kutu.append("en", "English")
+        for kod, ad, taslak in dilkat.etkin_diller():    # yalniz cevirisi hazir diller
+            self.dil_kutu.append(kod, dilkat.secici_adi(kod, ad, taslak))
         self.dil_kutu.set_active_id(self.lang)
         self.dil_kutu.connect("changed", self._dil_degisti)
         alt.pack_start(self.dil_kutu, True, True, 0)
@@ -335,6 +336,7 @@ class Uygulama(Gtk.Window):
             self.lang = kid
             self.ayar["dil"] = kid
             ayar_yaz(self.ayar)
+            self._arama_indeksi_kur()
             self._metinleri_uygula()
             if self._aktif_id:
                 self._detay_goster(self._aktif_id)

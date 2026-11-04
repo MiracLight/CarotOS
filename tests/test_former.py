@@ -50,7 +50,8 @@ class ZamanMotoruTesti(unittest.TestCase):
         m = fz.T("merhaba", "hello")
         self.assertEqual(fz.metin_al(m, "en"), "hello")
         self.assertEqual(fz.metin_al(m, "tr"), "merhaba")
-        self.assertEqual(fz.metin_al(m, "de"), "merhaba")   # bilinmeyen dil -> tr'ye duser
+        self.assertEqual(fz.metin_al(m, "de"), "hello")     # cevirisi olmayan dil -> en (ortak/dil.py), en de yoksa tr
+        self.assertEqual(fz.metin_al({"tr": "sadece"}, "de"), "sadece")
         self.assertEqual(fz.metin_al(None, "tr"), "")
         self.assertEqual(fz.metin_al("duz metin", "tr"), "duz metin")
 
