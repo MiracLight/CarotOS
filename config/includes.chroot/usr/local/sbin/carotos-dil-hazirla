@@ -1,0 +1,108 @@
+#!/usr/bin/python3 -I
+# -*- coding: utf-8 -*-
+"""CarotOS: bir sistem dilini kullanima hazirlar (root olarak, pkexec ile cagrilir).
+
+Kullanim:  carotos-dil-hazirla <dil-kodu>      (tr en de ru es pt ja zh fr)
+
+Yaptiklari:
+  1. /etc/locale.gen'de dilin locale'ini etkinlestirir ve `locale-gen` calistirir
+  2. eksik dil paketlerini (yazi tipi, Firefox/LibreOffice dili, yazim sozlugu) apt ile kurar
+Yapmadiklari: /etc/default/locale'e (sistem geneli varsayilan dil) DOKUNMAZ; makinedeki
+diger kullanicilari etkilemez. Oturum dilini kullanici kendi hesabinda Karsilama ayarlar.
+
+Guvenlik: tek arguman, sabit tablodan (ortak/sistem_dili.py) dogrulanir; kabuk kullanilmaz;
+yazilan satirlar ve kurulan paketler yalnizca tablodan gelir. Tablo modulu root'a ait degilse
+ya da grup/herkes tarafindan yazilabiliyorsa betik hicbir sey yapmadan cikar.
+"""
+import os
+import subprocess
+import sys
+
+MODUL_DIZINI = "/opt/carotos/ortak"
+LOCALE_GEN = "/etc/locale.gen"
+ORTAM = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL": "C", "DEBIAN_FRONTEND": "noninteractive"}
+
+
+def bildir(metin):
+    print("[carotos-dil] " + metin, flush=True)
+
+
+def modulu_yukle():
+    yol = os.path.join(MODUL_DIZINI, "sistem_dili.py")
+    st = os.stat(yol)
+    if st.st_uid != 0 or (st.st_mode & 0o022):
+        bildir("guvensiz modul (root'a ait olmali, baskalarinca yazilamamali): " + yol)
+        sys.exit(3)
+    sys.path.insert(0, MODUL_DIZINI)
+    import sistem_dili
+    return sistem_dili
+
+
+def calistir(komut):
+    return subprocess.run(komut, env=ORTAM).returncode
+
+
+def locale_etkinlestir(SD, kod):
+    satir = SD.locale_gen_satiri(kod)
+    try:
+        with open(LOCALE_GEN, "r", encoding="utf-8") as f:
+            satirlar = f.read().splitlines()
+    except FileNotFoundError:
+        satirlar = []
+    sonuc, bulundu = [], False
+    for s in satirlar:
+        if s.strip() == satir:
+            bulundu = True                         # zaten etkin
+        elif s.strip().lstrip("#").strip() == satir:
+            s, bulundu = satir, True               # yorumdan cikar
+        sonuc.append(s)
+    if not bulundu:
+        sonuc.append(satir)
+    gecici = LOCALE_GEN + ".carotos-yeni"
+    with open(gecici, "w", encoding="utf-8") as f:
+        f.write("\n".join(sonuc) + "\n")
+    os.chmod(gecici, 0o644)
+    os.replace(gecici, LOCALE_GEN)
+
+
+def main(argv):
+    if os.geteuid() != 0:
+        bildir("root olarak calistirilmali (pkexec)")
+        return 2
+    if len(argv) != 2:
+        bildir("kullanim: carotos-dil-hazirla <dil-kodu>")
+        return 2
+    SD = modulu_yukle()
+    kod = argv[1]
+    if kod not in SD.HAZIRLIK:
+        bildir("bilinmeyen dil kodu")
+        return 2
+    if kod in ("tr", "en"):
+        bildir("bu dil icin hazirlik gerekmiyor")
+        return 0
+
+    bildir("1/3 locale: " + SD.locale_adi(kod))
+    if not SD.locale_var_mi(kod, SD.locale_a()):
+        locale_etkinlestir(SD, kod)
+        if calistir(["locale-gen"]) != 0:
+            bildir("locale-gen basarisiz")
+            return 1
+
+    kurulu = SD.kurulu_paketler()
+    eksik = SD.eksik_paketler(kod, kurulu)
+    if not eksik:
+        bildir("2/3 paketler: hepsi kurulu")
+        bildir("3/3 tamam")
+        return 0
+    bildir("2/3 paketler: " + " ".join(eksik))
+    if calistir(["apt-get", "update"]) != 0:
+        bildir("uyari: depo listesi guncellenemedi (cevrimdisi olabilir), kurulum deneniyor")
+    if calistir(["apt-get", "install", "-y", "--no-install-recommends"] + eksik) != 0:
+        bildir("paket kurulumu basarisiz (internet baglantisini ve baska bir paket yoneticisinin calismadigini kontrol edin)")
+        return 1
+    bildir("3/3 tamam")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

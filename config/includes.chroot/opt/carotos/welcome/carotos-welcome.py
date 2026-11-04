@@ -26,6 +26,7 @@ ORTAK = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ORTAK not in sys.path:
     sys.path.insert(0, ORTAK)
 import dil  # noqa: E402  (ortak dil katmani: ortak/dil.py)
+import sistem_dili as sd  # noqa: E402  (dil paketi/locale hazirligi)
 import tema  # noqa: E402
 
 VURGU = "karsilama"                 # ortak/tema.py: marka mavisi
@@ -851,6 +852,29 @@ LANG_CHANGED_NOTE = {
 }
 
 
+DIL_HAZIRLIK = {
+    "dh_baslik": {"tr": "Sistem dili hazırlığı", "en": "System language setup"},
+    "dh_soru": {
+        "tr": "“{ad}” sistem dili olarak kullanılabilmesi için dil dosyaları ve gerekirse yazı "
+              "tipleri indirilecek (internet ve yönetici parolası gerekir). Şimdi hazırlansın mı?",
+        "en": "To use “{ad}” as the system language, language files and, if needed, fonts will be "
+              "downloaded (internet and your administrator password are required). Prepare now?"},
+    "dh_soru_alt": {
+        "tr": "Hayır derseniz CarotOS uygulamaları yine bu dilde açılır; masaüstü şimdiki dilde kalır. "
+              "Daha sonra Karşılama'dan tekrar deneyebilirsiniz.",
+        "en": "If you choose no, CarotOS apps still open in this language and the desktop stays in the "
+              "current language. You can try again later from Welcome."},
+    "dh_evet": {"tr": "Hazırla", "en": "Prepare"},
+    "dh_hayir": {"tr": "Şimdi değil", "en": "Not now"},
+    "dh_iptal": {"tr": "İptal", "en": "Cancel"},
+    "dh_calisiyor": {"tr": "Hazırlanıyor… pencereyi kapatmayın.", "en": "Preparing… please keep this window open."},
+    "dh_hata": {
+        "tr": "Hazırlık tamamlanamadı. İnternet bağlantısını kontrol edin. CarotOS uygulamaları yine "
+              "seçtiğiniz dilde açılır.",
+        "en": "Setup could not be completed. Check your internet connection. CarotOS apps still open in "
+              "your chosen language."},
+}
+UI.update(DIL_HAZIRLIK)
 UI.update(PICK_TEXTS)
 
 # tr/en sozlukleri her dil icin yedekli olur (eksik ceviri Ingilizceye duser)
@@ -905,6 +929,11 @@ SIBLING_CONFIGS = [
     ("carotos-usb", "settings.json"),
     ("carotos-former", "settings.json"),
     ("carotos-gsd", "settings.json"),
+    ("carotene", "settings.json"),
+    ("carotos-magaza", "ayarlar.json"),
+    ("carotpot", "settings.json"),
+    ("carotos-poligon", "ayar.json"),     # Poligon: anahtarlar "dil" ve "gorunum"
+    ("filenor", "filenor.json"),          # Filenor: anahtarlar "dil" ve "tema"
 ]
 
 # Koyu ve acik tema adaylari — sistemde bulunan ilki kullanilir.
@@ -920,7 +949,7 @@ LIGHT_ICON_THEMES = ["Papirus-Light", "Papirus", "gnome"]
 DARK_CURSOR_THEMES = ["Breeze_Light", "Breeze_Snow", "DMZ-White", "Adwaita"]
 LIGHT_CURSOR_THEMES = ["breeze_cursors", "DMZ-Black", "Adwaita"]
 
-LOCALE_FOR_LANG = {"tr": "tr_TR.UTF-8", "en": "en_US.UTF-8"}
+LOCALE_FOR_LANG = {kod: v["locale"] for kod, v in sd.HAZIRLIK.items()}
 
 # Duvar kagitlarinin arandigi dizinler (ilk dolu olan kullanilir).
 # CAROTOS_WP_DIR ile test/ozel dizin one alinabilir.
@@ -1104,6 +1133,18 @@ def apply_sibling_settings(lang, theme):
             # GSD de Former ile ayni "dil"/"tema" anahtarlarini kullanir.
             data["dil"] = lang
             data["tema"] = theme
+        elif folder == "carotos-poligon":
+            # Poligon "dil" ve "gorunum" (dark/light) anahtarlarini okur
+            data.pop("lang", None)
+            data.pop("theme", None)
+            data["dil"] = lang
+            data["gorunum"] = theme
+        elif folder == "filenor":
+            # Filenor "dil" ve "tema" (dark/light) anahtarlarini okur
+            data.pop("lang", None)
+            data.pop("theme", None)
+            data["dil"] = lang
+            data["tema"] = theme
         try:
             os.makedirs(os.path.dirname(path), exist_ok=True)
             with open(path, "w", encoding="utf-8") as fh:
@@ -1217,6 +1258,10 @@ def apply_session_language(lang):
     """
     locale = LOCALE_FOR_LANG.get(lang)
     if not locale:
+        return False
+    # Uretilmemis bir locale'i oturuma yazmak terminali/yazi tiplerini bozar (sessizce C'ye duser):
+    # tr/en ISO'da var; digerleri once hazirlanmali (bkz. sistem_dili, carotos-dil-hazirla)
+    if lang not in ("tr", "en") and not sd.locale_var_mi(lang, sd.locale_a()):
         return False
     ok = _write_xsessionrc(locale)
     _write_dmrc(locale)
@@ -2041,8 +2086,76 @@ class WelcomeWindow(Gtk.Window):
         """Sihirbaz kapanirken secimleri sisteme uygular."""
         apply_desktop_theme(self.theme)
         apply_sibling_settings(self.lang, self.theme)
+        self.prepare_language()
         apply_session_language(self.lang)
         apply_wallpaper(self.wallpaper)
+
+    def prepare_language(self):
+        """Secilen dilin locale'i/paketleri eksikse sorar ve hazirlar (ISO kucuk kalsin diye
+        dil paketleri istenince kurulur). Reddedilirse/basarisiz olursa oturum dili degismez;
+        CarotOS uygulamalari yine secilen dilde acilir (kendi cevirileri ISO'dadir)."""
+        if not sd.hazirlik_gerekli_mi(self.lang):
+            return True
+        ad = dict(dil.DILLER).get(self.lang, self.lang)
+        soru = Gtk.MessageDialog(transient_for=self, modal=True, message_type=Gtk.MessageType.QUESTION,
+                                 buttons=Gtk.ButtonsType.NONE, text=UI["dh_baslik"][self.lang])
+        soru.format_secondary_text(dil.T(UI["dh_soru"], self.lang, ad=ad) + "\n\n" + UI["dh_soru_alt"][self.lang])
+        soru.add_button(UI["dh_hayir"][self.lang], Gtk.ResponseType.CANCEL)
+        soru.add_button(UI["dh_evet"][self.lang], Gtk.ResponseType.OK)
+        yanit = soru.run()
+        soru.destroy()
+        if yanit != Gtk.ResponseType.OK:
+            return False
+        return self._run_language_setup(self.lang)
+
+    def _run_language_setup(self, kod):
+        """pkexec ile carotos-dil-hazirla'yi arka planda calistirir; pencere donmaz."""
+        import threading
+        dlg = Gtk.Dialog(title=UI["dh_baslik"][self.lang], transient_for=self, modal=True)
+        kutu = dlg.get_content_area()
+        kutu.set_spacing(10)
+        kutu.set_border_width(16)
+        satir = Gtk.Box(spacing=10)
+        spinner = Gtk.Spinner()
+        spinner.start()
+        satir.pack_start(spinner, False, False, 0)
+        durum = Gtk.Label(label=UI["dh_calisiyor"][self.lang], xalign=0)
+        durum.set_line_wrap(True)
+        satir.pack_start(durum, True, True, 0)
+        kutu.pack_start(satir, False, False, 0)
+        dlg.add_button(UI["dh_iptal"][self.lang], Gtk.ResponseType.CANCEL)
+        dlg.show_all()
+        kayit = {"surec": None, "kod": 1}
+
+        def calis():
+            try:
+                surec = subprocess.Popen(sd.hazirla_komutu(kod), stdout=subprocess.PIPE,
+                                         stderr=subprocess.STDOUT, text=True, bufsize=1)
+                kayit["surec"] = surec
+                for ln in surec.stdout:
+                    if ln.startswith("[carotos-dil]"):
+                        GLib.idle_add(durum.set_text, ln.rstrip()[len("[carotos-dil] "):])
+                kayit["kod"] = surec.wait()
+            except OSError:
+                kayit["kod"] = 1
+            GLib.idle_add(dlg.response, Gtk.ResponseType.OK)
+
+        threading.Thread(target=calis, daemon=True).start()
+        yanit = dlg.run()
+        surec = kayit["surec"]
+        if yanit == Gtk.ResponseType.CANCEL and surec is not None and surec.poll() is None:
+            surec.terminate()
+        dlg.destroy()
+        if yanit != Gtk.ResponseType.OK:
+            return False
+        if kayit["kod"] != 0:
+            hata = Gtk.MessageDialog(transient_for=self, modal=True, message_type=Gtk.MessageType.WARNING,
+                                     buttons=Gtk.ButtonsType.CLOSE, text=UI["dh_baslik"][self.lang])
+            hata.format_secondary_text(UI["dh_hata"][self.lang])
+            hata.run()
+            hata.destroy()
+            return False
+        return True
 
     def on_back(self, _button):
         if self.index > 0:
