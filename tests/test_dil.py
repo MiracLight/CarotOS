@@ -214,5 +214,44 @@ class ZenginlestirTesti(DilTabani):
         self.assertIsInstance(z["tr"], list)
 
 
+class DilOnceTesti(DilTabani):
+    """Poligon gibi dil-once (METIN[kod][anahtar]) tablolar."""
+
+    TABLO = {"tr": {"a": "Merhaba {ad}", "b": "Yalniz TR", "liste": ["x", "y"]},
+             "en": {"a": "Hello {ad}", "liste": ["x", "y"]}}
+
+    def test_kaynak_diller_ve_yedek(self):
+        m = dil.dil_once(self.TABLO)
+        self.assertEqual(m["tr"]["a"], "Merhaba {ad}")
+        self.assertEqual(m["en"]["a"], "Hello {ad}")
+        self.assertEqual(m["en"]["b"], "Yalniz TR")          # en yok -> tr
+        self.assertEqual(m["de"]["a"], "Hello {ad}")         # dil dosyasi yok -> en
+
+    def test_ceviri_dosyasi_kullanilir(self):
+        self.dosya("de", {"Hello {ad}": "Hallo {ad}"})
+        m = dil.dil_once(self.TABLO)
+        self.assertEqual(m["de"]["a"], "Hallo {ad}")
+        self.assertEqual(m["de"]["b"], "Yalniz TR")
+
+    def test_bilinmeyen_anahtar_keyerror(self):
+        m = dil.dil_once(self.TABLO)
+        for kod in ("tr", "de"):
+            with self.assertRaises(KeyError):
+                m[kod]["yok"]
+        self.assertIsNone(m["de"].get("yok"))
+        self.assertEqual(m["de"].get("yok", 1), 1)
+
+    def test_liste_degerleri_oldugu_gibi(self):
+        m = dil.dil_once(self.TABLO)
+        self.assertEqual(m["tr"]["liste"], ["x", "y"])
+        self.assertEqual(m["de"]["liste"], ["x", "y"])
+
+    def test_icerme_ve_anahtarlar(self):
+        m = dil.dil_once(self.TABLO)
+        self.assertIn("b", m["de"])
+        self.assertNotIn("yok", m["de"])
+        self.assertEqual(m["de"].keys(), {"a", "b", "liste"})
+
+
 if __name__ == "__main__":
     unittest.main()

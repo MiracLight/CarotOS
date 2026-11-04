@@ -33,6 +33,7 @@ from ogretmen_sunucu import OdaDurumu, oda_kodu_uret, oda_sifresi_uret, sunucu_b
 import soru_sablonlari as _sablon  # noqa: E402
 import soru_defteri as _defter  # noqa: E402
 import gorunum_ayari as _gorunum  # noqa: E402
+import dil_koprusu as _dil  # noqa: E402
 import gorev_bilgi as _bilgi  # noqa: E402
 import varyantlar as _varyantlar  # noqa: E402
 import tema  # noqa: E402
@@ -163,15 +164,12 @@ def _olcek_planla(pencere, icerik, taban_g, taban_y):
 
 
 def _sistem_dilini_belirle() -> str:
-    """ogrenci_uygulama.py::_sistem_dilini_belirle ile AYNI mantık --
-    sistem dili Türkçe ise 'tr', değilse 'en'. Bkz. oradaki docstring."""
-    for degisken in ("LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE"):
-        if os.environ.get(degisken, "").lower().startswith("tr"):
-            return "tr"
-    return "en"
+    """ogrenci_uygulama.py::_sistem_dilini_belirle ile AYNI mantık (kayıtlı seçim >
+    sistem dili > İngilizce). Bkz. oradaki docstring."""
+    return _dil.baslangic_dili(_gorunum.dil_oku())
 
 
-METIN = {
+_METIN_HAM = {
     "tr": {
         "baslik": "CarotOS Poligon — Öğretmen",
         "oda_kodu": "Oda Kodu",
@@ -360,6 +358,9 @@ METIN = {
     },
 }
 
+# Her dilde METIN[kod][anahtar] guvenle okunur (dil dosyasi, en, tr yedegi): ortak/dil.py
+METIN = _dil.dil_once(_METIN_HAM)
+
 VURGU = _gorunum.VURGU   # ortak/tema.py vurgu anahtari (renkler tema.AKTIF'ten okunur)
 
 # Kenar menusu sayfasi -> sayfa basligi metin anahtari
@@ -400,7 +401,7 @@ def _tum_gorevleri_yukle() -> list[dict]:
         try:
             veri = json.loads(dosya.read_text(encoding="utf-8"))
             if "id" in veri and "arac" in veri:
-                gorevler.append(veri)
+                gorevler.append(_dil.zengin(veri))
         except (json.JSONDecodeError, OSError):
             continue
     gorevler.sort(key=lambda g: (
@@ -501,8 +502,11 @@ class OgretmenPenceresi(Gtk.Window):
 
         # Sol alt: dil ve gorunum
         alt = Gtk.Box(spacing=8)
-        self.dil_dugmesi = Gtk.Button(label="EN")
-        self.dil_dugmesi.connect("clicked", self._dili_degistir)
+        self.dil_dugmesi = Gtk.ComboBoxText()
+        for _kod, _ad, _taslak in _dil.etkin_diller():
+            self.dil_dugmesi.append(_kod, _dil.secici_adi(_kod, _ad, _taslak))
+        self.dil_dugmesi.set_active_id(self.dil)
+        self.dil_dugmesi.connect("changed", self._dili_degistir)
         alt.pack_start(self.dil_dugmesi, True, True, 0)
         self.tema_dugmesi = Gtk.Button()
         self.tema_dugmesi.connect("clicked", self._tema_degistir)
@@ -1263,9 +1267,12 @@ class OgretmenPenceresi(Gtk.Window):
         return icerik
 
     # ------------------------------------------------------------------
-    def _dili_degistir(self, _düğme):
-        self.dil = "en" if self.dil == "tr" else "tr"
-        self._metinleri_uygula()
+    def _dili_degistir(self, kutu):
+        yeni = kutu.get_active_id()
+        if yeni and yeni != self.dil and _dil.gecerli_dil(yeni):
+            self.dil = yeni
+            _gorunum.dil_yaz(yeni)
+            self._metinleri_uygula()
 
     def _tema_degistir(self, _düğme):
         self.gorunum = "light" if self.gorunum == "dark" else "dark"
@@ -1285,7 +1292,6 @@ class OgretmenPenceresi(Gtk.Window):
                                  ("soru_ata", "sekme_sinif"), ("soru_olustur", "sekme_soru_olustur"),
                                  ("kayitli", "sekme_kayitli"), ("ag", "sekme_ip")):
             self.kabuk.menu_metni(_anahtar, m[_metin])
-        self.dil_dugmesi.set_label("TR" if self.dil == "en" else "EN")
         self.tema_dugmesi.set_label(m["tema_acik"] if self.gorunum == "dark" else m["tema_koyu"])
         self.kpi_katilan.ayarla(ad=m["kpi_katilan"])
         self.kpi_bitiren.ayarla(ad=m["kpi_bitiren"])

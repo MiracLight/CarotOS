@@ -27,6 +27,7 @@ from ogrenci_istemci import BaglantiHatasi, GOREVLER_DIZINI, PoligonIstemci  # n
 import gecmis_defteri  # noqa: E402
 import kullanici_defteri  # noqa: E402
 import gorunum_ayari as _gorunum  # noqa: E402
+import dil_koprusu as _dil  # noqa: E402
 import tema  # noqa: E402
 
 
@@ -162,21 +163,16 @@ def _olcek_planla(pencere, icerik, taban_g, taban_y):
 
 
 def _sistem_dilini_belirle() -> str:
-    """Uygulama ilk açıldığında hangi dille başlayacağını belirler:
-    sistem dili Türkçe ise 'tr', başka HERHANGİ bir dilse (ya da hiç
-    belirlenemiyorsa) 'en'. LC_ALL/LC_MESSAGES/LANG/LANGUAGE ortam
-    değişkenlerine bakılıyor -- GTK/gettext'in de kullandığı standart
-    öncelik sırası bu. Kullanıcı yine de sağ üstteki dil düğmesiyle
-    istediği an değiştirebiliyor, bu sadece AÇILIŞ varsayılanı."""
-    for degisken in ("LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE"):
-        if os.environ.get(degisken, "").lower().startswith("tr"):
-            return "tr"
-    return "en"
+    """Uygulama ilk açıldığında hangi dille başlayacağını belirler: kayıtlı seçim
+    (geçerliyse) > sistem dili (etkin bir dilse) > İngilizce. Kullanıcı yine de sol
+    alttaki dil kutusuyla istediği an değiştirebilir (seçim kaydedilir)."""
+    return _dil.baslangic_dili(_gorunum.dil_oku())
 
 
-METIN = {
+_METIN_HAM = {
     "tr": {
         "baslik": "CarotOS Poligon",
+        "hata_gorev_yok": "Öğretmen henüz bir görev açmadı",
         "baglan_sekme": "Odaya Katıl",
         "ogretmen_adres": "Öğretmen Adresi (IP)",
         "oda_kodu": "Oda Kodu",
@@ -264,6 +260,7 @@ METIN = {
         "tema_koyu": "Koyu tema",
     },
     "en": {
+        "hata_gorev_yok": "The teacher hasn't opened a task yet",
         "baslik": "CarotOS Poligon",
         "baglan_sekme": "Join Room",
         "ogretmen_adres": "Teacher Address (IP)",
@@ -352,6 +349,9 @@ METIN = {
         "tema_koyu": "Dark theme",
     },
 }
+
+# Her dilde METIN[kod][anahtar] guvenle okunur (dil dosyasi, en, tr yedegi): ortak/dil.py
+METIN = _dil.dil_once(_METIN_HAM)
 
 VURGU = _gorunum.VURGU   # ortak/tema.py vurgu anahtari (renkler tema.AKTIF'ten okunur)
 
@@ -449,9 +449,12 @@ class PoligonPenceresi(Gtk.Window):
         self.tema_dugmesi.connect("clicked", self._tema_degistir)
         cubuk.pack_end(self.tema_dugmesi, False, False, 0)
 
-        self.dil_dugmesi = Gtk.Button(label="EN")
+        self.dil_dugmesi = Gtk.ComboBoxText()
         tema.sinif(self.dil_dugmesi, "kucuk")
-        self.dil_dugmesi.connect("clicked", self._dili_degistir)
+        for _kod, _ad, _taslak in _dil.etkin_diller():
+            self.dil_dugmesi.append(_kod, _dil.secici_adi(_kod, _ad, _taslak))
+        self.dil_dugmesi.set_active_id(self.dil)
+        self.dil_dugmesi.connect("changed", self._dili_degistir)
         cubuk.pack_end(self.dil_dugmesi, False, False, 0)
 
         self.hap = tema.DurumHapi()
@@ -483,9 +486,12 @@ class PoligonPenceresi(Gtk.Window):
         """Dugme metni; renk ortak temanin CSS'inden gelir."""
         dugme.set_label(metin)
 
-    def _dili_degistir(self, _düğme):
-        self.dil = "en" if self.dil == "tr" else "tr"
-        self._metinleri_uygula()
+    def _dili_degistir(self, kutu):
+        yeni = kutu.get_active_id()
+        if yeni and yeni != self.dil and _dil.gecerli_dil(yeni):
+            self.dil = yeni
+            _gorunum.dil_yaz(yeni)
+            self._metinleri_uygula()
 
     def _tema_degistir(self, _düğme):
         self.gorunum = "light" if self.gorunum == "dark" else "dark"
@@ -498,7 +504,6 @@ class PoligonPenceresi(Gtk.Window):
         m = METIN[self.dil]
         self.baslik_etiketi.set_text(m["baslik"])
         self.marka_alt_etiketi.set_text(self.aktif_kullanici or "")
-        self.dil_dugmesi.set_label("TR" if self.dil == "en" else "EN")
         self.tema_dugmesi.set_label(m["tema_acik"] if self.gorunum == "dark" else m["tema_koyu"])
         self.slogan_etiketi.set_text(m["slogan"])
         self.mod_baslik_etiketi.set_text(m["mod_secim_basligi"])
@@ -1105,10 +1110,7 @@ class PoligonPenceresi(Gtk.Window):
         self.katil_dugmesi.set_sensitive(True)
 
     def _gorev_yok_hatasi(self):
-        self.baglanti_durum_etiketi.set_text(
-            "Öğretmen henüz bir görev açmadı" if self.dil == "tr"
-            else "The teacher hasn't opened a task yet"
-        )
+        self.baglanti_durum_etiketi.set_text(METIN[self.dil]["hata_gorev_yok"])
         self.katil_dugmesi.set_sensitive(True)
 
     def _katilma_hatasi(self):

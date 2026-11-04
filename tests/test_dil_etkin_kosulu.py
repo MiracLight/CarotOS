@@ -37,10 +37,11 @@ UYGULAMALAR = {
     "poligon-ogretmen": "poligon/ogretmen_uygulama.py",
     "filenor": "filenor/filenor_uygulama.py",
 }
-BAGLI_DEGIL_SIMDILIK = {"poligon-ogrenci", "poligon-ogretmen"}   # bkz. docs/CEVIRI.md
-# Filenor ortak katmana filenor_dil uzerinden baglanir (etkin_diller ile dil seciciyi kurar)
+BAGLI_DEGIL_SIMDILIK = set()   # bkz. docs/CEVIRI.md
+# Filenor ve Poligon ortak katmana kendi koprulerinden baglanir (filenor_dil / poligon/dil_koprusu)
 _BAGLANTI = re.compile(r"^\s*import dil( as \w+)?\b|^\s*from dil import"
-                       r"|^\s*from filenor_dil import[^\n]*\betkin_diller\b", re.M)
+                       r"|^\s*from filenor_dil import[^\n]*\betkin_diller\b"
+                       r"|^\s*import dil_koprusu\b", re.M)
 
 
 def etkin_diller():

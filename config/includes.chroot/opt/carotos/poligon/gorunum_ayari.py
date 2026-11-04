@@ -49,6 +49,24 @@ def gorunum_yaz(gorunum: str) -> None:
         pass
 
 
+def dil_oku() -> str | None:
+    """Kayitli arayuz dili kodu (gecerliligini cagiran denetler); yoksa None."""
+    kod = _oku().get("dil")
+    return kod if isinstance(kod, str) and kod else None
+
+
+def dil_yaz(kod: str) -> None:
+    """Sessizce basarisiz olur: ayar yazilamazsa uygulama yine calisir."""
+    veri = _oku()
+    veri["dil"] = kod
+    try:
+        yol = _ayar_dosyasi()
+        yol.parent.mkdir(parents=True, exist_ok=True)
+        yol.write_text(json.dumps(veri, ensure_ascii=False), encoding="utf-8")
+    except OSError:
+        pass
+
+
 def logo_bul(rol: str) -> str | None:
     """rol: 'ogrenci' ya da 'ogretmen'. ISO'da /usr/share/..., depodan
     calistirilirsa includes.chroot/usr/share/... altindaki ikon."""

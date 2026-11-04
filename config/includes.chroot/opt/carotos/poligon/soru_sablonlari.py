@@ -18,6 +18,8 @@ from __future__ import annotations
 
 import random
 
+import dil_koprusu as _dk
+
 # Her arac: baslik + alan listesi. Alan turleri:
 #   "aralik" -> "lo-hi" metni, [lo, hi] listesine cevrilir
 #   "sayi"   -> tam sayi (min/max arasina kistirilir)
@@ -259,6 +261,7 @@ SABLONLAR: dict = {
         ],
     },
 }
+SABLONLAR = _dk.zengin(SABLONLAR)   # baslik/etiket her dilde [kod] ile okunur
 
 
 def _varyant_alanlarini_ekle() -> None:

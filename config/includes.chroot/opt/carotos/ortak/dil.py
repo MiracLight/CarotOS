@@ -200,3 +200,53 @@ def zenginlestir(veri):
     if isinstance(veri, tuple):
         return tuple(zenginlestir(v) for v in veri)
     return veri
+
+
+class _DilTablosu:
+    """METIN[kod] sonucu: `[anahtar]` o dilde metni verir (dil dosyasi, en, tr yedegiyle)."""
+
+    def __init__(self, tablo, kod, dizin=None):
+        self._t, self._kod, self._dizin = tablo, kod, dizin
+
+    def __getitem__(self, anahtar):
+        dogrudan = self._t.get(self._kod, {}).get(anahtar)
+        if dogrudan is not None and not isinstance(dogrudan, str):
+            return dogrudan                       # liste/sayi gibi cevrilmeyen degerler oldugu gibi
+        sozluk = {k: v[anahtar] for k, v in self._t.items()
+                  if isinstance(v.get(anahtar), str)}
+        if not sozluk:
+            if any(anahtar in v for v in self._t.values()):
+                for v in self._t.values():
+                    if anahtar in v:
+                        return v[anahtar]
+            raise KeyError(anahtar)
+        return metin(sozluk, self._kod, anahtar, self._dizin)
+
+    def get(self, anahtar, varsayilan=None):
+        try:
+            return self[anahtar]
+        except KeyError:
+            return varsayilan
+
+    def __contains__(self, anahtar):
+        return any(anahtar in v for v in self._t.values())
+
+    def keys(self):
+        return set().union(*[set(v) for v in self._t.values()])
+
+
+class DilOnce:
+    """{"tr": {anahtar: metin}, "en": {...}} (dil-once) tablosunu her dil icin guvenli
+    `METIN[kod][anahtar]` yapar. Var olan cagri yerleri degismez; bilinmeyen anahtar yine
+    KeyError verir (gercek hatayi gizlemez), eksik DIL ise yedege duser."""
+
+    def __init__(self, tablo, dizin=None):
+        self._t, self._dizin = tablo, dizin
+
+    def __getitem__(self, kod):
+        return _DilTablosu(self._t, kod, self._dizin)
+
+
+def dil_once(tablo, dizin=None):
+    """DilOnce kisayolu (bkz. sinif)."""
+    return DilOnce(tablo, dizin)

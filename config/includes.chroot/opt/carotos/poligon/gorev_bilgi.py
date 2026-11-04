@@ -14,6 +14,8 @@ gorevler/ klasöründeki her görevin burada iki dilde tanımlı olduğunu denet
 
 from __future__ import annotations
 
+import dil_koprusu as _dk
+
 BILGI: dict = {
     "nmap-01": {
         "tr": {
@@ -269,13 +271,26 @@ BILGI: dict = {
     },
 }
 
-ALAN_ETIKETLERI = {
+ALAN_ETIKETLERI = _dk.dil_once({
     "tr": {"amac": "Amaç", "kazanim": "Kazanım", "kullanim": "Kullanım alanı"},
     "en": {"amac": "Purpose", "kazanim": "What it teaches", "kullanim": "Where it is used"},
-}
+})
 
 
-CESITLILIK_ETIKETI = {"tr": "Soru çeşitliliği", "en": "Question variety"}
+CESITLILIK_ETIKETI = _dk.zengin({"tr": "Soru çeşitliliği", "en": "Question variety"})
+
+_CESITLI_COK = {
+    "tr": ("{n} farklı soru. Görevi her atadığınızda bilgisayar henüz çıkmamış birini seçer; "
+           "sınıfın tamamı aynı soruyu çözer, her öğrencinin verisi (IP, dosya, bayrak) "
+           "ayrı üretilir."),
+    "en": ("{n} different questions. Each time you assign the task the computer picks "
+           "one that has not come up yet; the whole class gets the same question, "
+           "while each student's data (IPs, files, flags) is generated separately.")}
+_CESITLI_TEK = {
+    "tr": ("Tek soru türü, sınıfta herkes için aynı; her öğrencinin verisi (IP, dosya, bayrak) "
+           "ayrı üretilir."),
+    "en": ("A single question type, the same for the whole class; each student's data "
+           "(IPs, files, flags) is generated separately.")}
 
 
 def cesitlilik_getir(gorev_id: str, dil: str) -> str:
@@ -283,18 +298,8 @@ def cesitlilik_getir(gorev_id: str, dil: str) -> str:
     import varyantlar
     n = varyantlar.gorev_varyant_sayisi(gorev_id)
     if n > 1:
-        if dil == "en":
-            return (f"{n} different questions. Each time you assign the task the computer picks "
-                    f"one that has not come up yet; the whole class gets the same question, "
-                    f"while each student's data (IPs, files, flags) is generated separately.")
-        return (f"{n} farklı soru. Görevi her atadığınızda bilgisayar henüz çıkmamış birini seçer; "
-                f"sınıfın tamamı aynı soruyu çözer, her öğrencinin verisi (IP, dosya, bayrak) "
-                f"ayrı üretilir.")
-    if dil == "en":
-        return ("A single question type, the same for the whole class; each student's data "
-                "(IPs, files, flags) is generated separately.")
-    return ("Tek soru türü, sınıfta herkes için aynı; her öğrencinin verisi (IP, dosya, bayrak) "
-            "ayrı üretilir.")
+        return _dk.T(_CESITLI_COK, dil, n=n)
+    return _dk.sec(_CESITLI_TEK, dil)
 
 
 def bilgi_getir(gorev_id: str, dil: str) -> dict | None:
@@ -302,4 +307,9 @@ def bilgi_getir(gorev_id: str, dil: str) -> dict | None:
     kayit = BILGI.get(gorev_id)
     if not kayit:
         return None
-    return kayit.get(dil) or kayit.get("tr")
+    if dil in ("tr", "en"):
+        return kayit.get(dil) or kayit.get("tr")
+    # diger diller: her alan, Ingilizce metin uzerinden dil dosyasindan cevrilir (yoksa en/tr)
+    tr, en = kayit.get("tr", {}), kayit.get("en", {})
+    return {alan: _dk.sec({"tr": tr.get(alan, ""), "en": en.get(alan, "")}, dil)
+            for alan in set(tr) | set(en)}

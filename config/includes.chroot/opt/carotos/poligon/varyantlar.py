@@ -21,6 +21,8 @@ import json
 import random
 from pathlib import Path
 
+import dil_koprusu as _dk
+
 _RNG = random.SystemRandom()
 
 GOREVLER_DIZINI = Path(__file__).resolve().parent / "gorevler"
@@ -97,7 +99,7 @@ def gorev_varyant_sec(gorev_id: str, zorluk: str | None = None, kullanilmis=()) 
 
 def _metin(v: dict, alan: str, dil: str) -> str:
     d = v.get(alan) or {}
-    return d.get(dil) or d.get("tr", "")
+    return _dk.sec(d, dil) if d else ""
 
 
 def gorev_varyant_aciklamasi(gorev_id: str, no: int, dil: str = "tr") -> str:

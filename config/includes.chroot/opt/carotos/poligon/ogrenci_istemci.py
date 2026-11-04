@@ -39,6 +39,7 @@ from servisler.sahte_web import SahteWebServisi
 from servisler.sahte_trafik import SahteTrafik  # noqa: E402
 from servisler.sahte_savunma_hedefi import BasitDinleyici  # noqa: E402
 import gecmis_defteri  # noqa: E402
+import dil_koprusu as _dk  # noqa: E402
 from tuzak_laboratuvari import TuzakLab  # noqa: E402
 import uretilen_gorevler  # noqa: E402
 
@@ -106,6 +107,19 @@ def sudo_ile_calistir(komut: list[str], parola: str, zaman_asimi: float = 10) ->
         return False, "", "'sudo' bulunamadı"
     except subprocess.TimeoutExpired:
         return False, "", "komut zaman aşımına uğradı"
+
+
+_TUZAK_MESAJ = {
+    "calismiyor": {"tr": "Laboratuvar çalışmıyor.", "en": "The lab is not running."},
+    "durmus": {"tr": "Laboratuvar durmuş; görevi yeniden başlat.",
+               "en": "The lab has stopped; restart the task."},
+    "bulundu": {"tr": "CarotPot kayıtlarında bulundu: {ozet}",
+                "en": "Found in the CarotPot records: {ozet}"},
+    "yetersiz": {"tr": ("Henüz yeterli kayıt yok ({ozet}). Tuzaklara "
+                        "'{kullanici}' kullanıcı adıyla giriş dene."),
+                 "en": ("Not enough records yet ({ozet}). Try logging in to the "
+                        "traps as '{kullanici}'.")},
+}
 
 
 class PoligonIstemci:
@@ -235,7 +249,7 @@ class PoligonIstemci:
         değilse None döner -> arayüz görevin temel ipucunu kullanır."""
         ip = self._zorluk_parametreleri().get("ipucu")
         if isinstance(ip, dict):
-            return ip.get(dil) or ip.get("tr")
+            return _dk.sec(ip, dil)
         return None
 
     def gorevi_yukle(self, gorev_id: str) -> dict:
@@ -243,7 +257,7 @@ class PoligonIstemci:
         if not yol.exists():
             # test/demo amaçlı: şablon dosyayı da kabul et
             yol = GOREVLER_DIZINI / "sablon-ve-ornek.json"
-        self.gorev = json.loads(yol.read_text(encoding="utf-8"))
+        self.gorev = _dk.zengin(json.loads(yol.read_text(encoding="utf-8")))
         return self.gorev
 
     def gorevi_baslat(self) -> None:
@@ -481,11 +495,9 @@ class PoligonIstemci:
         (basarili, mesaj) döner. Cevap ağa gitmez, kayıtlar yerel okunur."""
         lab = self._servis
         if not isinstance(lab, TuzakLab) or not self.tuzak_kullanici:
-            return False, ("Laboratuvar çalışmıyor." if dil == "tr"
-                           else "The lab is not running.")
+            return False, _dk.sec(_TUZAK_MESAJ["calismiyor"], dil)
         if not lab.calisiyor_mu():
-            return False, ("Laboratuvar durmuş; görevi yeniden başlat." if dil == "tr"
-                           else "The lab has stopped; restart the task.")
+            return False, _dk.sec(_TUZAK_MESAJ["durmus"], dil)
         sayim = {ad: 0 for ad in lab.hizmetler}
         for o in lab.olaylar(tur="giris", kullanici=self.tuzak_kullanici):
             if o["hizmet"] in sayim:
@@ -495,14 +507,9 @@ class PoligonIstemci:
         if all(n >= self.tuzak_gerekli for n in sayim.values()):
             gecen_sure = int(time.time() - (self._baslangic_zamani or time.time()))
             self._otomatik_tamamla(gecen_sure, ozet)
-            return True, (f"CarotPot kayıtlarında bulundu: {ozet}" if dil == "tr"
-                          else f"Found in the CarotPot records: {ozet}")
+            return True, _dk.T(_TUZAK_MESAJ["bulundu"], dil, ozet=ozet)
         self._bildir("yanlis_denedi", cevap=ozet)
-        return False, (f"Henüz yeterli kayıt yok ({ozet}). Tuzaklara "
-                       f"'{self.tuzak_kullanici}' kullanıcı adıyla giriş dene."
-                       if dil == "tr" else
-                       f"Not enough records yet ({ozet}). Try logging in to the "
-                       f"traps as '{self.tuzak_kullanici}'.")
+        return False, _dk.T(_TUZAK_MESAJ["yetersiz"], dil, ozet=ozet, kullanici=self.tuzak_kullanici)
 
     # ------------------------------------------------------------------
     # Öğretmen sunucusuyla iletişim

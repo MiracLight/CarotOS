@@ -55,6 +55,15 @@ def dosyalari_tara():
     return sorted(sonuc)
 
 
+def _dil_once_ciftleri(tr_sozluk, en_sozluk):
+    """Iki ast.Dict'te ortak anahtarlarin (tr_metin, en_metin) ciftleri; yalniz duz metin degerler."""
+    def duz(d):
+        return {k.value: v.value for k, v in zip(d.keys, d.values)
+                if isinstance(k, ast.Constant) and isinstance(k.value, str) and _sabit(v)}
+    tr_d, en_d = duz(tr_sozluk), duz(en_sozluk)
+    return [(tr_d[k], en_d[k]) for k in tr_d if k in en_d and en_d[k].strip()]
+
+
 def cikar():
     """Kaynak taramasi. Dondurur: (metinler, dinamik)
     metinler: {en_metin: {"tr": {tr_metinler}, "yer": {goreli dosyalar}}}
@@ -74,6 +83,12 @@ def cikar():
                 if "tr" in anahtar and "en" in anahtar:
                     if _sabit(anahtar["tr"]) and _sabit(anahtar["en"]):
                         tr, en = anahtar["tr"].value, anahtar["en"].value
+                    elif isinstance(anahtar["tr"], ast.Dict) and isinstance(anahtar["en"], ast.Dict):
+                        # dil-once tablo (Poligon METIN = {"tr": {k: ..}, "en": {k: ..}}): ayni anahtarlar eslenir
+                        for tr_k, en_k in _dil_once_ciftleri(anahtar["tr"], anahtar["en"]):
+                            kayit = metinler.setdefault(en_k, {"tr": set(), "yer": set()})
+                            kayit["tr"].add(tr_k)
+                            kayit["yer"].add(rel)
                     else:
                         dinamik.append((rel, dugum.lineno))
             elif (isinstance(dugum, ast.Call) and isinstance(dugum.func, ast.Name) and dugum.func.id == "T"
