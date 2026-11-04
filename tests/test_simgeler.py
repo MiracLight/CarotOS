@@ -28,7 +28,8 @@ BOYUTLAR = (16, 22, 24, 32, 48, 64, 128, 256)
 
 # kaynak adi -> scalable dosya adi (varsa)
 SCALABLE = {"filenor": "filenor", "former": "carotos-former", "gsd": "carotos-gsd",
-            "saglik": "carotos-health", "magaza": "carotos-magaza"}
+            "saglik": "carotos-health", "magaza": "carotos-magaza", "usb": "carotos-usb-check"}
+GEREKLI_KAYNAKLAR = {"filenor", "former", "gsd", "saglik", "magaza", "carotene", "carotpot", "usb", "poligon-ogrenci"}
 YASAK_ETIKET = {"linearGradient", "radialGradient", "filter", "feGaussianBlur", "feDropShadow",
                 "feOffset", "mask", "image", "style", "script", "foreignObject", "text"}
 
@@ -47,9 +48,9 @@ class KaynakSvgTesti(unittest.TestCase):
     def kaynaklar(self):
         return sorted(f for f in os.listdir(KAYNAK) if f.endswith(".svg"))
 
-    def test_yedi_kaynak_var(self):
-        self.assertEqual({f[:-4] for f in self.kaynaklar()},
-                         {"filenor", "former", "gsd", "saglik", "magaza", "carotene", "carotpot"})
+    def test_gerekli_kaynaklar_var(self):
+        # Yeni simge eklenebilir (panel, poligon-ogretmen...); onaylananlar eksik olmamali.
+        self.assertLessEqual(GEREKLI_KAYNAKLAR, {f[:-4] for f in self.kaynaklar()})
 
     def test_gecerli_xml_256_ve_duz_dil(self):
         for ad in self.kaynaklar():
@@ -74,8 +75,8 @@ class UretilenDosyalarTesti(unittest.TestCase):
                 yol = os.path.join(HICOLOR, f"{b}x{b}", "apps", ad + ".png")
                 self.assertEqual(png_boyut(oku(yol)), (b, b), yol)
 
-    def test_256_png_saglik_ve_magaza(self):
-        for ad in ("carotos-health", "carotos-magaza"):
+    def test_256_png_saglik_magaza_usb_poligon(self):
+        for ad in ("carotos-health", "carotos-magaza", "carotos-usb-check", "carotos-poligon-ogrenci"):
             yol = os.path.join(HICOLOR, "256x256", "apps", ad + ".png")
             self.assertEqual(png_boyut(oku(yol)), (256, 256), yol)
 
@@ -100,7 +101,8 @@ class UretilenDosyalarTesti(unittest.TestCase):
     def test_desktop_dosyalari_hala_ayni_simge_adini_kullanir(self):
         beklenen = {"carotos-carotene": "carotene", "carotos-carotpot": "carotpot", "carotos-filenor": "filenor",
                     "carotos-former": "carotos-former", "carotos-gsd": "carotos-gsd",
-                    "carotos-health": "carotos-health", "carotos-magaza": "carotos-magaza"}
+                    "carotos-health": "carotos-health", "carotos-magaza": "carotos-magaza",
+                    "carotos-usb-check": "carotos-usb-check", "carotos-poligon-ogrenci": "carotos-poligon-ogrenci"}
         for dosya, simge in beklenen.items():
             icerik = oku(os.path.join(INC, "usr", "share", "applications", dosya + ".desktop"), "r")
             self.assertIn(f"\nIcon={simge}", icerik.replace("\r\n", "\n"), dosya)
