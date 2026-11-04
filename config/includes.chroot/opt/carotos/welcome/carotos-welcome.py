@@ -11,7 +11,7 @@ Kullanım:
 
 import gi
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk, Gdk, GdkPixbuf, GLib
+from gi.repository import Gtk, Gdk, GdkPixbuf, GLib, Pango
 
 import json
 import shutil
@@ -129,6 +129,73 @@ PAGES = [
             "tr": "Masaüstünüz için bir arka plan seçin",
             "en": "Choose a background for your desktop",
         },
+    },
+    {
+        "id": "network",
+        "title": {"tr": "Ağ ve gizlilik", "en": "Network and privacy"},
+        "subtitle": {
+            "tr": "Ortak ağlarda adresin ve adın korunur",
+            "en": "Your address and name are protected on shared networks",
+        },
+        "body": [
+            ("p", {
+                "tr": "Kafe, okul ya da yurt gibi ortak ağlarda bilgisayarının donanım "
+                      "adresi (MAC) ve adı ağdaki herkese görünebilir. CarotOS bunu "
+                      "azaltacak şekilde ayarlıdır:",
+                "en": "On shared networks such as cafés, schools or dorms, your "
+                      "computer's hardware address (MAC) and name can be visible to "
+                      "everyone on the network. CarotOS is set up to reduce this:",
+            }),
+            ("bullets", [
+                {"tr": "Her ağ için farklı bir sahte donanım adresi kullanılır; aynı "
+                       "ağda hep aynı kalır, böylece giriş sayfaları bozulmaz.",
+                 "en": "A different fake hardware address is used for each network. "
+                       "It stays the same on the same network, so login pages keep "
+                       "working."},
+                {"tr": "Bir ağa katılırken bilgisayarının adı yayınlanmaz.",
+                 "en": "Your computer's name is not announced when joining a network."},
+                {"tr": "IPv6'da giden bağlantılar için geçici adresler tercih edilir.",
+                 "en": "Temporary addresses are preferred for outgoing IPv6 connections."},
+                {"tr": "Takas önce RAM'de sıkıştırılmış (zram) tutulur. Kurulumda disk "
+                       "takası da oluştuysa, zram dolunca o yedek olarak kullanılır.",
+                 "en": "Swap goes to compressed RAM (zram) first. If the installer "
+                       "also created a disk swap, it is used as overflow once zram "
+                       "is full."},
+            ]),
+            ("p", {
+                "tr": "Bazı ağlar (bazı yurt, otel ve ev modemleri) yalnızca kayıtlı "
+                      "donanım adreslerine izin verir. Böyle bir ağa bağlanamıyorsan o "
+                      "bağlantı için gerçek adresi seç. Kablosuz ağ için:",
+                "en": "Some networks (certain dorms, hotels and home routers) only "
+                      "allow registered hardware addresses. If you cannot connect to "
+                      "such a network, choose the real address for that connection. "
+                      "For a wireless network:",
+            }),
+            ("code", 'nmcli connection modify "AĞ ADI" wifi.cloned-mac-address permanent'),
+            ("p", {
+                "tr": "Kablolu bağlantı için:",
+                "en": "For a wired connection:",
+            }),
+            ("code", 'nmcli connection modify "AĞ ADI" ethernet.cloned-mac-address permanent'),
+            ("p", {
+                "tr": "Ardından ağdan çıkıp yeniden bağlan. Dilersen aynı ayarı ağ "
+                      "simgesine sağ tıklayıp Bağlantıları Düzenle (Edit Connections) "
+                      "penceresinde, ağını seçip “Cloned MAC address” alanında "
+                      "Permanent seçerek de yapabilirsin.",
+                "en": "Then disconnect and reconnect. You can also make the same "
+                      "change by right-clicking the network icon, choosing Edit "
+                      "Connections, selecting your network and setting “Cloned MAC "
+                      "address” to Permanent.",
+            }),
+            ("note", {
+                "tr": "Bu ayar yalnızca o bağlantıyı etkiler; diğer ağlarda koruma "
+                      "açık kalır. Bu önlemler bir gizlilik azaltıcıdır, tam "
+                      "gizlilik garantisi vermez.",
+                "en": "This setting only affects that one connection; protection "
+                      "stays on for other networks. These measures reduce exposure; "
+                      "they do not guarantee full privacy.",
+            }),
+        ],
     },
     {
         "id": "linux",
@@ -1762,6 +1829,8 @@ class WelcomeWindow(Gtk.Window):
         if kind == "code":
             label = Gtk.Label(label=payload, xalign=0.0)
             label.set_selectable(True)
+            label.set_line_wrap(True)                 # uzun komutlar kutudan tasmasin
+            label.set_line_wrap_mode(Pango.WrapMode.CHAR)
             label.get_style_context().add_class("code-text")
             box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
             box.get_style_context().add_class("code-box")
