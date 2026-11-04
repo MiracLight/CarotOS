@@ -9,6 +9,61 @@ diliyle kurulur. Boylece motor dilden bagimsiz kalir, testler kodu dener.
 from __future__ import annotations
 
 import os
+import sys
+
+# Ortak dil katmani (ortak/dil.py): 9 dil icin ceviri dosyalarindan metin. Filenor tek basina
+# (ortak/ olmadan) calisirsa yalniz tr/en bilinir; burasi onu sessizce karsilar.
+try:
+    import dil as _dil
+except ImportError:
+    _ORTAK = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ortak")
+    if os.path.isdir(_ORTAK) and _ORTAK not in sys.path:
+        sys.path.insert(0, _ORTAK)
+    try:
+        import dil as _dil
+    except ImportError:
+        _dil = None
+
+
+def sec(sozluk, kod: str) -> str:
+    """{"tr","en",..} sozlugunden `kod` dilindeki metin; yoksa dil dosyasi, en, tr siralamasiyla."""
+    if _dil is not None:
+        return _dil.metin(sozluk, kod)
+    return sozluk.get(kod) or sozluk.get("en") or sozluk.get("tr", "")
+
+
+def T(sozluk, kod: str, **kw) -> str:
+    """sec() + str.format; bozuk ceviri yer tutucusunda Ingilizce/Turkce metne duser, istisna atmaz."""
+    if _dil is not None:
+        return _dil.T(sozluk, kod, None, **kw)
+    sablon = sec(sozluk, kod)
+    try:
+        return sablon.format(**kw)
+    except (KeyError, IndexError, ValueError):
+        return sablon
+
+
+def zengin(veri):
+    """Ic ice {"tr","en"} sozluklerini `[kod]` ile her dilde guvenle okunur yapar."""
+    return _dil.zenginlestir(veri) if _dil is not None else veri
+
+
+def etkin_diller():
+    """Dil seciciye girecek [(kod, ad, taslak_mi)]; ortak katman yoksa yalniz tr/en."""
+    if _dil is not None:
+        return _dil.etkin_diller()
+    return [("tr", "Türkçe", False), ("en", "English", False)]
+
+
+def gecerli_dil(kod: str):
+    """Ayardaki dil seciciye girebiliyorsa kod, degilse None."""
+    return kod if kod in {k for k, _, _ in etkin_diller()} else None
+
+
+def varsayilan_dil():
+    """Sistem dilinden ilk acilis dili (ortak katman yoksa None)."""
+    return _dil.varsayilan_dil() if _dil is not None else None
+
 
 MESAJ = {
     "ayni_bicim": {
@@ -109,20 +164,26 @@ _WINGET_KIMLIK = {
 }
 
 
+_WINGET_IPUCU = {
+    "tr": "Kurulum: winget install {k} (ya da Ayarlar'daki Kur düğmesi)",
+    "en": "Install: winget install {k} (or the Install button in Settings)"}
+_WINDOWS_YOK = {
+    "tr": "Bu Filenor sürümünde yok; en son sürümü indirin",
+    "en": "Not included in this Filenor build; download the latest release"}
+
+
 def ipucu_al(arac: str, dil: str = "tr") -> str:
     """Eksik arac icin kurulum ipucu; isletim sistemine gore (apt komutu / winget kimligi)."""
     if os.name == "nt":
         if arac in _WINGET_KIMLIK:
             k = _WINGET_KIMLIK[arac]
-            return (f"Kurulum: winget install {k} (ya da Ayarlar'daki Kur düğmesi)" if dil == "tr"
-                    else f"Install: winget install {k} (or the Install button in Settings)")
+            return T(_WINGET_IPUCU, dil, k=k)
         if arac in ("avif", "webp"):
             pass
         elif arac in ARAC_IPUCU:
-            return ("Bu Filenor sürümünde yok; en son sürümü indirin" if dil == "tr"
-                    else "Not included in this Filenor build; download the latest release")
-    ip = ARAC_IPUCU.get(arac, {})
-    return ip.get(dil) or ip.get("tr", "")
+            return sec(_WINDOWS_YOK, dil)
+    ip = ARAC_IPUCU.get(arac)
+    return sec(ip, dil) if ip else ""
 
 
 class FilenorHata(Exception):
@@ -142,14 +203,19 @@ def hata_metni(h: "FilenorHata", dil: str = "tr") -> str:
     kayit = MESAJ.get(h.kod)
     if not kayit:
         return f"{h.kod}: {h.ayrinti}"
-    kalip = kayit.get(dil) or kayit["tr"]
+    kalip = sec(kayit, dil)
     d = dict(h.ayrinti)
     if h.kod == "arac_eksik":
         d["ipucu"] = ipucu_al(d.get("arac", ""), dil)
-    try:
-        return kalip.format(**d).strip()
-    except (KeyError, IndexError):
-        return kalip
+    # ceviri yer tutucuyu bozmussa Ingilizce, o da olmazsa Turkce metne dusulur
+    for aday in (kalip, kayit.get("en"), kayit.get("tr")):
+        if not aday:
+            continue
+        try:
+            return aday.format(**d).strip()
+        except (KeyError, IndexError, ValueError):
+            continue
+    return kalip
 
 
 def mesaj(kod: str, dil: str = "tr", **d) -> str:

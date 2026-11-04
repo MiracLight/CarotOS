@@ -44,6 +44,7 @@ import filenor_motor as M  # noqa: E402
 import filenor_kurulum as K  # noqa: E402
 import filenor_sistem as S  # noqa: E402
 from filenor_dil import FilenorHata, hata_metni  # noqa: E402
+from filenor_dil import T as _T, etkin_diller, gecerli_dil, sec, varsayilan_dil  # noqa: E402
 from filenor_metin import METIN  # noqa: E402
 
 APP_VERSION = "2.0"
@@ -79,6 +80,12 @@ SECENEK_TANIM = {
 
 
 def dil_varsayilan() -> str:
+    """Ilk acilis dili. Linux: sistem dili etkin bir dilse o (ortak/dil.py), degilse en.
+    Windows: sistem arayuz dili tr/en."""
+    if os.name != "nt" and not os.environ.get("FILENOR_DIL"):
+        kod = varsayilan_dil()
+        if kod:
+            return kod
     return S.sistem_dili()
 
 
@@ -366,7 +373,7 @@ class Panel:
         for anahtar, (etk, w, ipucu) in self._sec_w.items():
             etk.set_text(t("sec_" + anahtar))
             ip = METIN.get("sech_" + anahtar)
-            ipucu.set_text(ip[self.uyg.lang] if ip else "")
+            ipucu.set_text(sec(ip, self.uyg.lang) if ip else "")
             if hasattr(w, "_dugmeler"):
                 for k, d in w._dugmeler.items():
                     d.set_label(t(w._metinler[k]))
@@ -998,7 +1005,7 @@ class Uygulama(Gtk.Window):
     def __init__(self, dosyalar: list[str] | None = None, logo: str | None = None):
         super().__init__(title="Filenor")
         self.ayar = M.ayar_oku()
-        if self.ayar.get("dil") not in ("tr", "en"):
+        if gecerli_dil(self.ayar.get("dil")) is None:
             self.ayar["dil"] = dil_varsayilan()
         if self.ayar.get("tema") not in ("dark", "light"):
             self.ayar["tema"] = "dark"
@@ -1029,8 +1036,8 @@ class Uygulama(Gtk.Window):
         # sol alt: dil + görünüm (diğer uygulamalarla aynı yer)
         alt = Gtk.Box(spacing=8)
         self.dil_kutu = Gtk.ComboBoxText()
-        self.dil_kutu.append("tr", "Türkçe")
-        self.dil_kutu.append("en", "English")
+        for kod, ad, taslak in etkin_diller():
+            self.dil_kutu.append(kod, f"{ad} (beta)" if taslak else ad)
         self.dil_kutu.set_active_id(self.lang)
         self.dil_kutu.connect("changed", self.dil_degisti)
         alt.pack_start(self.dil_kutu, True, True, 0)
@@ -1060,8 +1067,7 @@ class Uygulama(Gtk.Window):
 
     # -- genel -------------------------------------------------------------------
     def t(self, anahtar, **kw):
-        m = METIN[anahtar][self.lang]
-        return m.format(**kw) if kw else m
+        return _T(METIN[anahtar], self.lang, **kw) if kw else sec(METIN[anahtar], self.lang)
 
     def ayar_kaydet(self):
         M.ayar_yaz(self.ayar)

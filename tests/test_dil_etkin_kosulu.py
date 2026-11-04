@@ -37,7 +37,7 @@ UYGULAMALAR = {
     "poligon-ogretmen": "poligon/ogretmen_uygulama.py",
     "filenor": "filenor/filenor_uygulama.py",
 }
-BAGLI_DEGIL_SIMDILIK = {"poligon-ogrenci", "poligon-ogretmen", "filenor"}   # bkz. docs/CEVIRI.md
+BAGLI_DEGIL_SIMDILIK = {"poligon-ogrenci", "poligon-ogretmen"}   # bkz. docs/CEVIRI.md
 _BAGLANTI = re.compile(r"^\s*import dil( as \w+)?\b|^\s*from dil import", re.M)
 
 

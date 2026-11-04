@@ -16,7 +16,7 @@ from typing import Optional
 
 import filenor_motor as M
 import filenor_sistem as S
-from filenor_dil import FilenorHata
+from filenor_dil import FilenorHata, zengin
 from filenor_motor import Oturum, Secenek, calistir, tur, uzanti
 
 # id -> tanım. UI bu tablodan Araçlar sayfasını kurar.
@@ -73,6 +73,7 @@ ARACLAR: dict[str, dict] = {
         "girdi": {"video", "ses"}, "min": 1, "sec": ["baslangic", "bitis", "kalite"], "gerekli": ["ffmpeg", "ffprobe"], "cikti": "",
     },
 }
+ARACLAR = zengin(ARACLAR)   # ad/ac her dilde [kod] ile okunur (dil dosyasi, en, tr yedegi)
 
 
 def arac_kullanilabilir(ad: str) -> list[str]:
