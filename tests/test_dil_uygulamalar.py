@@ -24,11 +24,28 @@ sys.path.insert(0, os.path.join(INC, "ortak"))
 
 EKRAN = bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
 
+# GLib kullanici klasorlerini ILK cagrida onbellege alir: sahte HOME surec basina
+# bir kez kurulur (sinif basina degil), testler arasi yalniz ayar klasoru temizlenir.
+_EV = None
+
+
+def _sahte_ev():
+    global _EV
+    if _EV is None:
+        _EV = tempfile.TemporaryDirectory()
+        os.environ["HOME"] = _EV.name
+        os.environ["XDG_CONFIG_HOME"] = os.path.join(_EV.name, ".config")
+        os.environ["XDG_DATA_HOME"] = os.path.join(_EV.name, ".local", "share")
+        import atexit
+        atexit.register(_EV.cleanup)
+    return _EV
+
 UYGULAMALAR = {
     "health": "health/carotos-health.py",
     "usb": "usb/carotos-usb-check.py",
     "magaza": "magaza/carotos-magaza.py",
     "carotene": "carotene/carotene.py",
+    "welcome": "welcome/carotos-welcome.py",
 }
 
 
@@ -36,6 +53,7 @@ UYGULAMALAR = {
 class UygulamaDilTabani(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        cls.ev = _sahte_ev()           # GTK/GLib iceri aktarilmadan ONCE (klasorleri onbellege alir)
         try:
             import gi
             gi.require_version("Gtk", "3.0")
@@ -45,11 +63,7 @@ class UygulamaDilTabani(unittest.TestCase):
         cls.Gtk, cls.GLib = Gtk, GLib
         import dil
         cls.dil = dil
-        cls.ev = tempfile.TemporaryDirectory()
         cls.diller = tempfile.mkdtemp()
-        os.environ["HOME"] = cls.ev.name
-        os.environ["XDG_CONFIG_HOME"] = os.path.join(cls.ev.name, ".config")
-        os.environ["XDG_DATA_HOME"] = os.path.join(cls.ev.name, ".local", "share")
         cls.eski_dizin = dil.DIZIN
         dil.DIZIN = cls.diller
         dil.onbellegi_temizle()
@@ -60,7 +74,9 @@ class UygulamaDilTabani(unittest.TestCase):
         cls.dil.DIZIN = cls.eski_dizin
         cls.dil.onbellegi_temizle()
         shutil.rmtree(cls.diller, True)
-        cls.ev.cleanup()
+
+    def setUp(self):
+        shutil.rmtree(os.environ["XDG_CONFIG_HOME"], ignore_errors=True)   # her test temiz ayarla baslar
 
     def modul(self, ad):
         if ad not in self.moduller:
@@ -225,6 +241,53 @@ class CaroteneTesti(UygulamaDilTabani):
         m = self.modul("carotene")
         self.ayar_yaz("carotene", "settings.json", {"lang": "klingon", "theme": "dark"})
         self.assertEqual(m.load_settings()["lang"], "en")
+
+
+class KarsilamaTesti(UygulamaDilTabani):
+    def _kardes_ayar_yolu(self, klasor):
+        return os.path.join(os.environ["XDG_CONFIG_HOME"], klasor, "settings.json")
+
+    def test_dokuz_dilde_tum_sayfalar(self):
+        m = self.modul("welcome")
+        pencere = m.WelcomeWindow(m.load_settings())
+        self.addCleanup(pencere.destroy)
+        for lang in self.dil.KODLAR:
+            pencere.lang = lang
+            pencere.rebuild()
+            for i in range(len(m.PAGES)):
+                pencere.index = i
+                pencere.refresh()
+                self.pompala()
+        pencere.lang = "tr"
+
+    def test_dil_kartlari_ve_secici_hazir_dilleri_gosterir(self):
+        m = self.modul("welcome")
+        pencere = m.WelcomeWindow(m.load_settings())
+        self.addCleanup(pencere.destroy)
+        self.assertEqual(sorted(pencere.lang_cards), ["en", "tr"])          # dosya yok: yalniz tr/en
+        self.dil_dosyasi("de", {"Next": "Weiter"})
+        self.dil_dosyasi("es", {"Next": "Siguiente"})
+        pencere2 = m.WelcomeWindow(m.load_settings())
+        self.addCleanup(pencere2.destroy)
+        self.assertEqual(sorted(pencere2.lang_cards), ["de", "en", "es", "tr"])
+        adlar = [r[0] for r in pencere2.lang_combo.get_model()]
+        self.assertEqual(adlar, ["Türkçe", "English", "Deutsch (beta)", "Español (beta)"])
+
+    def test_secilen_dil_kardes_uygulamalara_yazilir(self):
+        m = self.modul("welcome")
+        self.dil_dosyasi("de", {"Next": "Weiter"})
+        m.apply_sibling_settings("de", "dark")
+        for klasor, anahtar in (("carotos-panel", "language"), ("carotos-health", "lang"),
+                                ("carotos-usb", "lang"), ("carotos-former", "dil"),
+                                ("carotos-gsd", "dil")):
+            with open(self._kardes_ayar_yolu(klasor), encoding="utf-8") as f:
+                self.assertEqual(json.load(f)[anahtar], "de", klasor)
+
+    def test_bozuk_kayitli_dil(self):
+        m = self.modul("welcome")
+        yol = self.ayar_yaz("carotos-welcome", "settings.json", {"lang": "klingon", "theme": "dark"})
+        self.assertEqual(m.load_settings()["lang"], "en")
+        os.remove(yol)
 
 
 if __name__ == "__main__":

@@ -25,6 +25,7 @@ ORTAK = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
                      "ortak")
 if ORTAK not in sys.path:
     sys.path.insert(0, ORTAK)
+import dil  # noqa: E402  (ortak dil katmani: ortak/dil.py)
 import tema  # noqa: E402
 
 VURGU = "karsilama"                 # ortak/tema.py: marka mavisi
@@ -802,16 +803,9 @@ PAGES = [
 # ---------------------------------------------------------------------------
 
 def _varsayilan_dil():
-    """Ilk acilis dili: sistem dili Turkce ise 'tr', baska HERHANGI bir dilse
-    'en'. Sabit 'tr' yazmak, kurulumda baska dil secen kullanicinin
-    uygulamalari Turkce gormesine yol aciyordu. C/POSIX dil bilgisi
-    tasimaz, o yuzden atlanir. Kayitli bir ayar varsa o yine onceliklidir."""
-    import os
-    for degisken in ("LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE"):
-        deger = os.environ.get(degisken, "").strip()
-        if deger and deger not in ("C", "POSIX"):
-            return "tr" if deger.lower().startswith("tr") else "en"
-    return "en"
+    """Ilk acilis dili: sistem dili etkin (cevirisi hazir) bir dilse o, degilse
+    'en'. Kayitli bir ayar varsa o yine onceliklidir (bkz. ortak/dil.py)."""
+    return dil.varsayilan_dil()
 
 
 DEFAULTS = {"lang": _varsayilan_dil(), "theme": "dark", "show_on_startup": True,
@@ -859,6 +853,17 @@ LANG_CHANGED_NOTE = {
 
 UI.update(PICK_TEXTS)
 
+# tr/en sozlukleri her dil icin yedekli olur (eksik ceviri Ingilizceye duser)
+UI = dil.zenginlestir(UI)
+PAGES = dil.zenginlestir(PAGES)
+SCOPE_NOTE = dil.zenginlestir(SCOPE_NOTE)
+LANG_CHANGED_NOTE = dil.zenginlestir(LANG_CHANGED_NOTE)
+
+# Dil kartlarinin alt yazisi (kartin dilinin Ingilizce adi; tr/en eskisi gibi)
+DIL_ALT_ADI = {"tr": "Turkish", "en": "İngilizce", "de": "German", "ru": "Russian",
+               "es": "Spanish", "pt": "Portuguese", "ja": "Japanese", "zh": "Chinese",
+               "fr": "French"}
+
 
 def load_settings():
     data = dict(DEFAULTS)
@@ -871,6 +876,7 @@ def load_settings():
                     data[key] = stored[key]
     except (OSError, ValueError):
         pass
+    data["lang"] = dil.gecerli(data.get("lang"))     # bozuk/bilinmeyen kayitli dil -> en
     return data
 
 
@@ -1301,8 +1307,8 @@ class WelcomeWindow(Gtk.Window):
 
         # Sag taraf: dil ve tema secicileri
         self.lang_combo = Gtk.ComboBoxText()
-        self.lang_combo.append("tr", "Türkçe")
-        self.lang_combo.append("en", "English")
+        for kod, ad, taslak in dil.etkin_diller():       # yalniz cevirisi hazir diller
+            self.lang_combo.append(kod, dil.secici_adi(kod, ad, taslak))
         self.lang_combo.set_active_id(self.lang)
         self.lang_combo.connect("changed", self.on_lang_changed)
         box.pack_end(self.lang_combo, False, False, 0)
@@ -1418,17 +1424,20 @@ class WelcomeWindow(Gtk.Window):
         lang_title.set_margin_top(34)
         outer.pack_start(lang_title, False, False, 0)
 
-        lang_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=14)
-        lang_row.set_homogeneous(True)
+        # Cevirisi hazir her dil icin bir kart; uc sutunlu izgara (2 dilde eskisi gibi
+        # iki kart, daha cok dilde alt satirlara iner).
+        lang_row = Gtk.Grid(column_spacing=14, row_spacing=14)
+        lang_row.set_column_homogeneous(True)
         lang_row.set_margin_top(14)
         outer.pack_start(lang_row, False, False, 0)
 
         self.lang_cards = {}
-        for code, name, sub in (("tr", "Türkçe", "Turkish"),
-                                ("en", "English", "İngilizce")):
-            card = self._lang_card(code, name, sub)
+        etkin = dil.etkin_diller()
+        sutun = 2 if len(etkin) <= 2 else 3             # iki dilde eski gorunum
+        for sira, (code, name, taslak) in enumerate(etkin):
+            card = self._lang_card(code, name, DIL_ALT_ADI.get(code, ""))
             self.lang_cards[code] = card
-            lang_row.pack_start(card["event"], True, True, 0)
+            lang_row.attach(card["event"], sira % sutun, sira // sutun, 1, 1)
 
         # --- aciklama ---
         note = Gtk.Label(label=UI["apply_note"][self.lang], xalign=0.0)
