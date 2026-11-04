@@ -705,6 +705,14 @@ PAGES = [
                        "want to go a little deeper, at your own pace."},
                 ["python3", "/opt/carotos/former/carotos-former.py"],
             )),
+            ("action", (
+                {"tr": "Sözlüğü (GSD) aç", "en": "Open the Glossary (GSD)"},
+                {"tr": "Linux, ağ, siber güvenlik ve kriptografi terimlerinin kısa "
+                       "açıklamaları. Duyduğunuz bir kelimeyi hızlıca aramak için.",
+                 "en": "Short explanations of Linux, networking, cybersecurity and "
+                       "cryptography terms. For looking up a word you just heard."},
+                ["python3", "/opt/carotos/gsd/carotos-gsd.py"],
+            )),
             ("p", {
                 "tr": "CarotOS açık kaynaklıdır. Hata bildirebilir, öneride "
                       "bulunabilir veya katkı verebilirsiniz.",
@@ -823,6 +831,7 @@ SIBLING_CONFIGS = [
     ("carotos-health", "settings.json"),
     ("carotos-usb", "settings.json"),
     ("carotos-former", "settings.json"),
+    ("carotos-gsd", "settings.json"),
 ]
 
 # Koyu ve acik tema adaylari — sistemde bulunan ilki kullanilir.
@@ -1016,6 +1025,10 @@ def apply_sibling_settings(lang, theme):
             data["language"] = lang
         elif folder == "carotos-former":
             # Former dil/tema anahtarlarini "dil"/"tema" diye okur.
+            data["dil"] = lang
+            data["tema"] = theme
+        elif folder == "carotos-gsd":
+            # GSD de Former ile ayni "dil"/"tema" anahtarlarini kullanir.
             data["dil"] = lang
             data["tema"] = theme
         try:
