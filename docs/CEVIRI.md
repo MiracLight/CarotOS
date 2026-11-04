@@ -40,9 +40,22 @@ def T(key, lang, **kw): return dil.T(STRINGS.get(key), lang, key, **kw)
 # ayar:        self.lang = dil.gecerli(ayar["language"])
 ```
 
-Pilot: Güvenlik Paneli (`tests/test_dil_guvenlik_paneli.py`). Henüz bağlanmayanlar:
-Karşılama, Sistem Sağlığı, USB Denetimi, Mağaza, Carotene, CarotPot, Filenor,
-Former, GSD, Poligon (öğrenci+öğretmen).
+Bağlı uygulamalar (`tests/test_dil_guvenlik_paneli.py`, `tests/test_dil_uygulamalar.py`):
+Güvenlik Paneli, Sistem Sağlığı, USB Denetimi, Mağaza, Carotene, Karşılama, GSD,
+Former, CarotPot (arayüz). **Henüz bağlanmayanlar: Poligon (öğrenci + öğretmen) ve Filenor.**
+Poligon'un `METIN` yapısı dil-önce (`METIN[dil][anahtar]`) olduğundan ve ayrı depoda
+(CarotOS-Poligon) aynalandığından, Filenor da ayrı depoda ve Windows'ta tek başına
+çalıştığından ayrı iş olarak yapılır. **Bu ikisi bağlanmadan hiçbir dil dosyası
+etkinleştirilmez:** `tests/test_dil_etkin_kosulu.py` etkin bir dil varken bağlanmamış
+uygulama kalırsa kırmızı olur.
+
+Bilinen sınırlar: (1) Former'ın birleştirerek ürettiği metinler (`T(a + b, c + d)`)
+ve f-string ile çalışma anında kurulan sözlükler `tools/ceviri.py` taramasında
+görünmez; çevrilebilmeleri için sabit metne dönüştürülmeli ya da çalışma anı
+toplayıcısı eklenmelidir. (2) CarotPot bildirim metinleri (hizmet `python3 -I` ile
+çalıştığı için) henüz dil dosyalarından çevrilmez; tr/en dışında İngilizce gelir.
+(3) Karşılama'nın "Sistem dili" kartı yalnızca tr/en için oturum dilini (locale)
+değiştirir; diğer diller yalnızca CarotOS uygulamalarının dilini ayarlar.
 
 Çalışma anında üretilen metinler (f-string, birleştirme) `tools/ceviri.py` tarafından
 çıkarılamaz ("dinamik" sayılır): bunlar `dil.T(...)` ile yer tutuculu sözlüğe
