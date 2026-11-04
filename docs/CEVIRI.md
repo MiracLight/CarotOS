@@ -40,21 +40,23 @@ def T(key, lang, **kw): return dil.T(STRINGS.get(key), lang, key, **kw)
 # ayar:        self.lang = dil.gecerli(ayar["language"])
 ```
 
-Bağlı uygulamalar (`tests/test_dil_guvenlik_paneli.py`, `tests/test_dil_uygulamalar.py`):
-Güvenlik Paneli, Sistem Sağlığı, USB Denetimi, Mağaza, Carotene, Karşılama, GSD,
-Former, CarotPot (arayüz). **Henüz bağlanmayanlar: Poligon (öğrenci + öğretmen) ve Filenor.**
-Poligon'un `METIN` yapısı dil-önce (`METIN[dil][anahtar]`) olduğundan ve ayrı depoda
-(CarotOS-Poligon) aynalandığından, Filenor da ayrı depoda ve Windows'ta tek başına
-çalıştığından ayrı iş olarak yapılır. **Bu ikisi bağlanmadan hiçbir dil dosyası
-etkinleştirilmez:** `tests/test_dil_etkin_kosulu.py` etkin bir dil varken bağlanmamış
-uygulama kalırsa kırmızı olur.
+Bağlı uygulamalar (`tests/test_dil_guvenlik_paneli.py`, `tests/test_dil_uygulamalar.py`,
+`tests/test_filenor_dil.py`, `tests/test_poligon_dil.py`): Güvenlik Paneli, Sistem Sağlığı,
+USB Denetimi, Mağaza, Carotene, Karşılama, GSD, Former, CarotPot (arayüz), Poligon (öğrenci +
+öğretmen) ve Filenor. Poligon'un `METIN` yapısı dil-önce (`METIN[dil][anahtar]`) olduğundan
+`dil.dil_once()` ile sarılır (çağrı yerleri değişmez); görev/şablon verisi `zenginlestir`
+ile her dilde okunur. İkisi de ortak katmana kendi köprülerinden bağlanır
+(`poligon/dil_koprusu.py`, `filenor/filenor_dil.py`); `ortak/` yoksa (bağımsız depo)
+yalnız tr/en çalışır. Poligon'un seçtiği dil `~/.config/carotos-poligon/ayar.json`'a
+kaydedilir. `tests/test_dil_etkin_kosulu.py` etkin bir dil varken bağlanmamış uygulama
+kalırsa kırmızı olur. **Ayrı depolara (CarotOS-Poligon, filenor) aynalama henüz yapılmadı.**
 
 Bilinen sınırlar: (1) Former'ın birleştirerek ürettiği metinler (`T(a + b, c + d)`)
 ve f-string ile çalışma anında kurulan sözlükler `tools/ceviri.py` taramasında
 görünmez; çevrilebilmeleri için sabit metne dönüştürülmeli ya da çalışma anı
 toplayıcısı eklenmelidir. (2) CarotPot bildirim metinleri (hizmet `python3 -I` ile
 çalıştığı için) henüz dil dosyalarından çevrilmez; tr/en dışında İngilizce gelir.
-(3) Karşılama'nın "Sistem dili" kartı yalnızca tr/en için oturum dilini (locale)
+(3) Filenor komut satırı çıktıları yalnız tr/en'dir (CLI). (4) Karşılama'nın "Sistem dili" kartı yalnızca tr/en için oturum dilini (locale)
 değiştirir; diğer diller yalnızca CarotOS uygulamalarının dilini ayarlar.
 
 Çalışma anında üretilen metinler (f-string, birleştirme) `tools/ceviri.py` tarafından
