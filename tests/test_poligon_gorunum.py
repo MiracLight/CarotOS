@@ -96,7 +96,7 @@ class ArayuzDosyalari(unittest.TestCase):
             metin = None
             for dugum in agac.body:
                 if (isinstance(dugum, ast.Assign) and len(dugum.targets) == 1
-                        and getattr(dugum.targets[0], "id", "") == "METIN"):
+                        and getattr(dugum.targets[0], "id", "") == "_METIN_HAM"):   # METIN = dil_once(_METIN_HAM)
                     metin = ast.literal_eval(dugum.value)
             self.assertIsNotNone(metin, ad)
             self.assertEqual(set(metin["tr"]), set(metin["en"]),

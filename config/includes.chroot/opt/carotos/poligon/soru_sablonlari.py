@@ -275,8 +275,8 @@ def _varyant_alanlarini_ekle() -> None:
             continue
         sablon["alanlar"].append({
             "anahtar": "varyant",
-            "etiket": {"tr": f"Soru varyantı (0=bilgisayar seçsin, 1-{n})",
-                       "en": f"Question variant (0=computer picks, 1-{n})"},
+            "etiket": _dk.zengin({"tr": f"Soru varyantı (0=bilgisayar seçsin, 1-{n})",
+                                  "en": f"Question variant (0=computer picks, 1-{n})"}),
             "tur": "sayi", "min": 0, "max": n, "varsayilan": "0",
             "oneriler": ["0", "1", "2", "3", "4"],
         })

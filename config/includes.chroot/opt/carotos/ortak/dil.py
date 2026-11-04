@@ -234,6 +234,15 @@ class _DilTablosu:
     def keys(self):
         return set().union(*[set(v) for v in self._t.values()])
 
+    def __iter__(self):
+        return iter(sorted(self.keys()))
+
+    def __len__(self):
+        return len(self.keys())
+
+    def items(self):
+        return [(k, self[k]) for k in sorted(self.keys())]
+
 
 class DilOnce:
     """{"tr": {anahtar: metin}, "en": {...}} (dil-once) tablosunu her dil icin guvenli
