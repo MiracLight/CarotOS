@@ -18,20 +18,18 @@ import json
 import os
 import sys
 
+_ORTAK = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ortak")
+if _ORTAK not in sys.path:
+    sys.path.insert(0, _ORTAK)
+import dil  # noqa: E402  (ortak dil katmani: ortak/dil.py)
+
 CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".config", "carotos-panel")
 CONFIG_PATH = os.path.join(CONFIG_DIR, "settings.json")
 
 def _varsayilan_dil():
-    """Ilk acilis dili: sistem dili Turkce ise 'tr', baska HERHANGI bir dilse
-    'en'. Sabit 'tr' yazmak, kurulumda baska dil secen kullanicinin
-    uygulamalari Turkce gormesine yol aciyordu. C/POSIX dil bilgisi
-    tasimaz, o yuzden atlanir. Kayitli bir ayar varsa o yine onceliklidir."""
-    import os
-    for degisken in ("LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE"):
-        deger = os.environ.get(degisken, "").strip()
-        if deger and deger not in ("C", "POSIX"):
-            return "tr" if deger.lower().startswith("tr") else "en"
-    return "en"
+    """Ilk acilis dili: sistem dili etkin (cevirisi hazir) bir dilse o,
+    degilse 'en'. Kayitli bir ayar varsa o yine onceliklidir (bkz. ortak/dil.py)."""
+    return dil.varsayilan_dil()
 
 
 DEFAULT_SETTINGS = {"language": _varsayilan_dil(), "theme": "dark"}
@@ -136,9 +134,17 @@ STRINGS = {
 }
 
 
+STRINGS = dil.zenginlestir(STRINGS)     # tr/en sozlukleri her dil icin yedekli (ortak/dil.py)
+
+
 def T(key, lang, **kw):
-    text = STRINGS.get(key, {}).get(lang, key)
-    return text.format(**kw) if kw else text
+    return dil.T(STRINGS.get(key), lang, key, **kw)
+
+
+def _dil_secici_doldur(combo):
+    """Dil seciciyi cevirisi hazir dillerle doldurur (taslaklar '(beta)')."""
+    for kod, ad, taslak in dil.etkin_diller():
+        combo.append(kod, dil.secici_adi(kod, ad, taslak))
 
 
 def root_icin_guvenli_mi(values):
@@ -415,6 +421,7 @@ TOOLS = [
         "requires": [],
     },
 ]
+TOOLS = dil.zenginlestir(TOOLS)         # arac metinleri de her dil icin yedekli
 
 
 # ===========================================================================
@@ -754,8 +761,7 @@ class SettingsPage(Gtk.Box):
         self.lang_label = tema.etiket("", "soluk")
         grid.attach(self.lang_label, 0, 0, 1, 1)
         self.lang_combo = Gtk.ComboBoxText()
-        self.lang_combo.append("tr", "Türkçe")
-        self.lang_combo.append("en", "English")
+        _dil_secici_doldur(self.lang_combo)
         self.lang_combo.set_active_id(app.lang)
         self.lang_combo.connect("changed", self.on_lang)
         grid.attach(self.lang_combo, 1, 0, 1, 1)
@@ -864,7 +870,9 @@ class PanelApp(Gtk.Window):
     def __init__(self):
         super().__init__()
         self.settings = load_settings()
-        self.lang = self.settings["language"]
+        # Kayitli dil bilinmiyorsa (elle bozulmus ayar) Ingilizce; cevirisi
+        # henuz etkin olmayan bilinen bir dilde metinler yedekten (en) gelir.
+        self.lang = self.settings["language"] = dil.gecerli(self.settings["language"])
         self.theme = self.settings["theme"] if self.settings["theme"] in ("dark", "light") else "dark"
         self.accent = tema.VURGULAR[VURGU]
         self.aktif = None
@@ -895,8 +903,7 @@ class PanelApp(Gtk.Window):
 
         alt = Gtk.Box(spacing=8)
         self.lang_combo = Gtk.ComboBoxText()
-        self.lang_combo.append("tr", "Türkçe")
-        self.lang_combo.append("en", "English")
+        _dil_secici_doldur(self.lang_combo)
         self.lang_combo.set_active_id(self.lang)
         self.lang_combo.connect("changed", self._dil_degisti)
         alt.pack_start(self.lang_combo, True, True, 0)
@@ -973,9 +980,9 @@ class PanelApp(Gtk.Window):
 
     def retranslate(self):
         self.set_title(T("app_title", self.lang))
-        self.kabuk.marka_ayarla("CarotOS", {"tr": "Güvenlik paneli", "en": "Security panel"}[self.lang])
-        self.kabuk.bolum_metni("araclar", {"tr": "Araçlar", "en": "Tools"}[self.lang])
-        self.kabuk.bolum_metni("sistem", {"tr": "Sistem", "en": "System"}[self.lang])
+        self.kabuk.marka_ayarla("CarotOS", dil.metin({"tr": "Güvenlik paneli", "en": "Security panel"}, self.lang))
+        self.kabuk.bolum_metni("araclar", dil.metin({"tr": "Araçlar", "en": "Tools"}, self.lang))
+        self.kabuk.bolum_metni("sistem", dil.metin({"tr": "Sistem", "en": "System"}, self.lang))
         for tool in TOOLS:
             self.kabuk.menu_metni(tool["name"], tool["name"])
         self.kabuk.menu_metni("__settings__", T("settings", self.lang))

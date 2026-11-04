@@ -189,7 +189,9 @@ class PanelBaglantisiTesti(unittest.TestCase):
     def test_yalniz_baska_sisteme_dokunan_dort_arac_kapida(self):
         kapili = {}
         for dugum in _panel_agaci().body:
-            if isinstance(dugum, ast.Assign) and any(getattr(t, "id", "") == "TOOLS" for t in dugum.targets):
+            # TOOLS sonradan dil.zenginlestir(TOOLS) ile yeniden atanir; yalniz liste degerini al
+            if (isinstance(dugum, ast.Assign) and isinstance(dugum.value, ast.List)
+                    and any(getattr(t, "id", "") == "TOOLS" for t in dugum.targets)):
                 for arac in dugum.value.elts:
                     anahtarlar = {k.value: v for k, v in zip(arac.keys, arac.values)
                                   if isinstance(k, ast.Constant)}
@@ -209,7 +211,8 @@ class PanelBaglantisiTesti(unittest.TestCase):
     def test_metinler_iki_dilde_ve_yasa_atfi_yok(self):
         metinler = None
         for dugum in _panel_agaci().body:
-            if isinstance(dugum, ast.Assign) and any(getattr(t, "id", "") == "STRINGS" for t in dugum.targets):
+            if (isinstance(dugum, ast.Assign) and isinstance(dugum.value, ast.Dict)
+                    and any(getattr(t, "id", "") == "STRINGS" for t in dugum.targets)):
                 metinler = ast.literal_eval(dugum.value)
         etik = {k: v for k, v in metinler.items() if k.startswith("etik_")}
         self.assertGreaterEqual(len(etik), 8)
