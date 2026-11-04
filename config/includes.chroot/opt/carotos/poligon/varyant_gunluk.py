@@ -387,6 +387,13 @@ def _web_hint_ip_tablosu(bicim):
         "jq -r 'select(.status==404) | .ip' {dosya} | sort | uniq -c | sort -rn | head")
 
 
+def _web_ip_bul(bicim, tr_baglac, en_baglac, devam):
+    """(tr, en) ipucu: once 404 tablosundan IP'yi bulma adimi, sonra komut."""
+    tablo = _web_hint_ip_tablosu(bicim)
+    return (f"IP'yi bul ({tablo}); {tr_baglac}: {devam}",
+            f"Find the IP ({tablo}); {en_baglac}: {devam}")
+
+
 _WEB_IP = [
     ("ip_en_cok_404",
      ("En çok 404 (bulunamadı) yanıtı alan IP adresini yaz.",
@@ -404,17 +411,19 @@ _WEB_IP = [
     ("farkli_yol_top",
      ("En çok 404 alan IP adresi kaç FARKLI yolu denedi? Yalnızca sayıyı yaz.",
       "How many DIFFERENT paths did the IP with the most 404s try? Write only the number."),
-     lambda b: (f"IP'yi bul ({_web_hint_ip_tablosu(b)}); sonra: " + _web_komut(
+     lambda b: _web_ip_bul(b, "sonra", "then", _web_komut(
          b, "awk '$9==404 && $1==\"<IP>\" {print $7}' {dosya} | sort -u | wc -l",
-         "jq -r 'select(.status==404 and .ip==\"<IP>\") | .path' {dosya} | sort -u | wc -l"),) * 2),
+         "jq -r 'select(.status==404 and .ip==\"<IP>\") | .path' {dosya} | sort -u | wc -l"))),
     ("arac_adi",
      ("En çok 404 alan IP adresi hangi aracı kullanıyor? User-Agent'taki araç adını yaz (örn. Nikto).",
       "Which tool does the IP with the most 404s use? Write the tool name from its User-Agent (e.g. Nikto)."),
-     lambda b: (f"IP'yi bul ({_web_hint_ip_tablosu(b)}); sonra o IP'nin satırlarında User-Agent alanına bak: grep '<IP>' {{dosya}} | head -3",) * 2),
+     lambda b: _web_ip_bul(b, "sonra o IP'nin satırlarında User-Agent alanına bak",
+                           "then look at the User-Agent field in that IP's lines",
+                           "grep '<IP>' {dosya} | head -3")),
     ("ilk_zaman_top",
      ("En çok 404 alan IP adresinin İLK isteği saat kaçta? SS:DD:SN biçiminde yaz (örn. 14:03:09).",
       "At what time was the FIRST request of the IP with the most 404s? Write it as HH:MM:SS (e.g. 14:03:09)."),
-     lambda b: (f"IP'yi bul ({_web_hint_ip_tablosu(b)}); sonra: grep '<IP>' {{dosya}} | head -1",) * 2),
+     lambda b: _web_ip_bul(b, "sonra", "then", "grep '<IP>' {dosya} | head -1")),
     ("yol_en_cok_404",
      ("Tüm günlükte en çok 404 alan YOLU (örn. /admin) yaz.",
       "Write the PATH that received the most 404 responses in the whole log (e.g. /admin)."),
@@ -593,6 +602,11 @@ def _cp_komut(b, grep, jq):
     return grep if b == "carotpot" else jq
 
 
+def _cp_tablo_ipucu(tr_onek, en_onek, komut):
+    """(tr, en) ipucu: aciklayici onek dile gore, komut ayni."""
+    return (f"{tr_onek}: {komut}", f"{en_onek}: {komut}")
+
+
 _CP_GIRIS_KULLANICI = {
     "carotpot": "grep 'tur=giris' {dosya} | grep -oE '\"kullanici\": \"[^\"]+\"' | sort | uniq -c | sort -rn | head",
     "jsonl": "jq -r 'select(.tur==\"giris\") | .kullanici' {dosya} | sort | uniq -c | sort -rn | head",
@@ -604,7 +618,8 @@ _CP_KULLANICI = [
      lambda b: _CP_GIRIS_KULLANICI[b], True),
     ("en_cok_sayi", ("En çok denenen kullanıcı adı kaç kez denendi? Yalnızca sayıyı yaz.",
                      "How many times was the most-tried username tried? Write only the number."),
-     lambda b: "Tablonun ilk satırındaki sayı: " + _CP_GIRIS_KULLANICI[b], True),
+     lambda b: _cp_tablo_ipucu("Tablonun ilk satırındaki sayı", "The number on the table's first row",
+                               _CP_GIRIS_KULLANICI[b]), True),
     ("farkli_kullanici", ("Giriş denemelerinde kaç FARKLI kullanıcı adı denendi? Yalnızca sayıyı yaz.",
                           "How many DIFFERENT usernames were tried in login attempts? Write only the number."),
      lambda b: _CP_GIRIS_KULLANICI[b].split(" | sort | uniq")[0] + " | sort -u | wc -l", True),
@@ -625,7 +640,8 @@ _CP_KULLANICI = [
                          "jq -r 'select(.tur==\"giris\" and .hizmet==\"http\") | .tur' {dosya} | wc -l"), True),
     ("ikinci_kullanici", ("En çok denenen İKİNCİ kullanıcı adını yaz.",
                           "Write the SECOND most-tried username."),
-     lambda b: "Tablonun ikinci satırı: " + _CP_GIRIS_KULLANICI[b], True),
+     lambda b: _cp_tablo_ipucu("Tablonun ikinci satırı", "The table's second row",
+                               _CP_GIRIS_KULLANICI[b]), True),
     ("parola_en_cok", ("En çok denenen (maskeli) parolayı kayıttaki haliyle yaz (örn. p*******).",
                        "Write the most-tried (masked) password exactly as shown in the log (e.g. p*******)."),
      lambda b: _cp_komut(b, "grep 'tur=giris' {dosya} | grep -oE '\"parola\": \"[^\"]+\"' | sort | uniq -c | sort -rn | head",
@@ -645,14 +661,14 @@ _CP_TARAYICI = [
                          "jq -r '[.kaynak,.hizmet] | @tsv' {dosya} | sort -u | cut -f1 | sort | uniq -c | sort -rn | head"), True),
     ("hizmet_sayisi", ("En çok farklı hizmete dokunan kaynak kaç FARKLI hizmete dokundu? Yalnızca sayıyı yaz.",
                        "How many DIFFERENT services did the source touching the most services touch? Write only the number."),
-     lambda b: "Tablonun ilk satırındaki sayı: " + _cp_komut(
+     lambda b: _cp_tablo_ipucu("Tablonun ilk satırındaki sayı", "The number on the table's first row", _cp_komut(
          b, "grep -oE 'kaynak=[0-9.]+ hizmet=[a-z]+' {dosya} | sort -u | cut -d' ' -f1 | sort | uniq -c | sort -rn | head",
-         "jq -r '[.kaynak,.hizmet] | @tsv' {dosya} | sort -u | cut -f1 | sort | uniq -c | sort -rn | head"), True),
+         "jq -r '[.kaynak,.hizmet] | @tsv' {dosya} | sort -u | cut -f1 | sort | uniq -c | sort -rn | head")), True),
     ("hizmet_listesi", ("En çok farklı hizmete dokunan kaynağın dokunduğu hizmetleri alfabetik sırayla, virgülle ayırarak yaz (örn. ftp,http,ssh).",
                         "Write the services touched by the source touching the most services, alphabetically, comma-separated (e.g. ftp,http,ssh)."),
-     lambda b: "IP'yi bul; sonra: " + _cp_komut(
+     lambda b: _cp_tablo_ipucu("IP'yi bul; sonra", "Find the IP; then", _cp_komut(
          b, "grep 'kaynak=<IP> ' {dosya} | grep -oE 'hizmet=[a-z]+' | sort -u",
-         "jq -r 'select(.kaynak==\"<IP>\") | .hizmet' {dosya} | sort -u"), True),
+         "jq -r 'select(.kaynak==\"<IP>\") | .hizmet' {dosya} | sort -u")), True),
     ("tarama_olay_sayisi", ("Kayıtta kaç 'tarama' olayı var? Yalnızca sayıyı yaz.",
                             "How many 'tarama' (scan) events are in the log? Write only the number."),
      lambda b: _cp_komut(b, "grep -c 'tur=tarama' {dosya}", "jq -r 'select(.tur==\"tarama\") | .tur' {dosya} | wc -l"), True),
@@ -665,8 +681,11 @@ _CP_TARAYICI = [
      lambda b: _cp_komut(b, "grep -oE 'kaynak=[0-9.]+' {dosya} | sort -u | wc -l", "jq -r '.kaynak' {dosya} | sort -u | wc -l"), True),
     ("tarama_suresi", ("İlk 'tarama' olayı ile son 'tarama' olayı arasında kaç saniye var? Yalnızca sayıyı yaz.",
                        "How many seconds are there between the first and the last 'tarama' (scan) event? Write only the number."),
-     lambda b: _cp_komut(b, "grep 'tur=tarama' {dosya} | sed -n '1p;$p'  (iki satırın saatlerini çıkar)",
-                         "jq -r 'select(.tur==\"tarama\") | .ts' {dosya} | sort -n | sed -n '1p;$p'  (iki değeri çıkar)"), True),
+     lambda b: _cp_komut(
+         b, ("grep 'tur=tarama' {dosya} | sed -n '1p;$p'  (iki satırın saatlerini çıkar)",
+             "grep 'tur=tarama' {dosya} | sed -n '1p;$p'  (subtract the times of the two lines)"),
+         ("jq -r 'select(.tur==\"tarama\") | .ts' {dosya} | sort -n | sed -n '1p;$p'  (iki değeri çıkar)",
+          "jq -r 'select(.tur==\"tarama\") | .ts' {dosya} | sort -n | sed -n '1p;$p'  (subtract the two values)")), True),
     ("ilk_tarama_hizmeti", ("İlk 'tarama' olayı hangi hizmete yapıldı? Hizmet adını yaz.",
                             "Which service did the first 'tarama' (scan) event target? Write the service name."),
      lambda b: _cp_komut(b, "grep 'tur=tarama' {dosya} | head -1",
@@ -692,7 +711,11 @@ def _cp_kayitlari(liste) -> list[dict]:
             if bicim == "jsonl" and not her_bicim:
                 continue
             ip = ipucu(bicim)
-            out.append(_v(tur, bicim, soru, (ip, ip), aciklama))
+            # Aciklayici metin iceren ipuclari (tr, en) cifti dondurur; salt
+            # komut olanlar tek dizgidir ve iki dilde aynidir.
+            if isinstance(ip, str):
+                ip = (ip, ip)
+            out.append(_v(tur, bicim, soru, ip, aciklama))
     return out
 
 
