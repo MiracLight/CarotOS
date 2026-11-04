@@ -105,6 +105,19 @@ class UretilenDosyalarTesti(unittest.TestCase):
         b64 = re.search(r'LOGO_B64 = \(\s*\n\s*"([^"\n]*)"\s*\n\)', metin).group(1)
         self.assertEqual(png_boyut(base64.b64decode(b64)), (128, 128))
 
+    def test_kenar_cubugu_logosu_depodan_calisinca_bulunur(self):
+        # Kabuk logo bulunamazsa sessizce gorselsiz kalir (Saglik'ta boyle olmustu): her uygulamanin
+        # logo adaylari arasinda depo-goreli yol (<kok>/usr/share/...) bulunmali ve dosya var olmali.
+        beklenen = {"health/carotos-health.py": "carotos-health.png",
+                    "carotene/carotene.py": "carotene.png",
+                    "carotpot/carotpot-arayuz.py": "carotpot.png"}
+        for dosya, png in beklenen.items():
+            with self.subTest(dosya=dosya):
+                metin = oku(os.path.join(OPT, *dosya.split("/")), "r")
+                self.assertIn(f"usr/share/icons/hicolor/256x256/apps/{png}", metin)
+                self.assertRegex(metin, r"os\.path\.join\((_KOK|kok),")
+                self.assertTrue(os.path.isfile(os.path.join(HICOLOR, "256x256", "apps", png)))
+
     def test_desktop_dosyalari_hala_ayni_simge_adini_kullanir(self):
         beklenen = {"carotos-carotene": "carotene", "carotos-carotpot": "carotpot", "carotos-filenor": "filenor",
                     "carotos-former": "carotos-former", "carotos-gsd": "carotos-gsd",

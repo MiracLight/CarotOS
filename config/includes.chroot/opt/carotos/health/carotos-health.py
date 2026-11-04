@@ -1387,7 +1387,10 @@ VURGU = "health"          # ortak/tema.py: nane yeşili
 CONFIG_DIR = os.path.join(GLib.get_user_config_dir(), "carotos-health")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "settings.json")
 
+# Depodan calistirilinca (kurulu degilken) simge depo icindeki yoldan bulunur.
+_KOK = os.path.abspath(os.path.join(BASE_DIR, "..", "..", ".."))
 LOGO_CANDIDATES = [
+    os.path.join(_KOK, "usr/share/icons/hicolor/256x256/apps/carotos-health.png"),
     "/usr/share/icons/hicolor/256x256/apps/carotos-health.png",
     "/usr/share/carotos/welcome/logo.png",
 ]
