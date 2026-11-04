@@ -100,6 +100,39 @@ STRINGS = {
     "firewall_checking": {"tr": "Kontrol ediliyor…", "en": "Checking…"},
     "firewall_updating": {"tr": "Güncelleniyor…", "en": "Updating…"},
     "refresh": {"tr": "Yenile", "en": "Refresh"},
+    # Etik koruma (ortak/etik_koruma.py). Metin bize aittir; hicbir yasadan
+    # madde/ceza atfi yoktur ve hukuki tavsiye degildir.
+    "etik_baslik": {"tr": "Bu hedef sana ait görünmüyor", "en": "This target doesn't look like yours"},
+    "etik_metin": {
+        "tr": "Bu hedef senin kendi makinene ya da bir laboratuvara benzemiyor.\n\n"
+              "Yalnızca sahibi olduğun ya da yazılı izin aldığın sistemleri test et. "
+              "İzinsiz tarama veya erişim denemesi birçok ülkede yasalara aykırı olabilir; "
+              "yerel kuralları kendin kontrol etmelisin. Bu uyarı hukuki tavsiye değildir.\n\n"
+              "Güvenle deneyebileceğin yerler: kendi makinen (127.0.0.1) ve CarotOS Poligon.",
+        "en": "This target doesn't look like your own machine or a lab.\n\n"
+              "Only test systems you own or have written permission to test. "
+              "Scanning or trying to access systems without permission may be against the law "
+              "in many countries; check the local rules yourself. This notice is not legal advice.\n\n"
+              "Safe places to practise: your own machine (127.0.0.1) and CarotOS Poligon.",
+    },
+    "etik_yaz": {"tr": "Devam etmek için hedefi aynen yaz:", "en": "To continue, type the target exactly:"},
+    "etik_devam": {"tr": "Devam et", "en": "Continue"},
+    "etik_iptal": {"tr": "Vazgeç", "en": "Cancel"},
+    "etik_ozel_baslik": {"tr": "Bu ağ sana mı ait?", "en": "Is this your network?"},
+    "etik_ozel_metin": {
+        "tr": "Hedef özel bir ağda ({ag}). Okul, iş yeri ya da kafe gibi başkasına ait bir ağ olabilir.\n\n"
+              "Bu ağ sana mı ait, ya da burada test yapmak için izin aldın mı? "
+              "Evet dersen bu ağ hatırlanır ve bir daha sorulmaz.",
+        "en": "The target is on a private network ({ag}). It may belong to someone else, "
+              "like a school, workplace or café.\n\n"
+              "Does this network belong to you, or do you have permission to test here? "
+              "If you say yes, this network is remembered and you won't be asked again.",
+    },
+    "etik_ozel_evet": {"tr": "Evet, bu benim ağım / iznim var", "en": "Yes, it's my network / I have permission"},
+    "etik_iptal_mesaj": {
+        "tr": "Etik onay verilmedi, araç çalıştırılmadı.",
+        "en": "Ethics confirmation not given; the tool was not run.",
+    },
 }
 
 
@@ -173,6 +206,7 @@ TOOLS = [
             ["nmap", "-sS", _v(v, "target")]
         ),
         "requires": ["target"],
+        "hedef_alani": "target",   # etik koruma: ortak/etik_koruma.py
     },
     {
         "name": "tcpdump",
@@ -257,6 +291,7 @@ TOOLS = [
         ],
         "build": lambda v: ["nikto", "-h", _v(v, "target")],
         "requires": ["target"],
+        "hedef_alani": "target",
     },
     {
         "name": "sqlmap",
@@ -279,6 +314,7 @@ TOOLS = [
         "build": lambda v: ["sqlmap", "-u", _v(v, "url")]
         + (shlex.split(_v(v, "extra")) if _v(v, "extra") else []),
         "requires": ["url"],
+        "hedef_alani": "url",
     },
     {
         "name": "john",
@@ -326,6 +362,7 @@ TOOLS = [
         "build": lambda v: ["hydra", "-L", _v(v, "userlist"), "-P", _v(v, "passlist"),
                             _v(v, "target"), _v(v, "service", "ssh")],
         "requires": ["target", "userlist", "passlist"],
+        "hedef_alani": "target",
     },
     {
         "name": "ufw",
@@ -390,8 +427,11 @@ for _y in (ORTAK, BASE_DIR):
     if _y not in sys.path:
         sys.path.insert(0, _y)
 
+import etik_koruma  # noqa: E402
 import tema  # noqa: E402
 from bekleme_cubugu import SweepBar  # noqa: E402
+
+ETIK_GUNLUGU = os.path.join(CONFIG_DIR, "etik-gunlugu.log")
 
 VURGU = "guvenlik"        # ortak/tema.py: kehribar
 
@@ -555,6 +595,8 @@ class ToolPage(Gtk.Box):
         if as_root and not root_icin_guvenli_mi(values):
             self.append(f"[!] {T('root_arg_hata', lang)}\n")
             return
+        if not self._etik_onay(values):
+            return
         try:
             cmd = self.tool["build"](values)
         except Exception as exc:  # noqa: BLE001
@@ -578,6 +620,75 @@ class ToolPage(Gtk.Box):
         self.stop_btn.set_sensitive(True)
         self.app.calisiyor(True, T("running", lang, tool=self.tool["name"]))
         threading.Thread(target=self._worker, args=(cmd,), daemon=True).start()
+
+    def _etik_onay(self, values):
+        """Baska bir sisteme dokunabilecek araclarda hedefi siniflar; yerel
+        degilse kullanicidan onay ister (bkz. ortak/etik_koruma.py). Egitici
+        surtunmedir, guvenlik kontrolu degildir. Karar gunluge yazilir."""
+        alan = self.tool.get("hedef_alani")
+        if not alan:
+            return True
+        lang = self.app.lang
+        metin = _v(values, alan)
+        arac = self.tool["name"]
+        onayli = self.app.settings.get("onayli_aglar", [])
+        karar = etik_koruma.degerlendir(metin, onayli)
+        if not karar["gerek"]:
+            if karar["sinif"] == etik_koruma.OZEL:   # daha once onaylanmis ag
+                etik_koruma.gunluge_yaz(ETIK_GUNLUGU, arac, metin, karar["sinif"], "hatirlanan")
+            return True
+        if karar["tur"] == "ozel":
+            onay = self._etik_pencere(
+                T("etik_ozel_baslik", lang),
+                T("etik_ozel_metin", lang, ag=", ".join(karar["aglar"])),
+                None, T("etik_ozel_evet", lang), lang)
+        else:
+            onay = self._etik_pencere(
+                T("etik_baslik", lang), T("etik_metin", lang),
+                karar["onay_metni"], T("etik_devam", lang), lang)
+        etik_koruma.gunluge_yaz(ETIK_GUNLUGU, arac, metin, karar["sinif"],
+                                "onayladi" if onay else "vazgecti")
+        if not onay:
+            self.append(f"[!] {T('etik_iptal_mesaj', lang)}\n")
+            return False
+        if karar["tur"] == "ozel":
+            liste = list(onayli)
+            liste.extend(a for a in karar["aglar"] if a not in liste)
+            self.app.settings["onayli_aglar"] = liste
+            save_settings(self.app.settings)
+        return True
+
+    def _etik_pencere(self, baslik, metin, yazilacak, devam_etiketi, lang):
+        """Onay penceresi. 'yazilacak' verilmisse, devam dugmesi ancak o metin
+        ELLE aynen yazilinca acilir. Varsayilan dugme her zaman 'Vazgec'."""
+        d = Gtk.Dialog(title=baslik, transient_for=self.app, modal=True)
+        d.set_default_size(520, -1)
+        kutu = d.get_content_area()
+        kutu.set_spacing(10)
+        for kenar in ("margin_start", "margin_end", "margin_top", "margin_bottom"):
+            setattr(kutu, kenar, 16)
+        govde = Gtk.Label(label=metin, wrap=True, xalign=0.0)
+        govde.set_max_width_chars(64)
+        kutu.pack_start(govde, False, False, 0)
+        girdi = None
+        if yazilacak:
+            kutu.pack_start(Gtk.Label(label=T("etik_yaz", lang), xalign=0.0), False, False, 0)
+            hedef = Gtk.Label(xalign=0.0)   # secilemez: kopyalayip yapistirmak yerine yazmak istenir
+            hedef.set_markup("<b>%s</b>" % GLib.markup_escape_text(yazilacak))
+            kutu.pack_start(hedef, False, False, 0)
+            girdi = Gtk.Entry()
+            kutu.pack_start(girdi, False, False, 0)
+        d.add_button(T("etik_iptal", lang), Gtk.ResponseType.CANCEL)
+        devam = d.add_button(devam_etiketi, Gtk.ResponseType.OK)
+        d.set_default_response(Gtk.ResponseType.CANCEL)
+        if girdi is not None:
+            devam.set_sensitive(False)
+            girdi.connect("changed", lambda e: devam.set_sensitive(
+                etik_koruma.onay_dogru(yazilacak, e.get_text())))
+        d.show_all()
+        cevap = d.run()
+        d.destroy()
+        return cevap == Gtk.ResponseType.OK
 
     def _worker(self, cmd):
         lang = self.app.lang
