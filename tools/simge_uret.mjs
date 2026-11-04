@@ -6,7 +6,7 @@
 //
 // Yeni bir simge eklemek: tools/simge/<ad>.svg dosyasini koyup asagidaki TABLO'ya bir satir ekleyin.
 // Kaynagi olmayan satirlar atlanir. Uretilenler (<depo>/config/includes.chroot altinda):
-//   png      -> usr/share/icons/hicolor/<boyut>x<boyut>/apps/<png>.png (boyutlar: tum | 256)
+//   png      -> usr/share/icons/hicolor/<boyut>x<boyut>/apps/<png>.png (boyutlar: tum | 256); ekPng: ek konumlar
 //   svg      -> usr/share/icons/hicolor/scalable/apps/<svg>.svg (kaynagin kopyasi)
 //   b64      -> opt/carotos/<b64>/ikonlar.b64  (ISO derlemesinde hook'lar acar: "<boyut> <base64>")
 //   kodPng   -> koda gomulu PNG (degisken adi ve dosya); site -> <site>/public/ikonlar/ikon-<site>.webp (256 px)
@@ -37,6 +37,9 @@ const TABLO = [
   { ad: "usb", png: "carotos-usb-check", svg: "carotos-usb-check", site: "usb-denetimi" },
   { ad: "poligon-ogrenci", png: "carotos-poligon-ogrenci", site: "poligon-ogrenci" },
   { ad: "poligon-ogretmen", png: "carotos-poligon-ogretmen", site: "poligon-ogretmen" },
+  // Guvenlik Paneli: simge iki yerde tutulur (hicolor + uygulamanin kendi yedegi), ayni 256 px
+  { ad: "panel", png: "carotos-security-panel", site: "guvenlik-paneli",
+    ekPng: [{ yol: "usr/share/icons/carotos/security-panel-icon.png", boyut: 256 }] },
 ];
 
 const kaynakYolu = (ad) => path.join(kaynakDizini, ad + ".svg");
@@ -75,6 +78,7 @@ for (const s of TABLO) {
       yaz(path.join(hicolor, `${b}x${b}`, "apps", `${s.png}.png`), await png(s.ad, b));
     }
   }
+  for (const e of s.ekPng || []) yaz(path.join(chroot, e.yol), await png(s.ad, e.boyut));
   if (s.svg) yaz(path.join(hicolor, "scalable", "apps", `${s.svg}.svg`), svg(s.ad));
   if (s.b64) yaz(path.join(chroot, "opt", "carotos", s.b64, "ikonlar.b64"), await b64Satirlari(s.ad));
   if (s.kodPng) degistirGomulu(s.kodPng.dosya, s.kodPng.degisken, (await png(s.ad, 128)).toString("base64"), s.kodPng.bol);

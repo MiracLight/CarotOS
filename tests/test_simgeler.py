@@ -29,7 +29,8 @@ BOYUTLAR = (16, 22, 24, 32, 48, 64, 128, 256)
 # kaynak adi -> scalable dosya adi (varsa)
 SCALABLE = {"filenor": "filenor", "former": "carotos-former", "gsd": "carotos-gsd",
             "saglik": "carotos-health", "magaza": "carotos-magaza", "usb": "carotos-usb-check"}
-GEREKLI_KAYNAKLAR = {"filenor", "former", "gsd", "saglik", "magaza", "carotene", "carotpot", "usb", "poligon-ogrenci"}
+GEREKLI_KAYNAKLAR = {"filenor", "former", "gsd", "saglik", "magaza", "carotene", "carotpot", "usb",
+                     "poligon-ogrenci", "poligon-ogretmen", "panel"}
 YASAK_ETIKET = {"linearGradient", "radialGradient", "filter", "feGaussianBlur", "feDropShadow",
                 "feOffset", "mask", "image", "style", "script", "foreignObject", "text"}
 
@@ -76,9 +77,15 @@ class UretilenDosyalarTesti(unittest.TestCase):
                 self.assertEqual(png_boyut(oku(yol)), (b, b), yol)
 
     def test_256_png_saglik_magaza_usb_poligon(self):
-        for ad in ("carotos-health", "carotos-magaza", "carotos-usb-check", "carotos-poligon-ogrenci"):
+        for ad in ("carotos-health", "carotos-magaza", "carotos-usb-check", "carotos-poligon-ogrenci",
+                   "carotos-poligon-ogretmen", "carotos-security-panel"):
             yol = os.path.join(HICOLOR, "256x256", "apps", ad + ".png")
             self.assertEqual(png_boyut(oku(yol)), (256, 256), yol)
+
+    def test_panel_simgesi_iki_konumda_ayni(self):
+        # Uygulama kendi yedegini (icons/carotos) kullanir; hicolor ile ayni olmali.
+        self.assertEqual(oku(os.path.join(HICOLOR, "256x256", "apps", "carotos-security-panel.png")),
+                         oku(os.path.join(INC, "usr", "share", "icons", "carotos", "security-panel-icon.png")))
 
     def test_gomulu_b64_sekiz_boyut(self):
         for uyg in ("filenor", "former", "gsd"):
@@ -102,7 +109,9 @@ class UretilenDosyalarTesti(unittest.TestCase):
         beklenen = {"carotos-carotene": "carotene", "carotos-carotpot": "carotpot", "carotos-filenor": "filenor",
                     "carotos-former": "carotos-former", "carotos-gsd": "carotos-gsd",
                     "carotos-health": "carotos-health", "carotos-magaza": "carotos-magaza",
-                    "carotos-usb-check": "carotos-usb-check", "carotos-poligon-ogrenci": "carotos-poligon-ogrenci"}
+                    "carotos-usb-check": "carotos-usb-check", "carotos-poligon-ogrenci": "carotos-poligon-ogrenci",
+                    "carotos-poligon-ogretmen": "carotos-poligon-ogretmen",
+                    "carotos-security-panel": "carotos-security-panel"}
         for dosya, simge in beklenen.items():
             icerik = oku(os.path.join(INC, "usr", "share", "applications", dosya + ".desktop"), "r")
             self.assertIn(f"\nIcon={simge}", icerik.replace("\r\n", "\n"), dosya)
