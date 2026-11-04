@@ -39,6 +39,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("Pango", "1.0")
 from gi.repository import GLib, Gtk, Pango  # noqa: E402
 
+import dil  # noqa: E402  (ortak dil katmani: ortak/dil.py)
 import tema  # noqa: E402  (CarotOS ortak grafit temasi)
 from bekleme_cubugu import SweepBar  # noqa: E402
 
@@ -305,12 +306,12 @@ METIN = {
                                 "file was kept in quarantine."},
 }
 
+METIN = dil.zenginlestir(METIN)      # tr/en sozlukleri her dil icin yedekli (ortak/dil.py)
+
+
 def _varsayilan_dil():
-    for degisken in ("LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE"):
-        deger = os.environ.get(degisken, "").strip()
-        if deger and deger not in ("C", "POSIX"):
-            return "tr" if deger.lower().startswith("tr") else "en"
-    return "en"
+    """Ilk acilis dili: sistem dili etkin bir dilse o, degilse 'en' (ortak/dil.py)."""
+    return dil.varsayilan_dil()
 
 
 CONFIG_DIR = os.path.join(GLib.get_user_config_dir(), "carotene")
@@ -340,7 +341,7 @@ def load_settings():
             stored = json.load(fh)
         if isinstance(stored, dict):
             for key in DEFAULTS:
-                if stored.get(key) in (("tr", "en") if key == "lang"
+                if stored.get(key) in (dil.KODLAR if key == "lang"
                                        else ("dark", "light")):
                     data[key] = stored[key]
     except (OSError, ValueError):
@@ -428,8 +429,8 @@ class CaroteneWindow(Gtk.Window):
 
         alt = Gtk.Box(spacing=8)
         self.lang_combo = Gtk.ComboBoxText()
-        self.lang_combo.append("tr", "Türkçe")
-        self.lang_combo.append("en", "English")
+        for kod, ad, taslak in dil.etkin_diller():       # yalniz cevirisi hazir diller
+            self.lang_combo.append(kod, dil.secici_adi(kod, ad, taslak))
         self.lang_combo.set_active_id(self.lang)
         self.lang_combo.connect("changed", self.on_lang_changed)
         alt.pack_start(self.lang_combo, True, True, 0)
@@ -440,8 +441,7 @@ class CaroteneWindow(Gtk.Window):
         self.retranslate()
 
     def t(self, anahtar, **kw):
-        metin = METIN[anahtar][self.lang]
-        return metin.format(**kw) if kw else metin
+        return dil.T(METIN.get(anahtar), self.lang, anahtar, **kw)
 
     # -- durum ve bildirimler ---------------------------------------------------
 

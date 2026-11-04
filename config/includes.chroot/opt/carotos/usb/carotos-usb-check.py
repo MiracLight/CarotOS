@@ -26,6 +26,13 @@ import sys
 import threading
 import time
 
+# Ortak dil katmani (ortak/dil.py, yalniz standart kutuphane): kurulu sistemde
+# /opt/carotos/ortak, depoda kardes klasor. Izleme modu da kullanir (Gtk gerekmez).
+_ORTAK_YOLU = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ortak")
+if _ORTAK_YOLU not in sys.path:
+    sys.path.insert(0, _ORTAK_YOLU)
+import dil  # noqa: E402
+
 APP_VERSION = "1.1"
 
 # Tarama sinirlari — cok buyuk aygitlarda takilmamak icin
@@ -245,9 +252,10 @@ def split_extensions(name):
 # ---------------------------------------------------------------------------
 
 def metin(deger, lang):
-    """Bulgu metni iki dilli sozluk ya da (eski kayitlarda) duz metindir."""
+    """Bulgu metni iki dilli sozluk ya da (eski kayitlarda) duz metindir.
+    Eksik dilde en, sonra tr'ye duser (ortak/dil.py)."""
     if isinstance(deger, dict):
-        return deger.get(lang) or deger.get("tr") or ""
+        return dil.metin(deger, lang)
     return deger or ""
 
 
@@ -595,24 +603,17 @@ def tarama_motoru():
 def clamav_bulgusu(bulgu):
     """Ayrintili tarama bulgusunu mevcut bulgu bicimine cevirir."""
     return {"level": HIGH, "kind": "clamav", "path": bulgu["yol"],
-            "title": {dil: UI["deep_finding_title"][dil].format(imza=bulgu["imza"])
-                      for dil in ("tr", "en")},
+            "title": {k: UI["deep_finding_title"][k].format(imza=bulgu["imza"])
+                      for k in ("tr", "en")},
             "detail": dict(UI["deep_finding_detail"])}
 
 
 CONFIG_DIR = os.path.join(GLib.get_user_config_dir(), "carotos-usb")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "settings.json")
 def _varsayilan_dil():
-    """Ilk acilis dili: sistem dili Turkce ise 'tr', baska HERHANGI bir dilse
-    'en'. Sabit 'tr' yazmak, kurulumda baska dil secen kullanicinin
-    uygulamalari Turkce gormesine yol aciyordu. C/POSIX dil bilgisi
-    tasimaz, o yuzden atlanir. Kayitli bir ayar varsa o yine onceliklidir."""
-    import os
-    for degisken in ("LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE"):
-        deger = os.environ.get(degisken, "").strip()
-        if deger and deger not in ("C", "POSIX"):
-            return "tr" if deger.lower().startswith("tr") else "en"
-    return "en"
+    """Ilk acilis dili: sistem dili etkin (cevirisi hazir) bir dilse o, degilse
+    'en'. Kayitli bir ayar varsa o yine onceliklidir (bkz. ortak/dil.py)."""
+    return dil.varsayilan_dil()
 
 
 DEFAULTS = {"lang": _varsayilan_dil(), "theme": "dark", "notify_when_clean": True}
@@ -787,6 +788,9 @@ UI = {
 }
 
 
+UI = dil.zenginlestir(UI)           # tr/en sozlukleri her dil icin yedekli (ortak/dil.py)
+
+
 def load_settings():
     data = dict(DEFAULTS)
     try:
@@ -798,6 +802,7 @@ def load_settings():
                     data[key] = stored[key]
     except (OSError, ValueError):
         pass
+    data["lang"] = dil.gecerli(data.get("lang"))     # bozuk/bilinmeyen kayitli dil -> en
     return data
 
 
@@ -903,8 +908,8 @@ def _tanimla_result_window(Gtk, Gdk, tema, SweepBar):
             # sol alt: dil ve gorunum
             alt = Gtk.Box(spacing=8)
             self.lang_combo = Gtk.ComboBoxText()
-            self.lang_combo.append("tr", "Türkçe")
-            self.lang_combo.append("en", "English")
+            for kod, ad, taslak in dil.etkin_diller():       # yalniz cevirisi hazir diller
+                self.lang_combo.append(kod, dil.secici_adi(kod, ad, taslak))
             self.lang_combo.set_active_id(self.lang)
             self.lang_combo.connect("changed", self.on_lang_changed)
             alt.pack_start(self.lang_combo, True, True, 0)

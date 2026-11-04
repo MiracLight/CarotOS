@@ -38,6 +38,7 @@ for _y in (ORTAK, BASE_DIR):
     if _y not in sys.path:
         sys.path.insert(0, _y)
 
+import dil  # noqa: E402  (ortak dil katmani: ortak/dil.py)
 import tema  # noqa: E402
 
 APP_VERSION = "2.0"
@@ -54,18 +55,18 @@ LOGO_B64 = (
 
 # --- Dil --------------------------------------------------------------------
 def _sistem_dili():
+    """CAROTOS_DIL > sistem dili (etkin diller arasindan, ortak/dil.py) > locale > en."""
     d = os.environ.get("CAROTOS_DIL")
-    if d in ("tr", "en"):
+    if d in dil.KODLAR:
         return d
-    for anahtar in ("LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE"):
-        deger = os.environ.get(anahtar, "")
-        if deger and deger not in ("C", "POSIX"):
-            return "tr" if deger.lower().startswith("tr") else "en"
+    if any(os.environ.get(a, "").strip() not in ("", "C", "POSIX")
+           for a in ("LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE")):
+        return dil.varsayilan_dil()
     try:
         kod = (locale.getdefaultlocale()[0] or "")
     except Exception:  # noqa: BLE001
         kod = ""
-    return "tr" if kod.lower().startswith("tr") else "en"
+    return dil.varsayilan_dil({"LANG": kod}) if kod else "en"
 
 
 def _ayar_dosyasi():
@@ -77,7 +78,7 @@ def ayarlari_oku():
     try:
         with open(_ayar_dosyasi(), encoding="utf-8") as f:
             k = json.load(f)
-        if k.get("lang") in ("tr", "en"):
+        if k.get("lang") in dil.KODLAR:
             veri["lang"] = k["lang"]
         if k.get("theme") in ("dark", "light"):
             veri["theme"] = k["theme"]
@@ -193,14 +194,17 @@ GENEL_IKON = {
 }
 
 
+METIN = dil.zenginlestir(METIN)      # tr/en sozlukleri her dil icin yedekli (ortak/dil.py)
+
+
 def M(anahtar, **b):
-    s = METIN[anahtar][DIL]
-    return s.format(**b) if b else s
+    return dil.T(METIN.get(anahtar), DIL, anahtar, **b)
 
 
 def metin(sozluk):
+    """Katalog/arayuz metni: iki dilli sozluk ya da duz metin. Eksik dilde en, tr."""
     if isinstance(sozluk, dict):
-        return sozluk.get(DIL) or sozluk.get("tr") or sozluk.get("en") or ""
+        return dil.metin(sozluk, DIL)
     return sozluk or ""
 
 
@@ -640,7 +644,7 @@ class MagazaPenceresi(Gtk.Window):
         self.ui = ayarlari_oku()
         global DIL
         DIL = self.ui["lang"]
-        self.set_title("CarotOS Store" if str(DIL).lower().startswith("en") else "CarotOS Mağaza")
+        self.set_title("CarotOS " + M("baslik"))   # "CarotOS" oneki her dilde kalir
         tema.uygula(self.ui["theme"], VURGU)
 
         self.set_default_size(1120, 740)
@@ -672,8 +676,8 @@ class MagazaPenceresi(Gtk.Window):
 
         alt = Gtk.Box(spacing=8)
         self.dil_kutu = Gtk.ComboBoxText()
-        self.dil_kutu.append("tr", "Türkçe")
-        self.dil_kutu.append("en", "English")
+        for kod, ad, taslak in dil.etkin_diller():       # yalniz cevirisi hazir diller
+            self.dil_kutu.append(kod, dil.secici_adi(kod, ad, taslak))
         self.dil_kutu.set_active_id(DIL)
         self.dil_kutu.connect("changed", self._dil_degisti)
         alt.pack_start(self.dil_kutu, True, True, 0)
@@ -716,7 +720,7 @@ class MagazaPenceresi(Gtk.Window):
     def _dil_degisti(self, kutu):
         global DIL
         yeni = kutu.get_active_id()
-        if yeni in ("tr", "en") and yeni != DIL:
+        if yeni in dil.KODLAR and yeni != DIL:
             DIL = self.ui["lang"] = yeni
             ayarlari_kaydet(self.ui)
             self.metinleri_uygula()

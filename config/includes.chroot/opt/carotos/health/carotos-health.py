@@ -1339,7 +1339,7 @@ def run_all_checks():
             "status": outcome["status"],
             "detail": outcome["detail"],
         })
-    return results
+    return dil.zenginlestir(results)    # calisma aninda uretilen tr/en sozlukleri de yedekli
 
 
 def score(results):
@@ -1378,6 +1378,7 @@ for _y in (ORTAK, BASE_DIR):
     if _y not in sys.path:
         sys.path.insert(0, _y)
 
+import dil  # noqa: E402  (ortak dil katmani: ortak/dil.py)
 import tema  # noqa: E402
 from bekleme_cubugu import SweepBar  # noqa: E402
 
@@ -1499,12 +1500,17 @@ KATEGORI_IKON = {
 }
 
 
+# tr/en sozlukleri her dil icin yedekli olur (eksik ceviri Ingilizceye duser)
+UI = dil.zenginlestir(UI)
+STATUS_LABEL = dil.zenginlestir(STATUS_LABEL)
+CHECKS = dil.zenginlestir(CHECKS)
+DEEP_SCANS = dil.zenginlestir(DEEP_SCANS)
+CATEGORIES = dil.zenginlestir(CATEGORIES)
+
+
 def _varsayilan_dil():
-    for degisken in ("LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE"):
-        deger = os.environ.get(degisken, "").strip()
-        if deger and deger not in ("C", "POSIX"):
-            return "tr" if deger.lower().startswith("tr") else "en"
-    return "en"
+    """Ilk acilis dili: sistem dili etkin bir dilse o, degilse 'en' (ortak/dil.py)."""
+    return dil.varsayilan_dil()
 
 
 DEFAULTS = {"lang": _varsayilan_dil(), "theme": "dark"}
@@ -1560,7 +1566,7 @@ class HealthWindow(Gtk.Window):
     def __init__(self, settings):
         super().__init__(title=UI["app_title"]["tr"])
         self.settings = settings
-        self.lang = settings["lang"]
+        self.lang = settings["lang"] = dil.gecerli(settings["lang"])
         self.ui_theme = settings["theme"] if settings["theme"] in ("dark", "light") else "dark"
         self.results = []
         self.audited_as_root = False
@@ -1606,8 +1612,8 @@ class HealthWindow(Gtk.Window):
 
         alt = Gtk.Box(spacing=8)
         self.lang_combo = Gtk.ComboBoxText()
-        self.lang_combo.append("tr", "Türkçe")
-        self.lang_combo.append("en", "English")
+        for kod, ad, taslak in dil.etkin_diller():       # yalniz cevirisi hazir diller
+            self.lang_combo.append(kod, dil.secici_adi(kod, ad, taslak))
         self.lang_combo.set_active_id(self.lang)
         self.lang_combo.connect("changed", self.on_lang_changed)
         alt.pack_start(self.lang_combo, True, True, 0)
@@ -1626,9 +1632,9 @@ class HealthWindow(Gtk.Window):
         self.kabuk.marka_ayarla(UI["app_title"][self.lang], UI["header_sub"][self.lang])
         self.kabuk.bolum_metni("ozet", UI["summary"][self.lang])
         self.kabuk.bolum_metni("denetimler",
-                               {"tr": "Denetimler", "en": "Checks"}[self.lang])
+                               dil.metin({"tr": "Denetimler", "en": "Checks"}, self.lang))
         self.kabuk.bolum_metni("ayrintili",
-                               {"tr": "Ayrıntılı", "en": "Detailed"}[self.lang])
+                               dil.metin({"tr": "Ayrıntılı", "en": "Detailed"}, self.lang))
         self.kabuk.menu_metni("summary", UI["summary"][self.lang])
         for key, label in CATEGORIES:
             self.kabuk.menu_metni(key, label[self.lang])
@@ -1668,12 +1674,12 @@ class HealthWindow(Gtk.Window):
             self.kabuk.baslik_ayarla(UI["summary"][self.lang], UI["summary_sub"][self.lang])
             self.kabuk.icerik(self.build_summary())
             return
-        etiket = next((lbl for k, lbl in CATEGORIES if k == key), {"tr": "", "en": ""})
+        etiket = next((lbl for k, lbl in CATEGORIES if k == key), dil.Metin({"tr": "", "en": ""}))
         holder = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
         if key == "deep":
             self.kabuk.baslik_ayarla(etiket[self.lang],
-                                     {"tr": "Yönetici yetkili, kullanıcı başlatır",
-                                      "en": "Administrator-level, user-initiated"}[self.lang])
+                                     dil.metin({"tr": "Yönetici yetkili, kullanıcı başlatır",
+                                                "en": "Administrator-level, user-initiated"}, self.lang))
             kutu, _ = tema.not_kutusu(UI["deep_intro"][self.lang], "bilgi")
             holder.pack_start(kutu, False, False, 0)
             for scan in DEEP_SCANS:
@@ -1898,7 +1904,7 @@ class HealthWindow(Gtk.Window):
         else:
             result = scan["parse"](code, out)
             result["stamp"] = time.strftime("%H:%M")
-            self.deep[scan["id"]] = result
+            self.deep[scan["id"]] = dil.zenginlestir(result)
             self.kabuk.bildir(UI["deep_finished"][self.lang].format(title=title), "basari")
         if self.current_category == "deep":
             self.show_category("deep")
