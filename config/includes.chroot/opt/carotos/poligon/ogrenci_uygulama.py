@@ -491,6 +491,10 @@ class PoligonPenceresi(Gtk.Window):
         if yeni and yeni != self.dil and _dil.gecerli_dil(yeni):
             self.dil = yeni
             _gorunum.dil_yaz(yeni)
+            # Açık görev bozulmasın: dosya ve ipucu komutları görev başlarken sabitlendi; yeni dil
+            # yalnızca SONRAKİ görevde etkili olur (bkz. terim_sozlugu.py).
+            if self.istemci is not None:
+                self.istemci.arayuz_dili = yeni
             self._metinleri_uygula()
 
     def _tema_degistir(self, _düğme):
@@ -963,7 +967,7 @@ class PoligonPenceresi(Gtk.Window):
         istemci = PoligonIstemci("", "", "", "bireysel")  # oda bilgisi kullanılmaz
         istemci.zorluk = self._secili_zorluk()
         gorev = istemci.gorevi_yukle(secilen)
-        istemci.gorevi_baslat()
+        istemci.gorevi_baslat(dil=self.dil)
         self._katildi(istemci, gorev)
 
     def _odaya_katil(self, _düğme):
@@ -1078,7 +1082,7 @@ class PoligonPenceresi(Gtk.Window):
             def yukle():
                 try:
                     gorev = istemci.gorevi_yukle(secilen)
-                    istemci.gorevi_baslat()
+                    istemci.gorevi_baslat(dil=self.dil)
                     GLib.idle_add(self._beklemeden_goreve, gorev)
                 except Exception:
                     # Yükleme başarısız -- bayrağı bırak, sonraki turda tekrar dene.
@@ -1135,6 +1139,7 @@ class PoligonPenceresi(Gtk.Window):
 
     def _katildi(self, istemci, gorev):
         self.istemci = istemci
+        istemci.arayuz_dili = self.dil   # gorevi_degistir (yeni gorev) bu dille uretir
         self.gorev_verisi = gorev
         self._ipucu_kullanildi = False  # yeni gorev -> ipucu henuz kullanilmadi
         self._metinleri_uygula()
@@ -1168,7 +1173,7 @@ class PoligonPenceresi(Gtk.Window):
         istemci = PoligonIstemci("", "", "", "bireysel")
         istemci.zorluk = self._secili_zorluk()
         gorev = istemci.gorevi_yukle(secilen)
-        istemci.gorevi_baslat()
+        istemci.gorevi_baslat(dil=self.dil)
         self._son_sonuc = None
         self.cevap_girisi.set_text("")
         self.gonder_dugmesi.set_sensitive(True)

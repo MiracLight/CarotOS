@@ -260,7 +260,7 @@ class PoligonIstemci:
         self.gorev = _dk.zengin(json.loads(yol.read_text(encoding="utf-8")))
         return self.gorev
 
-    def gorevi_baslat(self) -> None:
+    def gorevi_baslat(self, dil: str | None = None) -> None:
         """Görev türüne göre yerel hedefi üretir ve başlatır.
 
         flag_uretimi.yontem alanı hangi görev kalıbının kullanılacağını
@@ -271,6 +271,10 @@ class PoligonIstemci:
         """
         if self.gorev is None:
             raise RuntimeError("önce gorevi_yukle() çağrılmalı")
+        # Üretilen dosyaların alan adları GÖREV BAŞLARKEN sabitlenir: sürerken arayüz dili değişirse
+        # açık görev bozulmaz, sonraki görev yeni dille üretilir (bkz. terim_sozlugu.py).
+        dil = dil or getattr(self, "arayuz_dili", "tr")
+        self.gorev_dili = dil
         # önceki görevden kalan metin değişkenlerini temizle
         self.tuzak_kullanici = None
         self.uretim_degiskenleri = {}
@@ -379,7 +383,7 @@ class PoligonIstemci:
                 parametreler["varyant"] = self.varyant
             uretim = uretilen_gorevler.uret(
                 fu["uretec"], parametreler,
-                fu.get("sabit_parametreler"), hedef["bind_adres"])
+                fu.get("sabit_parametreler"), hedef["bind_adres"], dil=dil)
             self._servis = uretim
             self._dogru_cevap = uretim.dogru_cevap
             self.dosya_yolu = uretim.dosya_yolu

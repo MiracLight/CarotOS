@@ -35,6 +35,7 @@ import urllib.parse
 from datetime import datetime, timedelta
 from pathlib import Path
 
+import terim_sozlugu as _ts
 import varyant_gunluk as _vg
 import varyant_sifre as _vs
 import varyantlar as _vy
@@ -454,7 +455,8 @@ def _cp_gunlugu(p: dict, soru: str, bicim: str = "carotpot"):
     return [s for _, s in satirlar], cevap
 
 
-def uret_carotpot_kayit(p: dict, soru: str = "kullanici", **_) -> Uretim:
+def uret_carotpot_kayit(p: dict, soru: str = "kullanici", dil: str = "tr", **_) -> Uretim:
+    # dil: gorev baslarkenki arayuz dili (dosya alan adlari ve ipucu komutlari bu dile gore)
     anahtar = _vy.anahtar_bul("carotpot_kayit", soru)
     no, v = _varyant(anahtar, p)
     if v["tur"] == "ikinci_kullanici":
@@ -471,9 +473,15 @@ def uret_carotpot_kayit(p: dict, soru: str = "kullanici", **_) -> Uretim:
         raise RuntimeError(f"carotpot_kayit: belirsiz olmayan kayit uretilemedi (varyant {no})")
     dizin = _dizin_ac()
     ad = "olaylar.log" if v["bicim"] == "carotpot" else "olaylar.jsonl"
-    yol = _yaz(dizin, ad, "\n".join(satirlar) + "\n")
+    # Cevap Turkce (kanonik) satirlardan hesaplandi; ogrencinin gordugu dosya gorev BASLARKEN
+    # secili dilin alan adlariyla yazilir ve ipucu komutlari ayni adlari kullanir (bkz. terim_sozlugu).
+    yol = _yaz(dizin, ad, "\n".join(_ts.cp_yerellestir(satirlar, v["bicim"], dil)) + "\n")
     yer = {"{dosya}": yol, "{satir}": str(len(satirlar))}
-    return Uretim(cevap, _varyant_degiskenleri(anahtar, no, v, yer), yol, dizin)
+    degiskenler = _varyant_degiskenleri(anahtar, no, v, yer)
+    for k in list(degiskenler):
+        if k.startswith(("{soru_", "{ipucu_")):
+            degiskenler[k] = _ts.komut_yerellestir(degiskenler[k], dil)
+    return Uretim(cevap, degiskenler, yol, dizin)
 
 
 # ----------------------------------------------------------------------------
@@ -826,7 +834,7 @@ AG_URETECLERI = {"gizli_sayfa", "banner_avi", "tuzak_kayit_oku"}
 
 
 def uret(ad: str, parametreler: dict | None = None, sabit: dict | None = None,
-         bind_adres: str = "127.0.0.1") -> Uretim:
+         bind_adres: str = "127.0.0.1", dil: str = "tr") -> Uretim:
     """Adi verilen uretecle bir gorev icerigi uretir. Ag uretecleri icin
     bind_adres loopback degilse ValueError."""
     fonk = URETECLER.get(ad)
@@ -835,4 +843,4 @@ def uret(ad: str, parametreler: dict | None = None, sabit: dict | None = None,
     if ad in AG_URETECLERI and not loopback_adres_mi(bind_adres):
         raise ValueError(f"{ad}: yalniz loopback adresinde calisir: {bind_adres!r}")
     p = {**(sabit or {}), **(parametreler or {})}
-    return fonk(p, bind_adres=bind_adres, **{k: v for k, v in p.items() if k == "soru"})
+    return fonk(p, bind_adres=bind_adres, dil=dil, **{k: v for k, v in p.items() if k == "soru"})

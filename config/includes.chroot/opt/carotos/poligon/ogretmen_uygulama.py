@@ -709,7 +709,7 @@ class OgretmenPenceresi(Gtk.Window):
         ornek, senaryo = "", ""
         try:
             gorev = ist.gorevi_yukle(gid)
-            ist.gorevi_baslat()
+            ist.gorevi_baslat(dil=self.dil)
             ornek = ist._dogru_cevap or "(otomatik doğrulama)"
             senaryo = gorev["senaryo"][self.dil]
             aralik = ist.aralik_metni()
