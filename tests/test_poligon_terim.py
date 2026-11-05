@@ -177,7 +177,11 @@ class GorevSirasindaDilTesti(unittest.TestCase):
             self.assertEqual(open(yol, encoding="utf-8").read(), once)
             self.assertEqual(ist.uretim_degiskenleri, ipucu_once)
             self.assertEqual(ist.gorev_dili, "de")
-            self.assertIn("typ=anmeldung", ist.uretim_degiskenleri["{ipucu_en}"])
+            # varyanta göre grep (typ=anmeldung) ya da jq (.typ=="anmeldung") biçiminde: ikisinde de Almanca
+            ipucu = ist.uretim_degiskenleri["{ipucu_en}"]
+            self.assertTrue(any(t in ipucu for t in ("anmeldung", "dienst", "benutzername", "quelle", "typ")), ipucu)
+            self.assertNotIn("kullanici", ipucu)
+            self.assertNotIn("giris", ipucu)
 
             # sonraki görev yeni dille üretilir
             ist.gorevi_degistir("loganaliz-05")
