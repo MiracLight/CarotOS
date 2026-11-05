@@ -36,6 +36,9 @@ class DilKatmaniTesti(unittest.TestCase):
             self.skipTest("ortak dil katmani yok (Filenor tek basina)")
         self._eski = D._dil.DIZIN
         self.addCleanup(self._geri)
+        # Gercek ceviri dosyalari artik dolu: yedek-zinciri testleri bos bir diller/ klasoruyle calisir
+        D._dil.DIZIN = tempfile.mkdtemp(prefix="filenor-dil-bos-")
+        D._dil.onbellegi_temizle()
 
     def _geri(self):
         D._dil.DIZIN = self._eski
@@ -65,6 +68,7 @@ class DilKatmaniTesti(unittest.TestCase):
         metin = D.hata_metni(D.FilenorHata("dosya_yok", yol="/x/y"), "es")
         self.assertEqual(metin, "File not found: /x/y")
 
+    @unittest.skipIf(os.name == "nt", "Windows'ta ipucu winget yonergesidir")
     def test_ipucu_bilinmeyen_dilde_ingilizce(self):
         self.assertEqual(D.ipucu_al("ffmpeg", "ja"), "Install: sudo apt install ffmpeg")
         self.assertEqual(D.ipucu_al("ffmpeg", "tr"), "Kurulum: sudo apt install ffmpeg")
