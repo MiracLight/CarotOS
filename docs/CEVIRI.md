@@ -82,3 +82,13 @@ Hiçbir dil, ana dilini konuşan biri gözden geçirmeden "tam destek" diye duyu
 - Çeviriler hukuki/etik iddia taşımaz; etik işlem metni her dilde aynı içeriktedir.
 - İngilizce kaynak metin değişirse çeviri "yetim" olur (`kontrol` uyarır); yeniden çevrilir.
 - Dil dosyaları UTF-8, LF, anahtarlar sıralı yazılır (`ekle` bunu yapar); elle düzenlenebilir.
+
+## İspanyolca stil rehberi ve sözlük (taslak, kullanıcı onaylı parti 1: Güvenlik Paneli)
+
+- **Varyant:** Latin Amerika'ya yakın, tarafsız İspanyolca (İspanya'ya özgü sözcük yok: `Añadir` değil `Agregar`, `Ajustes` değil `Configuración`, `Comprobando` değil `Verificando`).
+- **Hitap:** `tú` kipi (`Elige`, `Guarda`, `¿Es esta tu red?`). `usted` ve `vosotros` kullanılmaz.
+- **Çevrilmeyenler:** araç/ürün adları (nmap, ClamAV, Wireshark, CarotOS, Poligon), kısaltmalar (SSH, UFW, DNS, SQL…), komut/dosya yolları, yer tutucular (`{tool}`, `{code}`).
+- **Sözlük:** target = `objetivo` (saldırı bağlamı); scan = `escanear`/`escaneo`; Firewall = `Firewall`; Enabled/Disabled = `Activado`/`Desactivado`; Status = `Estado`; Settings = `Configuración`; Language = `Idioma`; Refresh = `Actualizar`; Cancel = `Cancelar`; wordlist = `lista de palabras`; brute force = `fuerza bruta`; packet capture = `captura de paquetes`; PASS = `CORRECTO`, ATTENTION = `ATENCIÓN`, WARNING = `ADVERTENCIA` (karşıtı FAIL çıkarsa `FALLO`).
+- **Çift anlamlı kısa anahtarlar** (aynı İngilizce metin farklı yerde): bir çeviri tüm uygulamalarda geçerli olur; menü için isim, düğme için fiil gerekiyorsa fiil biçimi seçilir (`Scan` = `Escanear`).
+- **Parti sırası:** değişmeyecek uygulamalardan önce (Güvenlik Paneli → Sistem Sağlığı → Mağaza → USB → Carotene/CarotPot); Karşılama/Former/GSD uzun içerikleri, Karşılama yeni akışı (merkez-kol) yazıldıktan sonra.
+- Her partide: tablo (İngilizce, çeviri, Türkçe geri çeviri) kullanıcıya sunulur, onaylanınca `ekle` ile işlenir. `etkin: true` yalnız çekirdek uygulamalar büyük ölçüde bitince.
