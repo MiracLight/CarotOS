@@ -2,7 +2,7 @@
  "_meta": {
   "ad": "Русский",
   "durum": "taslak",
-  "etkin": false
+  "etkin": true
  },
  "metinler": {
   " Most tried usernames: {liste}.": "Чаще всего пробовали имена пользователей: {liste}.",
