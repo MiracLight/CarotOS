@@ -77,16 +77,16 @@ class KarsilamaAkisTesti(UygulamaDilTabani):
 
     def test_konu_acilir_bitirilir_ve_isaretlenir(self):
         self.hub_a_git()
-        self.p._on_konu_tikla(None, None, "gizlilik")
+        self.p._on_konu_tikla(None, None, "etik")
         self.pompala()
-        self.assertEqual(self.sayfa(), "network")
+        self.assertEqual(self.sayfa(), "etik")
         self.assertEqual(self.p.next_btn.get_label(), self.etiket("finish_topic"))
         self.assertTrue(self.p.skip_btn.get_visible())
         self.assertEqual(self.nokta_sayisi(), 1)
         self.tikla(self.p.next_btn)                                   # konuyu bitir
         self.assertEqual(self.sayfa(), "hub")
-        self.assertIn("gizlilik", self.ayar()["biten_konular"])      # kalici
-        alt, _ = self.p.hub_kartlari["gizlilik"]
+        self.assertIn("etik", self.ayar()["biten_konular"])          # kalici
+        alt, _ = self.p.hub_kartlari["etik"]
         self.assertTrue(alt.get_text().startswith("✓"))
         alt2, _ = self.p.hub_kartlari["sistem"]
         self.assertFalse(alt2.get_text().startswith("✓"))
@@ -135,7 +135,7 @@ class KarsilamaAkisTesti(UygulamaDilTabani):
     # -- kalicilik ve dil -----------------------------------------------------------------------------
     def test_biten_konular_yeni_pencerede_gorunur(self):
         self.hub_a_git()
-        self.p._on_konu_tikla(None, None, "gizlilik")
+        self.p._on_konu_tikla(None, None, "etik")
         self.tikla(self.p.next_btn)
         yeni = self.m.WelcomeWindow(self.m.load_settings())
         self.addCleanup(yeni.destroy)

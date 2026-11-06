@@ -760,6 +760,142 @@ PAGES = [
         ],
     },
     {
+        "id": "acikla",
+        "title": {"tr": "Komut Açıklayıcı", "en": "Command Explainer"},
+        "subtitle": {
+            "tr": "Bir komutu çalıştırmadan önce ne yapacağını öğren",
+            "en": "Find out what a command does before you run it",
+        },
+        "body": [
+            ("p", {
+                "tr": "Terminalde bir komut yazarken ne yapacağından emin değil misin? Satırı yazıp "
+                      "Alt+E tuşlarına bas: CarotOS komutu ÇALIŞTIRMADAN açıklar. Hiçbir şey çalışmaz, "
+                      "hiçbir şey ağa gönderilmez; her şey bilgisayarında kalır.",
+                "en": "Not sure what a command will do while you type it in the terminal? Write the line "
+                      "and press Alt+E: CarotOS explains it WITHOUT running it. Nothing is executed and "
+                      "nothing is sent over the network; it all stays on your computer.",
+            }),
+            ("bullets", [
+                {"tr": "Komutun her parçasının (boru, &&, ;) kısa bir özetini verir.",
+                 "en": "It gives a short summary of every part of the command (pipe, &&, ;)."},
+                {"tr": "Bayrakların ne işe yaradığını tek tek anlatır (ör. -l, -r, --no-install-recommends).",
+                 "en": "It explains what each flag does (e.g. -l, -r, --no-install-recommends)."},
+                {"tr": "Ağda ne kadar dikkat çekeceğini (gürültü) ve root yetkisi gerekip gerekmediğini söyler.",
+                 "en": "It tells you how much attention it draws on a network (noise) and whether root privileges are needed."},
+                {"tr": "Tehlikeli kalıpları uyarır: bir klasörü topluca silmek, internetten indirip doğrudan "
+                       "çalıştırmak (curl … | sh), bir disk aygıtına yazmak gibi.",
+                 "en": "It warns about dangerous patterns: deleting a whole folder, running something downloaded "
+                       "from the internet directly (curl … | sh), writing to a disk device, and so on."},
+                {"tr": "Veri tabanında olmayan bir komutu ya da bayrağı bilmiyormuş gibi yapmaz: açıkça \"tanımıyorum\" der.",
+                 "en": "It doesn't pretend to know a command or flag it doesn't have: it plainly says \"I don't know this\"."},
+            ]),
+            ("code", "sudo ufw status verbose"),
+            ("p", {
+                "tr": "Yukarıdaki satırı terminale yaz ama Enter'a basma; onun yerine Alt+E'ye bas. "
+                      "Komut satırından da kullanabilirsin:",
+                "en": "Type the line above in the terminal but don't press Enter; press Alt+E instead. "
+                      "You can also use it from the command line:",
+            }),
+            ("code", "carotos-acikla tar xzf arsiv.tar.gz"),
+            ("note", {
+                "tr": "Yapay zekâ değildir: hazır bir veri tabanıyla çalışır; kapsamı şimdilik temel Linux "
+                      "komutları ve savunma araçlarıdır. Değişkenleri ($ADI) ve takma adları çözmez, yalnızca "
+                      "bash'te çalışır. Bir komutu anlamadan çalıştırma.",
+                "en": "It is not an AI: it works from a ready-made database, and for now it covers the basic Linux "
+                      "commands and defensive tools. It doesn't resolve variables ($NAME) or aliases and works only "
+                      "in bash. Never run a command you don't understand.",
+            }),
+        ],
+    },
+    {
+        "id": "etik",
+        "title": {"tr": "Etik ve sorumluluk", "en": "Ethics and responsibility"},
+        "subtitle": {
+            "tr": "Güvenlik araçlarını yalnızca izinli yerlerde kullan",
+            "en": "Use security tools only where you have permission",
+        },
+        "body": [
+            ("p", {
+                "tr": "Bu araçlar öğrenmek ve kendi sistemini savunmak içindir. Başkasının ağında ya da "
+                      "sisteminde izinsiz tarama veya deneme yapmak birçok ülkede suçtur; geçerli kuralları kendin "
+                      "kontrol et. Bu metin hukuki tavsiye değildir.",
+                "en": "These tools are for learning and for defending your own systems. Scanning or trying things "
+                      "on someone else's network or system without permission is a criminal offence in many "
+                      "countries; check the rules that apply to you. This text is not legal advice.",
+            }),
+            ("p", {
+                "tr": "Bu yüzden Güvenlik Paneli, nmap, nikto, sqlmap ve hydra gibi araçlarda hedef olarak bir adres "
+                      "yazdığında önce hedefin kime ait olabileceğine bakar (adres sorgulaması yapmadan, yalnızca "
+                      "adrese bakarak):",
+                "en": "That is why, when you type a target address into tools like nmap, nikto, sqlmap and hydra, "
+                      "the Security Panel first checks who the target could belong to (just by looking at the "
+                      "address, without any lookup):",
+            }),
+            ("bullets", [
+                {"tr": "Kendi bilgisayarın (127.0.0.1, localhost): hiçbir şey sorulmaz.",
+                 "en": "Your own computer (127.0.0.1, localhost): nothing is asked."},
+                {"tr": "Özel ağ (ev, okul, kafe gibi): \"Bu ağ sana mı ait?\" bir kez sorulur; evet dersen o ağ hatırlanır.",
+                 "en": "A private network (home, school, café…): you are asked \"Is this your network?\" once; if you say yes, "
+                       "that network is remembered."},
+                {"tr": "Başka bir yer (açık internet adresi ya da geniş adres bloğu): hedefi aynen elle yazman "
+                       "istenir; yazmazsan araç çalışmaz.",
+                 "en": "Anywhere else (a public internet address or a wide address block): you must type the target "
+                       "exactly; if you don't, the tool does not run."},
+                {"tr": "Verdiğin her onay bilgisayarında bir günlüğe yazılır (~/.config/carotos-panel/etik-gunlugu.log); "
+                       "hiçbir yere gönderilmez.",
+                 "en": "Every confirmation you give is written to a log on your computer "
+                       "(~/.config/carotos-panel/etik-gunlugu.log); nothing is sent anywhere."},
+            ]),
+            ("note", {
+                "tr": "Güvenle alıştırma yapabileceğin yerler: kendi bilgisayarın (127.0.0.1) ve CarotOS Poligon.",
+                "en": "Safe places to practise: your own computer (127.0.0.1) and CarotOS Poligon.",
+            }),
+        ],
+    },
+    {
+        "id": "disk",
+        "title": {"tr": "Disk şifreleme ve swap", "en": "Disk encryption and swap"},
+        "subtitle": {
+            "tr": "Bilgisayarın çalınırsa verilerin güvende kalsın",
+            "en": "Keep your data safe if your computer is stolen",
+        },
+        "body": [
+            ("p", {
+                "tr": "Bilgisayarın kaybolur ya da çalınırsa, diski başka bir bilgisayara takan kişi şifresiz dosyaları "
+                      "okuyabilir. Tam disk şifreleme (LUKS) bunu önler: disk, parola girilmeden açılmaz.",
+                "en": "If your computer is lost or stolen, whoever puts its disk in another computer can read the "
+                      "files that aren't encrypted. Full-disk encryption (LUKS) prevents that: the disk won't open "
+                      "without the password.",
+            }),
+            ("note", {
+                "tr": "Disk şifrelemeyi kurulum sırasında, diski bölümlendirirken \"şifreli LVM\" seçeneğiyle açarsın. "
+                      "Sonradan eklemek zordur (diski yeniden kurmak gerekir). Şifreli diskin parolasını unutursan "
+                      "verilerin kurtarılamaz.",
+                "en": "You turn on disk encryption during installation, by choosing the \"encrypted LVM\" option when "
+                      "partitioning the disk. Adding it later is hard (you would need to reinstall). If you forget an "
+                      "encrypted disk's password, your data cannot be recovered.",
+            }),
+            ("p", {
+                "tr": "Swap da önemlidir: bellek dolunca sistem bellek içeriğini diske yazar. Şifresiz bir swap, "
+                      "parolalarını ve anahtarlarını diskte bırakabilir. CarotOS varsayılan olarak RAM içinde "
+                      "sıkıştırılmış bir swap (zram) kullanır; bu diske hiçbir şey yazmaz.",
+                "en": "Swap matters too: when memory fills up the system writes memory contents to disk. Unencrypted "
+                      "swap can leave your passwords and keys on the disk. By default CarotOS uses a swap compressed "
+                      "inside RAM (zram), which writes nothing to the disk.",
+            }),
+            ("bullets", [
+                {"tr": "Sistem Sağlığı'ndaki \"Swap şifreleme\" denetimi, diskte şifresiz swap olup olmadığına bakar.",
+                 "en": "The \"Swap encryption\" check in System Health looks for unencrypted swap on the disk."},
+                {"tr": "Varsa \"Disk swap'ını kapat\" düğmesi sunar: onay ister, ayar dosyasının yedeğini alır, zram'a dokunmaz.",
+                 "en": "If there is some, it offers a \"Disable disk swap\" button: it asks for confirmation, backs up the "
+                       "settings file and leaves zram alone."},
+                {"tr": "Disk şifreleme bilgisayar kapalıyken korur; açıkken ve oturum açıkken değil. Uzaklaşırken ekranı kilitle.",
+                 "en": "Disk encryption protects while the computer is off, not while it is on and you are logged in. "
+                       "Lock the screen when you walk away."},
+            ]),
+        ],
+    },
+    {
         "id": "resources",
         "title": {"tr": "Daha fazlası", "en": "Going further"},
         "subtitle": {
