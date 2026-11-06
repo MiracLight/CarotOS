@@ -61,6 +61,8 @@ def etkin_diller():
 
 
 def secici_adi(kod: str, ad: str, taslak: bool) -> str:
+    if _dil is not None:
+        return _dil.secici_adi(kod, ad, taslak)     # yazi tipi yoksa Latin ad (kutucuk gorunmesin)
     return f"{ad} (beta)" if taslak else ad
 
 

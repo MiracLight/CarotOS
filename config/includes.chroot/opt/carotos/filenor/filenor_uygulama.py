@@ -44,7 +44,7 @@ import filenor_motor as M  # noqa: E402
 import filenor_kurulum as K  # noqa: E402
 import filenor_sistem as S  # noqa: E402
 from filenor_dil import FilenorHata, hata_metni  # noqa: E402
-from filenor_dil import T as _T, etkin_diller, gecerli_dil, sec, varsayilan_dil  # noqa: E402
+from filenor_dil import T as _T, etkin_diller, gecerli_dil, sec, secici_adi, varsayilan_dil  # noqa: E402
 from filenor_metin import METIN  # noqa: E402
 
 APP_VERSION = "2.0"
@@ -1037,7 +1037,7 @@ class Uygulama(Gtk.Window):
         alt = Gtk.Box(spacing=8)
         self.dil_kutu = Gtk.ComboBoxText()
         for kod, ad, taslak in etkin_diller():
-            self.dil_kutu.append(kod, f"{ad} (beta)" if taslak else ad)
+            self.dil_kutu.append(kod, secici_adi(kod, ad, taslak))
         self.dil_kutu.set_active_id(self.lang)
         self.dil_kutu.connect("changed", self.dil_degisti)
         alt.pack_start(self.dil_kutu, True, True, 0)

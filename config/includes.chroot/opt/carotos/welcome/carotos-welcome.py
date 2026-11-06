@@ -1504,7 +1504,7 @@ class WelcomeWindow(Gtk.Window):
         etkin = dil.etkin_diller()
         sutun = 2 if len(etkin) <= 2 else 3             # iki dilde eski gorunum
         for sira, (code, name, taslak) in enumerate(etkin):
-            card = self._lang_card(code, name, DIL_ALT_ADI.get(code, ""))
+            card = self._lang_card(code, dil.gorunen_ad(code, name), DIL_ALT_ADI.get(code, ""))
             self.lang_cards[code] = card
             lang_row.attach(card["event"], sira % sutun, sira // sutun, 1, 1)
 

@@ -55,6 +55,13 @@ def etkin_diller():
     return [("tr", "Türkçe", False), ("en", "English", False)]
 
 
+def secici_adi(kod: str, ad: str, taslak: bool) -> str:
+    """Dil seciciye yazilacak ad (yazi tipi yoksa Latin ad; taslak ise '(beta)')."""
+    if _dil is not None:
+        return _dil.secici_adi(kod, ad, taslak)
+    return f"{ad} (beta)" if taslak else ad
+
+
 def gecerli_dil(kod: str):
     """Ayardaki dil seciciye girebiliyorsa kod, degilse None."""
     return kod if kod in {k for k, _, _ in etkin_diller()} else None

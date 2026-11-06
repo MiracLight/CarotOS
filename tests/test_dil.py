@@ -253,5 +253,50 @@ class DilOnceTesti(DilTabani):
         self.assertEqual(m["de"].keys(), {"a", "b", "liste"})
 
 
+class YaziTipiTesti(DilTabani):
+    """Yazi tipi yoksa 日本語/中文 kutucuk (tofu) olmasin: Latin ad gosterilir."""
+
+    def setUp(self):
+        super().setUp()
+        self._eski = dict(dil._yazi_onbellek)
+        self.addCleanup(lambda: (dil._yazi_onbellek.clear(), dil._yazi_onbellek.update(self._eski)))
+
+    def test_yazi_tipi_varsa_kendi_adi(self):
+        dil._yazi_onbellek.update({"ja": True, "zh": True})
+        self.assertEqual(dil.secici_adi("ja", "日本語", True), "日本語 (beta)")
+        self.assertEqual(dil.gorunen_ad("zh", "中文"), "中文")
+
+    def test_yazi_tipi_yoksa_latin_ad(self):
+        dil._yazi_onbellek.update({"ja": False, "zh": False})
+        self.assertEqual(dil.secici_adi("ja", "日本語", True), "Japanese (beta)")
+        self.assertEqual(dil.secici_adi("zh", "中文", False), "Chinese")
+        self.assertEqual(dil.gorunen_ad("ja", "日本語"), "Japanese")
+
+    def test_latin_ve_kiril_diller_etkilenmez(self):
+        dil._yazi_onbellek.update({"ja": False, "zh": False})
+        for kod, ad in (("de", "Deutsch"), ("ru", "Русский"), ("es", "Español"), ("tr", "Türkçe")):
+            self.assertEqual(dil.gorunen_ad(kod, ad), ad)
+
+    def test_fc_list_yoksa_adi_degistirmez(self):
+        from unittest import mock
+        dil._yazi_onbellek.clear()
+        with mock.patch("shutil.which", return_value=None):
+            self.assertTrue(dil.yazi_tipi_var_mi("ja"))
+        self.assertEqual(dil.gorunen_ad("ja", "日本語") if dil._yazi_onbellek.get("ja") else "x", "日本語")
+
+    def test_fc_list_bos_cikarsa_yok_sayilir(self):
+        from unittest import mock
+        dil._yazi_onbellek.clear()
+        sahte = mock.Mock(returncode=0, stdout="
+")
+        with mock.patch("shutil.which", return_value="/usr/bin/fc-list"), mock.patch("subprocess.run", return_value=sahte):
+            self.assertFalse(dil.yazi_tipi_var_mi("zh"))
+        dil._yazi_onbellek.clear()
+        sahte = mock.Mock(returncode=0, stdout="Noto Sans CJK JP
+")
+        with mock.patch("shutil.which", return_value="/usr/bin/fc-list"), mock.patch("subprocess.run", return_value=sahte):
+            self.assertTrue(dil.yazi_tipi_var_mi("zh"))
+
+
 if __name__ == "__main__":
     unittest.main()

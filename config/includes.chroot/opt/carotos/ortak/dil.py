@@ -94,8 +94,38 @@ def etkin_diller(dizin=None):
     return sonuc
 
 
+# Yazi tipi yoksa kendi yazisiyla (日本語, 中文) yazilan ad kutucuk (tofu) olarak cikar: Latin ad kullanilir.
+LATIN_ADLAR = {"ja": "Japanese", "zh": "Chinese"}
+_yazi_onbellek = {}
+
+
+def yazi_tipi_var_mi(kod):
+    """Sistemde `kod` dilinin yazisini cizen bir yazi tipi var mi (fc-list). fc-list yoksa/belirlenemezse True
+    (adi degistirme). Sonuc surec basina onbelleklenir."""
+    if kod not in _yazi_onbellek:
+        durum = True
+        try:
+            import shutil
+            import subprocess
+            if shutil.which("fc-list"):
+                r = subprocess.run(["fc-list", f":lang={kod}", "family"], capture_output=True, text=True, timeout=10)
+                durum = bool(r.stdout.strip()) if r.returncode == 0 else True
+        except (OSError, ValueError, Exception):  # noqa: BLE001
+            durum = True
+        _yazi_onbellek[kod] = durum
+    return _yazi_onbellek[kod]
+
+
+def gorunen_ad(kod, ad):
+    """Dilin seciciye/karta yazilacak adi: yazi tipi eksikse Latin harfli ad (kutucuk gorunmesin)."""
+    if kod in LATIN_ADLAR and not yazi_tipi_var_mi(kod):
+        return LATIN_ADLAR[kod]
+    return ad
+
+
 def secici_adi(kod, ad, taslak):
     """Dil seciciye yazilacak metin; gozden gecirilmemis dile 'beta' eklenir."""
+    ad = gorunen_ad(kod, ad)
     return f"{ad} (beta)" if taslak else ad
 
 
