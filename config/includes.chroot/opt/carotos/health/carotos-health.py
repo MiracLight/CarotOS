@@ -986,6 +986,68 @@ def check_memory():
                        "en": f"{used:.2f} GB / {total:.2f} GB in use"}}
 
 
+def swap_cihazlari(swaps_metni):
+    """/proc/swaps metninden [(yol, tur)] dondurur (zram dahil; baslik satiri atlanir)."""
+    sonuc = []
+    for satir in (swaps_metni or "").splitlines()[1:]:
+        parca = satir.split()
+        if len(parca) >= 2:
+            sonuc.append((parca[0], parca[1]))
+    return sonuc
+
+
+def _swap_sifreli_mi(yol, tur):
+    """True/False; belirlenemezse None. LUKS (dm-crypt) zincirde varsa sifreli sayilir:
+    bolum -> crypt -> lvm -> swap gibi zincirler `lsblk -s` ile ust ust listelenir."""
+    cihaz = yol
+    if tur == "file":
+        code, out = run(["findmnt", "-n", "-o", "SOURCE", "-T", yol])
+        if code != 0 or not out:
+            return None
+        cihaz = out.splitlines()[0].split("[")[0]
+    code, out = run(["lsblk", "-s", "-n", "-o", "TYPE", cihaz])
+    if code != 0 or not out:
+        return None
+    return "crypt" in out.split()
+
+
+def check_swap_encryption(swaps_metni=None, sifreli_mi=None):
+    """Diskteki swap sifreli mi? zram (RAM ici) disk sayilmaz. Bellek icerigi (parola, anahtar)
+    sifresiz swap yoluyla diske yazilabilir. Parametreler test icindir."""
+    if swaps_metni is None:
+        swaps_metni = read_file("/proc/swaps") or ""
+    sifreli_mi = sifreli_mi or _swap_sifreli_mi
+    cihazlar = swap_cihazlari(swaps_metni)
+    diskte = [(y, t) for y, t in cihazlar if "/zram" not in y]
+    if not cihazlar:
+        return {"status": OK, "detail": {"tr": "Swap kullanılmıyor.", "en": "No swap is in use."}}
+    if not diskte:
+        return {"status": OK,
+                "detail": {"tr": "Diskte swap yok; yalnızca RAM içinde sıkıştırılmış zram kullanılıyor.",
+                           "en": "There is no swap on disk; only RAM-compressed zram is used."}}
+    sifresiz, belirsiz = [], []
+    for yol, tur in diskte:
+        durum = sifreli_mi(yol, tur)
+        if durum is False:
+            sifresiz.append(yol)
+        elif durum is None:
+            belirsiz.append(yol)
+    if sifresiz:
+        liste = ", ".join(sifresiz)
+        return {"status": WARN,
+                "detail": {"tr": f"Diskte şifresiz swap var ({liste}): bellek içeriği (parolalar, anahtarlar) diske yazılmış olabilir.",
+                           "en": f"Unencrypted swap on disk ({liste}): memory contents (passwords, keys) may be written to disk."}}
+    if belirsiz:
+        liste = ", ".join(belirsiz)
+        return {"status": INFO,
+                "detail": {"tr": f"Diskteki swap'ın şifreli olup olmadığı belirlenemedi ({liste}).",
+                           "en": f"Could not tell whether swap on disk is encrypted ({liste})."}}
+    liste = ", ".join(y for y, _ in diskte)
+    return {"status": OK,
+            "detail": {"tr": f"Diskteki swap şifreli ({liste}).",
+                       "en": f"Swap on disk is encrypted ({liste})."}}
+
+
 def check_world_writable():
     """/etc altinda herkesin yazabildigi dosya guvenlik riskidir."""
     code, out = run(["find", "/etc", "-xdev", "-type", "f", "-perm", "-0002",
@@ -1319,6 +1381,19 @@ CHECKS = [
                       "çalıştığını gösterir.",
                 "en": "Idle memory usage shows how lightweight the system is."},
         "fix": "free -h",
+    },
+    {
+        "id": "swap_crypt", "category": "storage", "func": check_swap_encryption,
+        "title": {"tr": "Swap şifreleme", "en": "Swap encryption"},
+        "why": {"tr": "Bellek dolunca sistem içeriğini diske yazar; şifresiz swap, parolaların ve "
+                      "anahtarların diskte kalmasına yol açabilir.",
+                "en": "When memory fills up the system writes its contents to disk; unencrypted swap "
+                      "can leave passwords and keys on disk."},
+        "fix": "swapon --show; lsblk -s -o NAME,TYPE",
+        "action": {"cmd": "awk 'NR>1 && $1 !~ /zram/ {print $1}' /proc/swaps | xargs -r swapoff; "
+                          "sed -i.carotos-yedek -E '/^[^#].*[[:space:]]swap[[:space:]]/ s/^/#/' /etc/fstab",
+                   "label": {'tr': 'Disk swap\'ını kapat', 'en': 'Disable disk swap'},
+                   "confirm": True},
     },
 ]
 
