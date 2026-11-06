@@ -48,6 +48,13 @@ echo "CarotOS kurulum betiği tamamlandı."
 chmod 755 /usr/local/sbin/carotos-firstboot.sh
 chmod 755 /usr/local/sbin/carotos-dil-hazirla
 chmod 755 /usr/local/bin/carotos-saat-eslestir
+chmod 755 /usr/local/bin/carotos-acikla
+chmod 644 /usr/share/carotos/acikla.bash
+# Komut Aciklayici (Alt+E): etkilesimli bash'e baglanti (yinelenmez)
+if ! grep -q 'carotos/acikla.bash' /etc/bash.bashrc; then
+    printf '\n# CarotOS Komut Aciklayici (Alt+E)\n[ -r /usr/share/carotos/acikla.bash ] && . /usr/share/carotos/acikla.bash\n' >> /etc/bash.bashrc
+fi
+grep -q 'carotos/acikla.bash' /etc/bash.bashrc || { echo "CarotOS HATA: /etc/bash.bashrc Komut Aciklayici baglantisini icermiyor." >&2; exit 1; }
 chmod 644 /etc/skel/.config/autostart/carotos-saat-eslestir.desktop
 chmod 644 /etc/systemd/system/carotos-firstboot.service
 systemctl enable carotos-firstboot.service

@@ -91,7 +91,7 @@ def cikar():
                             kayit["yer"].add(rel)
                     else:
                         dinamik.append((rel, dugum.lineno))
-            elif (isinstance(dugum, ast.Call) and isinstance(dugum.func, ast.Name) and dugum.func.id == "T"
+            elif (isinstance(dugum, ast.Call) and isinstance(dugum.func, ast.Name) and dugum.func.id in ("T", "A")
                   and len(dugum.args) == 2 and not dugum.keywords
                   and _sabit(dugum.args[0]) and _sabit(dugum.args[1])):
                 tr, en = dugum.args[0].value, dugum.args[1].value

@@ -1,0 +1,46 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
+"""CarotOS Komut Açıklayıcı (komut satırı): bir komutu ÇALIŞTIRMADAN açıklar.
+
+Kullanım:
+  carotos-acikla [--dil KOD] <komut ve argümanları…>
+  carotos-acikla [--dil KOD] --satir "<tüm satır>"      (Alt+E bağlantısı bunu kullanır)
+  echo "sudo ufw status" | carotos-acikla               (satır stdin'den)
+
+Komutu hiçbir zaman çalıştırmaz; yalnızca ayrıştırır. Hiçbir şey ağa gönderilmez.
+"""
+import os
+import sys
+
+_BURASI = os.path.dirname(os.path.abspath(__file__))
+for _yol in ("/opt/carotos/acikla", os.path.join(_BURASI, "..", "..", "..", "opt", "carotos", "acikla")):
+    if os.path.isdir(_yol):
+        sys.path.insert(0, os.path.abspath(_yol))
+        break
+
+import acikla_motor  # noqa: E402
+
+
+def main(argv):
+    kod = None
+    kalan = list(argv)
+    if kalan and kalan[0] == "--dil" and len(kalan) >= 2:
+        kod, kalan = kalan[1], kalan[2:]
+    if kalan and kalan[0] in ("-h", "--help"):
+        print(__doc__.strip())
+        return 0
+    if kalan and kalan[0] == "--satir":
+        satir = " ".join(kalan[1:])
+    elif kalan:
+        satir = " ".join(kalan)
+    elif not sys.stdin.isatty():
+        satir = sys.stdin.read().strip()
+    else:
+        print(__doc__.strip())
+        return 0
+    sys.stdout.write(acikla_motor.acikla(satir, kod))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
