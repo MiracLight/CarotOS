@@ -287,13 +287,11 @@ class YaziTipiTesti(DilTabani):
     def test_fc_list_bos_cikarsa_yok_sayilir(self):
         from unittest import mock
         dil._yazi_onbellek.clear()
-        sahte = mock.Mock(returncode=0, stdout="
-")
+        sahte = mock.Mock(returncode=0, stdout="\n")
         with mock.patch("shutil.which", return_value="/usr/bin/fc-list"), mock.patch("subprocess.run", return_value=sahte):
             self.assertFalse(dil.yazi_tipi_var_mi("zh"))
         dil._yazi_onbellek.clear()
-        sahte = mock.Mock(returncode=0, stdout="Noto Sans CJK JP
-")
+        sahte = mock.Mock(returncode=0, stdout="Noto Sans CJK JP\n")
         with mock.patch("shutil.which", return_value="/usr/bin/fc-list"), mock.patch("subprocess.run", return_value=sahte):
             self.assertTrue(dil.yazi_tipi_var_mi("zh"))
 
