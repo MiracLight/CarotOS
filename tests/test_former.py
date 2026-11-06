@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Former testleri: zaman cizelgesi motoru (GTK'siz), 14 konunun icerik
+"""Former testleri: zaman cizelgesi motoru (GTK'siz), 15 konunun icerik
 dogrulamasi (iki dilli, sahneyle tutarli), Guvenlik Paneli'nin gercek arac
 listesiyle capraz kontrol, simge yolu bulma ve (ekran varsa) arayuzun
 butun konularda hatasiz gezilmesi.
@@ -132,14 +132,14 @@ class ZamanMotoruTesti(unittest.TestCase):
 
 # ---------------------------------------------------------------------------
 class IcerikTesti(unittest.TestCase):
-    """konular/ altindaki 14 konunun yapisal dogrulugu."""
+    """konular/ altindaki 15 konunun yapisal dogrulugu."""
 
     @classmethod
     def setUpClass(cls):
         cls.konular = konular.tumu()
 
-    def test_on_dort_konu_ve_benzersiz_kimlik(self):
-        self.assertEqual(len(self.konular), 14)
+    def test_on_bes_konu_ve_benzersiz_kimlik(self):
+        self.assertEqual(len(self.konular), 15)
         kimlikler = [k["id"] for k in self.konular]
         self.assertEqual(len(kimlikler), len(set(kimlikler)), kimlikler)
         self.assertEqual(set(kimlikler), set(konular.SIRA))
@@ -333,7 +333,7 @@ class SiblingAyarSenkronTesti(unittest.TestCase):
 @unittest.skipUnless(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"),
                      "ekran yok (xvfb-run ile calistirin)")
 class ArayuzDumanTesti(unittest.TestCase):
-    """Pencereyi acar, 14 konunun hepsini gezer, dil/tema degistirir.
+    """Pencereyi acar, 15 konunun hepsini gezer, dil/tema degistirir.
     Yakalanmayan istisna olmamali."""
 
     def test_butun_konular_hatasiz_gezilir(self):

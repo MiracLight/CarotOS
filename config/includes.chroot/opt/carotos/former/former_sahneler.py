@@ -432,3 +432,30 @@ def giris_sahnesi() -> dict:
                   "w": kw, "h": kh, "simge": simge, "metin": ad, "alt": alt, "aktif": False})
     return {"genislik": PW, "yukseklik": PH, "vurgu": "karsilama", "sayfa": None,
             "baslik": T("CarotOS", "CarotOS"), "ogeler": o}
+
+
+# ---------------------------------------------------------------------------
+# Komut Aciklayici (terminalde Alt+E)
+# ---------------------------------------------------------------------------
+def _terminal_sayfasi(p, sayfa, gecmis):
+    """Tek bir terminal sayfasi: cikti alani, komut satiri, Alt+E rozeti, alt not."""
+    return [
+        {"id": p + "_pencere", "tur": "cikti", "x": 10, "y": 34, "w": 740, "h": 290, "sayfa": sayfa,
+         "satirlar": list(gecmis)},
+        {"id": p + "_komut", "tur": "alan", "x": 10, "y": 334, "w": 560, "h": 28, "sayfa": sayfa, "deger": "",
+         "yer": T("Komutu buraya yaz, Enter'a basma", "Type the command here, do not press Enter")},
+        {"id": p + "_tus", "tur": "rozet", "x": 584, "y": 336, "w": 166, "h": 24, "sayfa": sayfa, "renk": "gri",
+         "metin": T("Alt+E: açıkla", "Alt+E: explain")},
+        {"id": p + "_not", "tur": "metin", "x": 12, "y": 374, "w": 736, "h": 30, "sayfa": sayfa, "sar": True,
+         "boyut": 8.2, "renk": "soluk",
+         "metin": T("Komut asla çalıştırılmaz; yalnızca ne yapacağı anlatılır.",
+                    "The command is never run; it only explains what it would do.")},
+    ]
+
+
+def acikla_sahnesi() -> dict:
+    """Terminal penceresi: komutu yaz, Alt+E ile aciklamayi gor. Iki sayfa: sakin ornek, tehlikeli ornek."""
+    gecmis = ["carot@carotos:~$ ls", "Belgeler  Masaüstü  arsiv.tar.gz", ""]
+    o = _terminal_sayfasi("a1", "bir", gecmis) + _terminal_sayfasi("a2", "iki", gecmis)
+    return {"genislik": PW, "yukseklik": PH, "vurgu": "guvenlik", "sayfa": "bir",
+            "baslik": T("Terminal", "Terminal"), "ogeler": o}

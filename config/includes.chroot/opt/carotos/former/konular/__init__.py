@@ -5,7 +5,7 @@ import importlib
 
 # Gosterim sirasi. grup: giris / araclar / uygulamalar
 SIRA = ["giris", "panel", "nmap", "tcpdump", "tshark", "aircrack_ng", "nikto", "sqlmap", "john", "hydra", "ufw",
-        "fail2ban", "carotpot", "carotene"]
+        "fail2ban", "carotpot", "carotene", "acikla"]
 
 
 def tumu():
