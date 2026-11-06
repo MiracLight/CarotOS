@@ -74,6 +74,44 @@ class HookTesti(unittest.TestCase):
             if "x-www-browser" in satir:
                 self.assertNotIn("|| true", satir)
 
+    def test_usr_lib_os_release_carotos_olur(self):
+        # hardinfo2 once /usr/lib/os-release'i okur (yalniz CachyOS icin /etc'e bakar): Debian'in dosyasi orada kalirsa
+        # "Debian" gorunur. Hook bloku sahte bir kokte (dpkg-divert taklidiyle) calistirilir.
+        import re
+        import tempfile
+        veri = dict(hook_listesi())["9999-carotos-setup.hook.chroot"].decode("utf-8")
+        blok = re.search(r"(if \[ -f /etc/os-release \].*?\nfi\n)", veri, re.S).group(1)
+        self.assertIn("dpkg-divert --local --rename --divert /usr/lib/os-release.debian --add /usr/lib/os-release", blok)
+        kok = tempfile.mkdtemp(prefix="osrel-")
+        os.makedirs(os.path.join(kok, "etc"))
+        os.makedirs(os.path.join(kok, "usr", "lib"))
+        os.makedirs(os.path.join(kok, "bin"))
+        with open(os.path.join(kok, "etc", "os-release"), "w") as f:
+            f.write('PRETTY_NAME="CarotOS 1.3 (Eggshell)"\nID=carotos\nID_LIKE=debian\n')
+        with open(os.path.join(kok, "usr", "lib", "os-release"), "w") as f:
+            f.write('PRETTY_NAME="Debian GNU/Linux 13 (trixie)"\nID=debian\n')
+        # dpkg-divert taklidi: --rename ile hedef dosyayi --divert yoluna tasir
+        stub = os.path.join(kok, "bin", "dpkg-divert")
+        with open(stub, "w") as f:
+            f.write('#!/bin/sh\nwhile [ $# -gt 0 ]; do case "$1" in --divert) d="$2"; shift;; --add) t="$2"; shift;; esac; shift; done\n'
+                    'mv "$t" "$d"\n')
+        os.chmod(stub, 0o755)
+        yerel = blok.replace("/usr/lib/os-release", kok + "/usr/lib/os-release").replace("/etc/os-release", kok + "/etc/os-release")
+        sonuc = subprocess.run([SH, "-e"], input=yerel.encode("utf-8"), capture_output=True, timeout=30,
+                               env=dict(os.environ, PATH=kok + "/bin:" + os.environ.get("PATH", "")))
+        self.assertEqual(sonuc.returncode, 0, sonuc.stderr.decode("utf-8", "replace"))
+        yeni = open(os.path.join(kok, "usr", "lib", "os-release")).read()
+        self.assertIn("ID=carotos", yeni)
+        self.assertNotIn("ID=debian\n", yeni)
+        eski = open(os.path.join(kok, "usr", "lib", "os-release.debian")).read()
+        self.assertIn("ID=debian", eski)          # Debian'in dosyasi divert yoluna tasindi
+
+    def test_etc_os_release_carotos(self):
+        yol = os.path.join(KOK, "config", "includes.chroot", "etc", "os-release")
+        icerik = open(yol, encoding="utf-8").read()
+        self.assertIn("ID=carotos", icerik)
+        self.assertIn("ID_LIKE=debian", icerik)
+
     def test_wireshark_hook(self):
         # dumpcap yetkileri ve wireshark grubu olusmali; olusmazsa derleme durmali
         veri = dict(hook_listesi())["9989-carotos-wireshark.hook.chroot"].decode("utf-8")

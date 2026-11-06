@@ -30,6 +30,18 @@ if [ -n "$(getent group sudo)" ]; then
     done
 fi
 
+# Sistem kimligi: hardinfo2 (ve benzer araclar) once /usr/lib/os-release'i okur, /etc/os-release'i yalniz CachyOS icin kullanir.
+# Debian'in dosyasi orada kaldigi icin "Debian" gorunuyordu. Dosya CarotOS'unkiyle degistirilir; dpkg-divert ile
+# base-files guncellemesi onu geri almaz (yeni Debian dosyasi os-release.debian olarak yanina yazilir).
+if [ -f /etc/os-release ] && grep -q '^ID=carotos' /etc/os-release; then
+    cp /etc/os-release /usr/lib/os-release.carotos
+    dpkg-divert --local --rename --divert /usr/lib/os-release.debian --add /usr/lib/os-release
+    mv /usr/lib/os-release.carotos /usr/lib/os-release
+    chmod 644 /usr/lib/os-release
+    grep -q '^ID=carotos' /usr/lib/os-release || { echo "CarotOS HATA: /usr/lib/os-release CarotOS kimligini tasimiyor." >&2; exit 1; }
+    echo "CarotOS: /usr/lib/os-release CarotOS kimligine ayarlandi (dpkg-divert)."
+fi
+
 echo "CarotOS kurulum betiği tamamlandı."
 
 # İlk açılış servisi (kurulum sonrası sudo düzeltmesi)
