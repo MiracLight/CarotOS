@@ -142,8 +142,8 @@ class KarsilamaAkisTesti(UygulamaDilTabani):
         yeni.show_all()
         yeni.sayfaya_git("hub")
         self.pompala()
-        self.assertEqual(yeni.gezinme.biten_konular(), ["gizlilik"])
-        self.assertTrue(yeni.hub_kartlari["gizlilik"][0].get_text().startswith("✓"))
+        self.assertEqual(yeni.gezinme.biten_konular(), ["etik"])
+        self.assertTrue(yeni.hub_kartlari["etik"][0].get_text().startswith("✓"))
 
     def test_dil_degisince_ayni_sayfada_kalir(self):
         self.hub_a_git()
