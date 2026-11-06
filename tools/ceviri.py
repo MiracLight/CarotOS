@@ -80,7 +80,8 @@ def cikar():
             if isinstance(dugum, ast.Dict):
                 anahtar = {k.value: v for k, v in zip(dugum.keys, dugum.values)
                            if isinstance(k, ast.Constant) and isinstance(k.value, str)}
-                if "tr" in anahtar and "en" in anahtar:
+                if "tr" in anahtar and "en" in anahtar and (set(anahtar) & set(KODLAR)) <= {"tr", "en"}:
+                    # tr/en disinda dil kodu da tasiyan sozluk (ör. DIL_ALT_ADI) bir dil tablosudur, ceviri cifti degil
                     if _sabit(anahtar["tr"]) and _sabit(anahtar["en"]):
                         tr, en = anahtar["tr"].value, anahtar["en"].value
                     elif isinstance(anahtar["tr"], ast.Dict) and isinstance(anahtar["en"], ast.Dict):

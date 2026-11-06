@@ -54,10 +54,14 @@ class AgSayfasiTesti(unittest.TestCase):
         cls.ids = [p["id"] for p in cls.pages]
         cls.sayfa = next(p for p in cls.pages if p["id"] == "network")
 
-    def test_sistem_hazirligindan_hemen_sonra(self):
-        # welcome -> appearance -> wallpaper (hazirlik) -> network
-        self.assertEqual(self.ids[:4], ["welcome", "appearance", "wallpaper", "network"])
+    def test_gizlilik_konusunun_sayfasi(self):
+        # Yeni akis (merkez-kol): welcome -> appearance -> wallpaper -> hub; ag sayfasi "Ag ve gizlilik" konusunda.
+        self.assertEqual(self.ids[:4], ["welcome", "appearance", "wallpaper", "hub"])
         self.assertEqual(len(self.ids), len(set(self.ids)))
+        sys.path.insert(0, os.path.dirname(WELCOME))
+        import gezinme
+        konu = next(k for k in gezinme.KONULAR if "network" in k["sayfalar"])
+        self.assertEqual(konu["id"], "gizlilik")
 
     def test_her_metin_iki_dilde_dolu(self):
         for m in metinler(self.sayfa):
