@@ -40,3 +40,4 @@ gir1.2-notify-0.7
 libnotify-bin
 systemd-zram-generator
 libu2f-udev
+systemd-timesyncd

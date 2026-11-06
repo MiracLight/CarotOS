@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=CarotOS Saat Eşleştirme
+Name[en]=CarotOS Clock Sync
+Comment=Panel saatini sistemin zaman dilimiyle eşleştirir
+Comment[en]=Matches the panel clock to the system time zone
+Exec=/usr/local/bin/carotos-saat-eslestir
+Terminal=false
+NoDisplay=true
+X-GNOME-Autostart-Delay=3
+OnlyShowIn=XFCE;

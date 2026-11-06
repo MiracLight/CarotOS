@@ -47,6 +47,8 @@ echo "CarotOS kurulum betiği tamamlandı."
 # İlk açılış servisi (kurulum sonrası sudo düzeltmesi)
 chmod 755 /usr/local/sbin/carotos-firstboot.sh
 chmod 755 /usr/local/sbin/carotos-dil-hazirla
+chmod 755 /usr/local/bin/carotos-saat-eslestir
+chmod 644 /etc/skel/.config/autostart/carotos-saat-eslestir.desktop
 chmod 644 /etc/systemd/system/carotos-firstboot.service
 systemctl enable carotos-firstboot.service
 echo "CarotOS: firstboot servisi etkinlestirildi."
