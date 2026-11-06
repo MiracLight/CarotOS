@@ -27,6 +27,10 @@ if ORTAK not in sys.path:
     sys.path.insert(0, ORTAK)
 import dil  # noqa: E402  (ortak dil katmani: ortak/dil.py)
 import sistem_dili as sd  # noqa: E402  (dil paketi/locale hazirligi)
+_BURASI = os.path.dirname(os.path.abspath(__file__))
+if _BURASI not in sys.path:
+    sys.path.insert(0, _BURASI)
+import gezinme  # noqa: E402  (merkez-kol gezinme modeli: gezinme.py)
 import tema  # noqa: E402
 
 VURGU = "karsilama"                 # ortak/tema.py: marka mavisi
@@ -131,6 +135,17 @@ PAGES = [
             "tr": "Masaüstünüz için bir arka plan seçin",
             "en": "Choose a background for your desktop",
         },
+    },
+    {
+        "id": "hub",
+        "title": {"tr": "Ne öğrenmek istersin?", "en": "What would you like to learn?"},
+        "subtitle": {
+            "tr": "İstediğin konuyu seç, bitirdiğin konunun yanında ✓ görünür. Hepsini görmek zorunda değilsin; "
+                  "dilediğin zaman “Konuları atla” ile sona geçebilirsin.",
+            "en": "Pick any topic; a ✓ appears next to the ones you finish. You don't have to see them all; "
+                  "you can jump to the end any time with “Skip topics”.",
+        },
+        "body": [("hub", None)],
     },
     {
         "id": "network",
@@ -810,7 +825,7 @@ def _varsayilan_dil():
 
 
 DEFAULTS = {"lang": _varsayilan_dil(), "theme": "dark", "show_on_startup": True,
-            "wallpaper": ""}
+            "wallpaper": "", "biten_konular": []}
 
 # Sihirbaz ust bandindaki secicilerin yaninda gosterilen aciklama
 PICK_TEXTS = {
@@ -874,11 +889,19 @@ DIL_HAZIRLIK = {
         "en": "Setup could not be completed. Check your internet connection. CarotOS apps still open in "
               "your chosen language."},
 }
+HUB_TEXTS = {
+    "finish_topic": {"tr": "Konuyu bitir", "en": "Finish topic"},
+    "skip_topics": {"tr": "Konuları atla", "en": "Skip topics"},
+    "to_end": {"tr": "Sona geç", "en": "Go to the end"},
+    "topic_pages": {"tr": "{n} sayfa", "en": "{n} pages"},
+}
+UI.update(HUB_TEXTS)
 UI.update(DIL_HAZIRLIK)
 UI.update(PICK_TEXTS)
 
 # tr/en sozlukleri her dil icin yedekli olur (eksik ceviri Ingilizceye duser)
 UI = dil.zenginlestir(UI)
+KONULAR = dil.zenginlestir(gezinme.KONULAR)
 PAGES = dil.zenginlestir(PAGES)
 SCOPE_NOTE = dil.zenginlestir(SCOPE_NOTE)
 LANG_CHANGED_NOTE = dil.zenginlestir(LANG_CHANGED_NOTE)
@@ -901,6 +924,8 @@ def load_settings():
     except (OSError, ValueError):
         pass
     data["lang"] = dil.gecerli(data.get("lang"))     # bozuk/bilinmeyen kayitli dil -> en
+    if not isinstance(data.get("biten_konular"), list):
+        data["biten_konular"] = []
     return data
 
 
@@ -1290,7 +1315,8 @@ class WelcomeWindow(Gtk.Window):
         self.theme = settings["theme"]
         self.wallpaper = settings.get("wallpaper", "") or ""
         self.wp_cards = {}
-        self.index = 0
+        self.gezinme = gezinme.Gezinme(settings.get("biten_konular", []))
+        self.hub_kartlari = {}
 
         self.set_default_size(940, 660)
         self.set_size_request(820, 580)
@@ -1379,15 +1405,7 @@ class WelcomeWindow(Gtk.Window):
         self.dots = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         self.dots.set_halign(Gtk.Align.CENTER)
         self.dots.set_valign(Gtk.Align.CENTER)
-        for i in range(len(PAGES)):
-            dot = Gtk.Label(label="")
-            dot.get_style_context().add_class("dot")
-            dot_box = Gtk.EventBox()
-            dot_box.add(dot)
-            dot_box.connect("button-press-event", self.on_dot_clicked, i)
-            dot_box.connect("realize", self._el_isaretci_yap)
-            self.dots.pack_start(dot_box, False, False, 0)
-        box.set_center_widget(self.dots)
+        box.set_center_widget(self.dots)          # noktalar bolume gore _noktalari_kur() ile dolar
 
         self.next_btn = Gtk.Button()
         self.next_btn.get_style_context().add_class("suggested-action")
@@ -1397,6 +1415,12 @@ class WelcomeWindow(Gtk.Window):
         self.back_btn = Gtk.Button()
         self.back_btn.connect("clicked", self.on_back)
         box.pack_end(self.back_btn, False, False, 0)
+
+        # Hub'da ve konularda her zaman gorunur; baslangicta (zorunlu bolum) gizli
+        self.skip_btn = Gtk.Button()
+        self.skip_btn.set_no_show_all(True)
+        self.skip_btn.connect("clicked", self.on_skip)
+        box.pack_end(self.skip_btn, False, False, 0)
 
         return box
 
@@ -1853,7 +1877,60 @@ class WelcomeWindow(Gtk.Window):
             frame.add(placeholder)
         return frame
 
+    def build_hub_block(self):
+        """Konu kartlari (iki sutun). Karta tiklayinca konu acilir; bitirilen konunun karti ✓ alir."""
+        self.hub_kartlari = {}
+        izgara = Gtk.Grid()
+        izgara.set_column_spacing(14)
+        izgara.set_row_spacing(14)
+        izgara.set_halign(Gtk.Align.CENTER)
+        for n, konu in enumerate(KONULAR):
+            kart = Gtk.EventBox()
+            kart.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
+            kart.connect("button-press-event", self._on_konu_tikla, konu["id"])
+            kart.connect("realize", self._el_isaretci_yap)
+            ic = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+            ic.get_style_context().add_class("konu-kart")
+            ic.get_style_context().add_class("pad")
+            ic.set_size_request(292, 124)
+            baslik = Gtk.Label(xalign=0.0)
+            baslik.set_markup("<b>%s</b>" % GLib.markup_escape_text(dil.metin(konu["baslik"], self.lang)))
+            baslik.set_line_wrap(True)
+            ic.pack_start(baslik, False, False, 0)
+            aciklama = Gtk.Label(label=dil.metin(konu["aciklama"], self.lang), xalign=0.0)
+            aciklama.set_line_wrap(True)
+            aciklama.set_max_width_chars(36)
+            aciklama.get_style_context().add_class("body-text")
+            ic.pack_start(aciklama, True, True, 0)
+            alt = Gtk.Label(xalign=0.0)
+            alt.get_style_context().add_class("page-subtitle")
+            ic.pack_end(alt, False, False, 0)
+            kart.add(ic)
+            izgara.attach(kart, n % 2, n // 2, 1, 1)
+            self.hub_kartlari[konu["id"]] = (alt, len(konu["sayfalar"]))
+        self._hub_guncelle()
+        return izgara
+
+    def _hub_guncelle(self):
+        for kimlik, (alt, sayfa_sayisi) in self.hub_kartlari.items():
+            metin = dil.T(UI["topic_pages"], self.lang, n=sayfa_sayisi)
+            ctx = alt.get_style_context()
+            if kimlik in self.gezinme.bitenler:
+                alt.set_text("\u2713 " + metin)
+                ctx.add_class("konu-bitti")
+            else:
+                alt.set_text(metin)
+                ctx.remove_class("konu-bitti")
+
+    def _on_konu_tikla(self, _widget, _event, kimlik):
+        if self.gezinme.konuyu_ac(kimlik):
+            self.stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT)
+            self.refresh()
+        return True
+
     def build_block(self, kind, payload):
+        if kind == "hub":
+            return self.build_hub_block()
         if kind == "p":
             label = Gtk.Label(label=payload[self.lang], xalign=0.0)
             label.set_line_wrap(True)
@@ -2022,15 +2099,20 @@ class WelcomeWindow(Gtk.Window):
     # -- durum yenileme ----------------------------------------------------
 
     def refresh(self):
-        page = PAGES[self.index]
-        self.stack.set_visible_child_name(page["id"])
+        g = self.gezinme
+        self.stack.set_visible_child_name(g.sayfa_id())
 
         self.back_btn.set_label(UI["back"][self.lang])
-        self.back_btn.set_sensitive(self.index > 0)
+        self.back_btn.set_sensitive(g.geri_var())
 
-        last = self.index == len(PAGES) - 1
-        self.next_btn.set_label(
-            UI["finish"][self.lang] if last else UI["next"][self.lang])
+        etiket = {"ileri": "next", "konuyu_bitir": "finish_topic",
+                  "sona_gec": "to_end", "bitir": "finish"}[g.ileri_etiketi()]
+        self.next_btn.set_label(UI[etiket][self.lang])
+        self.skip_btn.set_label(UI["skip_topics"][self.lang])
+        if g.atla_gorunur():
+            self.skip_btn.show()
+        else:
+            self.skip_btn.hide()
 
         self.check.set_label(UI["dont_show"][self.lang])
         self.theme_btn.set_label(
@@ -2039,13 +2121,34 @@ class WelcomeWindow(Gtk.Window):
         self.set_title(UI["window_title"][self.lang])
 
         self._sync_selection()
+        self._noktalari_kur()
+        self._hub_guncelle()
 
-        for i, dot_box in enumerate(self.dots.get_children()):
-            ctx = dot_box.get_child().get_style_context()
-            if i == self.index:
-                ctx.add_class("dot-active")
-            else:
-                ctx.remove_class("dot-active")
+    def _noktalari_kur(self):
+        """Alt banttaki noktalar yalnizca icinde bulunulan bolumu (baslangic ya da konu) gosterir."""
+        for cocuk in self.dots.get_children():
+            self.dots.remove(cocuk)
+        aktif = self.gezinme.bolum_indeksi()
+        for i in range(len(self.gezinme.bolum_sayfalari())):
+            dot = Gtk.Label(label="")
+            dot.get_style_context().add_class("dot")
+            if i == aktif:
+                dot.get_style_context().add_class("dot-active")
+            dot_box = Gtk.EventBox()
+            dot_box.add(dot)
+            dot_box.connect("button-press-event", self.on_dot_clicked, i)
+            dot_box.connect("realize", self._el_isaretci_yap)
+            self.dots.pack_start(dot_box, False, False, 0)
+        self.dots.show_all()
+
+    def sayfaya_git(self, sayfa_id):
+        """Bir sayfa kimligine dogrudan git (arayuzu yeniler)."""
+        if self.gezinme.sayfaya_git(sayfa_id):
+            self.refresh()
+
+    def _konulari_kaydet(self):
+        self.settings["biten_konular"] = self.gezinme.biten_konular()
+        save_settings(self.settings)
 
     def rebuild(self):
         """Dil degistiginde sayfalar yeniden olusturulur.
@@ -2073,14 +2176,20 @@ class WelcomeWindow(Gtk.Window):
     # -- olaylar -----------------------------------------------------------
 
     def on_next(self, _button):
-        if self.index < len(PAGES) - 1:
-            self.stack.set_transition_type(
-                Gtk.StackTransitionType.SLIDE_LEFT)
-            self.index += 1
-            self.refresh()
-        else:
+        if self.gezinme.ileri() == "bitir":
+            self._konulari_kaydet()
             self.apply_choices()
             self.close()
+            return
+        self.stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT)
+        self._konulari_kaydet()
+        self.refresh()
+
+    def on_skip(self, _button):
+        """'Konulari atla': hub'dan ya da bir konudan son sayfaya."""
+        if self.gezinme.atla():
+            self.stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT)
+            self.refresh()
 
     def apply_choices(self):
         """Sihirbaz kapanirken secimleri sisteme uygular."""
@@ -2158,10 +2267,9 @@ class WelcomeWindow(Gtk.Window):
         return True
 
     def on_back(self, _button):
-        if self.index > 0:
-            self.stack.set_transition_type(
-                Gtk.StackTransitionType.SLIDE_RIGHT)
-            self.index -= 1
+        if self.gezinme.geri_var():
+            self.gezinme.geri()
+            self.stack.set_transition_type(Gtk.StackTransitionType.SLIDE_RIGHT)
             self.refresh()
 
     def _el_isaretci_yap(self, widget):
@@ -2171,16 +2279,13 @@ class WelcomeWindow(Gtk.Window):
                 Gdk.Cursor.new_from_name(widget.get_display(), "pointer"))
 
     def on_dot_clicked(self, _widget, _event, index):
-        if index == self.index:
+        onceki = self.gezinme.bolum_indeksi()
+        if index == onceki:
             return
-        if index > self.index:
-            self.stack.set_transition_type(
-                Gtk.StackTransitionType.SLIDE_LEFT)
-        else:
-            self.stack.set_transition_type(
-                Gtk.StackTransitionType.SLIDE_RIGHT)
-        self.index = index
-        self.refresh()
+        self.stack.set_transition_type(
+            Gtk.StackTransitionType.SLIDE_LEFT if index > onceki else Gtk.StackTransitionType.SLIDE_RIGHT)
+        if self.gezinme.bolumde_sec(index):
+            self.refresh()
 
     def on_lang_changed(self, combo):
         chosen = combo.get_active_id()
@@ -2265,6 +2370,9 @@ class WelcomeWindow(Gtk.Window):
         .pick-card {{ background-color: {p['kart']};
                       border: 2px solid {p['cizgi']}; border-radius: 12px; }}
         .pick-card:hover {{ border-color: {p['silik']}; }}
+        .konu-kart {{ background-color: {p['kart']}; border: 1px solid {p['cizgi']}; border-radius: 12px; }}
+        .konu-kart:hover {{ border-color: {p['vurgu']}; }}
+        .konu-bitti {{ color: {p['yesil']}; font-weight: 700; }}
         .pick-selected, .pick-selected:hover {{ border-color: {p['vurgu']};
                                                 background-color: {vz}; }}
         .pick-title {{ font-size: 108%; font-weight: bold; }}

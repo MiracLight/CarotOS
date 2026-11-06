@@ -378,9 +378,8 @@ class KarsilamaTesti(UygulamaDilTabani):
         for lang in self.dil.KODLAR:
             pencere.lang = lang
             pencere.rebuild()
-            for i in range(len(m.PAGES)):
-                pencere.index = i
-                pencere.refresh()
+            for sayfa in m.PAGES:
+                pencere.sayfaya_git(sayfa["id"])
                 self.pompala()
         pencere.lang = "tr"
 
