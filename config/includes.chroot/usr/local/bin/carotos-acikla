@@ -12,6 +12,7 @@ Komutu hiçbir zaman çalıştırmaz; yalnızca ayrıştırır. Hiçbir şey ağ
 import os
 import sys
 
+sys.dont_write_bytecode = True
 _BURASI = os.path.dirname(os.path.abspath(__file__))
 for _yol in ("/opt/carotos/acikla", os.path.join(_BURASI, "..", "..", "..", "opt", "carotos", "acikla")):
     if os.path.isdir(_yol):
