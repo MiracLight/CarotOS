@@ -1,21 +1,24 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""CarotOS Plymouth acilis resmini uretir (Pillow gerekir; yalniz gelistirici makinesinde).
+"""CarotOS Plymouth temasi resimlerini uretir (Pillow gerekir; yalniz gelistirici makinesinde, VM'de gerekmez).
 
-Cikti (tools/plymouth-test/tema/):
-  background.png  1920x1080 notr koyu mavi zemin, sag altta kaplumbaga kabugundan esinli altigen deseni (logo yok)
-  yazi.png        seffaf zeminli kucuk "CarotOS" yazisi (sol alta konur; yazi tipi resme gomulu: initramfs'ta yazi tipi gerekmez)
-  onizleme.png    ikisinin 16:9 ve 4:3 ekranda nasil gorunecegi (yaklasik)
-Kullanim:  python tools/plymouth-test/uret.py
+Debian 13 temasi (ceratopsian) betigini aynen kullaniriz (parola penceresi ve animasyon orada); yalniz resimler bizim:
+  frill.png  1437x1441  sag altta kaplumbaga kabugundan esinli altigen deseni (Debian'in dalga sekli yerine)
+  glow.png   1437x1441  desenin ustunde nabiz gibi yanip sonen isik (betik opakligini 0.3-0.9 arasinda degistirir)
+  logo.png   459x95     sol altta mutevazi "CarotOS" yazisi (yazi tipi resme gomulu: initramfs'ta yazi tipi gerekmez)
+  onizleme.png          betigin yerlesim formulleriyle 16:9 ve 4:3 ekranda yaklasik gorunum
+Cikti: tools/plymouth-test/tema/carotos/  Kullanim:  python tools/plymouth-test/uret.py
 """
 import math
 import os
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
 BURASI = os.path.dirname(os.path.abspath(__file__))
-TEMA = os.path.join(BURASI, "tema")
-UST, ALT = (16, 26, 38), (26, 43, 62)
+TEMA = os.path.join(BURASI, "tema", "carotos")
+FRILL_BOY = (1437, 1441)
+LOGO_BOY = (459, 95)
+ZEMIN_UST, ZEMIN_ALT = (16, 26, 38), (26, 43, 62)            # betikteki arka plan renkleriyle ayni (0.063,0.102,0.149)/(0.102,0.169,0.243)
 YAZI_RENGI = (143, 163, 186, 255)
 FONT_ADAYLARI = (r"C:\Windows\Fonts\segoeuisl.ttf", r"C:\Windows\Fonts\segoeui.ttf",
                  "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
@@ -32,62 +35,103 @@ def altigen(cx, cy, r):
     return [(cx + r * math.cos(math.radians(60 * i)), cy + r * math.sin(math.radians(60 * i))) for i in range(6)]
 
 
-def arka_plan(w=1920, h=1080, ss=2):
-    W, H = w * ss, h * ss
-    im = Image.new("RGB", (W, H))
-    d = ImageDraw.Draw(im)
-    for y in range(H):
-        t = y / (H - 1)
-        d.line([(0, y), (W, y)], fill=tuple(int(UST[i] + (ALT[i] - UST[i]) * t) for i in range(3)))
+def desen(ss=2):
+    """(frill RGBA, maske L): altigen kumesi; sag alt kose sabit, uzaklastikca saydamlasir."""
+    W, H = FRILL_BOY[0] * ss, FRILL_BOY[1] * ss
     kat = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     k = ImageDraw.Draw(kat)
-    r = 118 * ss                                   # altigen yaricapi (yassi uclu dizilim)
+    maske = Image.new("L", (W, H), 0)
+    m = ImageDraw.Draw(maske)
+    r = 100 * ss
     adim_x, adim_y = 1.5 * r, math.sqrt(3) * r
-    merkez = (W * 0.90, H * 0.88)
-    for col in range(-9, 3):
-        for row in range(-8, 4):
+    merkez = (W * 0.93, H * 0.91)
+    for col in range(-12, 3):
+        for row in range(-12, 4):
             cx = merkez[0] + col * adim_x
             cy = merkez[1] + row * adim_y + (adim_y / 2 if col % 2 else 0)
-            uzak = math.hypot(cx - merkez[0], cy - merkez[1]) / (620 * ss)
+            uzak = math.hypot((cx - merkez[0]) * 0.92, (cy - merkez[1]) * 1.0) / (1120 * ss)
             if uzak > 1.0:
                 continue
-            guc = (1 - uzak) ** 1.4
-            dolgu = (47, 100, 160, int(20 + 85 * guc))
+            guc = (1 - uzak) ** 1.2
+            dolgu = (46, 102, 168, int(60 + 150 * guc))
             if col == 0 and row == 0:
-                dolgu = (52, 112, 182, 150)          # kabugun orta altigeni biraz belirgin
-            k.polygon(altigen(cx, cy, r - 5 * ss), fill=dolgu, outline=(110, 150, 200, int(30 + 70 * guc)))
-    im = Image.alpha_composite(im.convert("RGBA"), kat).convert("RGB")
-    im = im.resize((w, h), Image.LANCZOS)
-    im.save(os.path.join(TEMA, "background.png"), optimize=True)
+                dolgu = (60, 124, 200, 230)                # kabugun orta altigeni belirgin
+            poli = altigen(cx, cy, r - 5 * ss)
+            k.polygon(poli, fill=dolgu, outline=(120, 165, 215, int(70 + 120 * guc)))
+            m.polygon(poli, fill=int(255 * min(1.0, 0.35 + guc)))
+    return kat.resize(FRILL_BOY, Image.LANCZOS), maske.resize(FRILL_BOY, Image.LANCZOS)
+
+
+def isik(maske):
+    """Altigenlerin ustunde yumusak bir isik: desen maskesiyle sinirli, kose civarinda daha parlak."""
+    W, H = FRILL_BOY
+    g = Image.new("L", (W, H), 0)
+    d = ImageDraw.Draw(g)
+    d.ellipse([W * 0.45, H * 0.40, W * 1.15, H * 1.10], fill=190)
+    g = g.filter(ImageFilter.GaussianBlur(120))
+    alfa = ImageChops.multiply(g, maske)
+    out = Image.new("RGBA", (W, H), (150, 195, 245, 0))
+    out.putalpha(alfa)
+    return out
+
+
+def yazi_logo():
+    """459x95: 'CarotOS' sola yasli, genisligi dolduracak boyda (betik %10 ekran genisligine olcekler)."""
+    W, H = LOGO_BOY
+    boy = 120
+    while boy > 20:
+        f = font(boy)
+        kutu = f.getbbox("CarotOS")
+        if kutu[2] - kutu[0] <= W - 6 and kutu[3] - kutu[1] <= H - 6:
+            break
+        boy -= 2
+    im = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    ImageDraw.Draw(im).text((3 - kutu[0], (H - (kutu[3] - kutu[1])) // 2 - kutu[1]), "CarotOS", font=f, fill=YAZI_RENGI)
     return im
 
 
-def yazi():
-    f = font(34)
-    kutu = f.getbbox("CarotOS")
-    w, h = kutu[2] - kutu[0] + 8, kutu[3] - kutu[1] + 16
-    im = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    ImageDraw.Draw(im).text((4, 4 - kutu[1] + 4), "CarotOS", font=f, fill=YAZI_RENGI)
-    im.save(os.path.join(TEMA, "yazi.png"), optimize=True)
-    return im
-
-
-def onizleme(bg, yz):
-    """Betik mantigi: arka plan ekrani kaplayacak sekilde olceklenir (kirpilir), yazi sol alta konur."""
-    cikti = Image.new("RGB", (1920 + 40 + 1024, 1080), (40, 40, 40))
-    for (sw, sh, x0) in ((1920, 1080, 0), (1024, 768, 1960)):
-        oran = max(sw / bg.width, sh / bg.height)
-        yw, yh = int(bg.width * oran + 1), int(bg.height * oran + 1)
-        b = bg.resize((yw, yh), Image.LANCZOS)
+def onizleme(frill, glow, logo):
+    """ceratopsian.script'teki calcfmt formulleriyle (coef=0.6, logo en cok %10 genislik) yerlestirme."""
+    ceviri = []
+    for (sw, sh) in ((1920, 1080), (1024, 768)):
         ekran = Image.new("RGB", (sw, sh))
-        ekran.paste(b, ((sw - yw) // 2, (sh - yh) // 2))
-        ekran.paste(yz, (int(sw * 0.03), sh - yz.height - int(sh * 0.04)), yz)
-        cikti.paste(ekran, (x0, 0))
+        d = ImageDraw.Draw(ekran)
+        for y in range(sh):
+            t = y / (sh - 1)
+            d.line([(0, y), (sw, y)], fill=tuple(int(ZEMIN_UST[i] + (ZEMIN_ALT[i] - ZEMIN_UST[i]) * t) for i in range(3)))
+        coef = 0.6
+        if sw >= sh:
+            fy = int(coef * sh)
+            fx = int(coef * sh * FRILL_BOY[0] / FRILL_BOY[1])
+            px, py = sw - fx, sh - fy
+        else:
+            fx = int(coef * sw)
+            fy = int(coef * sw * FRILL_BOY[1] / FRILL_BOY[0])
+            px, py = sw - fx, sh - fy
+        f2 = frill.resize((fx, fy), Image.LANCZOS)
+        g2 = glow.resize((fx, fy), Image.LANCZOS)
+        g2.putalpha(g2.getchannel("A").point(lambda a: int(a * 0.6)))              # betik 0.3-0.9 arasi nabiz atar
+        ekran.paste(f2, (px, py), f2)
+        ekran.paste(g2, (px, py), g2)
+        lw = LOGO_BOY[0] if LOGO_BOY[0] < 0.1 * sw else int(0.1 * sw)
+        lh = int(lw / LOGO_BOY[0] * LOGO_BOY[1])
+        l2 = logo.resize((lw, lh), Image.LANCZOS)
+        ekran.paste(l2, (int(0.01 * sw), int(0.99 * sh) - lh), l2)
+        ceviri.append(ekran)
+    cikti = Image.new("RGB", (1920 + 40 + 1024, 1080), (40, 40, 40))
+    cikti.paste(ceviri[0], (0, 0))
+    cikti.paste(ceviri[1], (1960, 0))
     cikti.save(os.path.join(BURASI, "tema", "onizleme.png"))
 
 
 if __name__ == "__main__":
     os.makedirs(TEMA, exist_ok=True)
-    onizleme(arka_plan(), yazi())
-    for ad in ("background.png", "yazi.png", "onizleme.png"):
-        print(ad, os.path.getsize(os.path.join(TEMA, ad)), "bayt")
+    frill, maske = desen()
+    glow = isik(maske)
+    logo = yazi_logo()
+    frill.save(os.path.join(TEMA, "frill.png"), optimize=True)
+    glow.save(os.path.join(TEMA, "glow.png"), optimize=True)
+    logo.save(os.path.join(TEMA, "logo.png"), optimize=True)
+    onizleme(frill, glow, logo)
+    for ad in ("carotos/frill.png", "carotos/glow.png", "carotos/logo.png", "onizleme.png"):
+        print(ad, os.path.getsize(os.path.join(BURASI, "tema", ad)), "bayt")
