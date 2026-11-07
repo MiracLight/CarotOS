@@ -531,6 +531,12 @@ PAGES = [
                        "fail2ban ile savunma görevleri bulunur.",
                  "en": "Offense tasks with hydra, nmap, john, sqlmap and tshark; "
                        "defense tasks with ufw and fail2ban."},
+                {"tr": "CTF yarışması: öğretmen yarışmayı başlatır, herkes aynı görevleri kendi dosyasıyla "
+                       "çözer ve CAROT{...} biçimindeki bayrağı gönderir. Bayrağı doğrulayan ve puanı "
+                       "hesaplayan öğretmenin bilgisayarıdır; bayrağın başkasına yaramaz.",
+                 "en": "CTF contest: the teacher starts the contest, everyone solves the same challenges with "
+                       "their own file and submits the flag in the CAROT{...} format. The teacher's computer "
+                       "checks the flag and works out the score; your flag is no use to anyone else."},
             ]),
         ],
     },

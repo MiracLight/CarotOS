@@ -425,6 +425,7 @@
   "CSV table": "CSV 表格",
   "CTF": "CTF",
   "CTF contest": "CTF 比赛",
+  "CTF contest: the teacher starts the contest, everyone solves the same challenges with their own file and submits the flag in the CAROT{...} format. The teacher's computer checks the flag and works out the score; your flag is no use to anyone else.": "CTF 比赛:老师开始比赛,所有人用各自的文件解答相同的题目,并以 CAROT{...} 格式提交标志。验证标志并计算分数的是老师的电脑;你的标志对别人没有用处。",
   "CTF is only available in class mode.": "CTF 仅在课堂模式下可用。",
   "CURRENT": "当前",
   "CVE": "CVE",

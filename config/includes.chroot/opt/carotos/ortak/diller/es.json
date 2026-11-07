@@ -425,6 +425,7 @@
   "CSV table": "Tabla CSV",
   "CTF": "CTF",
   "CTF contest": "Competencia CTF",
+  "CTF contest: the teacher starts the contest, everyone solves the same challenges with their own file and submits the flag in the CAROT{...} format. The teacher's computer checks the flag and works out the score; your flag is no use to anyone else.": "Competencia CTF: el profesor inicia la competencia, todos resuelven los mismos retos con su propio archivo y envían la flag en el formato CAROT{...}. La flag la verifica y el puntaje lo calcula la computadora del profesor; tu flag no le sirve a nadie más.",
   "CTF is only available in class mode.": "El CTF solo está disponible en modo clase.",
   "CURRENT": "ACTUAL",
   "CVE": "CVE",
