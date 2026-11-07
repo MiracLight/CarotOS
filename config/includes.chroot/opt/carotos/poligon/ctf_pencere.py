@@ -129,6 +129,29 @@ def guvenli_dosya_adi(ad: str) -> str:
     return temiz.lstrip(".") or "gorev.txt"
 
 
+POLIGON_IKON = "carotos-poligon-ogrenci.png"
+
+
+def ikon_yollari() -> list:
+    """Poligon penceresi ikonu adaylari: kurulu sistem, sonra bu dosyanin yanindaki depo/paket duzeni."""
+    burasi = Path(__file__).resolve().parent
+    return ["/usr/share/icons/hicolor/256x256/apps/" + POLIGON_IKON,
+            str(burasi.parent.parent.parent / "usr" / "share" / "icons" / "hicolor" / "256x256" / "apps" / POLIGON_IKON)]
+
+
+def pencere_ikonu_ata(pencere) -> bool:
+    """Alt Poligon pencerelerinin baslik cubuguna CarotOS Poligon simgesini koyar (bulunamazsa sessizce gecer)."""
+    from gi.repository import GLib
+    for yol in ikon_yollari():
+        if os.path.isfile(yol):
+            try:
+                pencere.set_icon_from_file(yol)
+                return True
+            except GLib.Error:
+                continue
+    return False
+
+
 def kayit_yolu(ad: str, taban: str | None = None) -> str:
     taban = taban or os.path.join(os.path.expanduser("~"), KAYIT_KLASORU)
     return os.path.join(taban, guvenli_dosya_adi(ad))
@@ -147,6 +170,7 @@ def pencere_olustur(ctf, dil: str, ogrenci: str, gorunum: str = "dark", kayit_ta
     class CtfPencere(Gtk.Window):
         def __init__(self):
             super().__init__(title="CarotOS Poligon · CTF")
+            pencere_ikonu_ata(self)
             self.ctf, self.dil, self.ogrenci, self.kayit_taban = ctf, dil, ogrenci, kayit_taban
             self.gorevler: list[dict] = []
             self.secili: str | None = None

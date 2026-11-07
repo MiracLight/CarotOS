@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ortak"))
 import dil_koprusu as _dil  # noqa: E402
 import olay_gunlugu  # noqa: E402
 import savunma_analiz as _a  # noqa: E402
-from ctf_pencere import ctf_css  # noqa: E402  (ortak sekme/liste/tablo gorunumu)
+from ctf_pencere import ctf_css, pencere_ikonu_ata  # noqa: E402  (ortak sekme/liste/tablo gorunumu, ikon)
 
 T = _a.T
 YENILEME_MS = 1000
@@ -62,6 +62,7 @@ def pencere_olustur(dil: str, gorunum: str = "dark", gunluk=None, durum_fn=None,
     class SavunmaPencere(Gtk.Window):
         def __init__(self):
             super().__init__(title="CarotOS Poligon · " + _dil.sec(BASLIK, dil))
+            pencere_ikonu_ata(self)
             self.dil = dil
             self._kapali = False
             self._son_no = 0

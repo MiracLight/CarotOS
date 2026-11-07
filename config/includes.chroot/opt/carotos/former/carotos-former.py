@@ -16,6 +16,11 @@ from gi.repository import Gtk, Gdk, GLib  # noqa: E402
 
 sys.path.insert(0, "/opt/carotos/ortak")
 sys.path.insert(0, "/opt/carotos/former")
+# Depodan ya da paketten calistirilirsa kendi yanindaki katmanlar once gelir (kurulu kopya eski olabilir)
+_BURASI = os.path.dirname(os.path.abspath(__file__))
+if os.path.isfile(os.path.join(_BURASI, "..", "ortak", "dil.py")):
+    sys.path.insert(0, os.path.normpath(os.path.join(_BURASI, "..", "ortak")))
+    sys.path.insert(0, _BURASI)
 
 import dil as dilkat  # noqa: E402  (ortak dil katmani; "dil" adi parametrelerle cakisir)
 import tema  # noqa: E402

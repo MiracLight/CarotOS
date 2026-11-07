@@ -274,6 +274,11 @@ class PencereTesti(unittest.TestCase):
         self.assertEqual(len(self.p.model), 0)
         self.assertEqual(self.g.son(), [])
 
+    def test_pencere_ikonu_var(self):
+        self.assertIsNotNone(self.p.get_icon(), "baslik cubugunda Poligon simgesi olmali")
+        import ctf_pencere
+        self.assertTrue(any(os.path.isfile(y) for y in ctf_pencere.ikon_yollari()))
+
     def test_satir_metni_saf_islev(self):
         o = {"no": 1, "zaman": 0, "servis": "giris", "tur": "baglanti", "ayrinti": "", "port": 2121}
         zaman, servis, tur, ayr = self.mod.satir_metni(o, "en")
