@@ -171,6 +171,25 @@ class EtikPencereTesti(unittest.TestCase):
         self._calistir("8.8.8.8", bak)
         self.assertEqual(gorulen["baslik"], "This target doesn't look like yours")
 
+    def test_ayarlarda_onayli_aglar_sifirlanir(self):
+        ayar = self.app.settings_page
+        self.app.settings["onayli_aglar"] = ["192.168.1.0/24", "10.0.0.0/24"]
+        ayar.retranslate()
+        self.assertIn("2", ayar.onayli_sayi.get_text())
+        self.assertTrue(ayar.onayli_btn.get_sensitive())
+        ayar.onayli_sifirla()
+        self.assertEqual(self.app.settings["onayli_aglar"], [])
+        self.assertFalse(ayar.onayli_btn.get_sensitive())
+        # kalici: ayar dosyasina yazildi ve arac bir sonraki taramada yeniden sorar
+        with open(self.panel.CONFIG_PATH, encoding="utf-8") as f:
+            import json
+            self.assertEqual(json.load(f).get("onayli_aglar"), [])
+        self.app.lang = "en"
+        ayar.retranslate()
+        self.assertEqual(ayar.onayli_btn.get_label(), "Reset confirmed networks")
+        self.app.lang = "tr"
+        ayar.retranslate()
+
 
 if __name__ == "__main__":
     unittest.main()

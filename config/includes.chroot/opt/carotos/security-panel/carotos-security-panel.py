@@ -98,6 +98,13 @@ STRINGS = {
     "firewall_checking": {"tr": "Kontrol ediliyor…", "en": "Checking…"},
     "firewall_updating": {"tr": "Güncelleniyor…", "en": "Updating…"},
     "refresh": {"tr": "Yenile", "en": "Refresh"},
+    "onayli_baslik": {"tr": "Onaylı ağlar", "en": "Confirmed networks"},
+    "onayli_aciklama": {
+        "tr": "Araçlar bir özel ağı taramadan önce “Bu ağ sana mı ait?” diye sorar ve cevabını hatırlar. Buradan unutturabilirsin.",
+        "en": "Before a tool scans a private network it asks “Is this network yours?” and remembers the answer. You can make it forget here.",
+    },
+    "onayli_sayi": {"tr": "Hatırlanan ağ sayısı: {n}", "en": "Remembered networks: {n}"},
+    "onayli_sifirla": {"tr": "Onaylı ağları sıfırla", "en": "Reset confirmed networks"},
     # Etik koruma (ortak/etik_koruma.py). Metin bize aittir; hicbir yasadan
     # madde/ceza atfi yoktur ve hukuki tavsiye degildir.
     "etik_baslik": {"tr": "Bu hedef sana ait görünmüyor", "en": "This target doesn't look like yours"},
@@ -796,6 +803,19 @@ class SettingsPage(Gtk.Box):
         fic.pack_start(durum_satir, False, False, 6)
         self.pack_start(fdis, False, False, 0)
 
+        odis, oic = tema.kart()
+        self.onayli_title = tema.etiket("", "kart-baslik")
+        self.onayli_desc = tema.etiket("", "kart-alt", sar=True, genislik=70)
+        oic.pack_start(self.onayli_title, False, False, 0)
+        oic.pack_start(self.onayli_desc, False, False, 0)
+        osatir = Gtk.Box(spacing=10)
+        self.onayli_sayi = tema.etiket("", "soluk")
+        osatir.pack_start(self.onayli_sayi, True, True, 0)
+        self.onayli_btn = tema.dugme("", None, self.onayli_sifirla)
+        osatir.pack_end(self.onayli_btn, False, False, 0)
+        oic.pack_start(osatir, False, False, 6)
+        self.pack_start(odis, False, False, 0)
+
         self._fw_state = None
         self.retranslate()
         GLib.idle_add(self.refresh_firewall)
@@ -852,9 +872,24 @@ class SettingsPage(Gtk.Box):
         self.fw_title.set_text(T("firewall", lang))
         self.fw_desc.set_text(T("firewall_desc", lang))
         self.fw_refresh_btn.set_label(T("refresh", lang))
+        self.onayli_title.set_text(T("onayli_baslik", lang))
+        self.onayli_desc.set_text(T("onayli_aciklama", lang))
+        self.onayli_btn.set_label(T("onayli_sifirla", lang))
+        self._onayli_yenile()
         if self._fw_state is not None:
             self.fw_status_label.set_text(
                 T("firewall_on" if self._fw_state else "firewall_off", lang))
+
+    def _onayli_yenile(self):
+        n = len(self.app.settings.get("onayli_aglar", []) or [])
+        self.onayli_sayi.set_text(T("onayli_sayi", self.app.lang, n=n))
+        self.onayli_btn.set_sensitive(n > 0)
+
+    def onayli_sifirla(self, *_):
+        """Hatirlanan 'bu ag benim' onaylarini siler; arac bir sonraki taramada yeniden sorar."""
+        self.app.settings["onayli_aglar"] = []
+        save_settings(self.app.settings)
+        self._onayli_yenile()
 
     def on_lang(self, combo):
         new = combo.get_active_id()
