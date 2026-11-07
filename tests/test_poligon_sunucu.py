@@ -95,8 +95,11 @@ class TurkceAdUcAdan(SunucuTabani):
 class SohbetKimlikTesti(SunucuTabani):
     """/mesaj ve /sohbet yalnizca oda sifresini bilenlere acik."""
 
-    def katil(self):
-        self.assertEqual(self.istek("POST", "/katil", {"ogrenci": AD, "sifre": SIFRE})[0], 200)
+    def katil(self, ad=AD):
+        durum, govde = self.istek("POST", "/katil", {"ogrenci": ad, "sifre": SIFRE})
+        self.assertEqual(durum, 200)
+        self.anahtar = govde["anahtar"]
+        return self.anahtar
 
     def test_mesaj_sifresiz_reddedilir(self):
         self.katil()
@@ -108,12 +111,13 @@ class SohbetKimlikTesti(SunucuTabani):
         # LAN'daki biri kimden='ogretmen' diyerek ogrencilere ogretmen adina yazamamali
         self.katil()
         durum, _ = self.istek("POST", "/mesaj", {
-            "ogrenci": AD, "sifre": SIFRE, "kimden": "ogretmen", "metin": "komut calistir"})
+            "ogrenci": AD, "sifre": SIFRE, "anahtar": self.anahtar, "kimden": "ogretmen",
+            "metin": "komut calistir"})
         self.assertEqual(durum, 200)
         self.assertEqual(self.oda.sohbet_getir(AD)[-1]["kimden"], "ogrenci")
 
     def test_mesaj_katilmamis_ogrenciye_yazilmaz(self):
-        durum, _ = self.istek("POST", "/mesaj", {"ogrenci": "Hayalet", "sifre": SIFRE, "metin": "x"})
+        durum, _ = self.istek("POST", "/mesaj", {"ogrenci": "Hayalet", "sifre": SIFRE, "anahtar": "x", "metin": "x"})
         self.assertEqual(durum, 404)
         self.assertNotIn("Hayalet", self.oda.sohbetler)      # sozluk sismemeli
 
@@ -121,7 +125,8 @@ class SohbetKimlikTesti(SunucuTabani):
         self.katil()
         for metin in ("", "   ", "a" * 1001, 5, ["x"]):
             with self.subTest(metin=metin):
-                durum, _ = self.istek("POST", "/mesaj", {"ogrenci": AD, "sifre": SIFRE, "metin": metin})
+                durum, _ = self.istek("POST", "/mesaj", {"ogrenci": AD, "sifre": SIFRE, "anahtar": self.anahtar,
+                                                              "metin": metin})
                 self.assertEqual(durum, 400)
 
     def test_sohbet_sifresiz_okunamaz(self):
@@ -134,11 +139,36 @@ class SohbetKimlikTesti(SunucuTabani):
     def test_sohbet_sifreyle_okunur_ve_gecersiz_son_no_cokmez(self):
         self.katil()
         self.oda.mesaj_ekle(AD, "ogretmen", "ozel mesaj")
-        yol = "/sohbet?ogrenci=%s&sifre=%s&son_no=%s" % (
-            urllib.parse.quote(AD, safe=""), SIFRE, "abc")
+        yol = "/sohbet?ogrenci=%s&sifre=%s&anahtar=%s&son_no=%s" % (
+            urllib.parse.quote(AD, safe=""), SIFRE, self.anahtar, "abc")
         durum, govde = self.istek("GET", yol)
         self.assertEqual(durum, 200)
         self.assertEqual([m["metin"] for m in govde["mesajlar"]], ["ozel mesaj"])
+
+    def test_baska_ogrenci_adina_mesaj_ilerleme_sohbet_yapilamaz(self):
+        self.katil()                                   # Şule İpek (kurban)
+        saldirgan = self.katil("Ali")
+        kurban = AD
+        # kurbanin adina mesaj: saldirganin anahtariyla reddedilir
+        durum, govde = self.istek("POST", "/mesaj", {"ogrenci": kurban, "sifre": SIFRE,
+                                                      "anahtar": saldirgan, "metin": "sahte"})
+        self.assertEqual((durum, govde["hata"]), (403, "gecersiz_anahtar"))
+        self.assertEqual(self.oda.sohbet_getir(kurban), [])
+        # kurbanin adina ilerleme/puan
+        durum, _ = self.istek("POST", "/ilerleme", {
+            "ogrenci": kurban, "sifre": SIFRE, "anahtar": saldirgan, "gorev_id": "ufw-01",
+            "durum": "tamamlandi", "soru_no": 1, "puan": 999})
+        self.assertEqual(durum, 403)
+        self.assertEqual(self.oda.cozulen_sorular, {})
+        # kurbanin sohbetini okuma
+        self.oda.mesaj_ekle(kurban, "ogretmen", "ozel")
+        yol = "/sohbet?ogrenci=%s&sifre=%s&anahtar=%s" % (urllib.parse.quote(kurban, safe=""), SIFRE, saldirgan)
+        durum, govde = self.istek("GET", yol)
+        self.assertEqual(durum, 403)
+        self.assertNotIn("mesajlar", govde)
+        # anahtarsiz da reddedilir
+        durum, _ = self.istek("GET", "/sohbet?ogrenci=%s&sifre=%s" % (urllib.parse.quote(kurban, safe=""), SIFRE))
+        self.assertEqual(durum, 403)
 
     def test_istemci_mesajlasma_uctan_uca(self):
         ist = self.istemci()
@@ -191,11 +221,13 @@ class SunucuSertlestirmeTesti(SunucuTabani):
             with self.subTest(govde=govde):
                 durum, _ = self.istek("POST", "/katil", govde)
                 self.assertEqual(durum, 400)
-        self.assertEqual(self.istek("POST", "/katil", {"ogrenci": AD, "sifre": SIFRE})[0], 200)
+        durum, govde = self.istek("POST", "/katil", {"ogrenci": AD, "sifre": SIFRE})
+        self.assertEqual(durum, 200)
+        self.anahtar = govde["anahtar"]
         for sure in ("abc", [1], {"a": 1}):
             with self.subTest(sure_sn=sure):
                 durum, _ = self.istek("POST", "/ilerleme", {
-                    "ogrenci": AD, "sifre": SIFRE, "gorev_id": "ufw-01",
+                    "ogrenci": AD, "sifre": SIFRE, "anahtar": self.anahtar, "gorev_id": "ufw-01",
                     "durum": "basladi", "sure_sn": sure})
                 self.assertEqual(durum, 400)
 
@@ -214,9 +246,10 @@ class SunucuSertlestirmeTesti(SunucuTabani):
         self.assertEqual(govde["hata"], "cok_fazla_deneme")
 
     def test_dogru_sifre_sayac_artirmaz(self):
+        anahtar = self.istek("POST", "/katil", {"ogrenci": AD, "sifre": SIFRE})[1]["anahtar"]
         for i in range(ogretmen_sunucu.DENEME_LIMITI + 3):
             durum, _ = self.istek("POST", "/ilerleme", {
-                "ogrenci": AD, "sifre": SIFRE, "gorev_id": "ufw-01", "durum": "basladi"})
+                "ogrenci": AD, "sifre": SIFRE, "anahtar": anahtar, "gorev_id": "ufw-01", "durum": "basladi"})
             self.assertEqual(durum, 200, "deneme %d" % i)
 
 

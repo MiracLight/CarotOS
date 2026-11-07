@@ -566,6 +566,7 @@ class PoligonIstemci:
             yuk = {
                 "ogrenci": self.ogrenci_adi,
                 "sifre": self.oda_sifre,
+                "anahtar": self.anahtar,
                 "gorev_id": self.gorev["id"] if self.gorev else "?",
                 "durum": durum,
                 "sure_sn": sure_sn,
@@ -704,9 +705,9 @@ class PoligonIstemci:
             return []  # bireysel modda öğretmen yok, mesaj gelmez
         try:
             _, cevap = self._istek(
-                "/sohbet?ogrenci=%s&son_no=%d&sifre=%s" % (
+                "/sohbet?ogrenci=%s&son_no=%d&sifre=%s&anahtar=%s" % (
                     self._kodla(self.ogrenci_adi), self._son_mesaj_no,
-                    self._kodla(self.oda_sifre)),
+                    self._kodla(self.oda_sifre), self._kodla(self.anahtar)),
                 {}, "GET",
             )
             mesajlar = cevap.get("mesajlar", [])
@@ -722,6 +723,7 @@ class PoligonIstemci:
             durum, _ = self._istek("/mesaj", {
                 "ogrenci": self.ogrenci_adi,
                 "sifre": self.oda_sifre,
+                "anahtar": self.anahtar,
                 "metin": metin,
             })
             return durum == 200   # sifre/oda hatasinda eskiden hep True donerdi

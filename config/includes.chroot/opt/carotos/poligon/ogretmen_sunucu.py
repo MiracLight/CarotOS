@@ -10,9 +10,9 @@ GECMEZ -- sadece ilerleme/skor/ipucu JSON mesajlari.
 
 Protokol (hepsi JSON):
   POST /katil         {ogrenci, sifre}  -> {tamam, anahtar}  (anahtar: ogrenciye ozel; CTF isteklerinde gerekir)
-  POST /ilerleme      {ogrenci, sifre, gorev_id, durum, sure_sn}
-  POST /mesaj         {ogrenci, sifre, metin}      (ogrenci -> ogretmen sohbeti)
-  GET  /sohbet?ogrenci=AD&sifre=...&son_no=N        (ogrenci kendi sohbetini ceker)
+  POST /ilerleme      {ogrenci, sifre, anahtar, gorev_id, durum, sure_sn}
+  POST /mesaj         {ogrenci, sifre, anahtar, metin}   (ogrenci -> ogretmen sohbeti)
+  GET  /sohbet?ogrenci=AD&sifre=...&anahtar=...&son_no=N (ogrenci kendi sohbetini ceker)
   GET  /gorevler, /aktif_mi?ogrenci=AD              (sifresiz: gizli bilgi icermez)
   POST /ipucu_gonder  {ogrenci, mesaj}                    (ogretmen kullanir)
   GET  /ipucu?ogrenci=AD                                   (ogrenci sorar, bir kez okunur)
@@ -452,6 +452,8 @@ def _sunucu_sinifi_olustur(oda: OdaDurumu):
                 if not self._yetkili_mi(sorgu.get("sifre", [""])[0]):
                     return
                 ad = sorgu.get("ogrenci", [""])[0]
+                if not self._anahtar_tamam(ad, sorgu.get("anahtar", [""])[0]):
+                    return
                 try:
                     son_no = int(sorgu.get("son_no", ["0"])[0])
                 except ValueError:
@@ -462,6 +464,14 @@ def _sunucu_sinifi_olustur(oda: OdaDurumu):
             else:
                 self._json_gonder({"hata": "bilinmeyen yol"}, 404)
 
+        def _anahtar_tamam(self, ad, anahtar) -> bool:
+            """Ogrencinin KENDI anahtarini gostermesi: oda sifresi tum sinifta ortak oldugu icin tek basina
+            baska bir ogrenci adina ilerleme/mesaj/CTF islemi yapilmasini engellemez. Yanit hatada gonderilmistir."""
+            if oda.anahtar_dogru(ad, anahtar):
+                return True
+            self._json_gonder({"hata": "gecersiz_anahtar"}, 403)
+            return False
+
         def _ctf_ogrenci(self, sifre, ad, anahtar) -> bool:
             """CTF istekleri: oda sifresi dogru, ogrenci odaya katilmis ve KENDI anahtarini gostermis olmali
             (aksi halde sinifta oda sifresini bilen biri baska ogrenci adina ipucu acip puan kirabilirdi).
@@ -471,10 +481,7 @@ def _sunucu_sinifi_olustur(oda: OdaDurumu):
             if not isinstance(ad, str) or not (1 <= len(ad) <= MAKS_AD) or not oda.ogrenci_aktif_mi(ad):
                 self._json_gonder({"hata": "bilinmeyen öğrenci"}, 404)
                 return False
-            if not oda.anahtar_dogru(ad, anahtar):
-                self._json_gonder({"hata": "gecersiz_anahtar"}, 403)
-                return False
-            return True
+            return self._anahtar_tamam(ad, anahtar)
 
         def _ctf_hata(self, h) -> None:
             kod = {"bilinmeyen_gorev": 404, "baslamadi": 409, "surec_degil": 409}.get(h.kod, 400)
@@ -559,6 +566,8 @@ def _sunucu_sinifi_olustur(oda: OdaDurumu):
                     return
                 if not self._yetkili_mi(veri.get("sifre")):
                     return
+                if not self._anahtar_tamam(ad, veri.get("anahtar")):
+                    return
                 try:
                     gorev_id, durum = veri["gorev_id"], veri["durum"]
                     sure_sn = veri.get("sure_sn", 0) or 0
@@ -602,6 +611,8 @@ def _sunucu_sinifi_olustur(oda: OdaDurumu):
                 if not oda.ogrenci_aktif_mi(ad):
                     # katilmamis adlara yazilamaz: sohbet sozlugu sisirilemez
                     self._json_gonder({"hata": "bilinmeyen öğrenci"}, 404)
+                    return
+                if not self._anahtar_tamam(ad, veri.get("anahtar")):
                     return
                 kayit = oda.mesaj_ekle(ogrenci=ad, kimden="ogrenci", metin=metin)
                 self._json_gonder({"tamam": True, "no": kayit["no"]})
