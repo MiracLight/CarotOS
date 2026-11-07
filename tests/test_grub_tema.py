@@ -120,6 +120,16 @@ class KurulumBetigiTesti(unittest.TestCase):
             self.assertEqual(f.read(), "# eski grub.cfg\n")
         self.assertFalse(os.path.exists(self.yol("etc", "default", "grub")))       # /etc/default/grub'a dokunulmaz
 
+    def test_systemd_sessiz_ayari_yazilir_ve_geri_alinir(self):
+        self._calistir("kur")
+        yol = self.yol("etc", "systemd", "system.conf.d", "zz-carotos-sessiz.conf")
+        with open(yol, encoding="utf-8") as f:
+            icerik = f.read()
+        self.assertIn("[Manager]", icerik)
+        self.assertIn("ShowStatus=error", icerik)
+        self._calistir("geri-al")
+        self.assertFalse(os.path.exists(yol))
+
     def test_ayar_dosyasi_en_son_okunur(self):
         """/etc/default/grub.d/*.cfg alfabetik okunur; 'zz' hicbir pakete ait parcanin ardinda kalmaz."""
         self._calistir("kur")

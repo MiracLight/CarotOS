@@ -29,6 +29,7 @@ CFG="$KOK/etc/default/grub.d/zz-carotos-grub.cfg"
 ESKI_CFG="$KOK/etc/default/grub.d/90-carotos-tema.cfg"          # onceki denemenin ayar parcasi
 ESKI_TEMA="$KOK/boot/grub/themes/carotos"                         # onceki denemenin ozel temasi
 SURE_HEDEF="$KOK/etc/grub.d/99_carotos_sure"
+SYSTEMD_CFG="$KOK/etc/systemd/system.conf.d/zz-carotos-sessiz.conf"
 GRUBCFG="$KOK/boot/grub/grub.cfg"
 YEDEK="$GRUBCFG.carotos-yedek"
 
@@ -75,6 +76,7 @@ durum() {
     var() { [ -e "$1" ] && echo "VAR " || echo "YOK "; }
     soyle "Ayar parcasi        : $(var "$CFG")$CFG"
     soyle "Sure betigi         : $(var "$SURE_HEDEF")$SURE_HEDEF"
+    soyle "systemd sessiz ayari: $(var "$SYSTEMD_CFG")$SYSTEMD_CFG"
     soyle "Yedek grub.cfg      : $(var "$YEDEK")$YEDEK"
     soyle "Eski ozel tema      : $(var "$ESKI_TEMA")$ESKI_TEMA (VAR ise 'kur' kaldirir)"
     soyle "Eski ayar parcasi   : $(var "$ESKI_CFG")$ESKI_CFG (VAR ise 'kur' kaldirir)"
@@ -122,6 +124,21 @@ EOF
         soyle "  + (sessiz acilis parametreleri, TIMEOUT_STYLE, GRUB_DISABLE_OS_PROBER=false yazilir)"
     fi
 
+    soyle "3b/5 systemd durum satirlari ($SYSTEMD_CFG)"
+    yap mkdir -p "$(dirname "$SYSTEMD_CFG")"
+    if [ "$KURU" -eq 0 ]; then
+        cat > "$SYSTEMD_CFG" <<'EOF'
+# CarotOS: acilista basarili adimlarin ([ OK ] Started ...) ekrana dokulmesini engeller; hata olursa gorunur.
+# Cekirdek parametresi systemd.show_status=error ile ayni; baska bir yapilandirma dosyasi onu ezerse bu
+# parca ("zz": en son okunur) son sozu soyler.
+[Manager]
+ShowStatus=error
+EOF
+        chmod 644 "$SYSTEMD_CFG"
+    else
+        soyle "  + (ShowStatus=error yazilir)"
+    fi
+
     soyle "4/5 Sure betigi (yalniz CarotOS varsa 5 sn, baska sistem bulunursa 30 sn)"
     yap mkdir -p "$(dirname "$SURE_HEDEF")"
     yap cp -f "$SURE_KAYNAK" "$SURE_HEDEF"
@@ -140,7 +157,7 @@ geri_al() {
     komut_gerekli grub-mkconfig grub-script-check
     soyle "1/2 Dosyalar kaldiriliyor"
     yap rm -rf "$ESKI_TEMA"
-    yap rm -f "$CFG" "$ESKI_CFG" "$SURE_HEDEF"
+    yap rm -f "$CFG" "$ESKI_CFG" "$SURE_HEDEF" "$SYSTEMD_CFG"
     soyle "2/2 grub.cfg yeniden uretiliyor"
     grub_uret
     soyle "Geri alindi. Ilk yedek (varsa): $YEDEK"
