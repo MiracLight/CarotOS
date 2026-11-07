@@ -274,7 +274,7 @@ class Uygulama(Gtk.Window):
         alt.set_margin_end(18)
         alt.set_margin_bottom(16)
         alt.set_margin_top(4)
-        self.dil_kutu = Gtk.ComboBoxText()
+        self.dil_kutu = tema.AcilirSecim()
         for kod, ad, taslak in dilkat.etkin_diller():    # yalniz cevirisi hazir diller
             self.dil_kutu.append(kod, dilkat.secici_adi(kod, ad, taslak))
         self.dil_kutu.set_active_id(self.lang)

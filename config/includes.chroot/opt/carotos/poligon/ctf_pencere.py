@@ -52,6 +52,9 @@ def ctf_css(p: dict) -> str:
         r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
         return "rgba(%d,%d,%d,%s)" % (r, g, b, alfa)
     return f"""
+checkbutton.ctf-secim check {{ border-radius: 999px; -gtk-icon-source: none; }}
+checkbutton.ctf-secim check:checked {{ background-color: #15210a; border: 4px solid {p['vurgu']};
+    min-width: 8px; min-height: 8px; }}
 notebook.ctf-sekme {{ background-color: transparent; border: none; }}
 notebook.ctf-sekme > header {{ background-color: transparent; border: none; border-bottom: 1px solid {p['cizgi']}; }}
 notebook.ctf-sekme > header tab {{ background-color: transparent; border: none; border-bottom: 2px solid transparent;

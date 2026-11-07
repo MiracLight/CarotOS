@@ -95,6 +95,7 @@ def panel_olustur(oda, dil: str, ust=None):
                 for g in grup:
                     cb = Gtk.CheckButton()
                     cb.set_active(True)
+                    tema.sinif(cb, "ctf-secim")
                     cb._baslik = g["baslik"]
                     cb._kategori = kategori
                     self.secili[g["id"]] = cb

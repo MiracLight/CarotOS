@@ -170,5 +170,55 @@ class OgretmenVaryantBolumu(unittest.TestCase):
         self.assertEqual(self.w.varyant_combo.get_active_id(), "0")
 
 
+class AcilirYonuTesti(unittest.TestCase):
+    """Dil seciciler pencerenin altindaysa liste yukari, ustundeyse asagi acilir (ustte bos alan birakmaz)."""
+
+    def _pencere(self, secim_y):
+        pencere = Gtk.Window()
+        pencere.set_default_size(300, 600)
+        sabit = Gtk.Fixed()
+        secim = tema.AcilirSecim()
+        for i in range(9):
+            secim.append(str(i), "dil %d" % i)
+        sabit.put(secim, 10, secim_y)
+        pencere.add(sabit)
+        pencere.show_all()
+        pompala(0.4)
+        self.addCleanup(pencere.destroy)
+        return secim
+
+    def test_altta_yukari_ustte_asagi(self):
+        self.assertEqual(self._pencere(540)._yon(), Gtk.PositionType.TOP)
+        self.assertEqual(self._pencere(20)._yon(), Gtk.PositionType.BOTTOM)
+
+    def test_pencereye_eklenmemisse_cokmez(self):
+        self.assertEqual(tema.AcilirSecim()._yon(), Gtk.PositionType.BOTTOM)
+
+    def test_get_model_metinleri_verir(self):
+        s = tema.AcilirSecim()
+        s.append("tr", "Türkçe")
+        s.append("en", "English")
+        self.assertEqual([r[0] for r in s.get_model()], ["Türkçe", "English"])
+
+
+class DilSeciciKaynakTesti(unittest.TestCase):
+    """Hicbir uygulamada dil secici eski ComboBoxText olmamali (9 dilde ustte buyuk bosluk birakiyordu)."""
+
+    def test_dil_secicileri_acilir_secim(self):
+        import re
+        desen = re.compile(r"(?:lang_combo|dil_kutu|dil_dugmesi|dil_sec) = Gtk\.ComboBoxText")
+        kotu = []
+        for kok, _d, dosyalar in os.walk(INC):
+            if "__pycache__" in kok:
+                continue
+            for ad in dosyalar:
+                if ad.endswith(".py"):
+                    yol = os.path.join(kok, ad)
+                    with open(yol, encoding="utf-8") as f:
+                        if desen.search(f.read()):
+                            kotu.append(os.path.relpath(yol, INC))
+        self.assertEqual(kotu, [], "dil seciciler tema.AcilirSecim olmali")
+
+
 if __name__ == "__main__":
     unittest.main()

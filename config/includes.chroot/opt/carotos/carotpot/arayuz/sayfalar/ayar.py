@@ -53,7 +53,7 @@ class AyarSayfasi(Sayfa):
         dis, ic = tema.kart()
         tema.kart_basligi(ic, self.t("gorunum"))
         izgara = Gtk.Grid(column_spacing=14, row_spacing=12)
-        dil_sec = Gtk.ComboBoxText()
+        dil_sec = tema.AcilirSecim()
         for kod, ad, taslak in dil.etkin_diller():       # yalniz cevirisi hazir diller
             dil_sec.append(kod, dil.secici_adi(kod, ad, taslak))
         dil_sec.set_active_id(p.lang)

@@ -103,7 +103,7 @@ class Pencere(Gtk.Window):
         self.kabuk.ust_sag.pack_start(self.ana_dugme, False, False, 0)
 
         alt = Gtk.Box(spacing=8)
-        self.dil_kutu = Gtk.ComboBoxText()
+        self.dil_kutu = tema.AcilirSecim()
         for kod, ad, taslak in dil.etkin_diller():       # yalniz cevirisi hazir diller
             self.dil_kutu.append(kod, dil.secici_adi(kod, ad, taslak))
         self.dil_kutu.set_active_id(self.lang)

@@ -1519,7 +1519,7 @@ class WelcomeWindow(Gtk.Window):
         box.pack_start(version, False, False, 0)
 
         # Sag taraf: dil ve tema secicileri
-        self.lang_combo = Gtk.ComboBoxText()
+        self.lang_combo = tema.AcilirSecim()
         for kod, ad, taslak in dil.etkin_diller():       # yalniz cevirisi hazir diller
             self.lang_combo.append(kod, dil.secici_adi(kod, ad, taslak))
         self.lang_combo.set_active_id(self.lang)

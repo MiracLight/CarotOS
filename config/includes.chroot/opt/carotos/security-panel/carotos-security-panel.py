@@ -760,7 +760,7 @@ class SettingsPage(Gtk.Box):
         grid = Gtk.Grid(column_spacing=16, row_spacing=14)
         self.lang_label = tema.etiket("", "soluk")
         grid.attach(self.lang_label, 0, 0, 1, 1)
-        self.lang_combo = Gtk.ComboBoxText()
+        self.lang_combo = tema.AcilirSecim()
         _dil_secici_doldur(self.lang_combo)
         self.lang_combo.set_active_id(app.lang)
         self.lang_combo.connect("changed", self.on_lang)
@@ -902,7 +902,7 @@ class PanelApp(Gtk.Window):
         self.kabuk.ust_sag.pack_start(self.hap, False, False, 0)
 
         alt = Gtk.Box(spacing=8)
-        self.lang_combo = Gtk.ComboBoxText()
+        self.lang_combo = tema.AcilirSecim()
         _dil_secici_doldur(self.lang_combo)
         self.lang_combo.set_active_id(self.lang)
         self.lang_combo.connect("changed", self._dil_degisti)

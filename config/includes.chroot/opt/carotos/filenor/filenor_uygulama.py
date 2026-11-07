@@ -1035,7 +1035,7 @@ class Uygulama(Gtk.Window):
 
         # sol alt: dil + görünüm (diğer uygulamalarla aynı yer)
         alt = Gtk.Box(spacing=8)
-        self.dil_kutu = Gtk.ComboBoxText()
+        self.dil_kutu = tema.AcilirSecim()
         for kod, ad, taslak in etkin_diller():
             self.dil_kutu.append(kod, secici_adi(kod, ad, taslak))
         self.dil_kutu.set_active_id(self.lang)

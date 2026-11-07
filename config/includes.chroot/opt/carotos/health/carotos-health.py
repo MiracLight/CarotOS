@@ -1689,7 +1689,7 @@ class HealthWindow(Gtk.Window):
         self.kabuk.ust_sag.pack_start(self.refresh_btn, False, False, 0)
 
         alt = Gtk.Box(spacing=8)
-        self.lang_combo = Gtk.ComboBoxText()
+        self.lang_combo = tema.AcilirSecim()
         for kod, ad, taslak in dil.etkin_diller():       # yalniz cevirisi hazir diller
             self.lang_combo.append(kod, dil.secici_adi(kod, ad, taslak))
         self.lang_combo.set_active_id(self.lang)

@@ -510,7 +510,7 @@ class OgretmenPenceresi(Gtk.Window):
 
         # Sol alt: dil ve gorunum
         alt = Gtk.Box(spacing=8)
-        self.dil_dugmesi = Gtk.ComboBoxText()
+        self.dil_dugmesi = tema.AcilirSecim()
         for _kod, _ad, _taslak in _dil.etkin_diller():
             self.dil_dugmesi.append(_kod, _dil.secici_adi(_kod, _ad, _taslak))
         self.dil_dugmesi.set_active_id(self.dil)

@@ -440,6 +440,7 @@ class AcilirSecim(Gtk.Box):
         ic = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         self._yazi = Gtk.Label(xalign=0)
         self._yazi.set_ellipsize(Pango.EllipsizeMode.END)
+        self._yazi.set_width_chars(14)          # ellipsize eden etiket aksi halde "E..." kadar daralir
         ic.pack_start(self._yazi, True, True, 0)
         ok = Gtk.Label(label="\u25be")
         sinif(ok, "acilir-ok")
@@ -513,6 +514,10 @@ class AcilirSecim(Gtk.Box):
     def get_active_text(self):
         return self._ogeler[self._aktif][1] if self._aktif >= 0 else None
 
+    def get_model(self):
+        """ComboBoxText uyumu (salt okunur): her oge icin [gorunen_metin] satiri. Testler ve listeyi okuyanlar icin."""
+        return [[metin] for _kimlik, metin in self._ogeler]
+
     def metni_degistir(self, kimlik, metin):
         """Sinyal tetiklemeden bir ogenin gorunen metnini degistirir (dil degisimi)."""
         for i, oge in enumerate(self._ogeler):
@@ -533,10 +538,22 @@ class AcilirSecim(Gtk.Box):
         self._kaydirma.set_size_request(max(genislik - 12, 200), -1)
         if self._aktif >= 0:
             self._liste.select_row(self._liste.get_row_at_index(self._aktif))
+        self._acilir.set_position(self._yon())
         self._acilir.popup()
         if self._aktif >= 0:
             satir = self._liste.get_row_at_index(self._aktif)
             GLib.idle_add(self._satira_kaydir, satir)
+
+    def _yon(self):
+        """Dugme pencerenin alt yarisindaysa (sol alttaki dil seciciler) liste yukari, degilse asagi acilir."""
+        try:
+            ust = self._dugme.get_toplevel()
+            _x, y = self._dugme.translate_coordinates(ust, 0, 0)
+            if y is not None and y > ust.get_allocated_height() * 0.55:
+                return Gtk.PositionType.TOP
+        except (TypeError, AttributeError):
+            pass
+        return Gtk.PositionType.BOTTOM
 
     def _satira_kaydir(self, satir):
         alan = satir.get_allocation()

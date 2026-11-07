@@ -451,7 +451,7 @@ class PoligonPenceresi(Gtk.Window):
         self.tema_dugmesi.connect("clicked", self._tema_degistir)
         cubuk.pack_end(self.tema_dugmesi, False, False, 0)
 
-        self.dil_dugmesi = Gtk.ComboBoxText()
+        self.dil_dugmesi = tema.AcilirSecim()
         tema.sinif(self.dil_dugmesi, "kucuk")
         for _kod, _ad, _taslak in _dil.etkin_diller():
             self.dil_dugmesi.append(_kod, _dil.secici_adi(_kod, _ad, _taslak))
