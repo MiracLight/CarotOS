@@ -25,7 +25,8 @@ class CtfIstemci:
     def _sorgu(self, yol: str, **ek) -> dict:
         if not self.kullanilabilir:
             return {"hata": HATA_BIREYSEL}
-        q = urllib.parse.urlencode({"ogrenci": self._i.ogrenci_adi, "sifre": self._i.oda_sifre, **ek})
+        q = urllib.parse.urlencode({"ogrenci": self._i.ogrenci_adi, "sifre": self._i.oda_sifre,
+                                    "anahtar": getattr(self._i, "anahtar", ""), **ek})
         try:
             kod, govde = self._i._istek("%s?%s" % (yol, q), {}, "GET")
         except BaglantiHatasi:
@@ -36,7 +37,8 @@ class CtfIstemci:
         if not self.kullanilabilir:
             return {"hata": HATA_BIREYSEL}
         try:
-            kod, govde = self._i._istek(yol, {"ogrenci": self._i.ogrenci_adi, "sifre": self._i.oda_sifre, **ek})
+            kod, govde = self._i._istek(yol, {"ogrenci": self._i.ogrenci_adi, "sifre": self._i.oda_sifre,
+                                              "anahtar": getattr(self._i, "anahtar", ""), **ek})
         except BaglantiHatasi:
             return {"hata": HATA_BAGLANTI}
         return govde if isinstance(govde, dict) else {"hata": "gecersiz_yanit"}

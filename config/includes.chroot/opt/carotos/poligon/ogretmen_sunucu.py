@@ -9,7 +9,7 @@ Bu iki kural birbirine KARISTIRILMAMALI. Buradan saldiri trafigi
 GECMEZ -- sadece ilerleme/skor/ipucu JSON mesajlari.
 
 Protokol (hepsi JSON):
-  POST /katil         {ogrenci, sifre}
+  POST /katil         {ogrenci, sifre}  -> {tamam, anahtar}  (anahtar: ogrenciye ozel; CTF isteklerinde gerekir)
   POST /ilerleme      {ogrenci, sifre, gorev_id, durum, sure_sn}
   POST /mesaj         {ogrenci, sifre, metin}      (ogrenci -> ogretmen sohbeti)
   GET  /sohbet?ogrenci=AD&sifre=...&son_no=N        (ogrenci kendi sohbetini ceker)
@@ -19,7 +19,8 @@ Protokol (hepsi JSON):
   GET  /durum                                              (ogretmen paneli izler)
 
 CTF (hakem sunucudur; hepsi oda sifresi + katilmis ogrenci ister; bkz. ctf_cekirdek.py):
-  GET  /ctf/durum?ogrenci=AD&sifre=...            gorev listesi (bayrak YOK), kalan sure
+  (CTF isteklerinin hepsi ayrica katilimda verilen 'anahtar' ister)
+  GET  /ctf/durum?ogrenci=AD&sifre=...&anahtar=...  gorev listesi (bayrak YOK), kalan sure
   GET  /ctf/dosya?ogrenci=AD&sifre=...&gorev=ID   ogrenciye ozel gorev dosyasi
   GET  /ctf/skor?ogrenci=AD&sifre=...             skor tablosu (donukse donuk hali)
   POST /ctf/gonder    {ogrenci, sifre, gorev, bayrak}   sunucu dogrular ve puanlar
@@ -40,6 +41,7 @@ from urllib.parse import urlparse, parse_qs
 MAKS_GOVDE = 64 * 1024          # bayt
 MAKS_AD = 64                    # ogrenci adi / gorev kimligi / durum uzunlugu
 MAKS_MESAJ = 1000               # sohbet mesaji ve cevap metni uzunlugu
+ISTEK_ZAMAN_ASIMI = 10.0        # sn: yarim kalan istek (govdesi gelmeyen) baglantiyi sonsuza dek tutamaz
 DENEME_PENCERESI = 60.0         # sn
 DENEME_LIMITI = 10              # pencerede yanlis sifre sayisi
 
@@ -66,6 +68,9 @@ class OdaDurumu:
         # "Soruyu Ata" dediginde (gorev_ata / ozel_soru_ata) 1 artar.
         self.aktif_soru_no = 0
         self.ogrenciler: dict[str, dict] = {}
+        # Katilimda her ogrenciye verilen gizli anahtar: oda sifresi tum sinifta ortak oldugu icin
+        # CTF islemleri (bayrak, ipucu, dosya) baska bir ogrencinin adina yapilamasin diye bu da aranir.
+        self._anahtarlar: dict[str, str] = {}
         # Her öğrenci için BİRİKEN sohbet geçmişi (tek seferlik kuyruk değil):
         # ad -> [{"kimden","metin","zaman","no"}]. Mesajlar silinmez.
         self.sohbetler: dict[str, list] = {}
@@ -192,6 +197,7 @@ class OdaDurumu:
         için) temizlemesine yarar."""
         with self._kilit:
             self.ogrenciler.pop(ad, None)
+            self._anahtarlar.pop(ad, None)
 
     def sifre_dogru(self, sifre) -> bool:
         """Sabit sureli karsilastirma. ASCII disi ya da str olmayan degerde
@@ -233,6 +239,20 @@ class OdaDurumu:
                 "sure_sn": 0,
                 "son_gorulme": time.time(),
             }
+            self._anahtarlar[ad] = secrets.token_hex(16)
+
+    def anahtar_ver(self, ad: str) -> str:
+        """Katilmis ogrencinin gizli anahtari (yalnizca /katil yanitinda ogrencinin kendisine doner)."""
+        with self._kilit:
+            return self._anahtarlar.get(ad, "")
+
+    def anahtar_dogru(self, ad: str, anahtar) -> bool:
+        """Sabit sureli karsilastirma; str olmayan ya da bos anahtar her zaman reddedilir."""
+        with self._kilit:
+            gercek = self._anahtarlar.get(ad)
+        if not gercek or not isinstance(anahtar, str):
+            return False
+        return secrets.compare_digest(anahtar.encode("utf-8"), gercek.encode("utf-8"))
 
     def ilerleme_guncelle(self, ad: str, sifre: str, gorev_id: str,
                            durum: str, sure_sn: float,
@@ -350,6 +370,8 @@ def oda_sifresi_uret() -> str:
 
 def _sunucu_sinifi_olustur(oda: OdaDurumu):
     class Handler(BaseHTTPRequestHandler):
+        timeout = ISTEK_ZAMAN_ASIMI     # govdesi gelmeyen baglanti is parcacigini sonsuza dek tutmasin
+
         def log_message(self, format, *args):  # noqa: A002
             pass  # sınıfta konsolu kirletmesin
 
@@ -440,12 +462,17 @@ def _sunucu_sinifi_olustur(oda: OdaDurumu):
             else:
                 self._json_gonder({"hata": "bilinmeyen yol"}, 404)
 
-        def _ctf_ogrenci(self, sifre, ad) -> bool:
-            """CTF istekleri: oda sifresi dogru ve ogrenci odaya katilmis olmali. Yanit hatada gonderilmistir."""
+        def _ctf_ogrenci(self, sifre, ad, anahtar) -> bool:
+            """CTF istekleri: oda sifresi dogru, ogrenci odaya katilmis ve KENDI anahtarini gostermis olmali
+            (aksi halde sinifta oda sifresini bilen biri baska ogrenci adina ipucu acip puan kirabilirdi).
+            Yanit hatada gonderilmistir."""
             if not self._yetkili_mi(sifre):
                 return False
             if not isinstance(ad, str) or not (1 <= len(ad) <= MAKS_AD) or not oda.ogrenci_aktif_mi(ad):
                 self._json_gonder({"hata": "bilinmeyen öğrenci"}, 404)
+                return False
+            if not oda.anahtar_dogru(ad, anahtar):
+                self._json_gonder({"hata": "gecersiz_anahtar"}, 403)
                 return False
             return True
 
@@ -456,7 +483,7 @@ def _sunucu_sinifi_olustur(oda: OdaDurumu):
         def _ctf_oku(self, yol, sorgu) -> None:
             import ctf_cekirdek
             ad = sorgu.get("ogrenci", [""])[0]
-            if not self._ctf_ogrenci(sorgu.get("sifre", [""])[0], ad):
+            if not self._ctf_ogrenci(sorgu.get("sifre", [""])[0], ad, sorgu.get("anahtar", [""])[0]):
                 return
             ctf = oda.ctf_oturumu()
             try:
@@ -479,7 +506,7 @@ def _sunucu_sinifi_olustur(oda: OdaDurumu):
         def _ctf_yaz(self, yol, veri) -> None:
             import ctf_cekirdek
             ad = self._ad(veri)
-            if not self._ctf_ogrenci(veri.get("sifre"), ad):
+            if not self._ctf_ogrenci(veri.get("sifre"), ad, veri.get("anahtar")):
                 return
             gorev = veri.get("gorev")
             if not isinstance(gorev, str) or len(gorev) > MAKS_AD:
@@ -515,7 +542,7 @@ def _sunucu_sinifi_olustur(oda: OdaDurumu):
                     return
                 try:
                     oda.katil(ad=ad, sifre=veri["sifre"])
-                    self._json_gonder({"tamam": True})
+                    self._json_gonder({"tamam": True, "anahtar": oda.anahtar_ver(ad)})
                 except PermissionError:
                     self._json_gonder({"hata": "yanlış şifre"}, 403)
                 except ValueError:

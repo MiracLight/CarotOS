@@ -47,17 +47,22 @@ class CtfSunucuTesti(unittest.TestCase):
         self.addCleanup(self.sunucu.server_close)      # cleanup ters sirada calisir: once shutdown
         self.addCleanup(self.sunucu.shutdown)
         self.port = self.sunucu.server_address[1]
+        self.anahtar = {}
         for ad in ("ali", "veli"):
-            self.assertEqual(istek(self.port, "/katil", {"ogrenci": ad, "sifre": SIFRE})[0], 200)
+            kod, d = istek(self.port, "/katil", {"ogrenci": ad, "sifre": SIFRE})
+            self.assertEqual(kod, 200)
+            self.anahtar[ad] = d["anahtar"]
 
     def durum(self, ad="ali"):
-        return istek(self.port, "/ctf/durum", sorgu={"ogrenci": ad, "sifre": SIFRE})
+        return istek(self.port, "/ctf/durum", sorgu={"ogrenci": ad, "sifre": SIFRE, "anahtar": self.anahtar[ad]})
 
     def dosya(self, ad, gorev):
-        return istek(self.port, "/ctf/dosya", sorgu={"ogrenci": ad, "sifre": SIFRE, "gorev": gorev})
+        return istek(self.port, "/ctf/dosya", sorgu={"ogrenci": ad, "sifre": SIFRE, "anahtar": self.anahtar[ad],
+                                                      "gorev": gorev})
 
     def gonder(self, ad, gorev, bayrak):
-        return istek(self.port, "/ctf/gonder", {"ogrenci": ad, "sifre": SIFRE, "gorev": gorev, "bayrak": bayrak})
+        return istek(self.port, "/ctf/gonder", {"ogrenci": ad, "sifre": SIFRE, "anahtar": self.anahtar[ad], "gorev": gorev,
+                                          "bayrak": bayrak})
 
     def coz(self, ad, gorev):
         kod, d = self.dosya(ad, gorev)
@@ -103,7 +108,8 @@ class CtfSunucuTesti(unittest.TestCase):
         kod, r = self.gonder("ali", "kodlama-1", bayrak)
         self.assertEqual((kod, r["sonuc"]), (200, "dogru"))
         self.assertEqual(self.gonder("ali", "kodlama-1", bayrak)[1]["sonuc"], "zaten")
-        kod, s = istek(self.port, "/ctf/skor", sorgu={"ogrenci": "veli", "sifre": SIFRE})
+        kod, s = istek(self.port, "/ctf/skor", sorgu={"ogrenci": "veli", "sifre": SIFRE,
+                                                      "anahtar": self.anahtar["veli"]})
         self.assertEqual(s["satirlar"][0]["ad"], "ali")
         self.assertGreater(s["satirlar"][0]["puan"], 0)
         self.assertTrue({g["id"]: g for g in self.durum("ali")[1]["gorevler"]}["kodlama-1"]["cozuldu"])
@@ -117,9 +123,9 @@ class CtfSunucuTesti(unittest.TestCase):
 
     def test_ipucu_siralama_ve_dosya_yaniti(self):
         self.baslat()
-        kod, d = istek(self.port, "/ctf/ipucu", {"ogrenci": "ali", "sifre": SIFRE, "gorev": "kodlama-1", "no": 1})
+        kod, d = istek(self.port, "/ctf/ipucu", {"ogrenci": "ali", "sifre": SIFRE, "anahtar": self.anahtar["ali"], "gorev": "kodlama-1", "no": 1})
         self.assertEqual((kod, d["hata"]), (400, "once_oncekini_ac"))
-        kod, d = istek(self.port, "/ctf/ipucu", {"ogrenci": "ali", "sifre": SIFRE, "gorev": "kodlama-1", "no": 0})
+        kod, d = istek(self.port, "/ctf/ipucu", {"ogrenci": "ali", "sifre": SIFRE, "anahtar": self.anahtar["ali"], "gorev": "kodlama-1", "no": 0})
         self.assertEqual(kod, 200)
         self.assertGreater(d["ceza"], 0)
         self.assertEqual(len(self.dosya("ali", "kodlama-1")[1]["ipuclari"]), 1)
@@ -136,18 +142,18 @@ class CtfSunucuTesti(unittest.TestCase):
     def test_bozuk_girdiler_cokertmez(self):
         self.baslat()
         govdeler = [
-            {"ogrenci": "ali", "sifre": SIFRE},                                         # gorev yok
-            {"ogrenci": "ali", "sifre": SIFRE, "gorev": 5, "bayrak": "x"},
-            {"ogrenci": "ali", "sifre": SIFRE, "gorev": "x" * 500, "bayrak": "x"},
-            {"ogrenci": "ali", "sifre": SIFRE, "gorev": "kodlama-1", "bayrak": 5},
-            {"ogrenci": "ali", "sifre": SIFRE, "gorev": "kodlama-1", "bayrak": None},
-            {"ogrenci": "ali", "sifre": SIFRE, "gorev": "kodlama-1", "bayrak": "x" * 10000},
-            {"ogrenci": 5, "sifre": SIFRE, "gorev": "kodlama-1", "bayrak": "x"},
+            {"ogrenci": "ali", "sifre": SIFRE, "anahtar": self.anahtar["ali"]},                                         # gorev yok
+            {"ogrenci": "ali", "sifre": SIFRE, "anahtar": self.anahtar["ali"], "gorev": 5, "bayrak": "x"},
+            {"ogrenci": "ali", "sifre": SIFRE, "anahtar": self.anahtar["ali"], "gorev": "x" * 500, "bayrak": "x"},
+            {"ogrenci": "ali", "sifre": SIFRE, "anahtar": self.anahtar["ali"], "gorev": "kodlama-1", "bayrak": 5},
+            {"ogrenci": "ali", "sifre": SIFRE, "anahtar": self.anahtar["ali"], "gorev": "kodlama-1", "bayrak": None},
+            {"ogrenci": "ali", "sifre": SIFRE, "anahtar": self.anahtar["ali"], "gorev": "kodlama-1", "bayrak": "x" * 10000},
+            {"ogrenci": 5, "sifre": SIFRE, "anahtar": "x", "gorev": "kodlama-1", "bayrak": "x"},
         ]
         for g in govdeler:
             kod, _ = istek(self.port, "/ctf/gonder", g)
             self.assertIn(kod, (200, 400, 404), g)
-        kod, _ = istek(self.port, "/ctf/ipucu", {"ogrenci": "ali", "sifre": SIFRE, "gorev": "kodlama-1", "no": "a"})
+        kod, _ = istek(self.port, "/ctf/ipucu", {"ogrenci": "ali", "sifre": SIFRE, "anahtar": self.anahtar["ali"], "gorev": "kodlama-1", "no": "a"})
         self.assertEqual(kod, 400)
         self.assertEqual(self.dosya("ali", "x" * 500)[0], 404)
         self.assertEqual(self.durum()[0], 200)                                           # sunucu ayakta
@@ -157,8 +163,61 @@ class CtfSunucuTesti(unittest.TestCase):
         b = self.coz("ali", "kodlama-1")
         self.oda.ctf_oturumu().bitir()
         self.assertEqual(self.gonder("ali", "kodlama-1", b)[1]["sonuc"], "bitti")
-        kod, d = istek(self.port, "/ctf/ipucu", {"ogrenci": "ali", "sifre": SIFRE, "gorev": "kodlama-1", "no": 0})
+        kod, d = istek(self.port, "/ctf/ipucu", {"ogrenci": "ali", "sifre": SIFRE, "anahtar": self.anahtar["ali"], "gorev": "kodlama-1", "no": 0})
         self.assertEqual((kod, d["hata"]), (409, "surec_degil"))
+
+    # -- ogrenci anahtari (oda sifresi tum sinifta ortak) ----------------------------------------------------------
+    def test_baska_ogrenci_adina_islem_yapilamaz(self):
+        self.baslat()
+        sahte = {"ogrenci": "ali", "sifre": SIFRE, "anahtar": self.anahtar["veli"], "gorev": "kodlama-1"}
+        for yol, ek in (("/ctf/gonder", {"bayrak": "CAROT{x}"}), ("/ctf/ipucu", {"no": 0})):
+            kod, d = istek(self.port, yol, {**sahte, **ek})
+            self.assertEqual((kod, d["hata"]), (403, "gecersiz_anahtar"), yol)
+        for yol, ek in (("/ctf/durum", {}), ("/ctf/skor", {}), ("/ctf/dosya", {"gorev": "kodlama-1"})):
+            kod, d = istek(self.port, yol, sorgu={"ogrenci": "ali", "sifre": SIFRE, "anahtar": self.anahtar["veli"], **ek})
+            self.assertEqual((kod, d["hata"]), (403, "gecersiz_anahtar"), yol)
+        # anahtarsiz / bos / sayi da reddedilir
+        for anahtar in (None, "", 5):
+            g = {"ogrenci": "ali", "sifre": SIFRE, "gorev": "kodlama-1", "no": 0, "anahtar": anahtar}
+            self.assertEqual(istek(self.port, "/ctf/ipucu", g)[0], 403, repr(anahtar))
+        g = {"ogrenci": "ali", "sifre": SIFRE, "gorev": "kodlama-1", "no": 0}
+        self.assertEqual(istek(self.port, "/ctf/ipucu", g)[0], 403)
+        # kurbanin puani ve hakki etkilenmedi
+        self.assertEqual(self.oda.ctf_oturumu().ipuclari, [])
+        self.assertEqual(self.oda.ctf_oturumu()._yanlislar, {})
+
+    def test_anahtar_katilimda_yeniden_uretilir(self):
+        eski = self.anahtar["ali"]
+        self.oda.ogrenciyi_at("ali")
+        self.assertFalse(self.oda.anahtar_dogru("ali", eski))
+        kod, d = istek(self.port, "/katil", {"ogrenci": "ali", "sifre": SIFRE})
+        self.assertEqual(kod, 200)
+        self.assertNotEqual(d["anahtar"], eski)
+        self.assertEqual(len(d["anahtar"]), 32)
+
+    def test_yarim_kalan_istek_baglantiyi_sonsuza_dek_tutmaz(self):
+        import socket
+        import time
+        sinif = S._sunucu_sinifi_olustur(self.oda)
+        self.assertEqual(sinif.timeout, S.ISTEK_ZAMAN_ASIMI)
+        sinif.timeout = 1                                       # testte beklemeyelim
+        from http.server import ThreadingHTTPServer
+        sunucu = ThreadingHTTPServer(("127.0.0.1", 0), sinif)
+        sunucu.daemon_threads = True
+        import threading
+        threading.Thread(target=sunucu.serve_forever, daemon=True).start()
+        self.addCleanup(sunucu.server_close)
+        self.addCleanup(sunucu.shutdown)
+        c = socket.create_connection(("127.0.0.1", sunucu.server_address[1]), timeout=5)
+        self.addCleanup(c.close)
+        c.sendall(b"POST /katil HTTP/1.1\r\nContent-Length: 50000\r\n\r\n{")     # govde hic tamamlanmaz
+        t0 = time.monotonic()
+        try:
+            veri = c.recv(4096)                                 # sunucu kapatinca bos doner (ya da 4xx yaniti)
+        except socket.timeout:
+            self.fail("sunucu yarim kalan istegi zaman asimina ugratmadi")
+        self.assertLess(time.monotonic() - t0, 4)
+        self.assertTrue(veri == b"" or veri.startswith(b"HTTP/"))
 
     def test_ders_modu_ucnoktalari_bozulmadi(self):
         self.assertEqual(istek(self.port, "/durum")[0], 200)

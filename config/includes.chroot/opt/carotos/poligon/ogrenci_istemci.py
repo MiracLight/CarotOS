@@ -128,6 +128,7 @@ class PoligonIstemci:
         self.oda_kodu = oda_kodu
         self.oda_sifre = oda_sifre
         self.ogrenci_adi = ogrenci_adi
+        self.anahtar = ""          # /katil yanitinda gelir; CTF isteklerinde gonderilir
         self.gorev: dict | None = None
         self.hedef_parola: str | None = None  # sadece 'parola_uret' yönteminde dolar (geriye uyumluluk)
         self._dogru_cevap: str | None = None   # HER görev türünde dolar, doğrulama bunu kullanır
@@ -597,6 +598,7 @@ class PoligonIstemci:
             return False, "__BAGLANTI_HATASI__"
 
         if durum == 200:
+            self.anahtar = str(cevap.get("anahtar") or "")
             return True, ""
         return False, cevap.get("mesaj") or cevap.get("hata", "Bilinmeyen hata")
 
