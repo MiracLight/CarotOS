@@ -18,6 +18,7 @@ SADECE 127.0.0.1: guvenlik kurali burada da kod seviyesinde zorunlu.
 from __future__ import annotations
 
 from ag_guvenlik import loopback_adres_mi  # noqa: E402
+from olay_gunlugu import GUNLUK  # noqa: E402
 
 import sqlite3
 import threading
@@ -92,7 +93,9 @@ class SahteWebServisi:
             def do_GET(self):
                 ayristirilan = urlparse(self.path)
                 if ayristirilan.path != "/urun":
+                    GUNLUK.kaydet("web", "http_404", ayristirilan.path, self.server.server_address[1])
                     self.send_response(404); self.end_headers(); return
+                GUNLUK.kaydet("web", "http_istek", ayristirilan.path, self.server.server_address[1])
 
                 sorgu = parse_qs(ayristirilan.query)
                 kullanici_id = sorgu.get("id", ["1"])[0]

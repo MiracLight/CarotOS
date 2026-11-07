@@ -537,6 +537,12 @@ PAGES = [
                  "en": "CTF contest: the teacher starts the contest, everyone solves the same challenges with "
                        "their own file and submits the flag in the CAROT{...} format. The teacher's computer "
                        "checks the flag and works out the score; your flag is no use to anyone else."},
+                {"tr": "Savunmacı görünümü: saldırının sahte servislerde bıraktığı izleri (olay günlüğü) görürsün; "
+                       "uygulama kalıpları bulgu olarak gösterir ve ufw ile fail2ban'ın nasıl koruduğunu anlatır. "
+                       "Günlüğe yalnızca meta veri yazılır, parolalar yazılmaz.",
+                 "en": "Defender view: you see the traces your attack left on the fake services (the event log); "
+                       "the app shows patterns as findings and explains how ufw and fail2ban protect. Only "
+                       "metadata is logged, never passwords."},
             ]),
         ],
     },

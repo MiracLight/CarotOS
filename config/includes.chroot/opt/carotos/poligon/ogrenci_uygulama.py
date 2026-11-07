@@ -259,6 +259,7 @@ _METIN_HAM = {
         "tema_acik": "Açık tema",
         "tema_koyu": "Koyu tema",
         "ctf_dugme": "CTF yarışması",
+        "savunma_dugme": "Savunmacı görünümü",
     },
     "en": {
         "hata_gorev_yok": "The teacher hasn't opened a task yet",
@@ -349,6 +350,7 @@ _METIN_HAM = {
         "tema_acik": "Light theme",
         "tema_koyu": "Dark theme",
         "ctf_dugme": "CTF contest",
+        "savunma_dugme": "Defender view",
     },
 }
 
@@ -471,6 +473,14 @@ class PoligonPenceresi(Gtk.Window):
         self.ctf_dugmesi.hide()
         self.ctf_dugmesi.connect("clicked", self._ctf_ac)
         cubuk.pack_end(self.ctf_dugmesi, False, False, 0)
+
+        # Savunmaci gorunumu: gorev ekraninda gorunur (sinif ya da bireysel fark etmez; yalniz yerel olaylari okur)
+        self.savunma_dugmesi = Gtk.Button()
+        tema.sinif(self.savunma_dugmesi, "kucuk")
+        self.savunma_dugmesi.set_no_show_all(True)
+        self.savunma_dugmesi.hide()
+        self.savunma_dugmesi.connect("clicked", self._savunma_ac)
+        cubuk.pack_end(self.savunma_dugmesi, False, False, 0)
         return cubuk
 
     def _sayfa_ekle(self, kutu, ad, genislik=560):
@@ -493,6 +503,7 @@ class PoligonPenceresi(Gtk.Window):
             self.hap.hide()
         sinifta = ad in ("gorev", "bekleme") and not self.bireysel_mod and self.istemci is not None
         self.ctf_dugmesi.set_visible(sinifta)
+        self.savunma_dugmesi.set_visible(ad in ("gorev", "bekleme"))
 
     def _ctf_ac(self, _dugme):
         """CTF penceresini acar (tek ornek). Sunucu hakemdir; bkz. ctf_pencere.py."""
@@ -507,6 +518,21 @@ class PoligonPenceresi(Gtk.Window):
             CtfIstemci(self.istemci), self.dil, self.istemci.ogrenci_adi, self.gorunum)
         self._ctf_penceresi.connect("destroy", lambda *_: setattr(self, "_ctf_penceresi", None))
         self._ctf_penceresi.show_all()
+
+    def _savunma_ac(self, _dugme):
+        """Savunmaci gorunumunu acar (tek ornek). Yalniz sahte servislerin olay gunlugunu okur."""
+        if getattr(self, "_savunma_penceresi", None) is not None:
+            self._savunma_penceresi.present()
+            return
+        import savunma_pencere
+        self._savunma_penceresi = savunma_pencere.pencere_olustur(self.dil, self.gorunum)
+        self._savunma_penceresi.connect("destroy", lambda *_: setattr(self, "_savunma_penceresi", None))
+        self._savunma_penceresi.show_all()
+
+    def _savunma_penceresini_kapat(self):
+        if getattr(self, "_savunma_penceresi", None) is not None:
+            self._savunma_penceresi.destroy()
+            self._savunma_penceresi = None
 
     def _ctf_penceresini_kapat(self):
         if getattr(self, "_ctf_penceresi", None) is not None:
@@ -541,6 +567,9 @@ class PoligonPenceresi(Gtk.Window):
         self.marka_alt_etiketi.set_text(self.aktif_kullanici or "")
         self.tema_dugmesi.set_label(m["tema_acik"] if self.gorunum == "dark" else m["tema_koyu"])
         self.ctf_dugmesi.set_label(m["ctf_dugme"])
+        self.savunma_dugmesi.set_label(m["savunma_dugme"])
+        if getattr(self, "_savunma_penceresi", None) is not None:
+            self._savunma_penceresi.dil_ayarla(self.dil)
         self.slogan_etiketi.set_text(m["slogan"])
         self.mod_baslik_etiketi.set_text(m["mod_secim_basligi"])
         self._dugme_metni_ayarla(self.bireysel_dugmesi, m["bireysel_dugme"])

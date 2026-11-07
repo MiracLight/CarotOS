@@ -15,6 +15,7 @@ import socket
 import threading
 
 from ag_guvenlik import loopback_adres_mi
+from olay_gunlugu import GUNLUK
 
 YEM_BASLIKLAR = (
     "SSH-2.0-OpenSSH_8.9p1 Ubuntu-3ubuntu0.4",
@@ -69,6 +70,7 @@ class SahteBannerOrtami:
                 continue
             except OSError:
                 return
+            GUNLUK.kaydet("banner", "baglanti", port=port)
             try:
                 bag.settimeout(3)
                 if self.mod == "istek":

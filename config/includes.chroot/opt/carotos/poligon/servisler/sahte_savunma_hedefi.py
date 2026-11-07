@@ -14,6 +14,7 @@ içinde, `sudo ufw status` çıktısı okunarak yapılır -- bkz. oradaki not.
 from __future__ import annotations
 
 from ag_guvenlik import loopback_adres_mi  # noqa: E402
+from olay_gunlugu import GUNLUK  # noqa: E402
 
 import socket
 import threading
@@ -65,6 +66,7 @@ class BasitDinleyici:
     def _istemciyi_isle(self, conn: socket.socket) -> None:
         try:
             conn.settimeout(5)
+            GUNLUK.kaydet("savunma", "baglanti", port=self.port)
             conn.sendall(b"CarotOS Poligon -- savunma hedefi\r\n")
         except (OSError, socket.timeout):
             pass

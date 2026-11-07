@@ -21,6 +21,7 @@ ekstra bir IPC kanali gerekmiyor.
 from __future__ import annotations
 
 from ag_guvenlik import loopback_adres_mi  # noqa: E402
+from olay_gunlugu import GUNLUK  # noqa: E402
 
 import socket
 import threading
@@ -77,6 +78,7 @@ class SahteGirisServisi:
     def _istemciyi_isle(self, conn: socket.socket) -> None:
         try:
             conn.settimeout(10)
+            GUNLUK.kaydet("giris", "baglanti", port=self.port)
             conn.sendall(b"220 CarotOS Egitim Servisi\r\n")
             girilen_kullanici = None
             arabellek = b""
@@ -100,8 +102,10 @@ class SahteGirisServisi:
                         girilen_kullanici == self.kullanici
                         and girilen_parola == self.parola
                     ):
+                        GUNLUK.kaydet("giris", "giris_basarili", girilen_kullanici or "", self.port)
                         conn.sendall(b"230 Giris basarili\r\n")
                     else:
+                        GUNLUK.kaydet("giris", "giris_basarisiz", girilen_kullanici or "", self.port)
                         conn.sendall(b"530 Giris basarisiz\r\n")
                 elif ust.startswith("QUIT"):
                     conn.sendall(b"221 Bye\r\n")

@@ -13,6 +13,7 @@ nmap'in TCP connect/SYN taramasinda "acik" olarak gorunmeleri.
 from __future__ import annotations
 
 from ag_guvenlik import loopback_adres_mi  # noqa: E402
+from olay_gunlugu import GUNLUK  # noqa: E402
 
 import secrets
 import socket
@@ -86,6 +87,7 @@ class SahteAgOrtami:
         while self._calisiyor:
             try:
                 conn, _ = soket.accept()
+                GUNLUK.kaydet("ag", "baglanti", port=soket.getsockname()[1])
                 conn.close()  # bağlantıyı kabul et, hiçbir şey yapma, kapat
             except OSError:
                 break

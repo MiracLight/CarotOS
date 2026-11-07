@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Former testleri: zaman cizelgesi motoru (GTK'siz), 18 konunun icerik
+"""Former testleri: zaman cizelgesi motoru (GTK'siz), 19 konunun icerik
 dogrulamasi (iki dilli, sahneyle tutarli), Guvenlik Paneli'nin gercek arac
 listesiyle capraz kontrol, simge yolu bulma ve (ekran varsa) arayuzun
 butun konularda hatasiz gezilmesi.
@@ -132,14 +132,14 @@ class ZamanMotoruTesti(unittest.TestCase):
 
 # ---------------------------------------------------------------------------
 class IcerikTesti(unittest.TestCase):
-    """konular/ altindaki 18 konunun yapisal dogrulugu."""
+    """konular/ altindaki 19 konunun yapisal dogrulugu."""
 
     @classmethod
     def setUpClass(cls):
         cls.konular = konular.tumu()
 
-    def test_on_sekiz_konu_ve_benzersiz_kimlik(self):
-        self.assertEqual(len(self.konular), 18)
+    def test_on_dokuz_konu_ve_benzersiz_kimlik(self):
+        self.assertEqual(len(self.konular), 19)
         kimlikler = [k["id"] for k in self.konular]
         self.assertEqual(len(kimlikler), len(set(kimlikler)), kimlikler)
         self.assertEqual(set(kimlikler), set(konular.SIRA))
@@ -333,7 +333,7 @@ class SiblingAyarSenkronTesti(unittest.TestCase):
 @unittest.skipUnless(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"),
                      "ekran yok (xvfb-run ile calistirin)")
 class ArayuzDumanTesti(unittest.TestCase):
-    """Pencereyi acar, 18 konunun hepsini gezer, dil/tema degistirir.
+    """Pencereyi acar, 19 konunun hepsini gezer, dil/tema degistirir.
     Yakalanmayan istisna olmamali."""
 
     def test_butun_konular_hatasiz_gezilir(self):
@@ -432,6 +432,26 @@ class YeniKonuIddiaTesti(unittest.TestCase):
         self.assertIn("ctf_dugme", ogrenci)
         self.assertIn("Poligon-CTF", metin)
         self.assertIn("Poligon-CTF", pencere)
+
+    def test_savunma_etiketleri_uygulamayla_ayni(self):
+        ogrenci = self._oku("poligon", "ogrenci_uygulama.py")
+        pencere = self._oku("poligon", "savunma_pencere.py")
+        metin = self._metinler("savunma")
+        self.assertIn('"savunma_dugme": "Savunmacı görünümü"', ogrenci)
+        self.assertIn('"savunma_dugme": "Defender view"', ogrenci)
+        self.assertIn("Savunmacı görünümü", metin)
+        self.assertIn("Defender view", metin)
+        self.assertIn('T("Günlüğü temizle", "Clear the log")', pencere)
+        sahne_tr = "".join(o["metin"]["tr"] for o in self.konular["savunma"]["sahne"]["ogeler"]
+                           if isinstance(o.get("metin"), dict))
+        self.assertIn("Günlüğü temizle", sahne_tr)
+        self.assertIn("ufw", metin)
+        self.assertIn("fail2ban", metin)
+        # sahne ile pencere ayni bulgu basligini kullanir
+        analiz = self._oku("poligon", "savunma_analiz.py")
+        self.assertIn('T("Parola deneme saldırısı", "Password guessing attack")', analiz)
+        self.assertIn("Password guessing attack", "".join(
+            o["metin"]["en"] for o in self.konular["savunma"]["sahne"]["ogeler"] if isinstance(o.get("metin"), dict)))
 
     def test_acikla_kisayolu_ve_arac_var(self):
         bash = os.path.join(INC, "usr", "share", "carotos", "acikla.bash")
