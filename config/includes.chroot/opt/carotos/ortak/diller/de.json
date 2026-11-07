@@ -1967,6 +1967,7 @@
   "Start": "Starten",
   "Start (s)": "Start (s)",
   "Start Task": "Aufgabe starten",
+  "Start a new contest": "Neuen Wettbewerb starten",
   "Start a new contest?": "Neuen Wettbewerb starten?",
   "Start a simple web server on your own machine (e.g. python3 -m http.server) and scan it.": "Auf dem eigenen Rechner einen einfachen Webserver starten (z. B. python3 -m http.server) und scannen.",
   "Start immediately with a random task. No teacher needed, go at your own pace.": "Sofort mit einer zufälligen Aufgabe starten. Keine Lehrkraft nötig, im eigenen Tempo.",

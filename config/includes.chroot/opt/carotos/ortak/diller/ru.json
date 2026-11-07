@@ -1967,6 +1967,7 @@
   "Start": "Запустить",
   "Start (s)": "Начало (с)",
   "Start Task": "Начать задание",
+  "Start a new contest": "Начать новое соревнование",
   "Start a new contest?": "Начать новое соревнование?",
   "Start a simple web server on your own machine (e.g. python3 -m http.server) and scan it.": "Запустите простой веб-сервер на своей машине (например, python3 -m http.server) и просканируйте его.",
   "Start immediately with a random task. No teacher needed, go at your own pace.": "Начните сразу со случайного задания. Учитель не нужен, занимайтесь в своём темпе.",

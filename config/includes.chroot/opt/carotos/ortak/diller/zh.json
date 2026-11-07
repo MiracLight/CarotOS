@@ -1967,6 +1967,7 @@
   "Start": "开始",
   "Start (s)": "开始（秒）",
   "Start Task": "开始任务",
+  "Start a new contest": "开始新比赛",
   "Start a new contest?": "开始新的比赛?",
   "Start a simple web server on your own machine (e.g. python3 -m http.server) and scan it.": "在自己的机器上启动一个简单的 Web 服务器（例如 python3 -m http.server）并对其扫描。",
   "Start immediately with a random task. No teacher needed, go at your own pace.": "立即开始随机任务。无需老师，按自己的节奏进行。",

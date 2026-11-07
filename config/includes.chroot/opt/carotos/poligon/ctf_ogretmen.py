@@ -260,10 +260,14 @@ def panel_olustur(oda, dil: str, ust=None):
                                              "scoreboard is frozen for students"))
             self.sure_etiketi.set_text(ozel)
             calisiyor = kod == "surec"
-            # Gorev secimi yalniz baslamadan once gerekir; sonra yer acilsin, skor tablosu yukari gelsin
-            self.izgara.set_visible(kod == "hazir")
+            # Gorev secimi yarisma SURERKEN gizlenir (yer acilir, skor yukari gelir); baslamadan once ve
+            # bittikten sonra gorunur: ogretmen uygulamayi kapatmadan yeni yarisma kurabilir
+            self.izgara.set_visible(not calisiyor)
+            self.baslat_dugmesi.set_label(self.t(T("Yeni yarışma başlat", "Start a new contest"))
+                                          if kod == "bitti" else
+                                          self.t(T("Yarışmayı başlat", "Start the contest")))
             self.gorev_et.set_text(self.t(T("Yarışmaya girecek görevler", "Challenges in the contest"))
-                                   if kod == "hazir" else
+                                   if not calisiyor else
                                    self.t(T("{n} görev yarışmada", "{n} challenges in the contest"),
                                           n=len(ctf.acik_idler)))
             for w in (self.sure_girisi, self.dondurma_girisi, self.baslat_dugmesi):

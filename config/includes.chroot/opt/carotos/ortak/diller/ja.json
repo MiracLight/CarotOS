@@ -1967,6 +1967,7 @@
   "Start": "開始",
   "Start (s)": "開始(秒)",
   "Start Task": "課題を開始",
+  "Start a new contest": "新しいコンテストを開始",
   "Start a new contest?": "新しいコンテストを開始しますか?",
   "Start a simple web server on your own machine (e.g. python3 -m http.server) and scan it.": "自分のマシンで簡単なWebサーバー(たとえばpython3 -m http.server)を起動して、スキャンしてみましょう。",
   "Start immediately with a random task. No teacher needed, go at your own pace.": "ランダムな課題ですぐに始めます。先生は不要で、自分のペースで進められます。",

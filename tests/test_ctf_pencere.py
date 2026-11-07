@@ -241,6 +241,18 @@ class OgretmenPaneliTesti(unittest.TestCase):
         self.assertEqual(p.durum_rozeti.get_text(), "Bitti")
         self.assertTrue(p.baslat_dugmesi.get_sensitive())
         self.assertTrue(p.csv_dugmesi.get_sensitive())
+        # bittikten sonra yeniden gorev secilip yeni yarisma kurulabilir (uygulamayi kapatmadan)
+        self.assertTrue(p.izgara.get_visible())
+        self.assertEqual(p.baslat_dugmesi.get_label(), "Yeni yarışma başlat")
+        for cb in p.secili.values():
+            self.assertTrue(cb.get_sensitive())
+        for cb in p.secili.values():
+            cb.set_active(False)
+        p.secili["log-1"].set_active(True)
+        p._baslat(None)
+        self.assertEqual(self.oda.ctf_oturumu().durum(), "surec")
+        self.assertEqual(self.oda.ctf_oturumu().acik_idler, ["log-1"])
+        self.assertFalse(p.izgara.get_visible())                  # yarisma surerken gizli
 
     def test_secilen_gorevler_yarismaya_girer_ve_bos_secim_reddedilir(self):
         p = self.panel
