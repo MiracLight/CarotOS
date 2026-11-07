@@ -17,6 +17,13 @@ Protokol (hepsi JSON):
   POST /ipucu_gonder  {ogrenci, mesaj}                    (ogretmen kullanir)
   GET  /ipucu?ogrenci=AD                                   (ogrenci sorar, bir kez okunur)
   GET  /durum                                              (ogretmen paneli izler)
+
+CTF (hakem sunucudur; hepsi oda sifresi + katilmis ogrenci ister; bkz. ctf_cekirdek.py):
+  GET  /ctf/durum?ogrenci=AD&sifre=...            gorev listesi (bayrak YOK), kalan sure
+  GET  /ctf/dosya?ogrenci=AD&sifre=...&gorev=ID   ogrenciye ozel gorev dosyasi
+  GET  /ctf/skor?ogrenci=AD&sifre=...             skor tablosu (donukse donuk hali)
+  POST /ctf/gonder    {ogrenci, sifre, gorev, bayrak}   sunucu dogrular ve puanlar
+  POST /ctf/ipucu     {ogrenci, sifre, gorev, no}       siradaki ipucu (ceza cozumde dusulur)
 """
 
 from __future__ import annotations
@@ -79,6 +86,16 @@ class OdaDurumu:
         self.cozulen_sorular: dict[str, dict] = {}
         self._mesaj_sayaci = 0
         self._kilit = threading.Lock()
+        # CTF yarismasi (ders modundan bagimsiz): ogretmen baslatinca olusur. Hakem sunucudur.
+        self.ctf = None
+
+    def ctf_oturumu(self):
+        """CTF oturumunu (yoksa) olusturur ve dondurur; yarisma ogretmen 'baslat' diyene kadar 'hazir' kalir."""
+        with self._kilit:
+            if self.ctf is None:
+                import ctf_cekirdek
+                self.ctf = ctf_cekirdek.CtfOturumu()
+            return self.ctf
 
     def gorev_ac(self, gorev_id: str, zorluk: str = "orta") -> None:
         if zorluk not in ("kolay", "orta", "zor"):
@@ -418,8 +435,64 @@ def _sunucu_sinifi_olustur(oda: OdaDurumu):
                 except ValueError:
                     son_no = 0
                 self._json_gonder({"mesajlar": oda.sohbet_getir(ad, son_no)})
+            elif ayristirilan.path in ("/ctf/durum", "/ctf/dosya", "/ctf/skor"):
+                self._ctf_oku(ayristirilan.path, sorgu)
             else:
                 self._json_gonder({"hata": "bilinmeyen yol"}, 404)
+
+        def _ctf_ogrenci(self, sifre, ad) -> bool:
+            """CTF istekleri: oda sifresi dogru ve ogrenci odaya katilmis olmali. Yanit hatada gonderilmistir."""
+            if not self._yetkili_mi(sifre):
+                return False
+            if not isinstance(ad, str) or not (1 <= len(ad) <= MAKS_AD) or not oda.ogrenci_aktif_mi(ad):
+                self._json_gonder({"hata": "bilinmeyen öğrenci"}, 404)
+                return False
+            return True
+
+        def _ctf_hata(self, h) -> None:
+            kod = {"bilinmeyen_gorev": 404, "baslamadi": 409, "surec_degil": 409}.get(h.kod, 400)
+            self._json_gonder({"hata": h.kod}, kod)
+
+        def _ctf_oku(self, yol, sorgu) -> None:
+            import ctf_cekirdek
+            ad = sorgu.get("ogrenci", [""])[0]
+            if not self._ctf_ogrenci(sorgu.get("sifre", [""])[0], ad):
+                return
+            ctf = oda.ctf_oturumu()
+            try:
+                if yol == "/ctf/durum":
+                    self._json_gonder({
+                        "durum": ctf.durum(), "kalan_sn": ctf.kalan_sn(), "donuk": ctf.donuk_mu(),
+                        "gorevler": ctf.ogrenci_gorevleri(ad)})
+                elif yol == "/ctf/skor":
+                    self._json_gonder(ctf.skor_tablosu())
+                else:
+                    gorev = sorgu.get("gorev", [""])[0]
+                    if len(gorev) > MAKS_AD:
+                        raise ctf_cekirdek.CtfHata("bilinmeyen_gorev")
+                    dosya_adi, icerik = ctf.dosya(ad, gorev)
+                    self._json_gonder({"ad": dosya_adi, "icerik": icerik,
+                                       "ipuclari": ctf.acilan_ipuclari(ad, gorev)})
+            except ctf_cekirdek.CtfHata as h:
+                self._ctf_hata(h)
+
+        def _ctf_yaz(self, yol, veri) -> None:
+            import ctf_cekirdek
+            ad = self._ad(veri)
+            if not self._ctf_ogrenci(veri.get("sifre"), ad):
+                return
+            gorev = veri.get("gorev")
+            if not isinstance(gorev, str) or len(gorev) > MAKS_AD:
+                self._json_gonder({"hata": "bilinmeyen_gorev"}, 404)
+                return
+            ctf = oda.ctf_oturumu()
+            try:
+                if yol == "/ctf/gonder":
+                    self._json_gonder(ctf.gonder(ad, gorev, veri.get("bayrak")))
+                else:
+                    self._json_gonder(ctf.ipucu_al(ad, gorev, veri.get("no")))
+            except ctf_cekirdek.CtfHata as h:
+                self._ctf_hata(h)
 
         def do_POST(self) -> None:  # noqa: N802
             try:
@@ -505,6 +578,8 @@ def _sunucu_sinifi_olustur(oda: OdaDurumu):
                     return
                 kayit = oda.mesaj_ekle(ogrenci=ad, kimden="ogrenci", metin=metin)
                 self._json_gonder({"tamam": True, "no": kayit["no"]})
+            elif ayristirilan.path in ("/ctf/gonder", "/ctf/ipucu"):
+                self._ctf_yaz(ayristirilan.path, veri)
             else:
                 self._json_gonder({"hata": "bilinmeyen yol"}, 404)
 

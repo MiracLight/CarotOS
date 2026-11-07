@@ -1,0 +1,150 @@
+{
+  "surum": 1,
+  "_not": "Bayraklar burada YOK: her ogrenci icin sunucuda oturum sirrindan turetilir (ctf_cekirdek.py). Bayrak bicimi CAROT{...}.",
+  "gorevler": [
+    {
+      "id": "kodlama-1", "kategori": "kodlama", "zorluk": "kolay", "puan": 100, "uretici": "kodlama_zinciri",
+      "parametreler": {"katmanlar": ["base64"]},
+      "baslik": {"tr": "Tek katman", "en": "One layer"},
+      "aciklama": {"tr": "Dosyadaki mesaj bir kodlamayla gizlenmiş. Kodlamayı çöz ve bayrağı bul.",
+                   "en": "The message in the file is hidden with an encoding. Decode it and find the flag."},
+      "ipuclari": [
+        {"tr": "Harf ve rakamlardan oluşan, sonu bazen = ile biten metinler çoğunlukla Base64'tür.",
+         "en": "Text made of letters and digits, sometimes ending in =, is very often Base64.", "ceza": 10},
+        {"tr": "Terminalde: echo 'METIN' | base64 -d", "en": "In the terminal: echo 'TEXT' | base64 -d", "ceza": 20}
+      ]
+    },
+    {
+      "id": "kodlama-2", "kategori": "kodlama", "zorluk": "orta", "puan": 200, "uretici": "kodlama_zinciri",
+      "parametreler": {"katmanlar": ["hex", "base64"]},
+      "baslik": {"tr": "İki katman", "en": "Two layers"},
+      "aciklama": {"tr": "Mesaj iki kez kodlanmış. Her katmanı sırayla aç.",
+                   "en": "The message was encoded twice. Peel off each layer in turn."},
+      "ipuclari": [
+        {"tr": "Bir katmanı açınca çıkan metne yine bak: o da bir kodlama olabilir.",
+         "en": "Look at what you get after one layer: it may be another encoding.", "ceza": 20},
+        {"tr": "Yalnızca 0-9 ve a-f karakterlerinden oluşan metin onaltılık (hex) olabilir: xxd -r -p",
+         "en": "Text made only of 0-9 and a-f may be hexadecimal: xxd -r -p", "ceza": 40}
+      ]
+    },
+    {
+      "id": "kodlama-3", "kategori": "kodlama", "zorluk": "zor", "puan": 300, "uretici": "kodlama_zinciri",
+      "parametreler": {"katmanlar": ["rot13", "base64", "ters", "hex"], "katmanlari_goster": false},
+      "baslik": {"tr": "Katman katman", "en": "Layer by layer"},
+      "aciklama": {"tr": "Dört farklı katman var ve kaç tane olduğu bile yazmıyor. Sırayı sen bul.",
+                   "en": "There are four different layers and the file does not even say how many. Work out the order."},
+      "ipuclari": [
+        {"tr": "Katmanlar: onaltılık, ters çevirme, Base64 ve ROT13 (sırası karışık).",
+         "en": "The layers are hexadecimal, reversal, Base64 and ROT13 (in mixed order).", "ceza": 60}
+      ]
+    },
+    {
+      "id": "kripto-1", "kategori": "kriptografi", "zorluk": "kolay", "puan": 100, "uretici": "sezar_sifresi",
+      "baslik": {"tr": "Sezar'ın mesajı", "en": "Caesar's message"},
+      "aciklama": {"tr": "Her harf alfabede aynı sayıda kaydırılmış. Kaydırmayı bul ve mesajı oku.",
+                   "en": "Every letter was shifted by the same number of places. Find the shift and read the message."},
+      "ipuclari": [
+        {"tr": "Kaydırma 1 ile 25 arasında; hepsini denemek çok sürmez.",
+         "en": "The shift is between 1 and 25; trying them all does not take long.", "ceza": 15},
+        {"tr": "Bayrak her zaman CAROT{ ile başlar. Çıkan metinde bunu ara.",
+         "en": "The flag always starts with CAROT{. Look for that in the result.", "ceza": 30}
+      ]
+    },
+    {
+      "id": "kripto-2", "kategori": "kriptografi", "zorluk": "orta", "puan": 200, "uretici": "xor_tek_bayt",
+      "baslik": {"tr": "Tek anahtarlı XOR", "en": "Single-key XOR"},
+      "aciklama": {"tr": "Bayrak, tek bir bayt değeriyle XOR'lanıp onaltılık yazılmış. Anahtarı bul.",
+                   "en": "The flag was XORed with a single byte value and written in hexadecimal. Find the key."},
+      "ipuclari": [
+        {"tr": "Anahtar yalnızca 255 olasılıktan biri. Bir betikle hepsini deneyebilirsin.",
+         "en": "The key is one of only 255 possibilities. You can try them all with a script.", "ceza": 30},
+        {"tr": "Doğru anahtarla çıkan metin CAROT{ ile başlar.",
+         "en": "With the right key the result starts with CAROT{.", "ceza": 50}
+      ]
+    },
+    {
+      "id": "hash-1", "kategori": "hash", "zorluk": "orta", "puan": 200, "uretici": "hash_kir",
+      "parametreler": {"algo": "sha256", "hane": 2},
+      "baslik": {"tr": "Parolayı bul", "en": "Find the password"},
+      "aciklama": {"tr": "Dosyada bir parolanın özeti (hash) ve bir kelime listesi var. Parolayı bul; bayrak CAROT{parola} biçimindedir.",
+                   "en": "The file holds a password hash and a word list. Find the password; the flag is CAROT{password}."},
+      "ipuclari": [
+        {"tr": "Parola, listedeki bir kelime ve ardından iki haneli bir sayıdır (örn. kelime07).",
+         "en": "The password is a word from the list followed by a two-digit number (e.g. word07).", "ceza": 30},
+        {"tr": "Her kelimeyi 00-99 sayılarıyla birleştirip özetini al, hedefle karşılaştır. Bir betik yaz.",
+         "en": "Combine each word with 00-99, hash it and compare with the target. Write a short script.", "ceza": 50}
+      ]
+    },
+    {
+      "id": "hash-2", "kategori": "hash", "zorluk": "zor", "puan": 300, "uretici": "hash_kir",
+      "parametreler": {"algo": "md5", "hane": 4},
+      "baslik": {"tr": "Daha uzun parola", "en": "A longer password"},
+      "aciklama": {"tr": "Bu kez parola dört haneli bir sayıyla bitiyor. Aynı fikir, daha çok deneme.",
+                   "en": "This time the password ends in a four-digit number. Same idea, more tries."},
+      "ipuclari": [
+        {"tr": "Deneme sayısı 30 kelime x 10000 sayı. Bilgisayar için çok küçük bir iş; betik yeterli.",
+         "en": "That is 30 words x 10000 numbers. A tiny job for a computer; a script is enough.", "ceza": 60}
+      ]
+    },
+    {
+      "id": "log-1", "kategori": "log", "zorluk": "kolay", "puan": 100, "uretici": "log_saldirgan",
+      "parametreler": {"saldiri_sayisi": 25, "diger_adres": 4},
+      "baslik": {"tr": "Kim saldırıyor?", "en": "Who is attacking?"},
+      "aciklama": {"tr": "auth.log dosyasında bir adres çok sayıda başarısız giriş denemesi yapmış. Bu adresi bul; bayrak CAROT{adres} biçimindedir.",
+                   "en": "In auth.log one address made very many failed login attempts. Find it; the flag is CAROT{address}."},
+      "ipuclari": [
+        {"tr": "'Failed password' satırlarına bak ve adresleri say.",
+         "en": "Look at the 'Failed password' lines and count the addresses.", "ceza": 15},
+        {"tr": "grep 'Failed password' auth.log | awk '{print $11}' | sort | uniq -c | sort -rn | head",
+         "en": "grep 'Failed password' auth.log | awk '{print $11}' | sort | uniq -c | sort -rn | head", "ceza": 30}
+      ]
+    },
+    {
+      "id": "log-2", "kategori": "log", "zorluk": "orta", "puan": 200, "uretici": "log_saldirgan",
+      "parametreler": {"saldiri_sayisi": 60, "diger_adres": 9},
+      "baslik": {"tr": "Kalabalıkta saldırgan", "en": "An attacker in the crowd"},
+      "aciklama": {"tr": "Günlük daha büyük ve başka adresler de başarısız deneme yapmış. En çok deneyen adres bayrağı verir.",
+                   "en": "The log is bigger and other addresses also failed. The address with the most attempts gives the flag."},
+      "ipuclari": [
+        {"tr": "Başarılı girişleri (Accepted) yok say; yalnızca başarısızları say.",
+         "en": "Ignore the successful logins (Accepted); count only the failures.", "ceza": 25}
+      ]
+    },
+    {
+      "id": "log-3", "kategori": "log", "zorluk": "zor", "puan": 300, "uretici": "log_belirtec",
+      "parametreler": {"satir": 120},
+      "baslik": {"tr": "Gizli belirteç", "en": "The hidden token"},
+      "aciklama": {"tr": "Web sunucusu günlüğünde bir istek, adresine bir belirteç (token) sızdırmış. Bul ve çöz.",
+                   "en": "In the web server log one request leaked a token in its address. Find it and decode it."},
+      "ipuclari": [
+        {"tr": "Diğer satırlar sıradan sayfalar. 'belirtec=' geçen tek satırı ara.",
+         "en": "The other lines are ordinary pages. Look for the single line containing 'belirtec='.", "ceza": 30},
+        {"tr": "Belirteç Base64'ün URL'ye uygun biçimidir (- ve _ kullanır, sonda = olmayabilir).",
+         "en": "The token is URL-safe Base64 (uses - and _, may lack trailing =).", "ceza": 60}
+      ]
+    },
+    {
+      "id": "adli-1", "kategori": "adli", "zorluk": "orta", "puan": 200, "uretici": "adli_hexdump",
+      "baslik": {"tr": "Onaltılık döküm", "en": "Hex dump"},
+      "aciklama": {"tr": "Bir dosyanın onaltılık dökümü elinde. İçinde okunabilir bir metin saklı; bayrağı bul.",
+                   "en": "You have a hex dump of a file. A readable text is hidden inside; find the flag."},
+      "ipuclari": [
+        {"tr": "Sağdaki | | içindeki sütun baytların yazdırılabilir karşılığıdır.",
+         "en": "The column inside | | on the right shows the printable form of the bytes.", "ceza": 20},
+        {"tr": "Bayrak CAROT{ ile başlar; bu metni dökümde ara.",
+         "en": "The flag starts with CAROT{; look for that text in the dump.", "ceza": 40}
+      ]
+    },
+    {
+      "id": "adli-2", "kategori": "adli", "zorluk": "zor", "puan": 300, "uretici": "adli_meta",
+      "baslik": {"tr": "Üst veri", "en": "Metadata"},
+      "aciklama": {"tr": "Bir belgenin üst veri (metadata) dosyası bu. Olağan dışı bir alan, bayrağı onaltılık olarak saklıyor.",
+                   "en": "This is a document's metadata file. One unusual field hides the flag in hexadecimal."},
+      "ipuclari": [
+        {"tr": "Alanların çoğu sıradan (boyut, dil, sürüm). Adı olağan dışı olanı bul.",
+         "en": "Most fields are ordinary (size, language, version). Find the one with an unusual name.", "ceza": 30},
+        {"tr": "Değer onaltılık: xxd -r -p ile metne çevir.", "en": "The value is hexadecimal: turn it into text with xxd -r -p.", "ceza": 60}
+      ]
+    }
+  ]
+}
