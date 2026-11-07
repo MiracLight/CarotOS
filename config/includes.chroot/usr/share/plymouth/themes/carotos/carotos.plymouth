@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=CarotOS
+Description=CarotOS boot splash (Debian 13 ceratopsian script, CarotOS imagery)
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/carotos
+ScriptFile=/usr/share/plymouth/themes/carotos/carotos.script

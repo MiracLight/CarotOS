@@ -41,3 +41,6 @@ libnotify-bin
 systemd-zram-generator
 libu2f-udev
 systemd-timesyncd
+# Onyukleme: Plymouth acilis ekrani (CarotOS temasi) ve baska isletim sistemlerini GRUB menusunde bulan os-prober
+plymouth
+os-prober

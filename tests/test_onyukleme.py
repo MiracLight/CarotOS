@@ -41,7 +41,7 @@ def preseed_parametreleri():
 class GrubAyariTesti(unittest.TestCase):
     def test_sessiz_acilis_parametreleri(self):
         p = grub_parametreleri()
-        for beklenen in ("quiet", "loglevel=3", "systemd.show_status=auto"):
+        for beklenen in ("quiet", "splash", "loglevel=3", "systemd.show_status=error", "noresume"):
             self.assertIn(beklenen, p)
 
     def test_basarisiz_servisler_gizlenmez(self):

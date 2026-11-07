@@ -1,0 +1,22 @@
+#!/bin/sh
+# CarotOS: onyukleme ayarlari.
+#  * /etc/grub.d/99_carotos_sure calistirilabilir olmali (yalniz CarotOS varsa menu 5 sn, baska isletim
+#    sistemi bulunursa 30 sn). includes.chroot izinleri korumaz, burada 755 yapilir.
+#  * Plymouth acilis temasi 'carotos' secilir ve baslangic imaji (initramfs) yenilenir; kurulu sistem
+#    /etc/plymouth/plymouthd.conf ayarini ve imaji bu dosya sisteminden alir.
+# Hook'lar sessizce basarisiz olabilir: burada her adim dogrulanir, bir sey eksikse derleme DURUR.
+set -e
+
+chmod 755 /etc/grub.d/99_carotos_sure
+[ -x /etc/grub.d/99_carotos_sure ] || { echo "CarotOS HATA: 99_carotos_sure calistirilabilir degil." >&2; exit 1; }
+chmod 644 /etc/default/grub.d/carotos.cfg /etc/systemd/system.conf.d/zz-carotos-sessiz.conf
+
+command -v plymouth-set-default-theme >/dev/null 2>&1 || { echo "CarotOS HATA: plymouth kurulu degil (paket listesinde 'plymouth' olmali)." >&2; exit 1; }
+[ -f /usr/share/plymouth/themes/carotos/carotos.plymouth ] || { echo "CarotOS HATA: carotos Plymouth temasi yok." >&2; exit 1; }
+chmod 644 /usr/share/plymouth/themes/carotos/*
+plymouth-set-default-theme carotos
+grep -q '^Theme=carotos' /etc/plymouth/plymouthd.conf || { echo "CarotOS HATA: Plymouth temasi secilemedi." >&2; exit 1; }
+
+# -k all: chroot'ta calisan cekirdek (uname -r) degil, kurulu cekirdekler icin
+update-initramfs -u -k all
+echo "CarotOS: onyukleme ayarlari (GRUB suresi, Plymouth temasi) yerlestirildi."
