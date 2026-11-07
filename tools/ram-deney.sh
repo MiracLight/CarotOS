@@ -50,6 +50,19 @@ xfwm4_pss() {
         for pid in $(pgrep -f "$ad" | head -n 2); do satir "$ad (root)" "$pid"; done
     done
     echo
+    echo "## 1b) TÜM süreçler, gerçek pay (PSS, MB), en büyük 25 (root süreçleri için 'sudo sh ram-deney.sh' çalıştırın)"
+    for d in /proc/[0-9]*; do
+        p=${d#/proc/}
+        v=$(awk '/^Pss:/ {printf "%.1f", $2/1024}' "$d/smaps_rollup" 2>/dev/null) || continue
+        [ -n "$v" ] || continue
+        printf '%s %s %s\n' "$v" "$p" "$(cut -c1-40 "$d/comm" 2>/dev/null)"
+    done | sort -rn | head -n 25 | awk '{printf "  %7s MB  pid %-6s %s\n", $1, $2, $3}'
+    echo
+    echo "## 1c) Süreçlerin toplam PSS'i ve çekirdek/diğer payı (MB)"
+    toplam=$(for d in /proc/[0-9]*; do awk '/^Pss:/ {print $2}' "$d/smaps_rollup" 2>/dev/null; done | awk '{t+=$1} END {printf "%.0f", t/1024}')
+    echo "  okunabilen süreçlerin toplam PSS'i : ${toplam:-?} MB (root olmadan başkalarının süreçleri eksik)"
+    awk '/^(MemTotal|MemFree|Buffers|Cached|AnonPages|Shmem|Slab|SReclaimable|SUnreclaim|KernelStack|PageTables|Percpu|Mapped):/ {printf "  %-14s %7.0f MB\n", $1, $2/1024}' /proc/meminfo
+    echo
     echo "## 2) Masaüstü duvar kağıdı"
     if command -v xfconf-query >/dev/null 2>&1; then
         xfconf-query -c xfce4-desktop -lv 2>/dev/null | grep -E "last-image" | head -n 3 || true
