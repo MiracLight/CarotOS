@@ -13,7 +13,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ortak"))
 import dil_koprusu as _dil  # noqa: E402
-from ctf_pencere import DURUM_AD, DURUM_RENK, KATEGORI_AD, T, gorevleri_grupla, sure_metni  # noqa: E402
+from ctf_pencere import (DURUM_AD, DURUM_RENK, KATEGORI_AD, T, ctf_css, gorevleri_grupla,  # noqa: E402,F401
+                         sure_metni)
 
 VARSAYILAN_SURE_DK = 45
 YENILEME_MS = 2000
@@ -33,7 +34,7 @@ def panel_olustur(oda, dil: str, ust=None):
     """Dondurur: Panel nesnesi (.widget, .dil_ayarla(kod), .yenile())."""
     import gi
     gi.require_version("Gtk", "3.0")
-    from gi.repository import GLib, Gtk
+    from gi.repository import GLib, Gdk, Gtk
     import tema
 
     class Panel:
@@ -41,7 +42,13 @@ def panel_olustur(oda, dil: str, ust=None):
             self.oda, self.dil, self.ust = oda, dil, ust
             self.secili: dict[str, Gtk.CheckButton] = {}
             self._kapali = False
-            self.widget = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+            self._css = None
+            self.govde = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+            # Gorev kutulari sayfayi uzatir: kucuk pencerede skor tablosu da erisilebilir olsun
+            self.widget = Gtk.ScrolledWindow()
+            self.widget.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+            self.widget.set_shadow_type(Gtk.ShadowType.NONE)
+            self.widget.add(self.govde)
             self.widget.connect("destroy", lambda *_: setattr(self, "_kapali", True))
             self._kontrol_karti()
             self._skor_karti()
@@ -92,6 +99,9 @@ def panel_olustur(oda, dil: str, ust=None):
                     cb._kategori = kategori
                     self.secili[g["id"]] = cb
                     izgara.add(cb)
+            izgara.show_all()                   # alt ogeler bir kez gosterilir ...
+            izgara.set_no_show_all(True)        # ... sonra pencere show_all() gorunurlugu bozmasin; yenile() yonetir
+            self.izgara = izgara
             kart.pack_start(izgara, False, False, 0)
 
             dugmeler = Gtk.Box(spacing=8)
@@ -108,18 +118,19 @@ def panel_olustur(oda, dil: str, ust=None):
             self.not_etiketi = Gtk.Label(xalign=0, wrap=True)
             tema.sinif(self.not_etiketi, "soluk")
             kart.pack_start(self.not_etiketi, False, False, 0)
-            self.widget.pack_start(kart, False, False, 0)
+            self.govde.pack_start(kart, False, False, 0)
 
         def _agac(self, tur, n):
             model = Gtk.ListStore(*tur)
             agac = Gtk.TreeView(model=model)
+            tema.sinif(agac, "ctf-agac")
             sutunlar = []
             for i in range(n):
                 s = Gtk.TreeViewColumn("", Gtk.CellRendererText(), text=i)
                 agac.append_column(s)
                 sutunlar.append(s)
             kay = Gtk.ScrolledWindow()
-            kay.set_min_content_height(120)
+            kay.set_min_content_height(150)
             kay.add(agac)
             return model, sutunlar, kay
 
@@ -136,11 +147,20 @@ def panel_olustur(oda, dil: str, ust=None):
             kart.pack_start(self.ist_baslik, False, False, 0)
             self.ist_modeli, self.ist_sutunlari, kay2 = self._agac((str, str, int, int), 4)
             kart.pack_start(kay2, True, True, 0)
-            self.widget.pack_start(kart, True, True, 0)
+            self.govde.pack_start(kart, True, True, 0)
 
         # -- metinler -------------------------------------------------------------------------------------------
+        def _css_yenile(self):
+            """Tablo/sekme stilleri (ortak temada yok): aktif palete gore, uygulama CSS'inden daha yuksek oncelikle."""
+            if self._css is None:
+                self._css = Gtk.CssProvider()
+                Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), self._css,
+                                                         Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 2)
+            self._css.load_from_data(ctf_css(tema.AKTIF).encode())
+
         def dil_ayarla(self, dil):
             self.dil = dil
+            self._css_yenile()
             self.sure_et.set_text(self.t(T("Süre (dk)", "Duration (min)")))
             self.dondurma_et.set_text(self.t(T("Son dakikalarda skoru dondur (dk, 0 = kapalı)",
                                                "Freeze the score in the last minutes (0 = off)")))
@@ -240,6 +260,12 @@ def panel_olustur(oda, dil: str, ust=None):
                                              "scoreboard is frozen for students"))
             self.sure_etiketi.set_text(ozel)
             calisiyor = kod == "surec"
+            # Gorev secimi yalniz baslamadan once gerekir; sonra yer acilsin, skor tablosu yukari gelsin
+            self.izgara.set_visible(kod == "hazir")
+            self.gorev_et.set_text(self.t(T("Yarışmaya girecek görevler", "Challenges in the contest"))
+                                   if kod == "hazir" else
+                                   self.t(T("{n} görev yarışmada", "{n} challenges in the contest"),
+                                          n=len(ctf.acik_idler)))
             for w in (self.sure_girisi, self.dondurma_girisi, self.baslat_dugmesi):
                 w.set_sensitive(not calisiyor)
             for cb in self.secili.values():

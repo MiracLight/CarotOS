@@ -45,6 +45,31 @@ HATA_AD = {
 }
 
 
+def ctf_css(p: dict) -> str:
+    """CTF'ye ozel CSS (ortak tema TreeView/Notebook/ListBox'a dokunmaz; yalniz ctf-* siniflari). p: tema paleti."""
+    def a(h, alfa):
+        h = h.lstrip("#")
+        r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+        return "rgba(%d,%d,%d,%s)" % (r, g, b, alfa)
+    return f"""
+notebook.ctf-sekme {{ background-color: transparent; border: none; }}
+notebook.ctf-sekme > header {{ background-color: transparent; border: none; border-bottom: 1px solid {p['cizgi']}; }}
+notebook.ctf-sekme > header tab {{ background-color: transparent; border: none; border-bottom: 2px solid transparent;
+    padding: 6px 16px; color: {p['soluk']}; }}
+notebook.ctf-sekme > header tab:checked {{ color: {p['yazi']}; border-bottom: 2px solid {p['vurgu']}; }}
+notebook.ctf-sekme > stack {{ background-color: transparent; }}
+list.ctf-liste, list.ctf-liste row {{ background-color: transparent; border: none; outline: none; }}
+list.ctf-liste row {{ border-radius: 6px; padding: 4px 8px; }}
+list.ctf-liste row:hover {{ background-color: {a(p['kart2'], 0.7)}; }}
+list.ctf-liste row:selected {{ background-color: {a(p['vurgu'], 0.22)}; }}
+treeview.ctf-agac {{ background-color: {p['kart']}; color: {p['yazi']}; border: none; }}
+treeview.ctf-agac:selected {{ background-color: {a(p['vurgu'], 0.22)}; color: {p['yazi']}; }}
+treeview.ctf-agac header button {{ background-color: {p['kart2']}; background-image: none; color: {p['soluk']};
+    border: none; border-bottom: 1px solid {p['cizgi']}; border-radius: 0; box-shadow: none; font-weight: bold;
+    padding: 6px 10px; }}
+"""
+
+
 def sure_metni(sn) -> str:
     """Kalan sure: 1:05:09 ya da 04:30."""
     sn = max(0, int(sn or 0))
@@ -126,7 +151,11 @@ def pencere_olustur(ctf, dil: str, ogrenci: str, gorunum: str = "dark", kayit_ta
             self._yeniden_ciziliyor = False
             self._kapali = False
             self.set_default_size(920, 620)
-            tema.uygula(gorunum, "guvenlik")
+            self._palet = tema.uygula(gorunum, "guvenlik")
+            self._css = Gtk.CssProvider()
+            self._css.load_from_data(ctf_css(self._palet).encode())
+            Gtk.StyleContext.add_provider_for_screen(self.get_screen(), self._css,
+                                                     Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 2)
 
             kok = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
             kok.set_margin_top(12); kok.set_margin_bottom(12); kok.set_margin_start(14); kok.set_margin_end(14)
@@ -149,6 +178,7 @@ def pencere_olustur(ctf, dil: str, ogrenci: str, gorunum: str = "dark", kayit_ta
             kok.pack_start(self.not_etiketi, False, False, 0)
 
             self.sekmeler = Gtk.Notebook()
+            tema.sinif(self.sekmeler, "ctf-sekme")
             kok.pack_start(self.sekmeler, True, True, 0)
             self._gorev_sekmesi()
             self._skor_sekmesi()
@@ -168,6 +198,7 @@ def pencere_olustur(ctf, dil: str, ogrenci: str, gorunum: str = "dark", kayit_ta
         def _gorev_sekmesi(self):
             kutu = Gtk.Box(spacing=12)
             self.liste = Gtk.ListBox()
+            tema.sinif(self.liste, "ctf-liste")
             self.liste.set_selection_mode(Gtk.SelectionMode.SINGLE)
             self.liste.connect("row-selected", self._satir_secildi)
             kay = Gtk.ScrolledWindow()
@@ -230,6 +261,7 @@ def pencere_olustur(ctf, dil: str, ogrenci: str, gorunum: str = "dark", kayit_ta
         def _skor_sekmesi(self):
             self.skor_modeli = Gtk.ListStore(int, str, int, int)
             self.skor_agaci = Gtk.TreeView(model=self.skor_modeli)
+            tema.sinif(self.skor_agaci, "ctf-agac")
             self.skor_sutunlari = []
             for i in range(4):
                 sutun = Gtk.TreeViewColumn("", Gtk.CellRendererText(), text=i)
@@ -430,7 +462,8 @@ def pencere_olustur(ctf, dil: str, ogrenci: str, gorunum: str = "dark", kayit_ta
 
         def _ipucu_ekle(self, ip):
             et = Gtk.Label(xalign=0, wrap=True, selectable=True)
-            et.set_markup("💡 " + GLib.markup_escape_text(_dil.sec(ip, self.dil)))
+            et.set_markup("<b>%s</b> %s" % (GLib.markup_escape_text(self.t(T("İpucu:", "Hint:"))),
+                                           GLib.markup_escape_text(_dil.sec(ip, self.dil))))
             et.show()
             self.ipucu_kutusu.pack_start(et, False, False, 0)
 
