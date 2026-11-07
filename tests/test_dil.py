@@ -126,6 +126,65 @@ class EtkinDillerTesti(DilTabani):
         self.assertIsNone(dil.ceviri("a", "es"))
 
 
+class BaslikOkumaTesti(DilTabani):
+    """etkin_diller() dosyalarin tamamini yuklememeli (her CarotOS uygulamasinda ~7 MB RAM)."""
+
+    def test_etkin_diller_tam_yukleme_yapmaz(self):
+        self.dosya("de", {"Run": "Ausführen"})
+        self.dosya("fr", {"Run": "Lancer"})
+        dil.onbellegi_temizle()
+        self.assertEqual([k for k, _, _ in dil.etkin_diller()], ["tr", "en", "de", "fr"])
+        self.assertEqual(dil._onbellek, {})                 # hicbir dilin metinleri bellege alinmadi
+        self.assertEqual(dil.ceviri("Run", "de"), "Ausführen")   # kullanilan dil istenince yuklenir
+        self.assertEqual(len(dil._onbellek), 1)
+
+    def test_baslik_tam_yuklemeyle_ayni_sonucu_verir(self):
+        for kod, icerik in (("de", {"A": "a"}), ("fr", {}), ("es", {"A": 5, "B": ""}), ("pt", {"A": "", "B": "ok"}),
+                            ("ru", {"A": "x"})):
+            self.dosya(kod, icerik, etkin=(kod != "ru"))
+        for kod in ("de", "fr", "es", "pt", "ru"):
+            dil.onbellegi_temizle()
+            tam = dil._dosya(kod)
+            dil.onbellegi_temizle()
+            self.assertEqual(dil._baslik(kod), (tam["meta"], bool(tam["metinler"])), kod)
+
+    def test_beklenmeyen_bicimlerde_eski_davranis(self):
+        yollar = {
+            "de": '{"metinler": {"A": "a"}, "_meta": {"etkin": true}}',                    # sira ters
+            "fr": '{"_meta":{"etkin":true},"metinler":{"A":"a"}}',                          # sikistirilmis
+            "es": '{ "_meta" : { "etkin" : true } , "metinler" : { "A" : "a" } }',          # bosluklu
+            "pt": '{"_meta": {"etkin": true}, "metinler": {"A": 5, "B": "ok"}}',           # ilk cift gecersiz
+        }
+        for kod, govde in yollar.items():
+            with open(os.path.join(self.gecici, kod + ".json"), "w", encoding="utf-8") as f:
+                f.write(govde)
+        dil.onbellegi_temizle()
+        self.assertEqual([k for k, _, _ in dil.etkin_diller()], ["tr", "en", "de", "es", "pt", "fr"])      # DILLER sirasi
+
+    def test_buyuk_baslik_tam_yuklemeye_duser(self):
+        meta = {"etkin": True, "not": "x" * 6000}
+        with open(os.path.join(self.gecici, "de.json"), "w", encoding="utf-8") as f:
+            json.dump({"_meta": meta, "metinler": {"A": "a"}}, f)
+        dil.onbellegi_temizle()
+        self.assertEqual([k for k, _, _ in dil.etkin_diller()], ["tr", "en", "de"])
+
+    def test_gercek_dil_dosyalari_ayni_listeyi_verir(self):
+        dil.DIZIN = self.eski                                # gercek ortak/diller klasoru (sonra setUp geri alir)
+        dil.onbellegi_temizle()
+        hizli = dil.etkin_diller()
+        self.assertEqual(dil._onbellek, {})
+        dil.onbellegi_temizle()
+        tam = []
+        for kod, ad in dil.DILLER:
+            if kod in dil.KAYNAK_DILLER:
+                tam.append((kod, ad, False))
+                continue
+            d = dil._dosya(kod)
+            if d["meta"].get("etkin") is True and d["metinler"]:
+                tam.append((kod, ad, d["meta"].get("durum", "taslak") != "gozden-gecirildi"))
+        self.assertEqual(hizli, tam)
+
+
 class MetinTesti(DilTabani):
     def test_dogrudan_ve_kaynak_diller(self):
         s = {"tr": "Çalıştır", "en": "Run"}

@@ -46,6 +46,7 @@ KAYNAK_DILLER = ("tr", "en")          # kodda yazili; her zaman etkin
 DIZIN = os.path.join(os.path.dirname(os.path.abspath(__file__)), "diller")
 
 _onbellek = {}                        # (dizin, kod) -> {"meta": {...}, "metinler": {...}}
+_baslik_onbellek = {}                 # (dizin, kod) -> (meta, metinler_dolu_mu): dosyanin tamami YUKLENMEDEN
 
 
 def gecerli(kod, varsayilan="en"):
@@ -74,8 +75,55 @@ def _dosya(kod, dizin=None):
     return _onbellek[anahtar]
 
 
+def _atla(metin, p):
+    while p < len(metin) and metin[p] in " \n\r\t":
+        p += 1
+    return p
+
+
+def _baslik(kod, dizin=None):
+    """(meta, metinler_dolu_mu). Dil secicisi her uygulamada yedi dosyanin hepsini bellege yuklemesin diye dosyanin
+    yalniz basindaki `_meta` ve `metinler`in ilk gecerli cifti okunur (~7 MB RAM/uygulama kazanci). Beklenmeyen bicimde
+    (ilk cift gecerli degil, baslik buyuk, bozuk dosya...) eski davranisa, yani tam yukleme `_dosya`ya doner."""
+    dizin = dizin or DIZIN
+    anahtar = (dizin, kod)
+    if anahtar in _onbellek:                          # zaten tam yuklendiyse ondan oku
+        d = _onbellek[anahtar]
+        return d["meta"], bool(d["metinler"])
+    if anahtar not in _baslik_onbellek:
+        sonuc = None
+        try:
+            with open(os.path.join(dizin, kod + ".json"), encoding="utf-8") as f:
+                bas = f.read(4096)
+            dec = json.JSONDecoder()
+            i = bas.index('"_meta"')
+            meta, bitis = dec.raw_decode(bas, _atla(bas, bas.index(":", i) + 1))
+            k = bas.index('"metinler"', bitis)
+            p = _atla(bas, bas.index("{", bas.index(":", k)) + 1)
+            if isinstance(meta, dict):
+                if bas[p] == "}":
+                    sonuc = (meta, False)
+                else:
+                    ad, p = dec.raw_decode(bas, p)
+                    p = _atla(bas, p)
+                    if bas[p] == ":":
+                        deger, _ = dec.raw_decode(bas, _atla(bas, p + 1))
+                        if isinstance(ad, str) and isinstance(deger, str) and deger.strip():
+                            sonuc = (meta, True)       # ilk cift gecerli: en az bir ceviri var
+        except OSError:
+            sonuc = ({}, False)                        # dosya yok / okunamiyor: _dosya ile ayni sonuc, yuklemeye gerek yok
+        except (ValueError, IndexError):
+            sonuc = None
+        if sonuc is None:
+            d = _dosya(kod, dizin)
+            sonuc = (d["meta"], bool(d["metinler"]))
+        _baslik_onbellek[anahtar] = sonuc
+    return _baslik_onbellek[anahtar]
+
+
 def onbellegi_temizle():
     _onbellek.clear()
+    _baslik_onbellek.clear()
 
 
 def etkin_diller(dizin=None):
@@ -88,9 +136,9 @@ def etkin_diller(dizin=None):
         if kod in KAYNAK_DILLER:
             sonuc.append((kod, ad, False))
             continue
-        d = _dosya(kod, dizin)
-        if d["meta"].get("etkin") is True and d["metinler"]:
-            sonuc.append((kod, ad, d["meta"].get("durum", "taslak") != "gozden-gecirildi"))
+        meta, dolu = _baslik(kod, dizin)
+        if meta.get("etkin") is True and dolu:
+            sonuc.append((kod, ad, meta.get("durum", "taslak") != "gozden-gecirildi"))
     return sonuc
 
 
