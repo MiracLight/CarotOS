@@ -42,6 +42,9 @@ class XfconfTesti(unittest.TestCase):
         self.assertEqual(ozellik("xfwm4.xml", "general/button_layout"), "O|HMC")
         self.assertEqual(ozellik("xfwm4.xml", "general/title_alignment"), "center")
         self.assertEqual(ozellik("xfwm4.xml", "general/use_compositing"), "true")
+        # "auto" GLX deneyip Mesa/llvmpipe yukluyor (VM ve GPU'suz makinede xfwm4 gercek payi 76 MB); "xpresent" ayni
+        # gorunumle 12 MB (dev VM olcumu, 8 Kasim 2026: kullanilan bellek 666 -> 630 MB). Gercek donanimda dogrulanmadi.
+        self.assertEqual(ozellik("xfwm4.xml", "general/vblank_mode"), "xpresent")
         self.assertEqual(ozellik("xfwm4.xml", "general/theme"), "Arc-Dark")
 
     def test_ust_panel_tema_arka_planini_kullanir(self):
