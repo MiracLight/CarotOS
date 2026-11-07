@@ -114,7 +114,8 @@ kur() {
 # loglevel=3, quiet'ten SONRA gelmeli. systemd.show_status=error: basarili adimlar ([ OK ] satirlari)
 # gizlenir, hata olursa gorunur. noresume: diskte swap yok (zram kullaniliyor), "Gave up waiting for suspend/resume device"
 # satiri ve bekleme kalkar (hazirda bekletme bu kurulumda zaten kullanilamaz).
-GRUB_CMDLINE_LINUX_DEFAULT="quiet loglevel=3 systemd.show_status=error vt.global_cursor_default=0 noresume"
+# splash: Plymouth acilis ekrani (kurulu); kalan cekirdek/servis satirlarinin ustunu orter.
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash loglevel=3 systemd.show_status=error vt.global_cursor_default=0 noresume"
 GRUB_TIMEOUT_STYLE="menu"
 GRUB_TIMEOUT="5"
 # Debian 12'den beri varsayilan kapali: Windows ve baska Linux'lar menude gorunsun.
