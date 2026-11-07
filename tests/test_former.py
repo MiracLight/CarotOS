@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Former testleri: zaman cizelgesi motoru (GTK'siz), 15 konunun icerik
+"""Former testleri: zaman cizelgesi motoru (GTK'siz), 17 konunun icerik
 dogrulamasi (iki dilli, sahneyle tutarli), Guvenlik Paneli'nin gercek arac
 listesiyle capraz kontrol, simge yolu bulma ve (ekran varsa) arayuzun
 butun konularda hatasiz gezilmesi.
@@ -132,14 +132,14 @@ class ZamanMotoruTesti(unittest.TestCase):
 
 # ---------------------------------------------------------------------------
 class IcerikTesti(unittest.TestCase):
-    """konular/ altindaki 15 konunun yapisal dogrulugu."""
+    """konular/ altindaki 17 konunun yapisal dogrulugu."""
 
     @classmethod
     def setUpClass(cls):
         cls.konular = konular.tumu()
 
-    def test_on_bes_konu_ve_benzersiz_kimlik(self):
-        self.assertEqual(len(self.konular), 15)
+    def test_on_yedi_konu_ve_benzersiz_kimlik(self):
+        self.assertEqual(len(self.konular), 17)
         kimlikler = [k["id"] for k in self.konular]
         self.assertEqual(len(kimlikler), len(set(kimlikler)), kimlikler)
         self.assertEqual(set(kimlikler), set(konular.SIRA))
@@ -333,7 +333,7 @@ class SiblingAyarSenkronTesti(unittest.TestCase):
 @unittest.skipUnless(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"),
                      "ekran yok (xvfb-run ile calistirin)")
 class ArayuzDumanTesti(unittest.TestCase):
-    """Pencereyi acar, 15 konunun hepsini gezer, dil/tema degistirir.
+    """Pencereyi acar, 17 konunun hepsini gezer, dil/tema degistirir.
     Yakalanmayan istisna olmamali."""
 
     def test_butun_konular_hatasiz_gezilir(self):
@@ -379,6 +379,49 @@ class ArayuzDumanTesti(unittest.TestCase):
         Gtk.main()
         app.destroy()
         self.assertEqual(hatalar, [])
+
+
+class YeniKonuIddiaTesti(unittest.TestCase):
+    """Komut Aciklayici, Etik ve Disk konularindaki somut iddialar koddaki gercekle eslesmeli."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.konular = {k["id"]: k for k in konular.tumu()}
+
+    @staticmethod
+    def _oku(*yol):
+        with open(os.path.join(INC, "opt", "carotos", *yol), encoding="utf-8") as f:
+            return f.read()
+
+    def _metinler(self, kimlik):
+        k = self.konular[kimlik]
+        parcalar = [a.get("metin") for a in k["adimlar"] if isinstance(a.get("metin"), dict)]
+        for _b, bloklar in k["bolumler"]:
+            for tur, icerik in bloklar:
+                if tur in ("p", "not", "uyari"):
+                    parcalar.append(icerik)
+                elif tur == "liste":
+                    parcalar.extend(icerik)
+        return "\n".join(p["tr"] + "\n" + p["en"] for p in parcalar)
+
+    def test_etik_gunluk_yolu_panelle_ayni(self):
+        panel = self._oku("security-panel", "carotos-security-panel.py")
+        self.assertIn('ETIK_GUNLUGU = os.path.join(CONFIG_DIR, "etik-gunlugu.log")', panel)
+        self.assertIn("~/.config/carotos-panel/etik-gunlugu.log", self._metinler("etik"))
+
+    def test_disk_eylem_etiketi_saglikla_ayni(self):
+        saglik = self._oku("health", "carotos-health.py")
+        self.assertIn("Disk swap\\'ını kapat", saglik)
+        metin = self._metinler("disk")
+        self.assertIn("Disk swap'ını kapat", metin)
+        self.assertIn("Disable disk swap", metin)
+
+    def test_acikla_kisayolu_ve_arac_var(self):
+        bash = os.path.join(INC, "usr", "share", "carotos", "acikla.bash")
+        with open(bash, encoding="utf-8") as f:
+            self.assertIn(r'"\ee"', f.read())                  # Alt+E = ESC e
+        self.assertTrue(os.path.isfile(os.path.join(INC, "usr", "local", "bin", "carotos-acikla")))
+        self.assertIn("Alt+E", self._metinler("acikla"))
 
 
 if __name__ == "__main__":
