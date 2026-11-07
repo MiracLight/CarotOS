@@ -30,6 +30,7 @@ from gi.repository import GLib, Gtk  # noqa: E402
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ortak"))  # ortak grafit tema
 from ogretmen_sunucu import OdaDurumu, oda_kodu_uret, oda_sifresi_uret, sunucu_baslat  # noqa: E402
+import ctf_ogretmen as _ctf_ogretmen  # noqa: E402
 import soru_sablonlari as _sablon  # noqa: E402
 import soru_defteri as _defter  # noqa: E402
 import gorunum_ayari as _gorunum  # noqa: E402
@@ -255,6 +256,9 @@ _METIN_HAM = {
         "bolum_sinif": "Sınıf",
         "bolum_soru": "Soru bankası",
         "bolum_ayar": "Ayarlar",
+        "bolum_ctf": "CTF",
+        "menu_ctf": "Yarışma",
+        "ctf_baslik": "CTF yarışması",
         "menu_skor": "Skor Tablosu",
         "oda_acik": "Oda açık · {n} öğrenci",
         "kpi_katilan": "Katılan öğrenci",
@@ -348,6 +352,9 @@ _METIN_HAM = {
         "bolum_sinif": "Class",
         "bolum_soru": "Question bank",
         "bolum_ayar": "Settings",
+        "bolum_ctf": "CTF",
+        "menu_ctf": "Contest",
+        "ctf_baslik": "CTF contest",
         "menu_skor": "Scoreboard",
         "oda_acik": "Room open · {n} students",
         "kpi_katilan": "Students joined",
@@ -367,7 +374,7 @@ VURGU = _gorunum.VURGU   # ortak/tema.py vurgu anahtari (renkler tema.AKTIF'ten 
 SAYFA_BASLIK = {
     "ogrenciler": "ogrenciler_basligi", "skor": "ozet_baslik",
     "soru_ata": "sinif_basligi", "soru_olustur": "so_baslik",
-    "kayitli": "ks_baslik", "ag": "ip_baslik",
+    "kayitli": "ks_baslik", "ag": "ip_baslik", "ctf": "ctf_baslik",
 }
 
 DURUM_ANAHTARI = {
@@ -491,6 +498,7 @@ class OgretmenPenceresi(Gtk.Window):
         bolumler = [
             ("sinif", [("ogrenciler", "kisi"), ("skor", "rapor"), ("soru_ata", "hedef")]),
             ("soru", [("soru_olustur", "arti"), ("kayitli", "liste")]),
+            ("ctf", [("ctf", "kalkan")]),
             ("ayar", [("ag", "ag")]),
         ]
         self.kabuk = tema.Kabuk(_gorunum.logo_bul("ogretmen"), bolumler, self._sayfa_secildi)
@@ -525,6 +533,7 @@ class OgretmenPenceresi(Gtk.Window):
             "soru_olustur": self._soru_olustur_sekmesi_olustur(),
             "kayitli": self._kayitli_sorular_sekmesi_olustur(),
             "ag": self._ip_adres_sekmesi_olustur(),
+            "ctf": self._ctf_sekmesi_olustur(),
         }
         # Sayfa basligi kabukta; kartlarin kendi basliklari gizlenir
         # (metinleri yine guncellenir, kod yollari degismez).
@@ -534,6 +543,11 @@ class OgretmenPenceresi(Gtk.Window):
             e = getattr(self, ad)
             e.set_no_show_all(True)
             e.hide()
+
+    def _ctf_sekmesi_olustur(self) -> Gtk.Widget:
+        """CTF yarisma paneli (ctf_ogretmen.py): baslat/bitir, canli skor, istatistik, CSV."""
+        self.ctf_paneli = _ctf_ogretmen.panel_olustur(self.oda, self.dil, self)
+        return self.ctf_paneli.widget
 
     def _oda_seridi_olustur(self) -> Gtk.Widget:
         kart = Gtk.Box(spacing=44)
@@ -1288,9 +1302,11 @@ class OgretmenPenceresi(Gtk.Window):
         self.kabuk.bolum_metni("sinif", m["bolum_sinif"])
         self.kabuk.bolum_metni("soru", m["bolum_soru"])
         self.kabuk.bolum_metni("ayar", m["bolum_ayar"])
+        self.kabuk.bolum_metni("ctf", m["bolum_ctf"])
+        self.ctf_paneli.dil_ayarla(self.dil)
         for _anahtar, _metin in (("ogrenciler", "sekme_ogrenciler"), ("skor", "menu_skor"),
                                  ("soru_ata", "sekme_sinif"), ("soru_olustur", "sekme_soru_olustur"),
-                                 ("kayitli", "sekme_kayitli"), ("ag", "sekme_ip")):
+                                 ("kayitli", "sekme_kayitli"), ("ag", "sekme_ip"), ("ctf", "menu_ctf")):
             self.kabuk.menu_metni(_anahtar, m[_metin])
         self.tema_dugmesi.set_label(m["tema_acik"] if self.gorunum == "dark" else m["tema_koyu"])
         self.kpi_katilan.ayarla(ad=m["kpi_katilan"])

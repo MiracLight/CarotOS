@@ -84,6 +84,28 @@ class TaramaTesti(AracTabani):
         metinler, _ = self.mod.cikar()          # T("run", lang): ikinci arguman duz metin degil
         self.assertNotIn("run", metinler)
 
+    def test_poligon_json_gorev_paketleri_taranir(self):
+        uyg = os.path.join(self.gecici, *self.mod.UYG.split("/"))
+        for alt in ("gorevler", "ctf", "baska"):
+            os.makedirs(os.path.join(uyg, "poligon", alt))
+        paket = {"gorevler": [{"id": "x", "baslik": {"tr": "Başlık", "en": "Title"},
+                               "ipuclari": [{"tr": "İpucu", "en": "Hint", "ceza": 5}],
+                               "tek_dilli": {"tr": "Yalnız Türkçe"},
+                               "dil_tablosu": {"tr": "Türkçe", "en": "English", "de": "Deutsch"}}]}
+        for alt in ("gorevler", "ctf", "baska"):
+            with open(os.path.join(uyg, "poligon", alt, "p.json"), "w", encoding="utf-8") as f:
+                json.dump(paket, f)
+        metinler, _ = self.mod.cikar()
+        self.assertEqual(metinler["Title"]["tr"], {"Başlık"})
+        self.assertEqual(metinler["Hint"]["tr"], {"İpucu"})
+        self.assertEqual(metinler["Title"]["yer"] & {"config/includes.chroot/opt/carotos/poligon/gorevler/p.json",
+                                                      "config/includes.chroot/opt/carotos/poligon/ctf/p.json"},
+                         {"config/includes.chroot/opt/carotos/poligon/gorevler/p.json",
+                          "config/includes.chroot/opt/carotos/poligon/ctf/p.json"})
+        self.assertFalse(any("baska" in y for k in metinler.values() for y in k["yer"]))    # yalniz gorevler/ ve ctf/
+        self.assertNotIn("English", metinler)            # baska dil kodu tasiyan tablo ceviri cifti degil
+        self.assertNotIn("Yalnız Türkçe", [t for k in metinler.values() for t in k["tr"]])
+
 
 class KomutlarTesti(AracTabani):
     def test_durum_kapsami(self):

@@ -172,5 +172,103 @@ class PencereTesti(unittest.TestCase):
         self.assertIn("Cannot reach", self.p.not_etiketi.get_text())
 
 
+class EntegrasyonTesti(unittest.TestCase):
+    """Ogretmen ve ogrenci uygulamalarina CTF baglantisi (kaynak duzeyi; uygulamalari acmadan)."""
+
+    @staticmethod
+    def _oku(ad):
+        with open(os.path.join(POLIGON, ad), encoding="utf-8") as f:
+            return f.read()
+
+    def test_ogretmen_uygulamasina_baglandi(self):
+        k = self._oku("ogretmen_uygulama.py")
+        self.assertIn("import ctf_ogretmen", k)
+        self.assertIn('("ctf", [("ctf", "kalkan")])', k)
+        self.assertIn('"ctf": self._ctf_sekmesi_olustur()', k)
+        self.assertIn('"ctf": "ctf_baslik"', k)
+        for anahtar in ("bolum_ctf", "menu_ctf", "ctf_baslik"):
+            self.assertEqual(k.count('"%s":' % anahtar), 2, anahtar)       # tr ve en
+
+    def test_ogrenci_uygulamasina_baglandi(self):
+        k = self._oku("ogrenci_uygulama.py")
+        self.assertEqual(k.count('"ctf_dugme":'), 2)
+        self.assertIn("def _ctf_ac", k)
+        self.assertIn("self._ctf_penceresini_kapat()", k)                     # oturum bitince pencere kapanir
+        self.assertIn("not self.bireysel_mod and self.istemci is not None", k)  # yalniz sinif modunda
+
+    def test_csv_yardimcilari(self):
+        import ctf_ogretmen as O
+        self.assertRegex(O.csv_dosya_adi(0), r"^poligon-ctf-\d{8}-\d{4}\.csv$")
+        yol = os.path.join(tempfile.mkdtemp(prefix="ctf-csv-"), "s.csv")
+        O.csv_kaydet(yol, "sira,ogrenci\n1,Şule\n")
+        with open(yol, "rb") as f:
+            ham = f.read()
+        self.assertTrue(ham.startswith(b"\xef\xbb\xbf"))             # BOM: Excel Turkce karakteri dogru acar
+        self.assertIn("Şule".encode("utf-8"), ham)
+
+
+@unittest.skipUnless(EKRAN, "ekran yok (xvfb-run ile calistirin)")
+class OgretmenPaneliTesti(unittest.TestCase):
+    def setUp(self):
+        import gi
+        gi.require_version("Gtk", "3.0")
+        from gi.repository import Gtk
+        import ctf_ogretmen
+        import ogretmen_sunucu
+        import tema
+        self.Gtk, self.tema = Gtk, tema
+        self.oda = ogretmen_sunucu.OdaDurumu("1234", "abc123")
+        self.panel = ctf_ogretmen.panel_olustur(self.oda, "tr", None)
+        self.pencere = Gtk.Window()
+        self.pencere.add(self.panel.widget)
+        self.pencere.show_all()
+        self.addCleanup(self.pencere.destroy)
+
+    def test_baslat_ve_bitir(self):
+        p = self.panel
+        self.assertEqual(p.durum_rozeti.get_text(), "Hazır")
+        self.assertFalse(p.bitir_dugmesi.get_sensitive())
+        self.assertFalse(p.csv_dugmesi.get_sensitive())
+        p.sure_girisi.set_value(30)
+        p._baslat(None)
+        self.assertEqual(self.oda.ctf_oturumu().durum(), "surec")
+        self.assertEqual(p.durum_rozeti.get_text(), "Sürüyor")
+        self.assertFalse(p.baslat_dugmesi.get_sensitive())
+        self.assertTrue(p.bitir_dugmesi.get_sensitive())
+        self.assertIn("Kalan", p.sure_etiketi.get_text())
+        self.tema.onay_sor = lambda *a, **k: True               # onay penceresini atla
+        p._bitir(None)
+        self.assertEqual(p.durum_rozeti.get_text(), "Bitti")
+        self.assertTrue(p.baslat_dugmesi.get_sensitive())
+        self.assertTrue(p.csv_dugmesi.get_sensitive())
+
+    def test_secilen_gorevler_yarismaya_girer_ve_bos_secim_reddedilir(self):
+        p = self.panel
+        for cb in p.secili.values():
+            cb.set_active(False)
+        p._baslat(None)
+        self.assertEqual(self.oda.ctf_oturumu().durum(), "hazir")
+        self.assertTrue(p.not_etiketi.get_text())
+        p.secili["kodlama-1"].set_active(True)
+        p.secili["log-1"].set_active(True)
+        p._baslat(None)
+        self.assertEqual(sorted(self.oda.ctf_oturumu().acik_idler), ["kodlama-1", "log-1"])
+
+    def test_skor_canli_gorunur_ve_dil_degisir(self):
+        import ctf_uretici as U
+        o = self.oda.ctf_oturumu()
+        self.panel._baslat(None)
+        o.dondurma = None
+        g = o.gorevler["kodlama-1"]
+        ad, icerik = o.dosya("ali", "kodlama-1")
+        o.gonder("ali", "kodlama-1", U.COZUCULAR[g["uretici"]](icerik, g["parametreler"]))
+        self.panel.yenile()
+        self.assertEqual(len(self.panel.skor_modeli), 1)
+        self.assertEqual(self.panel.skor_modeli[0][1], "ali")
+        self.panel.dil_ayarla("en")
+        self.assertEqual(self.panel.baslat_dugmesi.get_label(), "Start the contest")
+        self.assertEqual(self.panel.durum_rozeti.get_text(), "Running")
+
+
 if __name__ == "__main__":
     unittest.main()

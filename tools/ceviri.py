@@ -100,7 +100,46 @@ def cikar():
                 kayit = metinler.setdefault(en, {"tr": set(), "yer": set()})
                 kayit["tr"].add(tr)
                 kayit["yer"].add(rel)
+    for rel, tam in json_dosyalari():
+        try:
+            with open(tam, encoding="utf-8") as f:
+                veri = json.load(f)
+        except (OSError, ValueError):
+            continue
+        for tr, en in _json_ciftleri(veri):
+            if en.strip():
+                kayit = metinler.setdefault(en, {"tr": set(), "yer": set()})
+                kayit["tr"].add(tr)
+                kayit["yer"].add(rel)
     return metinler, dinamik
+
+
+def _json_ciftleri(obj):
+    """JSON agacindaki duz metin {"tr": .., "en": ..} ciftleri (baska dil kodu tasimayanlar)."""
+    if isinstance(obj, dict):
+        if (isinstance(obj.get("tr"), str) and isinstance(obj.get("en"), str)
+                and (set(obj) & set(KODLAR)) <= {"tr", "en"}):
+            yield obj["tr"], obj["en"]
+        else:
+            for v in obj.values():
+                yield from _json_ciftleri(v)
+    elif isinstance(obj, list):
+        for v in obj:
+            yield from _json_ciftleri(v)
+
+
+def json_dosyalari():
+    """Poligon gorev paketleri (gorevler/*.json, ctf/*.json): metinleri JSON'dadir."""
+    sonuc = []
+    for alt in ("gorevler", "ctf"):
+        yol = os.path.join(KOK, UYG, "poligon", alt)
+        if not os.path.isdir(yol):
+            continue
+        for ad in sorted(os.listdir(yol)):
+            if ad.endswith(".json"):
+                tam = os.path.join(yol, ad)
+                sonuc.append((os.path.relpath(tam, KOK).replace(os.sep, "/"), tam))
+    return sonuc
 
 
 def dil_dosyasi(kod):

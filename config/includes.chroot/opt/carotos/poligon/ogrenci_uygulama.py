@@ -258,6 +258,7 @@ _METIN_HAM = {
         "hap_bekleme": "Soru bekleniyor",
         "tema_acik": "Açık tema",
         "tema_koyu": "Koyu tema",
+        "ctf_dugme": "CTF yarışması",
     },
     "en": {
         "hata_gorev_yok": "The teacher hasn't opened a task yet",
@@ -347,6 +348,7 @@ _METIN_HAM = {
         "hap_bekleme": "Waiting for a question",
         "tema_acik": "Light theme",
         "tema_koyu": "Dark theme",
+        "ctf_dugme": "CTF contest",
     },
 }
 
@@ -461,6 +463,14 @@ class PoligonPenceresi(Gtk.Window):
         self.hap.set_no_show_all(True)
         self.hap.hide()
         cubuk.pack_end(self.hap, False, False, 0)
+
+        # CTF: yalniz sinif modunda (ogretmen sunucusuna bagliyken) gorunur
+        self.ctf_dugmesi = Gtk.Button()
+        tema.sinif(self.ctf_dugmesi, "kucuk")
+        self.ctf_dugmesi.set_no_show_all(True)
+        self.ctf_dugmesi.hide()
+        self.ctf_dugmesi.connect("clicked", self._ctf_ac)
+        cubuk.pack_end(self.ctf_dugmesi, False, False, 0)
         return cubuk
 
     def _sayfa_ekle(self, kutu, ad, genislik=560):
@@ -481,6 +491,27 @@ class PoligonPenceresi(Gtk.Window):
             self.hap.show(); self.hap.e.show()
         else:
             self.hap.hide()
+        sinifta = ad in ("gorev", "bekleme") and not self.bireysel_mod and self.istemci is not None
+        self.ctf_dugmesi.set_visible(sinifta)
+
+    def _ctf_ac(self, _dugme):
+        """CTF penceresini acar (tek ornek). Sunucu hakemdir; bkz. ctf_pencere.py."""
+        if self.istemci is None or self.istemci.bireysel_mod:
+            return
+        if getattr(self, "_ctf_penceresi", None) is not None:
+            self._ctf_penceresi.present()
+            return
+        from ctf_istemci import CtfIstemci
+        import ctf_pencere
+        self._ctf_penceresi = ctf_pencere.pencere_olustur(
+            CtfIstemci(self.istemci), self.dil, self.istemci.ogrenci_adi, self.gorunum)
+        self._ctf_penceresi.connect("destroy", lambda *_: setattr(self, "_ctf_penceresi", None))
+        self._ctf_penceresi.show_all()
+
+    def _ctf_penceresini_kapat(self):
+        if getattr(self, "_ctf_penceresi", None) is not None:
+            self._ctf_penceresi.destroy()
+            self._ctf_penceresi = None
 
     def _dugme_metni_ayarla(self, dugme: Gtk.Button, metin: str):
         """Dugme metni; renk ortak temanin CSS'inden gelir."""
@@ -509,6 +540,7 @@ class PoligonPenceresi(Gtk.Window):
         self.baslik_etiketi.set_text(m["baslik"])
         self.marka_alt_etiketi.set_text(self.aktif_kullanici or "")
         self.tema_dugmesi.set_label(m["tema_acik"] if self.gorunum == "dark" else m["tema_koyu"])
+        self.ctf_dugmesi.set_label(m["ctf_dugme"])
         self.slogan_etiketi.set_text(m["slogan"])
         self.mod_baslik_etiketi.set_text(m["mod_secim_basligi"])
         self._dugme_metni_ayarla(self.bireysel_dugmesi, m["bireysel_dugme"])
@@ -1550,6 +1582,7 @@ class PoligonPenceresi(Gtk.Window):
         m_anahtar, METIN sözlüğündeki '{m_anahtar}_basligi' ve
         '{m_anahtar}_mesaji' anahtarlarının ön eki olarak kullanılır."""
         m = METIN[self.dil]
+        self._ctf_penceresini_kapat()
         if self.istemci is not None:
             self.istemci.gorevi_durdur()
         self.istemci = None
