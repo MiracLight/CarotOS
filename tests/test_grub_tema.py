@@ -111,6 +111,7 @@ class KurulumBetigiTesti(unittest.TestCase):
         sat = [x for x in cfg.splitlines() if x.startswith("GRUB_CMDLINE_LINUX_DEFAULT")][0]
         self.assertLess(sat.index("quiet"), sat.index("loglevel=3"))       # loglevel quiet'ten sonra gelmeli
         self.assertIn("systemd.show_status=error", sat)
+        self.assertIn("noresume", sat)
         self.assertFalse(os.path.exists(self.yol("boot", "grub", "themes")))
         sure = self.yol("etc", "grub.d", "99_carotos_sure")
         self.assertTrue(os.stat(sure).st_mode & stat.S_IXUSR)
