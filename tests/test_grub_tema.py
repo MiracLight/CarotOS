@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""CarotOS GRUB tema denemesi (tools/grub-test): tema dosyalari, sure betigi ve kurulum betigi.
+"""CarotOS GRUB ayar denemesi (tools/grub-test): sure betigi ve kurulum betigi (Debian temasi, ozel tema yok).
 
 GRUB'in kendisi yok: grub-mkfont, grub-mkconfig, grub-script-check ve os-prober sahte komutlarla taklit edilir,
 betikler sahte bir kok dizinde (CAROT_KOK) calistirilir. Gercek GRUB cikisi VM'de elle denenir.
@@ -27,75 +27,6 @@ SURE = os.path.join(KLASOR, "grub.d", "99_carotos_sure")
 SH = shutil.which("sh")
 
 PNG_ADLARI = ("background.png", "select_c.png", "select_w.png", "select_e.png")
-
-
-class TemaDosyalariTesti(unittest.TestCase):
-    def setUp(self):
-        with open(os.path.join(TEMA, "theme.txt"), encoding="utf-8") as f:
-            self.tema = f.read()
-
-    def test_gerekli_gorseller_var_ve_gecerli_png(self):
-        for ad in PNG_ADLARI:
-            yol = os.path.join(TEMA, ad)
-            self.assertTrue(os.path.isfile(yol), ad)
-            with open(yol, "rb") as f:
-                self.assertEqual(f.read(8), b"\x89PNG\r\n\x1a\n", ad)
-
-    def test_temanin_basvurdugu_dosyalar_mevcut(self):
-        adlar = set(re.findall(r'(?:file|desktop-image)\s*[=:]\s*"([^"]+)"', self.tema))
-        self.assertEqual(adlar, {"background.png"})              # logo yok: minimal tema
-        for ad in adlar:
-            self.assertTrue(os.path.isfile(os.path.join(TEMA, ad)), ad)
-        stil = re.search(r'selected_item_pixmap_style\s*=\s*"([^"]+)"', self.tema).group(1)
-        for k in ("c", "w", "e"):
-            self.assertTrue(os.path.isfile(os.path.join(TEMA, stil.replace("*", "select_" + k).replace("select_select_", "select_"))),
-                            stil)
-
-    def test_zamanlayici_ve_menu_bilesenleri(self):
-        self.assertEqual(self.tema.count("+ boot_menu"), 1)
-        self.assertEqual(self.tema.count('id = "__timeout__"'), 2)      # ilerleme cubugu + sayac yazisi
-        self.assertIn('text = "%d"', self.tema)
-
-    def test_yazi_tipleri_betigin_urettigiyle_ayni(self):
-        with open(BETIK, encoding="utf-8") as f:
-            betik = f.read()
-        for ad, boyut, dosya in (("DejaVu Sans Regular", 14, "DejaVuSans.ttf"), ("DejaVu Sans Regular", 18, "DejaVuSans.ttf"),
-                                 ("DejaVu Sans Bold", 18, "DejaVuSans-Bold.ttf")):
-            self.assertIn("%s %d" % (ad, boyut), self.tema)
-            self.assertIn("-s %d" % boyut, betik)
-            self.assertIn(dosya, betik)
-        kullanilan = set(re.findall(r'"(DejaVu Sans [A-Za-z]+ \d+)"', self.tema))
-        self.assertEqual(kullanilan, {"DejaVu Sans Regular 14", "DejaVu Sans Regular 18", "DejaVu Sans Bold 18"})
-
-    def test_konum_ve_boyutlar_yuzdedir_ekran_boyutuna_bagli_degil(self):
-        """Piksel ofsetleri (50%-90, 7%+196 gibi) kucuk ekranlarda ogeleri ust uste bindiriyordu."""
-        for ad in ("left", "top", "width", "height"):
-            for deger in re.findall(r"^\s*%s\s*=\s*(\S+)\s*$" % ad, self.tema, re.M):
-                self.assertTrue(re.fullmatch(r"\d+%", deger) or deger == "0", "%s = %s" % (ad, deger))
-        self.assertNotIn("+ image", self.tema)
-        for anahtar in ("terminal-left", "terminal-top", "terminal-width", "terminal-height"):
-            self.assertRegex(self.tema, r'%s:\s*"(0|100%%)"' % anahtar)
-
-    def test_terminal_cercevesiz(self):
-        self.assertRegex(self.tema, r'terminal-border:\s*"0"')
-
-    def test_ogeler_dikeyde_ust_uste_binmez(self):
-        """top/height yuzdeleri sirayla cakismamali: baslik, menu, zamanlayici, ipucu."""
-        bloklar = re.split(r"^\+ ", self.tema, flags=re.M)[1:]
-        aralik = []
-        for b in bloklar:
-            top = re.search(r"top\s*=\s*(\d+)%", b)
-            yuk = re.search(r"height\s*=\s*(\d+)%", b)
-            if top and yuk:
-                aralik.append((int(top.group(1)), int(top.group(1)) + int(yuk.group(1)), b.split()[0]))
-        aralik.sort()
-        for (a0, a1, an), (b0, b1, bn) in zip(aralik, aralik[1:]):
-            self.assertLessEqual(a1, b0, "%s ile %s ust uste biniyor" % (an, bn))
-
-    def test_renkler_mavi_beyaz_paletten(self):
-        for h in re.findall(r'"(#[0-9a-fA-F]{6})"', self.tema):
-            r, g, b = (int(h[i:i + 2], 16) for i in (1, 3, 5))
-            self.assertGreaterEqual(b, r, "mavi baskin olmali: " + h)
 
 
 @unittest.skipUnless(SH, "sh yok")
@@ -168,20 +99,19 @@ class KurulumBetigiTesti(unittest.TestCase):
     def yol(self, *p):
         return os.path.join(self.kok, *p)
 
-    def test_kur_dosyalari_yazar(self):
+    def test_kur_ayar_ve_sure_betigini_yazar_ozel_tema_koymaz(self):
         r = self._calistir("kur")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        for ad in ("theme.txt",) + PNG_ADLARI + ("dejavu-regular-14.pf2", "dejavu-regular-18.pf2", "dejavu-bold-18.pf2"):
-            self.assertTrue(os.path.isfile(self.yol("boot", "grub", "themes", "carotos", ad)), ad)
-        with open(self.yol("etc", "default", "grub.d", "90-carotos-tema.cfg"), encoding="utf-8") as f:
+        with open(self.yol("etc", "default", "grub.d", "zz-carotos-grub.cfg"), encoding="utf-8") as f:
             cfg = f.read()
-        self.assertIn('GRUB_THEME="/boot/grub/themes/carotos/theme.txt"', cfg)
-        self.assertIn("GRUB_DISABLE_OS_PROBER=false", cfg)
+        self.assertNotIn("GRUB_THEME", cfg.replace("tema ayari", ""))                 # Debian temasi: tema ayari yok
+        self.assertNotIn("GRUB_BACKGROUND", cfg)
         self.assertNotIn("GRUB_GFXPAYLOAD_LINUX", cfg)
-        self.assertIn('GRUB_BACKGROUND="/boot/grub/themes/carotos/background.png"', cfg)
+        self.assertIn("GRUB_DISABLE_OS_PROBER=false", cfg)
         sat = [x for x in cfg.splitlines() if x.startswith("GRUB_CMDLINE_LINUX_DEFAULT")][0]
         self.assertLess(sat.index("quiet"), sat.index("loglevel=3"))       # loglevel quiet'ten sonra gelmeli
         self.assertIn("systemd.show_status=error", sat)
+        self.assertFalse(os.path.exists(self.yol("boot", "grub", "themes")))
         sure = self.yol("etc", "grub.d", "99_carotos_sure")
         self.assertTrue(os.stat(sure).st_mode & stat.S_IXUSR)
         with open(self.grubcfg) as f:
@@ -190,12 +120,25 @@ class KurulumBetigiTesti(unittest.TestCase):
             self.assertEqual(f.read(), "# eski grub.cfg\n")
         self.assertFalse(os.path.exists(self.yol("etc", "default", "grub")))       # /etc/default/grub'a dokunulmaz
 
-    def test_eski_logo_temizlenir(self):
+    def test_ayar_dosyasi_en_son_okunur(self):
+        """/etc/default/grub.d/*.cfg alfabetik okunur; 'zz' hicbir pakete ait parcanin ardinda kalmaz."""
+        self._calistir("kur")
+        grubd = self.yol("etc", "default", "grub.d")
+        for ornek in ("00_init.cfg", "05_debian_theme.cfg", "carotos.cfg", "desktop-base.cfg", "init-select.cfg"):
+            self.assertLess(ornek, "zz-carotos-grub.cfg", ornek)
+        self.assertEqual(sorted(os.listdir(grubd))[-1], "zz-carotos-grub.cfg")
+
+    def test_onceki_denemenin_ozel_temasi_ve_ayari_temizlenir(self):
         hedef = self.yol("boot", "grub", "themes", "carotos")
         os.makedirs(hedef)
-        open(os.path.join(hedef, "logo.png"), "w").close()
+        open(os.path.join(hedef, "theme.txt"), "w").close()
+        eski = self.yol("etc", "default", "grub.d", "90-carotos-tema.cfg")
+        os.makedirs(os.path.dirname(eski))
+        with open(eski, "w") as f:
+            f.write('GRUB_THEME="/boot/grub/themes/carotos/theme.txt"\n')
         self.assertEqual(self._calistir("kur").returncode, 0)
-        self.assertFalse(os.path.exists(os.path.join(hedef, "logo.png")))
+        self.assertFalse(os.path.exists(hedef))
+        self.assertFalse(os.path.exists(eski))
 
     def test_ikinci_kurulum_ilk_yedegi_ezmez(self):
         self._calistir("kur")
@@ -206,7 +149,7 @@ class KurulumBetigiTesti(unittest.TestCase):
     def test_kuru_mod_hicbir_sey_degistirmez(self):
         r = self._calistir("kur", "--kuru")
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertIn("grub-mkfont", r.stdout)
+        self.assertIn("grub-mkconfig", r.stdout)
         self.assertFalse(os.path.exists(self.yol("boot", "grub", "themes")))
         self.assertFalse(os.path.exists(self.yol("etc")))
         with open(self.grubcfg) as f:
@@ -226,24 +169,18 @@ class KurulumBetigiTesti(unittest.TestCase):
         self.assertIn("sudo apt install os-prober", r.stderr)
         self.assertFalse(os.path.exists(self.yol("boot", "grub", "themes")))
 
-    def test_dejavu_yoksa_apt_ipucu_verir(self):
-        os.remove(os.path.join(self.yazi, "DejaVuSans.ttf"))
-        r = self._calistir("kur")
-        self.assertNotEqual(r.returncode, 0)
-        self.assertIn("fonts-dejavu-core", r.stderr)
-
     def test_geri_al_kaldirir(self):
         self._calistir("kur")
         r = self._calistir("geri-al")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        self.assertFalse(os.path.exists(self.yol("boot", "grub", "themes", "carotos")))
+        self.assertFalse(os.path.exists(self.yol("etc", "default", "grub.d", "zz-carotos-grub.cfg")))
         self.assertFalse(os.path.exists(self.yol("etc", "default", "grub.d", "90-carotos-tema.cfg")))
         self.assertFalse(os.path.exists(self.yol("etc", "grub.d", "99_carotos_sure")))
 
     def test_durum_ve_bilinmeyen_komut(self):
         r = self._calistir("durum")
         self.assertEqual(r.returncode, 0)
-        self.assertIn("Tema klasoru", r.stdout)
+        self.assertIn("Ayar parcasi", r.stdout)
         self.assertNotEqual(self._calistir("sil-hepsini").returncode, 0)
 
 
