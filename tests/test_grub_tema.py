@@ -71,10 +71,13 @@ class TemaDosyalariTesti(unittest.TestCase):
         """Piksel ofsetleri (50%-90, 7%+196 gibi) kucuk ekranlarda ogeleri ust uste bindiriyordu."""
         for ad in ("left", "top", "width", "height"):
             for deger in re.findall(r"^\s*%s\s*=\s*(\S+)\s*$" % ad, self.tema, re.M):
-                if ad in ("height",) and deger.isdigit():              # progress_bar ince cizgi kalinligi (piksel) serbest
-                    continue
                 self.assertTrue(re.fullmatch(r"\d+%", deger) or deger == "0", "%s = %s" % (ad, deger))
         self.assertNotIn("+ image", self.tema)
+        for anahtar in ("terminal-left", "terminal-top", "terminal-width", "terminal-height"):
+            self.assertRegex(self.tema, r'%s:\s*"(0|100%%)"' % anahtar)
+
+    def test_terminal_cercevesiz(self):
+        self.assertRegex(self.tema, r'terminal-border:\s*"0"')
 
     def test_ogeler_dikeyde_ust_uste_binmez(self):
         """top/height yuzdeleri sirayla cakismamali: baslik, menu, zamanlayici, ipucu."""
@@ -175,9 +178,10 @@ class KurulumBetigiTesti(unittest.TestCase):
         self.assertIn('GRUB_THEME="/boot/grub/themes/carotos/theme.txt"', cfg)
         self.assertIn("GRUB_DISABLE_OS_PROBER=false", cfg)
         self.assertNotIn("GRUB_GFXPAYLOAD_LINUX", cfg)
+        self.assertIn('GRUB_BACKGROUND="/boot/grub/themes/carotos/background.png"', cfg)
         sat = [x for x in cfg.splitlines() if x.startswith("GRUB_CMDLINE_LINUX_DEFAULT")][0]
         self.assertLess(sat.index("quiet"), sat.index("loglevel=3"))       # loglevel quiet'ten sonra gelmeli
-        self.assertIn("systemd.show_status=auto", sat)
+        self.assertIn("systemd.show_status=error", sat)
         sure = self.yol("etc", "grub.d", "99_carotos_sure")
         self.assertTrue(os.stat(sure).st_mode & stat.S_IXUSR)
         with open(self.grubcfg) as f:

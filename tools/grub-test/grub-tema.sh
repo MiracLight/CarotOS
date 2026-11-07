@@ -112,11 +112,13 @@ kur() {
         cat > "$CFG" <<'EOF'
 # CarotOS GRUB temasi (deneme). /etc/default/grub'a dokunulmaz; update-grub bu parcayi ondan sonra okur.
 GRUB_THEME="/boot/grub/themes/carotos/theme.txt"
+# Cekirdek yuklenirken terminal alani da ayni zemini kullansin (aksi halde baska bir pakete ait dalgali zemin cikabiliyor).
+GRUB_BACKGROUND="/boot/grub/themes/carotos/background.png"
 GRUB_GFXMODE="1920x1080,1366x768,1280x720,1024x768,800x600,auto"
 GRUB_TERMINAL_OUTPUT="gfxterm"
 # Sessiz acilis (ISO'daki carotos.cfg ile ayni deger; eski kurulu test makinesinde o dosya yoktur): GRUB'dan sonra
 # cekirdegin hata/uyari satirlari (vmwgfx, ata, acpi vb.) ekrana dokulmesin. loglevel=3, quiet'ten SONRA gelmeli.
-GRUB_CMDLINE_LINUX_DEFAULT="quiet loglevel=3 systemd.show_status=auto vt.global_cursor_default=0"
+GRUB_CMDLINE_LINUX_DEFAULT="quiet loglevel=3 systemd.show_status=error vt.global_cursor_default=0"
 GRUB_TIMEOUT_STYLE="menu"
 GRUB_TIMEOUT="5"
 # Debian 12'den beri varsayilan kapali: Windows ve baska Linux'lar menude gorunsun.

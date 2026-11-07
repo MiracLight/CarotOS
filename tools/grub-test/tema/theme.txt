@@ -8,6 +8,12 @@ desktop-image-scale-method: "stretch"
 desktop-color: "#101a26"
 title-text: ""
 terminal-font: "DejaVu Sans Regular 14"
+# Çekirdek yükleme mesajları (Loading Linux ...) için terminal alanı: çerçevesiz, tema zemininin üstünde.
+terminal-left: "0"
+terminal-top: "0"
+terminal-width: "100%"
+terminal-height: "100%"
+terminal-border: "0"
 
 + label {
     text = "CarotOS"
@@ -41,7 +47,7 @@ terminal-font: "DejaVu Sans Regular 14"
     left = 25%
     top = 80%
     width = 50%
-    height = 4
+    height = 1%
     show_text = false
     fg_color = "#5b86b8"
     bg_color = "#1d2e42"
