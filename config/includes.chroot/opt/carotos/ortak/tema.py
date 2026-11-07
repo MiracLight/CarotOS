@@ -548,6 +548,8 @@ class AcilirSecim(Gtk.Box):
         """Dugme pencerenin alt yarisindaysa (sol alttaki dil seciciler) liste yukari, degilse asagi acilir."""
         try:
             ust = self._dugme.get_toplevel()
+            if not isinstance(ust, Gtk.Window):          # henuz bir pencerede degil
+                return Gtk.PositionType.BOTTOM
             _x, y = self._dugme.translate_coordinates(ust, 0, 0)
             if y is not None and y > ust.get_allocated_height() * 0.55:
                 return Gtk.PositionType.TOP

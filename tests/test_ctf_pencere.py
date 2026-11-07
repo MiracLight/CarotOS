@@ -152,6 +152,13 @@ class PencereTesti(unittest.TestCase):
         self.assertIn("Puanın", self.p.puan_etiketi.get_text())
         self.assertFalse(self.p.gonder_dugmesi.get_sensitive() and self.p.bayrak_girisi.get_sensitive())
 
+    def test_skorda_kendi_satirim_kalin(self):
+        self.p._skoru_yaz({"satirlar": [
+            {"sira": 1, "ad": "veli", "puan": 300, "cozulen": 2},
+            {"sira": 2, "ad": "ali", "puan": 200, "cozulen": 1}]})
+        agirlik = {r[1]: r[4] for r in self.p.skor_modeli}
+        self.assertEqual(agirlik, {"veli": 400, "ali": 700})
+
     def test_ipucu_acilir(self):
         self.oda.ctf_oturumu().baslat(30)
         self.pompala(4.5)

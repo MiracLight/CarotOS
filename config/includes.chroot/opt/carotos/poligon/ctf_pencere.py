@@ -262,12 +262,12 @@ def pencere_olustur(ctf, dil: str, ogrenci: str, gorunum: str = "dark", kayit_ta
             self.sekmeler.append_page(kutu, self.gorev_sekme_etiketi)
 
         def _skor_sekmesi(self):
-            self.skor_modeli = Gtk.ListStore(int, str, int, int)
+            self.skor_modeli = Gtk.ListStore(int, str, int, int, int)      # son sutun: yazi agirligi (kendi satirim kalin)
             self.skor_agaci = Gtk.TreeView(model=self.skor_modeli)
             tema.sinif(self.skor_agaci, "ctf-agac")
             self.skor_sutunlari = []
             for i in range(4):
-                sutun = Gtk.TreeViewColumn("", Gtk.CellRendererText(), text=i)
+                sutun = Gtk.TreeViewColumn("", Gtk.CellRendererText(), text=i, weight=4)
                 self.skor_agaci.append_column(sutun)
                 self.skor_sutunlari.append(sutun)
             kay = Gtk.ScrolledWindow()
@@ -383,7 +383,8 @@ def pencere_olustur(ctf, dil: str, ogrenci: str, gorunum: str = "dark", kayit_ta
             if "hata" in s:
                 return
             for r in s.get("satirlar", []):
-                self.skor_modeli.append([r["sira"], r["ad"], r["puan"], r["cozulen"]])
+                self.skor_modeli.append([r["sira"], r["ad"], r["puan"], r["cozulen"],
+                                         700 if r["ad"] == self.ogrenci else 400])
             self.skor_not.set_text(self.t(T("Skor tablosu donduruldu: son dakikalardaki gelişmeler gizli.",
                                             "The scoreboard is frozen: the latest changes are hidden."))
                                    if s.get("donuk") else "")

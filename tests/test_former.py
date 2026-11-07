@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Former testleri: zaman cizelgesi motoru (GTK'siz), 17 konunun icerik
+"""Former testleri: zaman cizelgesi motoru (GTK'siz), 18 konunun icerik
 dogrulamasi (iki dilli, sahneyle tutarli), Guvenlik Paneli'nin gercek arac
 listesiyle capraz kontrol, simge yolu bulma ve (ekran varsa) arayuzun
 butun konularda hatasiz gezilmesi.
@@ -132,14 +132,14 @@ class ZamanMotoruTesti(unittest.TestCase):
 
 # ---------------------------------------------------------------------------
 class IcerikTesti(unittest.TestCase):
-    """konular/ altindaki 17 konunun yapisal dogrulugu."""
+    """konular/ altindaki 18 konunun yapisal dogrulugu."""
 
     @classmethod
     def setUpClass(cls):
         cls.konular = konular.tumu()
 
-    def test_on_yedi_konu_ve_benzersiz_kimlik(self):
-        self.assertEqual(len(self.konular), 17)
+    def test_on_sekiz_konu_ve_benzersiz_kimlik(self):
+        self.assertEqual(len(self.konular), 18)
         kimlikler = [k["id"] for k in self.konular]
         self.assertEqual(len(kimlikler), len(set(kimlikler)), kimlikler)
         self.assertEqual(set(kimlikler), set(konular.SIRA))
@@ -333,7 +333,7 @@ class SiblingAyarSenkronTesti(unittest.TestCase):
 @unittest.skipUnless(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"),
                      "ekran yok (xvfb-run ile calistirin)")
 class ArayuzDumanTesti(unittest.TestCase):
-    """Pencereyi acar, 17 konunun hepsini gezer, dil/tema degistirir.
+    """Pencereyi acar, 18 konunun hepsini gezer, dil/tema degistirir.
     Yakalanmayan istisna olmamali."""
 
     def test_butun_konular_hatasiz_gezilir(self):
@@ -415,6 +415,23 @@ class YeniKonuIddiaTesti(unittest.TestCase):
         metin = self._metinler("disk")
         self.assertIn("Disk swap'ını kapat", metin)
         self.assertIn("Disable disk swap", metin)
+
+    def test_ctf_etiketleri_uygulamayla_ayni(self):
+        pencere = self._oku("poligon", "ctf_pencere.py")
+        ogrenci = self._oku("poligon", "ogrenci_uygulama.py")
+        uretici = self._oku("poligon", "ctf_uretici.py")
+        metin = self._metinler("ctf")
+        for tr, en in (("Dosyayı kaydet", "Save file"), ("Gönder", "Submit")):
+            self.assertIn('T("%s", "%s")' % (tr, en), pencere)
+            self.assertIn(tr, metin)
+        self.assertIn('T("İpucu aç (−{c} puan)", "Open a hint (−{c} points)")', pencere)
+        self.assertIn("CAROT{", uretici)
+        self.assertIn("CAROT{...}", metin)
+        self.assertIn("CTF yarışması", metin + "\n".join(
+            k["ad"]["tr"] for k in self.konular.values() if k["id"] == "ctf"))
+        self.assertIn("ctf_dugme", ogrenci)
+        self.assertIn("Poligon-CTF", metin)
+        self.assertIn("Poligon-CTF", pencere)
 
     def test_acikla_kisayolu_ve_arac_var(self):
         bash = os.path.join(INC, "usr", "share", "carotos", "acikla.bash")
