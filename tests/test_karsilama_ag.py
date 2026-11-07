@@ -73,6 +73,17 @@ class AgSayfasiTesti(unittest.TestCase):
         c.optionxform = str
         c.read(NM, encoding="utf-8")
         anahtarlar = set(c["connection"])
+        # sahte MAC anahtarlari artik varsayilan degil, anahtarin yazdigi 91-carotos-mac.conf'ta
+        import importlib.machinery
+        import importlib.util
+        yol = os.path.join(KOK, "config", "includes.chroot", "usr", "local", "sbin", "carotos-mac-ayar")
+        yukleyici = importlib.machinery.SourceFileLoader("mac_ayar_karsilama", yol)
+        modul = importlib.util.module_from_spec(importlib.util.spec_from_loader("mac_ayar_karsilama", yukleyici))
+        yukleyici.exec_module(modul)
+        c2 = configparser.ConfigParser(interpolation=None)
+        c2.optionxform = str
+        c2.read_string(modul.ICERIK)
+        anahtarlar |= set(c2["connection"])
         komutlar = [y for t, y in self.sayfa["body"] if t == "code"]
         self.assertEqual(len(komutlar), 2)
         for k in komutlar:

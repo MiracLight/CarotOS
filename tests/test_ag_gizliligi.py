@@ -33,22 +33,38 @@ def ini(yol):
     return p
 
 
+def ini_metni(metin):
+    c = configparser.ConfigParser(interpolation=None)
+    c.optionxform = str
+    c.read_string(metin)
+    return c
+
+
 class NetworkManagerTesti(unittest.TestCase):
     def setUp(self):
         self.c = ini(NM)
 
     def test_baglanti_varsayilanlari(self):
         b = self.c["connection"]
-        self.assertIn(b["wifi.cloned-mac-address"], ("stable", "random"))
-        self.assertIn(b["ethernet.cloned-mac-address"], ("stable", "random"))
         self.assertEqual(b["ipv4.dhcp-send-hostname"], "false")
         self.assertEqual(b["ipv6.dhcp-send-hostname"], "false")
         self.assertEqual(b["ipv6.ip6-privacy"], "2")
 
-    def test_gercek_donanim_adresi_korunmuyor(self):
-        # "preserve" (NetworkManager varsayilani) gercek MAC'i aga gosterir.
+    def test_sahte_mac_varsayilan_degil_anahtarla_acilir(self):
+        # Karar (8 Kasim 2026): sahte MAC MAC filtreli aglarda (okul, ofis) baglanti kurdurmaz; varsayilan KAPALI.
+        # Karsilama > Ag ve gizlilik anahtari 91-carotos-mac.conf yazar (tests/test_mac_anahtari.py).
         for anahtar in ("wifi.cloned-mac-address", "ethernet.cloned-mac-address"):
-            self.assertNotIn(self.c["connection"][anahtar], ("preserve", "permanent"))
+            self.assertNotIn(anahtar, self.c["connection"])
+        import importlib.machinery
+        import importlib.util
+        yol = os.path.join(CHROOT, "usr/local/sbin/carotos-mac-ayar")
+        yukleyici = importlib.machinery.SourceFileLoader("mac_ayar_ag", yol)
+        modul = importlib.util.module_from_spec(importlib.util.spec_from_loader("mac_ayar_ag", yukleyici))
+        yukleyici.exec_module(modul)
+        anahtar_dosyasi = ini_metni(modul.ICERIK)
+        for anahtar in ("wifi.cloned-mac-address", "ethernet.cloned-mac-address"):
+            self.assertIn(anahtar_dosyasi["connection"][anahtar], ("stable", "random"))
+            self.assertNotIn(anahtar_dosyasi["connection"][anahtar], ("preserve", "permanent"))
 
     def test_tarama_rastgele_mac(self):
         self.assertEqual(self.c["device"]["wifi.scan-rand-mac-address"], "yes")

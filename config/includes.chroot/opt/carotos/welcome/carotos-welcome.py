@@ -88,6 +88,8 @@ UI = {
 #   ("note",    {tr, en})                      vurgulu not kutusu
 #   ("links",   [ (metin, url, {tr, en}), ... ]) tiklanabilir web baglantilari
 #   ("grid",    [ (baslik, {tr, en}), ... ])   iki sutunlu kutu izgarasi
+#   ("mac_anahtar", {baslik, alt, acik, kapali, hata: {tr, en}})
+#                                               sahte MAC anahtari (pkexec carotos-mac-ayar)
 #   ("action",  ({tr, en} baslik, {tr, en} alt, [komut, ...]))
 #                                               tiklandiginda bir uygulama acan buyuk kutu
 
@@ -164,11 +166,6 @@ PAGES = [
                       "everyone on the network. CarotOS is set up to reduce this:",
             }),
             ("bullets", [
-                {"tr": "Her ağ için farklı bir sahte donanım adresi kullanılır; aynı "
-                       "ağda hep aynı kalır, böylece giriş sayfaları bozulmaz.",
-                 "en": "A different fake hardware address is used for each network. "
-                       "It stays the same on the same network, so login pages keep "
-                       "working."},
                 {"tr": "Bir ağa katılırken bilgisayarının adı yayınlanmaz.",
                  "en": "Your computer's name is not announced when joining a network."},
                 {"tr": "IPv6'da giden bağlantılar için geçici adresler tercih edilir.",
@@ -179,6 +176,24 @@ PAGES = [
                        "also created a disk swap, it is used as overflow once zram "
                        "is full."},
             ]),
+            ("mac_anahtar", {
+                "baslik": {"tr": "Her ağ için farklı sahte donanım adresi (MAC)",
+                           "en": "A different fake hardware address (MAC) for each network"},
+                "alt": {"tr": "Kafe, otel ya da havalimanı gibi tanımadığın ağlarda aç. Aynı ağda adres "
+                              "hep aynı kalır, giriş sayfaları bozulmaz. Okul ya da ofis ağı donanım "
+                              "adresine göre izin veriyorsa kapalı bırak: aksi halde bağlanamazsın.",
+                        "en": "Turn this on for networks you do not know, such as cafés, hotels or "
+                              "airports. The address stays the same on the same network, so login pages "
+                              "keep working. Leave it off if your school or office network only allows "
+                              "registered hardware addresses: otherwise you cannot connect."},
+                "acik": {"tr": "Açık: yeni bağlantılarda sahte adres kullanılır. Ağdan çıkıp yeniden bağlan.",
+                         "en": "On: a fake address is used for new connections. Disconnect and reconnect."},
+                "kapali": {"tr": "Kapalı: donanımın gerçek adresi kullanılır.",
+                           "en": "Off: the real hardware address is used."},
+                "hata": {"tr": "Ayar değiştirilemedi (yetki verilmedi ya da bir hata oldu).",
+                         "en": "The setting could not be changed (permission was not granted or an "
+                               "error occurred)."},
+            }),
             ("p", {
                 "tr": "Bazı ağlar (bazı yurt, otel ve ev modemleri) yalnızca kayıtlı "
                       "donanım adreslerine izin verir. Böyle bir ağa bağlanamıyorsan o "
@@ -2215,6 +2230,9 @@ class WelcomeWindow(Gtk.Window):
                 grid.attach(cell, i % 2, i // 2, 1, 1)
             return grid
 
+        if kind == "mac_anahtar":
+            return self.build_mac_anahtar(payload)
+
         if kind == "action":
             baslik, alt_metin, komut = payload
             inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
@@ -2236,6 +2254,82 @@ class WelcomeWindow(Gtk.Window):
             return btn
 
         return None
+
+    MAC_AYAR = "/usr/local/sbin/carotos-mac-ayar"
+    MAC_DOSYASI = "/etc/NetworkManager/conf.d/91-carotos-mac.conf"
+
+    def mac_acik_mi(self):
+        return os.path.isfile(self.MAC_DOSYASI)
+
+    def mac_komutu(self, acik):
+        """Yetkili betigin komutu (pkexec ile); testte yerine kopya konur."""
+        return ["pkexec", self.MAC_AYAR, "ac" if acik else "kapat"]
+
+    def mac_yetkili_calistir(self, komut):
+        try:
+            return subprocess.run(komut, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=120).returncode
+        except (OSError, subprocess.SubprocessError):
+            return 1
+
+    def build_mac_anahtar(self, p):
+        """Sahte MAC anahtari: yetkili betigi pkexec ile calistirir; pencere donmaz, basarisizsa anahtar eski haline doner."""
+        import threading
+        satir = Gtk.Box(spacing=14)
+        satir.set_halign(Gtk.Align.CENTER)
+        satir.set_size_request(self.CARD_WIDTH, -1)
+        metin = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        baslik = Gtk.Label(label=p["baslik"][self.lang], xalign=0.0)
+        baslik.set_line_wrap(True)
+        baslik.get_style_context().add_class("action-title")
+        metin.pack_start(baslik, False, False, 0)
+        alt = Gtk.Label(label=p["alt"][self.lang], xalign=0.0)
+        alt.set_line_wrap(True)
+        alt.set_max_width_chars(58)
+        alt.get_style_context().add_class("action-sub")
+        metin.pack_start(alt, False, False, 0)
+        durum = Gtk.Label(xalign=0.0)
+        durum.set_line_wrap(True)
+        durum.set_max_width_chars(58)
+        durum.get_style_context().add_class("action-sub")
+        metin.pack_start(durum, False, False, 0)
+        satir.pack_start(metin, True, True, 0)
+        anahtar = Gtk.Switch()
+        anahtar.set_valign(Gtk.Align.CENTER)
+        satir.pack_end(anahtar, False, False, 0)
+
+        def yaz(acik):
+            durum.set_text((p["acik"] if acik else p["kapali"])[self.lang])
+
+        acik = self.mac_acik_mi()
+        anahtar.set_active(acik)
+        yaz(acik)
+
+        def degisti(sw, istenen):
+            sw.set_sensitive(False)
+
+            def calis():
+                tamam = self.mac_yetkili_calistir(self.mac_komutu(istenen)) == 0
+                GLib.idle_add(bitti, tamam, istenen)
+            threading.Thread(target=calis, daemon=True).start()
+            return True                                    # durumu biz ayarliyoruz (basarisizsa eski haline doner)
+
+        def bitti(tamam, istenen):
+            anahtar.set_sensitive(True)
+            if tamam:
+                anahtar.set_state(istenen)
+                yaz(istenen)
+            else:
+                # set_active "state-set" sinyalini yeniden tetikler (betik tekrar calisirdi): sinyal gecici bloklanir
+                anahtar.handler_block(kimlik)
+                anahtar.set_active(not istenen)
+                anahtar.handler_unblock(kimlik)
+                anahtar.set_state(not istenen)
+                durum.set_text(p["hata"][self.lang])
+            return False
+
+        kimlik = anahtar.connect("state-set", degisti)
+        self.mac_anahtari = anahtar                        # testler icin
+        return satir
 
     def on_action_clicked(self, _button, komut):
         """'action' turundeki bir kutuya tiklandiginda ilgili uygulamayi acar."""
