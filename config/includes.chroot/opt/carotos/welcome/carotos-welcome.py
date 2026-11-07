@@ -2275,21 +2275,20 @@ class WelcomeWindow(Gtk.Window):
         """Sahte MAC anahtari: yetkili betigi pkexec ile calistirir; pencere donmaz, basarisizsa anahtar eski haline doner."""
         import threading
         satir = Gtk.Box(spacing=14)
-        satir.set_halign(Gtk.Align.CENTER)
-        satir.set_size_request(self.CARD_WIDTH, -1)
-        metin = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        metin = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         baslik = Gtk.Label(label=p["baslik"][self.lang], xalign=0.0)
         baslik.set_line_wrap(True)
+        baslik.set_max_width_chars(42)
         baslik.get_style_context().add_class("action-title")
         metin.pack_start(baslik, False, False, 0)
         alt = Gtk.Label(label=p["alt"][self.lang], xalign=0.0)
         alt.set_line_wrap(True)
-        alt.set_max_width_chars(58)
-        alt.get_style_context().add_class("action-sub")
+        alt.set_max_width_chars(42)
+        alt.get_style_context().add_class("body-text")
         metin.pack_start(alt, False, False, 0)
         durum = Gtk.Label(xalign=0.0)
         durum.set_line_wrap(True)
-        durum.set_max_width_chars(58)
+        durum.set_max_width_chars(42)
         durum.get_style_context().add_class("action-sub")
         metin.pack_start(durum, False, False, 0)
         satir.pack_start(metin, True, True, 0)
@@ -2329,7 +2328,7 @@ class WelcomeWindow(Gtk.Window):
 
         kimlik = anahtar.connect("state-set", degisti)
         self.mac_anahtari = anahtar                        # testler icin
-        return satir
+        return self.card(satir)                            # diger bloklarla ayni kutu
 
     def on_action_clicked(self, _button, komut):
         """'action' turundeki bir kutuya tiklandiginda ilgili uygulamayi acar."""
