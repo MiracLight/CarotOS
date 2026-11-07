@@ -57,9 +57,10 @@ checkbutton.ctf-secim check:checked {{ background-color: #15210a; border: 4px so
     min-width: 8px; min-height: 8px; }}
 notebook.ctf-sekme {{ background-color: transparent; border: none; }}
 notebook.ctf-sekme > header {{ background-color: transparent; border: none; border-bottom: 1px solid {p['cizgi']}; }}
-notebook.ctf-sekme > header tab {{ background-color: transparent; border: none; border-bottom: 2px solid transparent;
-    padding: 6px 16px; color: {p['soluk']}; }}
-notebook.ctf-sekme > header tab:checked {{ color: {p['yazi']}; border-bottom: 2px solid {p['vurgu']}; }}
+notebook.ctf-sekme > header tab {{ background-color: transparent; background-image: none; box-shadow: none;
+    border: none; border-bottom: 2px solid transparent; padding: 6px 16px; color: {p['soluk']}; }}
+notebook.ctf-sekme > header tab:checked {{ color: {p['yazi']}; box-shadow: none; border-bottom: 2px solid {p['vurgu']}; }}
+notebook.ctf-sekme > header.top > tabs > tab:checked {{ box-shadow: none; border-bottom: 2px solid {p['vurgu']}; }}
 notebook.ctf-sekme > stack {{ background-color: transparent; }}
 list.ctf-liste, list.ctf-liste row {{ background-color: transparent; border: none; outline: none; }}
 list.ctf-liste row {{ border-radius: 6px; padding: 4px 8px; }}
@@ -267,7 +268,9 @@ def pencere_olustur(ctf, dil: str, ogrenci: str, gorunum: str = "dark", kayit_ta
             tema.sinif(self.skor_agaci, "ctf-agac")
             self.skor_sutunlari = []
             for i in range(4):
-                sutun = Gtk.TreeViewColumn("", Gtk.CellRendererText(), text=i, weight=4)
+                sutun = Gtk.TreeViewColumn("", Gtk.CellRendererText(xpad=10, ypad=5), text=i, weight=4)
+                sutun.set_min_width((60, 220, 100, 100)[i])
+                sutun.set_expand(i == 1)
                 self.skor_agaci.append_column(sutun)
                 self.skor_sutunlari.append(sutun)
             kay = Gtk.ScrolledWindow()
