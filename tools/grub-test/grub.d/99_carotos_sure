@@ -1,0 +1,28 @@
+#!/bin/sh
+# /etc/grub.d/99_carotos_sure -- GRUB menu bekleme suresi (CarotOS karari):
+#   yalnizca CarotOS kuruluysa  -> 5 sn
+#   baska isletim sistemi varsa -> 30 sn (kullanici secim yapabilsin)
+# GRUB sureyi kendiliginden buna gore degistirmez; update-grub sirasinda os-prober'a bakilir.
+# Cikti grub.cfg'ye en sona eklenir, bu yuzden 00_header'daki "set timeout=" degerini ezer.
+# os-prober yoksa ya da GRUB_DISABLE_OS_PROBER=false degilse baska sistem aranmaz (5 sn).
+set -e
+
+SURE_TEK=${CAROT_SURE_TEK:-5}
+SURE_COK=${CAROT_SURE_COK:-30}
+
+diger=0
+if command -v os-prober >/dev/null 2>&1 && [ "${GRUB_DISABLE_OS_PROBER:-true}" = "false" ]; then
+    diger=$(timeout 90 os-prober 2>/dev/null | grep -c . || true)
+fi
+
+if [ "${diger:-0}" -gt 0 ]; then
+    sure=$SURE_COK
+else
+    sure=$SURE_TEK
+    diger=0
+fi
+
+cat <<EOF
+# CarotOS: baska isletim sistemi sayisi: $diger -> menu bekleme suresi $sure sn
+set timeout=$sure
+EOF

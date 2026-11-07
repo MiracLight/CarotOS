@@ -1,0 +1,79 @@
+# CarotOS GRUB temasi (mavi-beyaz). Yalniz tema: onyukleyici (shim/grub) ikililerine dokunulmaz.
+# Yazi tipleri kur.sh tarafindan DejaVu Sans'tan uretilir (grub-mkfont): Regular 14/18, Bold 18.
+# Tema bulunamazsa ya da bozuksa GRUB duz metin menuye duser (guvenli geri donus).
+
+desktop-image: "background.png"
+desktop-image-scale-method: "crop"
+desktop-color: "#081428"
+title-text: ""
+terminal-font: "DejaVu Sans Regular 14"
+
++ image {
+    file = "logo.png"
+    left = 50%-90
+    top = 7%
+    width = 180
+    height = 180
+}
+
++ label {
+    text = "CarotOS"
+    font = "DejaVu Sans Bold 18"
+    color = "#ffffff"
+    align = "center"
+    left = 0
+    top = 7%+196
+    width = 100%
+    height = 28
+}
+
++ boot_menu {
+    left = 50%-260
+    top = 36%
+    width = 520
+    height = 40%
+    item_font = "DejaVu Sans Regular 18"
+    item_color = "#cfe3ff"
+    selected_item_font = "DejaVu Sans Bold 18"
+    selected_item_color = "#ffffff"
+    item_height = 40
+    item_padding = 14
+    item_spacing = 6
+    selected_item_pixmap_style = "select_*.png"
+    scrollbar = false
+}
+
++ progress_bar {
+    id = "__timeout__"
+    left = 50%-260
+    top = 80%
+    width = 520
+    height = 8
+    show_text = false
+    fg_color = "#3f8fe8"
+    bg_color = "#12294d"
+    border_color = "#12294d"
+}
+
++ label {
+    id = "__timeout__"
+    text = "%d"
+    font = "DejaVu Sans Regular 14"
+    color = "#9fb8d8"
+    align = "center"
+    left = 0
+    top = 80%+16
+    width = 100%
+    height = 22
+}
+
++ label {
+    text = "↑ ↓  ·  Enter  ·  e  ·  c"
+    font = "DejaVu Sans Regular 14"
+    color = "#6f8bb0"
+    align = "center"
+    left = 0
+    top = 94%
+    width = 100%
+    height = 22
+}
