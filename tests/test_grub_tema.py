@@ -26,7 +26,7 @@ BETIK = os.path.join(KLASOR, "grub-tema.sh")
 SURE = os.path.join(KLASOR, "grub.d", "99_carotos_sure")
 SH = shutil.which("sh")
 
-PNG_ADLARI = ("background.png", "logo.png", "select_c.png", "select_w.png", "select_e.png")
+PNG_ADLARI = ("background.png", "select_c.png", "select_w.png", "select_e.png")
 
 
 class TemaDosyalariTesti(unittest.TestCase):
@@ -43,7 +43,7 @@ class TemaDosyalariTesti(unittest.TestCase):
 
     def test_temanin_basvurdugu_dosyalar_mevcut(self):
         adlar = set(re.findall(r'(?:file|desktop-image)\s*[=:]\s*"([^"]+)"', self.tema))
-        self.assertTrue({"background.png", "logo.png"} <= adlar)
+        self.assertEqual(adlar, {"background.png"})              # logo yok: minimal tema
         for ad in adlar:
             self.assertTrue(os.path.isfile(os.path.join(TEMA, ad)), ad)
         stil = re.search(r'selected_item_pixmap_style\s*=\s*"([^"]+)"', self.tema).group(1)
@@ -66,6 +66,28 @@ class TemaDosyalariTesti(unittest.TestCase):
             self.assertIn(dosya, betik)
         kullanilan = set(re.findall(r'"(DejaVu Sans [A-Za-z]+ \d+)"', self.tema))
         self.assertEqual(kullanilan, {"DejaVu Sans Regular 14", "DejaVu Sans Regular 18", "DejaVu Sans Bold 18"})
+
+    def test_konum_ve_boyutlar_yuzdedir_ekran_boyutuna_bagli_degil(self):
+        """Piksel ofsetleri (50%-90, 7%+196 gibi) kucuk ekranlarda ogeleri ust uste bindiriyordu."""
+        for ad in ("left", "top", "width", "height"):
+            for deger in re.findall(r"^\s*%s\s*=\s*(\S+)\s*$" % ad, self.tema, re.M):
+                if ad in ("height",) and deger.isdigit():              # progress_bar ince cizgi kalinligi (piksel) serbest
+                    continue
+                self.assertTrue(re.fullmatch(r"\d+%", deger) or deger == "0", "%s = %s" % (ad, deger))
+        self.assertNotIn("+ image", self.tema)
+
+    def test_ogeler_dikeyde_ust_uste_binmez(self):
+        """top/height yuzdeleri sirayla cakismamali: baslik, menu, zamanlayici, ipucu."""
+        bloklar = re.split(r"^\+ ", self.tema, flags=re.M)[1:]
+        aralik = []
+        for b in bloklar:
+            top = re.search(r"top\s*=\s*(\d+)%", b)
+            yuk = re.search(r"height\s*=\s*(\d+)%", b)
+            if top and yuk:
+                aralik.append((int(top.group(1)), int(top.group(1)) + int(yuk.group(1)), b.split()[0]))
+        aralik.sort()
+        for (a0, a1, an), (b0, b1, bn) in zip(aralik, aralik[1:]):
+            self.assertLessEqual(a1, b0, "%s ile %s ust uste biniyor" % (an, bn))
 
     def test_renkler_mavi_beyaz_paletten(self):
         for h in re.findall(r'"(#[0-9a-fA-F]{6})"', self.tema):
@@ -152,6 +174,10 @@ class KurulumBetigiTesti(unittest.TestCase):
             cfg = f.read()
         self.assertIn('GRUB_THEME="/boot/grub/themes/carotos/theme.txt"', cfg)
         self.assertIn("GRUB_DISABLE_OS_PROBER=false", cfg)
+        self.assertNotIn("GRUB_GFXPAYLOAD_LINUX", cfg)
+        sat = [x for x in cfg.splitlines() if x.startswith("GRUB_CMDLINE_LINUX_DEFAULT")][0]
+        self.assertLess(sat.index("quiet"), sat.index("loglevel=3"))       # loglevel quiet'ten sonra gelmeli
+        self.assertIn("systemd.show_status=auto", sat)
         sure = self.yol("etc", "grub.d", "99_carotos_sure")
         self.assertTrue(os.stat(sure).st_mode & stat.S_IXUSR)
         with open(self.grubcfg) as f:
@@ -159,6 +185,13 @@ class KurulumBetigiTesti(unittest.TestCase):
         with open(self.grubcfg + ".carotos-yedek") as f:
             self.assertEqual(f.read(), "# eski grub.cfg\n")
         self.assertFalse(os.path.exists(self.yol("etc", "default", "grub")))       # /etc/default/grub'a dokunulmaz
+
+    def test_eski_logo_temizlenir(self):
+        hedef = self.yol("boot", "grub", "themes", "carotos")
+        os.makedirs(hedef)
+        open(os.path.join(hedef, "logo.png"), "w").close()
+        self.assertEqual(self._calistir("kur").returncode, 0)
+        self.assertFalse(os.path.exists(os.path.join(hedef, "logo.png")))
 
     def test_ikinci_kurulum_ilk_yedegi_ezmez(self):
         self._calistir("kur")

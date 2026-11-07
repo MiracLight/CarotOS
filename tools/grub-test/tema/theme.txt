@@ -1,43 +1,36 @@
-# CarotOS GRUB temasi (mavi-beyaz). Yalniz tema: onyukleyici (shim/grub) ikililerine dokunulmaz.
-# Yazi tipleri kur.sh tarafindan DejaVu Sans'tan uretilir (grub-mkfont): Regular 14/18, Bold 18.
-# Tema bulunamazsa ya da bozuksa GRUB duz metin menuye duser (guvenli geri donus).
+# CarotOS GRUB temasi: minimal, nötr mavi tonlar, logo yok. Tüm konum ve boyutlar YÜZDEDİR (ekran boyutundan
+# bağımsız; üst üste binme olmaz). Önyükleyici (shim/grub) ikililerine dokunulmaz.
+# Yazı tipleri kur.sh tarafından DejaVu Sans'tan üretilir (grub-mkfont): Regular 14/18, Bold 18;
+# update-grub tema klasöründeki *.pf2 dosyalarını kendisi yükler. Tema bozuksa GRUB düz metin menüye düşer.
 
 desktop-image: "background.png"
-desktop-image-scale-method: "crop"
-desktop-color: "#081428"
+desktop-image-scale-method: "stretch"
+desktop-color: "#101a26"
 title-text: ""
 terminal-font: "DejaVu Sans Regular 14"
-
-+ image {
-    file = "logo.png"
-    left = 50%-90
-    top = 7%
-    width = 180
-    height = 180
-}
 
 + label {
     text = "CarotOS"
     font = "DejaVu Sans Bold 18"
-    color = "#ffffff"
+    color = "#e8eef6"
     align = "center"
     left = 0
-    top = 7%+196
+    top = 18%
     width = 100%
-    height = 28
+    height = 6%
 }
 
 + boot_menu {
-    left = 50%-260
-    top = 36%
-    width = 520
-    height = 40%
+    left = 25%
+    top = 30%
+    width = 50%
+    height = 42%
     item_font = "DejaVu Sans Regular 18"
-    item_color = "#cfe3ff"
+    item_color = "#b9c7d8"
     selected_item_font = "DejaVu Sans Bold 18"
     selected_item_color = "#ffffff"
-    item_height = 40
-    item_padding = 14
+    item_height = 36
+    item_padding = 12
     item_spacing = 6
     selected_item_pixmap_style = "select_*.png"
     scrollbar = false
@@ -45,35 +38,35 @@ terminal-font: "DejaVu Sans Regular 14"
 
 + progress_bar {
     id = "__timeout__"
-    left = 50%-260
+    left = 25%
     top = 80%
-    width = 520
-    height = 8
+    width = 50%
+    height = 4
     show_text = false
-    fg_color = "#3f8fe8"
-    bg_color = "#12294d"
-    border_color = "#12294d"
+    fg_color = "#5b86b8"
+    bg_color = "#1d2e42"
+    border_color = "#1d2e42"
 }
 
 + label {
     id = "__timeout__"
     text = "%d"
     font = "DejaVu Sans Regular 14"
-    color = "#9fb8d8"
+    color = "#8ea2ba"
     align = "center"
     left = 0
-    top = 80%+16
+    top = 83%
     width = 100%
-    height = 22
+    height = 5%
 }
 
 + label {
     text = "↑ ↓  ·  Enter  ·  e  ·  c"
     font = "DejaVu Sans Regular 14"
-    color = "#6f8bb0"
+    color = "#62758c"
     align = "center"
     left = 0
-    top = 94%
+    top = 92%
     width = 100%
-    height = 22
+    height = 5%
 }

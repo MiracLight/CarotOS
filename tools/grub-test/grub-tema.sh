@@ -87,7 +87,7 @@ kur() {
     PAKET_IPUCU=os-prober
     komut_gerekli os-prober
     [ -f "$TEMA_KAYNAK/theme.txt" ] || hata "tema bulunamadi: $TEMA_KAYNAK"
-    for f in background.png logo.png select_c.png select_w.png select_e.png; do
+    for f in background.png select_c.png select_w.png select_e.png; do
         [ -f "$TEMA_KAYNAK/$f" ] || hata "tema dosyasi eksik: $f (python tools/grub-test/uret.py ile uretin)"
     done
     [ -f "$SURE_KAYNAK" ] || hata "sure betigi bulunamadi: $SURE_KAYNAK"
@@ -99,7 +99,8 @@ kur() {
 
     soyle "2/5 Tema dosyalari"
     yap mkdir -p "$TEMA_HEDEF"
-    yap cp -f "$TEMA_KAYNAK/theme.txt" "$TEMA_KAYNAK/background.png" "$TEMA_KAYNAK/logo.png" \
+    yap rm -f "$TEMA_HEDEF/logo.png"                  # onceki denemeden kalan logo (artik kullanilmiyor)
+    yap cp -f "$TEMA_KAYNAK/theme.txt" "$TEMA_KAYNAK/background.png" \
         "$TEMA_KAYNAK/select_c.png" "$TEMA_KAYNAK/select_w.png" "$TEMA_KAYNAK/select_e.png" "$TEMA_HEDEF/"
     yap grub-mkfont -s 14 -o "$TEMA_HEDEF/dejavu-regular-14.pf2" "$YAZI_DIZINI/DejaVuSans.ttf"
     yap grub-mkfont -s 18 -o "$TEMA_HEDEF/dejavu-regular-18.pf2" "$YAZI_DIZINI/DejaVuSans.ttf"
@@ -111,9 +112,11 @@ kur() {
         cat > "$CFG" <<'EOF'
 # CarotOS GRUB temasi (deneme). /etc/default/grub'a dokunulmaz; update-grub bu parcayi ondan sonra okur.
 GRUB_THEME="/boot/grub/themes/carotos/theme.txt"
-GRUB_GFXMODE="1920x1080,1366x768,1280x720,auto"
-GRUB_GFXPAYLOAD_LINUX="keep"
+GRUB_GFXMODE="1920x1080,1366x768,1280x720,1024x768,800x600,auto"
 GRUB_TERMINAL_OUTPUT="gfxterm"
+# Sessiz acilis (ISO'daki carotos.cfg ile ayni deger; eski kurulu test makinesinde o dosya yoktur): GRUB'dan sonra
+# cekirdegin hata/uyari satirlari (vmwgfx, ata, acpi vb.) ekrana dokulmesin. loglevel=3, quiet'ten SONRA gelmeli.
+GRUB_CMDLINE_LINUX_DEFAULT="quiet loglevel=3 systemd.show_status=auto vt.global_cursor_default=0"
 GRUB_TIMEOUT_STYLE="menu"
 GRUB_TIMEOUT="5"
 # Debian 12'den beri varsayilan kapali: Windows ve baska Linux'lar menude gorunsun.
@@ -121,7 +124,7 @@ GRUB_DISABLE_OS_PROBER=false
 EOF
         chmod 644 "$CFG"
     else
-        soyle "  + (GRUB_THEME, GFXMODE, TIMEOUT_STYLE, GRUB_DISABLE_OS_PROBER=false yazilir)"
+        soyle "  + (GRUB_THEME, GFXMODE, sessiz acilis parametreleri, TIMEOUT_STYLE, GRUB_DISABLE_OS_PROBER=false yazilir)"
     fi
 
     soyle "4/5 Sure betigi (yalniz CarotOS varsa 5 sn, baska sistem bulunursa 30 sn)"
