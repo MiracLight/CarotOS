@@ -78,7 +78,7 @@ class GrubAyariTesti(unittest.TestCase):
         self.assertLess(p.index("quiet"), p.index("splash"))
         self.assertLess(p.index("quiet"), p.index("loglevel=3"))
         self.assertIn("systemd.show_status=error", p)
-        self.assertIn("noresume", p)
+        self.assertNotIn("noresume", p)                            # hibernate sonrasi is kaybi riski
         self.assertNotIn("systemd.show_status=auto", p)
 
     def test_ana_grub_dosyasi_yok(self):

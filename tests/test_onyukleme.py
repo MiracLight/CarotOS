@@ -41,8 +41,13 @@ def preseed_parametreleri():
 class GrubAyariTesti(unittest.TestCase):
     def test_sessiz_acilis_parametreleri(self):
         p = grub_parametreleri()
-        for beklenen in ("quiet", "splash", "loglevel=3", "systemd.show_status=error", "noresume"):
+        for beklenen in ("quiet", "splash", "loglevel=3", "systemd.show_status=error"):
             self.assertIn(beklenen, p)
+
+    def test_hibernate_donusu_bozulmaz(self):
+        """noresume, hazirda bekletme sonrasi uyku goruntusunu yok sayar: kaydedilmemis is kaybolur."""
+        self.assertNotIn("noresume", grub_parametreleri())
+        self.assertNotIn("noresume", preseed_parametreleri())
 
     def test_basarisiz_servisler_gizlenmez(self):
         # show_status=false/no bir servis hatasini da gizler

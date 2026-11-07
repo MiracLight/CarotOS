@@ -111,7 +111,7 @@ class KurulumBetigiTesti(unittest.TestCase):
         sat = [x for x in cfg.splitlines() if x.startswith("GRUB_CMDLINE_LINUX_DEFAULT")][0]
         self.assertLess(sat.index("quiet"), sat.index("loglevel=3"))       # loglevel quiet'ten sonra gelmeli
         self.assertIn("systemd.show_status=error", sat)
-        self.assertIn("noresume", sat)
+        self.assertNotIn("noresume", sat)                          # hibernate sonrasi is kaybi riski
         self.assertLess(sat.index("quiet"), sat.index("splash"))
         self.assertLess(sat.index("splash"), sat.index("loglevel=3"))
         self.assertFalse(os.path.exists(self.yol("boot", "grub", "themes")))

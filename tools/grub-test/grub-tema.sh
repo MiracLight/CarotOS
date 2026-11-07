@@ -112,10 +112,11 @@ kur() {
 #
 # Sessiz acilis (ISO'daki carotos.cfg ile ayni amac; eski kurulu test makinesinde o dosya yoktur).
 # loglevel=3, quiet'ten SONRA gelmeli. systemd.show_status=error: basarili adimlar ([ OK ] satirlari)
-# gizlenir, hata olursa gorunur. noresume: diskte swap yok (zram kullaniliyor), "Gave up waiting for suspend/resume device"
-# satiri ve bekleme kalkar (hazirda bekletme bu kurulumda zaten kullanilamaz).
+# gizlenir, hata olursa gorunur.
+# noresume KULLANILMAZ (bilerek): hazirda bekletme (hibernate) sonrasi acilista uyku goruntusunu yok sayar ve
+# kaydedilmemis isi kaybettirir. Diskte swap olan kurulumlarda (kurucunun olusturdugu swap bolumu) bu gercek bir risktir.
 # splash: Plymouth acilis ekrani (kurulu); kalan cekirdek/servis satirlarinin ustunu orter.
-GRUB_CMDLINE_LINUX_DEFAULT="quiet splash loglevel=3 systemd.show_status=error vt.global_cursor_default=0 noresume"
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash loglevel=3 systemd.show_status=error vt.global_cursor_default=0"
 GRUB_TIMEOUT_STYLE="menu"
 GRUB_TIMEOUT="5"
 # Debian 12'den beri varsayilan kapali: Windows ve baska Linux'lar menude gorunsun.
