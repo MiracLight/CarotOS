@@ -92,6 +92,9 @@ sudo find / -iname "carotos-1.3*" 2>/dev/null
 ```
 config/
 ├── package-lists/carotos.list.chroot   Kurulacak paketler
+├── packages.chroot/                    Yerel .deb'ler (carotos-archive-keyring: apt.carotos.org anahtari +
+│                                       carotos.sources; dpkg sahipli). Derleme sonrasi dogrulama:
+│                                       grep -a "paket deposu tanimi yerlestirildi" build.log
 ├── includes.chroot/                    Sisteme kopyalanacak dosyalar
 │   ├── etc/os-release
 │   ├── etc/apt/sources.list.d/debian.sources

@@ -18,3 +18,5 @@
 *.iso binary
 # Uzantisiz ikili (PNG) dosyalar
 .face binary
+*.gpg binary
+*.deb binary

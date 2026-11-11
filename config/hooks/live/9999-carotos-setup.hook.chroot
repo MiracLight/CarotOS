@@ -87,3 +87,11 @@ chmod 755 /opt/carotos/usb/carotos-usb-check.py || true
 chmod 644 /usr/share/applications/carotos-usb-check.desktop || true
 chmod 644 /etc/skel/.config/autostart/carotos-usb-monitor.desktop || true
 echo "CarotOS: usb denetimi yerlestirildi."
+
+# CarotOS paket deposu (apt.carotos.org): imza anahtari ve depo tanimi config/packages.chroot'taki
+# carotos-archive-keyring paketiyle gelir (dpkg sahipli; elle kopyalanmaz). Sessizce eksik kalmasin.
+dpkg -s carotos-archive-keyring 2>/dev/null | grep -q '^Status: install ok installed' \
+    || { echo "CarotOS HATA: carotos-archive-keyring kurulmadi (config/packages.chroot)." >&2; exit 1; }
+[ -s /usr/share/keyrings/carotos-archive-keyring.gpg ] && [ -s /etc/apt/sources.list.d/carotos.sources ] \
+    || { echo "CarotOS HATA: depo anahtari ya da carotos.sources eksik." >&2; exit 1; }
+echo "CarotOS: paket deposu tanimi yerlestirildi (apt.carotos.org)."

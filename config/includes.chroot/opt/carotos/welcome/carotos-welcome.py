@@ -175,6 +175,12 @@ PAGES = [
                  "en": "Swap goes to compressed RAM (zram) first. If the installer "
                        "also created a disk swap, it is used as overflow once zram "
                        "is full."},
+                {"tr": "Güncellemeleri denetlerken apt, Debian'ın yanında CarotOS deposuna "
+                       "(apt.carotos.org) da bağlanır. Bu istekler sunucu günlüğüne düşer; "
+                       "CarotOS kullanım verisi toplamaz.",
+                 "en": "When checking for updates, apt also connects to the CarotOS repository "
+                       "(apt.carotos.org) besides Debian. These requests appear in the server log; "
+                       "CarotOS does not collect usage data."},
             ]),
             ("mac_anahtar", {
                 "baslik": {"tr": "Her ağ için farklı sahte donanım adresi (MAC)",

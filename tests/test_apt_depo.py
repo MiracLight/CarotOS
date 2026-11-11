@@ -138,6 +138,28 @@ class DepoYapilandirmasi(unittest.TestCase):
             self.assertIn(("carotos-" + ad, sur), gorulen, "%s %s yayin kaydinda yok" % (ad, sur))
         self.assertIn("icerik degisti ama surum ayni", oku("surum-denetle.sh"))
 
+    def test_iso_keyring_paketi_yayindakiyle_ayni(self):
+        # ISO, depo tanimini dpkg sahipli paketle getirir (elle kopyalanan dosya sonra paketle cakisir)
+        import glob
+        import hashlib
+        debler = glob.glob(os.path.join(KOK, "config", "packages.chroot", "carotos-archive-keyring_*_all.deb"))
+        self.assertEqual(len(debler), 1, debler)
+        with open(debler[0], "rb") as f:
+            oz = hashlib.sha256(f.read()).hexdigest()
+        surum = os.path.basename(debler[0]).split("_")[1]
+        kayit = [s.split() for s in oku("yayin-ozetleri").splitlines() if s.startswith("carotos-archive-keyring ")]
+        self.assertIn(["carotos-archive-keyring", surum, oz], kayit, "ISO'daki keyring yayindakiyle ayni olmali")
+        # elle kopyalanmis kopya olmamali
+        inc = os.path.join(KOK, "config", "includes.chroot")
+        self.assertFalse(os.path.exists(os.path.join(inc, "usr", "share", "keyrings", "carotos-archive-keyring.gpg")))
+        self.assertFalse(os.path.exists(os.path.join(inc, "etc", "apt", "sources.list.d", "carotos.sources")))
+        hook = open(os.path.join(KOK, "config", "hooks", "live", "9999-carotos-setup.hook.chroot"),
+                    encoding="utf-8").read()
+        self.assertIn("dpkg -s carotos-archive-keyring", hook)
+        ga = open(os.path.join(KOK, ".gitattributes"), encoding="utf-8").read()
+        self.assertIn("*.deb binary", ga)
+        self.assertIn("*.gpg binary", ga)
+
     def test_betikler(self):
         for ad in ("depo-uret.sh", "imzala-yukle.sh", "test-bos-depo.sh", "paket-yap.sh", "test-paket.sh", "surum-denetle.sh"):
             k = oku(ad)
