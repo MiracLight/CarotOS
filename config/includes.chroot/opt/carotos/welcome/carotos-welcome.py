@@ -929,6 +929,62 @@ PAGES = [
         ],
     },
     {
+        "id": "windows",
+        "title": {"tr": "Windows ile birlikte", "en": "Alongside Windows"},
+        "subtitle": {
+            "tr": "Aynı bilgisayarda iki sistem: kurmadan önce ve sonra",
+            "en": "Two systems on one computer: before and after installing",
+        },
+        "body": [
+            ("p", {
+                "tr": "CarotOS'u Windows'u silmeden aynı diske kurabilirsin. Bilgisayar açılınca bir menüden hangi "
+                      "sistemi başlatacağını seçersin. Kurmadan önce Windows'ta birkaç hazırlık yapmak verilerini korur:",
+                "en": "You can install CarotOS on the same disk without removing Windows. When the computer starts, "
+                      "you choose which system to boot from a menu. A few preparations in Windows before installing "
+                      "keep your data safe:",
+            }),
+            ("bullets", [
+                {"tr": "Önemli dosyalarının yedeğini al. Disk bölümlendirme yanlış seçimle veri siler.",
+                 "en": "Back up your important files. Partitioning the disk deletes data if you pick the wrong option."},
+                {"tr": "BitLocker açıksa kurtarma anahtarını bir yere yaz ya da kurulumdan önce askıya al; "
+                       "yoksa Windows açılışta bu anahtarı isteyebilir.",
+                 "en": "If BitLocker is on, write down the recovery key or suspend it before installing; otherwise "
+                       "Windows may ask for that key at startup."},
+                {"tr": "Windows'ta Hızlı Başlatma'yı kapat. Açıkken Windows diski tam kapatmaz ve iki sistemden "
+                       "aynı dosyalara erişmek veri bozabilir.",
+                 "en": "Turn off Fast Startup in Windows. While it is on, Windows does not fully release the disk, "
+                       "and using the same files from both systems can corrupt data."},
+                {"tr": "Windows'un Disk Yönetimi'nde Windows bölümünü küçülterek CarotOS'a boş alan aç.",
+                 "en": "Make free space for CarotOS by shrinking the Windows partition in Windows Disk Management."},
+                {"tr": "Kurucuda boş alanı kullanan seçeneği seç; \"tüm diski kullan\" Windows'u siler.",
+                 "en": "In the installer, choose the option that uses the free space; \"use the entire disk\" erases "
+                       "Windows."},
+            ]),
+            ("p", {
+                "tr": "Kurulumdan sonra açılış menüsünde Windows da listelenir. Başka bir sistem bulunduğunda menü "
+                      "30 saniye bekler, yalnızca CarotOS varsa 5 saniye. Secure Boot'u kapatman gerekmez.",
+                "en": "After installation, Windows is also listed in the boot menu. When another system is found the "
+                      "menu waits 30 seconds, or 5 seconds if only CarotOS is installed. You do not need to turn off "
+                      "Secure Boot.",
+            }),
+            ("p", {
+                "tr": "Saat kayıyorsa: Windows bilgisayarın donanım saatini yerel saat olarak, Linux ise UTC olarak "
+                      "tutar. Türkiye'de bu, sistemler arasında geçince 3 saatlik fark demektir. CarotOS'u Windows "
+                      "gibi yerel saati kullanacak şekilde ayarlamak için:",
+                "en": "If the clock drifts: Windows keeps the computer's hardware clock in local time, Linux keeps it "
+                      "in UTC. Switching between them then shows a difference equal to your time zone offset. To make "
+                      "CarotOS use local time like Windows:",
+            }),
+            ("code", "sudo timedatectl set-local-rtc 1 --adjust-system-clock"),
+            ("note", {
+                "tr": "Bilgisayarında yalnızca CarotOS varsa bu ayara gerek yoktur; saat yanlışsa önce saat dilimini "
+                      "kontrol et: timedatectl",
+                "en": "If CarotOS is the only system on your computer, you do not need this setting; if the time is "
+                      "wrong, check the time zone first: timedatectl",
+            }),
+        ],
+    },
+    {
         "id": "dogrula",
         "title": {"tr": "İndirdiğini doğrula", "en": "Verify what you download"},
         "subtitle": {

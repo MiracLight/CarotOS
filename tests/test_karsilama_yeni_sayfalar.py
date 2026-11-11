@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.join(INC, "opt", "carotos", "welcome"))
 import gezinme  # noqa: E402
 
 
-YENI = ("acikla", "etik", "disk")
+YENI = ("acikla", "etik", "disk", "dogrula", "windows")
 
 
 def sayfalar():
@@ -118,12 +118,45 @@ class YeniSayfaTesti(unittest.TestCase):
         self.assertIn("swap-priority", zram)
 
 
+    def test_windows_iddialari(self):
+        # sayfadaki 30/5 sn, os-prober ve saat komutu koddaki ayarlarla ayni olmali
+        sure = oku("etc", "grub.d", "99_carotos_sure")
+        self.assertIn("SURE_TEK=${CAROT_SURE_TEK:-5}", sure)
+        self.assertIn("SURE_COK=${CAROT_SURE_COK:-30}", sure)
+        cfg = oku("etc", "default", "grub.d", "carotos.cfg")
+        self.assertIn("GRUB_DISABLE_OS_PROBER=false", cfg)
+        with open(os.path.join(KOK, "config", "package-lists", "carotos.list.chroot"), encoding="utf-8") as f:
+            self.assertIn("os-prober", f.read().split())
+        for dil, (cok, tek) in (("tr", ("30 saniye", "5 saniye")), ("en", ("30 seconds", "5 seconds"))):
+            metin = tum_metin(self.s["windows"], dil)
+            self.assertIn(cok, metin)
+            self.assertIn(tek, metin)
+            self.assertIn("BitLocker", metin)
+        kodlar = [y for t, y in self.s["windows"]["body"] if t == "code"]
+        self.assertEqual(kodlar, ["sudo timedatectl set-local-rtc 1 --adjust-system-clock"])
+
+    def test_dogrula_iddialari(self):
+        kodlar = [y for t, y in self.s["dogrula"]["body"] if t == "code"]
+        anahtar = "/usr/share/keyrings/carotos-archive-keyring.gpg"
+        self.assertIn("gpgv --keyring %s SHA256SUMS.sign SHA256SUMS" % anahtar, kodlar)
+        self.assertIn("sha256sum -c SHA256SUMS --ignore-missing", kodlar)
+        # anahtar yolu, ISO'ya giren keyring paketinin getirdigi yol
+        self.assertTrue(os.path.isfile(os.path.join(KOK, "tools", "apt", "keyring-paketi") + anahtar))
+        # imzalama betigi ayni dosya adlarini uretir
+        with open(os.path.join(KOK, "tools", "iso", "imzala-iso.sh"), encoding="utf-8") as f:
+            betik = f.read()
+        self.assertIn("SHA256SUMS.sign", betik)
+        self.assertIn("> SHA256SUMS", betik)
+
+
 class KonuKartiTesti(unittest.TestCase):
     def test_konular_ve_sayfa_sayilari(self):
         konular = {k["id"]: k["sayfalar"] for k in gezinme.KONULAR}
         self.assertEqual(konular["arac"], ["panel", "tools", "terminal", "acikla"])
         self.assertEqual(konular["etik"], ["etik"])
         self.assertEqual(konular["gizlilik"], ["network", "disk"])
+        self.assertEqual(konular["sistem"][-1], "windows")
+        self.assertEqual(konular["koruma"][-1], "dogrula")
 
     def test_her_sayfa_tam_bir_konuda(self):
         sayac = {}
