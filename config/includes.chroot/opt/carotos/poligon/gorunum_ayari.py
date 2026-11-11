@@ -99,7 +99,7 @@ check:checked, radio:checked {{ color: #15210a; }}
 .durum-deneme {{ color: {p['sari']}; font-weight: 700; }}
 .durum-yanlis {{ color: {p['kirmizi']}; font-weight: 700; }}
 .sohbet-ogretmen {{ background-color: {rgba(p['vurgu'], 0.14)}; border: 1px solid {rgba(p['vurgu'], 0.35)}; border-radius: 10px; padding: 6px 12px; }}
-.sohbet-ogrenci {{ background-color: {p['vurgu_koyu']}; color: #ffffff; border-radius: 10px; padding: 6px 12px; }}
+.sohbet-ogrenci {{ background-color: {p['vurgu_koyu']}; color: {p['koyu_vurgu_yazi']}; border-radius: 10px; padding: 6px 12px; }}
 .poligon-liste {{ background-color: transparent; }}
 .poligon-liste row {{ background-color: transparent; border-radius: 8px; padding: 2px; }}
 .poligon-liste row:hover {{ background-color: {rgba(p['kart2'], 0.7)}; }}

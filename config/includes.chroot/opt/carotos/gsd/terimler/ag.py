@@ -421,4 +421,77 @@ TERIMLER = [
         "ornek": "curl http://localhost:8080",
         "ilgili": ["ip", "port"],
     },
+    {
+        "id": "arp",
+        "baslik": {"tr": "ARP (Adres Çözümleme Protokolü)", "en": "ARP (Address Resolution Protocol)"},
+        "kisa": {"tr": "Yerel ağda bir IP adresinin hangi MAC adresine ait olduğunu bulan protokol.", "en": "The protocol that finds which MAC address owns an IP address on the local network."},
+        "aciklama": {
+            "tr": "Bir cihaz yerel ağdaki 192.168.1.1'e paket göndermeden önce \"bu IP kimin?\" diye ağa yayın yapar, sahibi MAC adresiyle cevap verir ve bu eşleme bir süre önbellekte tutulur.\n\nARP kimlik doğrulama yapmaz: saldırgan sahte cevaplar göndererek kendini yönlendirici gibi tanıtabilir (ARP zehirleme) ve trafiği üzerinden geçirebilir. arp-scan ağdaki cihazları ARP ile listeler.",
+            "en": "Before a device sends a packet to 192.168.1.1 on the local network, it broadcasts \"who has this IP?\", the owner answers with its MAC address and the mapping is cached for a while.\n\nARP has no authentication: an attacker can send fake replies to pose as the router (ARP poisoning) and route traffic through themselves. arp-scan lists devices on the network using ARP.",
+        },
+        "ornek": "ip neigh      # ARP önbelleğini gösterir",
+        "ilgili": ["mac_adresi", "ip", "mitm"],
+    },
+    {
+        "id": "icmp",
+        "baslik": {"tr": "ICMP", "en": "ICMP"},
+        "kisa": {"tr": "Ağ cihazlarının hata ve durum iletileri için kullandığı protokol (ping bunu kullanır).", "en": "The protocol network devices use for error and status messages (ping uses it)."},
+        "aciklama": {
+            "tr": "ICMP veri taşımaz; \"hedefe ulaşılamıyor\", \"süre aşıldı\" gibi bilgileri iletir. ping ICMP \"echo\" isteği gönderip cevabı bekler, traceroute ise süre aşıldı iletilerinden yolu çıkarır.\n\nBazı güvenlik duvarları ICMP'yi engeller; bu yüzden ping'e cevap vermeyen bir makine kapalı olmak zorunda değildir.",
+            "en": "ICMP doesn't carry data; it delivers information such as \"destination unreachable\" or \"time exceeded\". ping sends an ICMP \"echo\" request and waits for the reply, while traceroute works out the path from time-exceeded messages.\n\nSome firewalls block ICMP, so a machine that doesn't answer ping isn't necessarily down.",
+        },
+        "ilgili": ["ping", "traceroute", "guvenlik_duvari"],
+    },
+    {
+        "id": "ipv6",
+        "baslik": {"tr": "IPv6", "en": "IPv6"},
+        "kisa": {"tr": "128 bitlik adresler kullanan yeni nesil İnternet Protokolü.", "en": "The new-generation Internet Protocol using 128-bit addresses."},
+        "aciklama": {
+            "tr": "IPv4'ün yaklaşık 4,3 milyar adresi tükendiği için geliştirildi; adresler 2001:db8::1 gibi onaltılık yazılır. Her cihaza doğrudan genel adres verilebildiği için NAT'a daha az ihtiyaç duyulur.\n\nGüvenlik notu: bir güvenlik duvarı yalnızca IPv4 için ayarlanmışsa IPv6 üzerinden açık kalabilir; ufw her ikisini de yönetir.",
+            "en": "It was created because IPv4's roughly 4.3 billion addresses ran out; addresses are written in hex like 2001:db8::1. Every device can get a public address directly, so NAT is needed less.\n\nSecurity note: a firewall configured only for IPv4 may leave things open over IPv6; ufw manages both.",
+        },
+        "ilgili": ["ip", "nat", "ufw"],
+    },
+    {
+        "id": "wpa",
+        "baslik": {"tr": "WPA2 / WPA3 (Wi-Fi Güvenliği)", "en": "WPA2 / WPA3 (Wi-Fi Security)"},
+        "kisa": {"tr": "Kablosuz ağ trafiğini şifreleyen ve ağa kimin katılabileceğini denetleyen güvenlik standartları.", "en": "Security standards that encrypt wireless traffic and control who can join the network."},
+        "aciklama": {
+            "tr": "WPA2-PSK'da (ev ağları) bir cihaz ağa bağlanırken 4 yönlü el sıkışma yapılır. Bu el sıkışmayı yakalayan biri parolayı çevrimdışı olarak sözlük saldırısıyla denemeye çalışabilir; bu yüzden uzun ve sözlükte olmayan bir parola şarttır.\n\nWPA3, SAE adlı yeni el sıkışmayla çevrimdışı parola denemeyi engeller. Eski WEP birkaç dakikada kırılabildiği için hiç kullanılmamalıdır; WPS düğmesi de kapatılmalıdır.",
+            "en": "In WPA2-PSK (home networks) a 4-way handshake happens when a device joins. Someone who captures that handshake can try to guess the password offline with a dictionary attack, so a long password that isn't in any dictionary is essential.\n\nWPA3 blocks offline guessing with a new handshake called SAE. The old WEP can be cracked in minutes and should never be used; the WPS button should be turned off too.",
+        },
+        "ilgili": ["aircrack_ng", "sozluk_saldirisi", "sifreleme"],
+    },
+    {
+        "id": "ntp",
+        "baslik": {"tr": "NTP (Ağ Zaman Protokolü)", "en": "NTP (Network Time Protocol)"},
+        "kisa": {"tr": "Bilgisayar saatini İnternet üzerindeki zaman sunucularıyla eşitleyen protokol.", "en": "The protocol that syncs a computer's clock with time servers on the Internet."},
+        "aciklama": {
+            "tr": "Doğru saat güvenlik için önemlidir: HTTPS sertifikaları ve iki faktörlü doğrulama kodları saate bakar, günlüklerdeki olaylar ancak saat doğruysa sıralanabilir. Pili biten eski bilgisayarlarda saat her açılışta geri gidebilir.\n\nCarotOS'ta systemd-timesyncd saati NTP ile eşitler; timedatectl ile durumu görebilirsiniz. Saat dilimi ayrı bir ayardır (ör. Europe/Istanbul).",
+            "en": "An accurate clock matters for security: HTTPS certificates and two-factor codes depend on the time, and log events can only be ordered if the clock is right. On old computers with a dead battery the clock may jump back at every boot.\n\nOn CarotOS systemd-timesyncd syncs the clock over NTP; see its status with timedatectl. The time zone is a separate setting (e.g. Europe/Istanbul).",
+        },
+        "ornek": "timedatectl",
+        "ilgili": ["sertifika", "log_dosyasi", "iki_faktorlu_dogrulama"],
+    },
+    {
+        "id": "http_durum_kodu",
+        "baslik": {"tr": "HTTP Durum Kodu", "en": "HTTP Status Code"},
+        "kisa": {"tr": "Web sunucusunun her isteğe verdiği üç haneli sonuç kodu (200, 404, 500…).", "en": "The three-digit result a web server returns for every request (200, 404, 500…)."},
+        "aciklama": {
+            "tr": "2xx başarılı (200 Tamam), 3xx yönlendirme (301 kalıcı taşındı), 4xx istemci hatası (401 kimlik gerekli, 403 yasak, 404 bulunamadı), 5xx sunucu hatası (500 iç hata) demektir.\n\nGüvenlik testlerinde kodlar ipucu verir: 403 dönen bir yol aslında vardır ama erişim kapalıdır; 500 hatası girdinin sunucuda beklenmedik bir şeye yol açtığını gösterebilir.",
+            "en": "2xx means success (200 OK), 3xx redirection (301 moved permanently), 4xx client error (401 authentication required, 403 forbidden, 404 not found), 5xx server error (500 internal error).\n\nIn security testing the codes are clues: a path returning 403 exists but access is blocked; a 500 error may show that the input caused something unexpected on the server.",
+        },
+        "ornek": "curl -I http://localhost      # yalnızca başlıkları ve durum kodunu gösterir",
+        "ilgili": ["http", "dizin_kesfi", "nikto"],
+    },
+    {
+        "id": "cerez",
+        "baslik": {"tr": "Çerez (Cookie)", "en": "Cookie"},
+        "kisa": {"tr": "Sitenin tarayıcıda sakladığı ve her istekte geri gönderilen küçük veri.", "en": "A small piece of data a site stores in the browser and gets back with every request."},
+        "aciklama": {
+            "tr": "HTTP durumsuzdur; oturumunuzun açık olduğunu site, tarayıcınıza verdiği oturum çerezinden anlar. Bu çerezi ele geçiren biri parolayı bilmeden sizin yerinize geçebilir.\n\nGüvenli çerez ayarları: Secure (yalnızca HTTPS), HttpOnly (JavaScript okuyamaz, XSS'e karşı), SameSite (başka sitelerden gelen isteklerde gönderilmez, CSRF'ye karşı).",
+            "en": "HTTP is stateless; a site knows you're logged in from the session cookie it gave your browser. Anyone who steals that cookie can take your place without knowing the password.\n\nSecure cookie settings: Secure (HTTPS only), HttpOnly (JavaScript can't read it, against XSS), SameSite (not sent on requests from other sites, against CSRF).",
+        },
+        "ilgili": ["http", "xss", "csrf"],
+    },
 ]

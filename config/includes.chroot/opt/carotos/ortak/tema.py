@@ -84,6 +84,30 @@ def _karistir(a, b, oran):
     return "#%02x%02x%02x" % tuple(round(x + (y - x) * oran) for x, y in zip(ra, rb))
 
 
+def parlaklik(h):
+    """WCAG 2.x goreli parlaklik (0..1)."""
+    def kanal(c):
+        c = c / 255
+        return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+    r, g, b = (kanal(x) for x in _hex(h))
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def kontrast(a, b):
+    """WCAG kontrast orani (1..21)."""
+    la, lb = sorted((parlaklik(a), parlaklik(b)), reverse=True)
+    return (la + 0.05) / (lb + 0.05)
+
+
+KOYU_YAZI = "#14161d"
+
+
+def ustune_yazi(zemin):
+    """Dolgu rengi uzerindeki yazi: beyaz ya da koyu, hangisi daha okunursa.
+    Acik vurgularda (limon, camgobegi, kehribar) beyaz yazi ~1,5-2,4:1 kaliyordu."""
+    return "#ffffff" if kontrast(zemin, "#ffffff") >= kontrast(zemin, KOYU_YAZI) else KOYU_YAZI
+
+
 def rgba_metni(h, alfa):
     r, g, b = _hex(h)
     return f"rgba({r},{g},{b},{alfa})"
@@ -105,7 +129,8 @@ def palet(gorunum="dark", vurgu="carotpot"):
         p["vurgu_yazi"] = _karistir(v, "#000000", 0.28)
         p["vurgu_koyu"] = _karistir(v, "#000000", 0.18)
     p["vurgu_zemin"] = rgba_metni(v, 0.16)
-    p["ana_yazi"] = "#ffffff"
+    p["ana_yazi"] = ustune_yazi(v)                       # vurgu dolgulu dugme/secim yazisi
+    p["koyu_vurgu_yazi"] = ustune_yazi(p["vurgu_koyu"])  # r-vurgu rozeti
     return p
 
 
@@ -194,7 +219,7 @@ list.menu, .menu {{ background-color: transparent; border: none; box-shadow: non
 .r-kirmizi {{ background-color: {p['kirmizi']}; }}
 .r-sari {{ background-color: {_karistir(p['sari'], '#000000', 0.18)}; }}
 .r-yesil {{ background-color: {_karistir(p['yesil'], '#000000', 0.15)}; }}
-.r-vurgu {{ background-color: {p['vurgu_koyu']}; }}
+.r-vurgu {{ background-color: {p['vurgu_koyu']}; color: {p['koyu_vurgu_yazi']}; }}
 .r-mavi {{ background-color: {_karistir(p['mavi'], '#000000', 0.2)}; }}
 .r-gri {{ background-color: {p['kart2']}; color: {p['soluk']}; }}
 .etiket {{ border-radius: 5px; padding: 1px 7px; font-size: 78%; background-color: {p['kart2']}; color: {p['vurgu_yazi']}; }}
@@ -220,7 +245,7 @@ button:disabled {{ opacity: 0.5; }}
 button label {{ color: {p['yazi']}; }}
 button.ana, button.suggested-action {{ background-color: {p['vurgu']}; border-color: {p['vurgu']}; }}
 button.ana:hover, button.suggested-action:hover {{ background-color: {_karistir(p['vurgu'], '#ffffff', 0.12)}; }}
-button.ana label, button.suggested-action label {{ color: #ffffff; font-weight: bold; }}
+button.ana label, button.suggested-action label {{ color: {p['ana_yazi']}; font-weight: bold; }}
 button.tehlike, button.destructive-action {{ background-color: {p['kirmizi']}; border-color: {p['kirmizi']}; }}
 button.tehlike:hover, button.destructive-action:hover {{ background-color: {_karistir(p['kirmizi'], '#ffffff', 0.12)}; }}
 button.tehlike label, button.destructive-action label {{ color: #ffffff; font-weight: bold; }}
@@ -228,7 +253,7 @@ button.duz {{ background-color: transparent; border-color: transparent; }}
 button.duz:hover {{ background-color: {p['kart2']}; }}
 button.secim {{ border-radius: 999px; padding: 4px 14px; }}
 button.secim:checked {{ background-color: {p['vurgu']}; border-color: {p['vurgu']}; }}
-button.secim:checked label {{ color: #ffffff; font-weight: bold; }}
+button.secim:checked label {{ color: {p['ana_yazi']}; font-weight: bold; }}
 button.kucuk {{ padding: 2px 10px; font-size: 90%; }}
 switch {{ background-color: {p['kart2']}; border: 1px solid {p['cizgi']}; border-radius: 999px; }}
 switch:checked {{ background-color: {p['vurgu']}; border-color: {p['vurgu']}; }}
@@ -254,10 +279,10 @@ menu menuitem, popover modelbutton {{ color: {p['yazi']}; padding: 6px 12px; }}
 menu menuitem:hover, popover modelbutton:hover {{ background-color: {p['kart2']}; }}
 menu menuitem label {{ color: {p['yazi']}; }}
 calendar {{ background-color: {p['kart']}; color: {p['yazi']}; border: 1px solid {p['cizgi']}; }}
-calendar:selected {{ background-color: {p['vurgu']}; color: #ffffff; }}
+calendar:selected {{ background-color: {p['vurgu']}; color: {p['ana_yazi']}; }}
 progressbar trough {{ background-color: {p['kart2']}; border: none; border-radius: 4px; min-height: 6px; }}
 progressbar progress {{ background-color: {p['vurgu']}; border: none; border-radius: 4px; min-height: 6px; }}
-check, radio {{ background-color: {p['kart2']}; background-image: none; border: 1px solid {p['cizgi']}; box-shadow: none; padding: 0; margin: 0 2px; min-width: 14px; min-height: 14px; color: #ffffff; }}
+check, radio {{ background-color: {p['kart2']}; background-image: none; border: 1px solid {p['cizgi']}; box-shadow: none; padding: 0; margin: 0 2px; min-width: 14px; min-height: 14px; color: {p['ana_yazi']}; }}
 check {{ border-radius: 4px; }}
 radio {{ border-radius: 999px; -gtk-icon-source: none; }}
 check:checked {{ background-color: {p['vurgu']}; border-color: {p['vurgu']}; }}

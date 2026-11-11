@@ -64,6 +64,10 @@ STRINGS = {
     },
     "stop": {"tr": "Durdur", "en": "Stop"},
     "clear": {"tr": "Çıktıyı temizle", "en": "Clear output"},
+    "explain": {"tr": "Açıkla", "en": "Explain"},
+    "explain_tip": {"tr": "Komutu çalıştırmadan ne yapacağını, bayraklarını ve bıraktığı izi anlatır.",
+                    "en": "Explains what the command will do, its flags and the traces it leaves, without running it."},
+    "explain_yok": {"tr": "Komut Açıklayıcı bulunamadı.", "en": "Command Explainer not found."},
     "ready": {"tr": "Hazır", "en": "Ready"},
     "running": {"tr": "{tool} çalışıyor…", "en": "{tool} running…"},
     "settings": {"tr": "Ayarlar", "en": "Settings"},
@@ -443,6 +447,14 @@ for _y in (ORTAK, BASE_DIR):
 
 import etik_koruma  # noqa: E402
 import tema  # noqa: E402
+
+_ACIKLA = os.path.join(os.path.dirname(BASE_DIR), "acikla")
+if _ACIKLA not in sys.path:
+    sys.path.insert(0, _ACIKLA)
+try:
+    import acikla_motor  # Komut Açıklayıcı: komutu ÇALIŞTIRMADAN ayrıştırır
+except ImportError:  # noqa: BLE001
+    acikla_motor = None
 from bekleme_cubugu import SweepBar  # noqa: E402
 
 ETIK_GUNLUGU = os.path.join(CONFIG_DIR, "etik-gunlugu.log")
@@ -505,9 +517,11 @@ class ToolPage(Gtk.Box):
         self.stop_btn = tema.dugme("", "tehlike", self.stop)
         self.stop_btn.set_sensitive(False)
         self.clear_btn = tema.dugme("", "duz", lambda: self.output_buffer.set_text(""))
+        self.explain_btn = tema.dugme("", None, self.explain)
         btn_row.pack_start(self.run_btn, False, False, 0)
         btn_row.pack_start(self.root_btn, False, False, 0)
         btn_row.pack_start(self.stop_btn, False, False, 0)
+        btn_row.pack_start(self.explain_btn, False, False, 0)
         btn_row.pack_end(self.clear_btn, False, False, 0)
         fic.pack_start(btn_row, False, False, 0)
         self.pack_start(fdis, False, False, 0)
@@ -578,6 +592,8 @@ class ToolPage(Gtk.Box):
         self.root_btn.set_label(T("run_root", lang))
         self.stop_btn.set_label(T("stop", lang))
         self.clear_btn.set_label(T("clear", lang))
+        self.explain_btn.set_label(T("explain", lang))
+        self.explain_btn.set_tooltip_text(T("explain_tip", lang))
         if t.get("needs_root"):
             self.root_hint.set_text(T("root_hint", lang))
             self.root_hint_kutu.set_visible(True)
@@ -634,6 +650,20 @@ class ToolPage(Gtk.Box):
         self.stop_btn.set_sensitive(True)
         self.app.calisiyor(True, T("running", lang, tool=self.tool["name"]))
         threading.Thread(target=self._worker, args=(cmd,), daemon=True).start()
+
+    def explain_text(self):
+        """Formdaki değerlerle kurulacak komutun açıklaması (komut çalıştırılmaz, etik onayı gerekmez)."""
+        lang = self.app.lang
+        if acikla_motor is None:
+            return T("explain_yok", lang)
+        try:
+            cmd = [c for c in self.tool["build"](self._collect()) if c != ""]
+        except Exception:  # noqa: BLE001  (eksik alan: yalnızca araç adını açıkla)
+            cmd = [self.tool["name"]]
+        return acikla_motor.acikla(shlex.join(cmd or [self.tool["name"]]), lang)
+
+    def explain(self):
+        self.output_buffer.set_text(self.explain_text())
 
     def _etik_onay(self, values):
         """Baska bir sisteme dokunabilecek araclarda hedefi siniflar; yerel

@@ -621,4 +621,118 @@ TERIMLER = [
         "ornek": "sudo ufw allow 22/tcp",
         "ilgili": ["guvenlik_duvari", "port"],
     },
+    {
+        "id": "sql_enjeksiyonu",
+        "baslik": {"tr": "SQL Enjeksiyonu (SQL Injection)", "en": "SQL Injection"},
+        "kisa": {"tr": "Kullanıcı girdisinin veritabanı sorgusuna kod olarak karışması.", "en": "User input ending up in a database query as code."},
+        "aciklama": {
+            "tr": "Bir uygulama formdan ya da adresten gelen değeri doğrudan SQL sorgusunun içine yapıştırırsa, saldırgan tırnak ve SQL komutları göndererek sorgunun anlamını değiştirebilir: giriş ekranını atlamak, başka kullanıcıların verilerini okumak ya da tabloları silmek gibi.\n\nÇözüm girdiyi \"temizlemeye\" çalışmak değil, parametreli sorgular (hazır ifadeler) kullanmaktır: veri ile komut ayrı gönderilir ve veri asla kod olarak yorumlanmaz. sqlmap bu açığı test etmek için kullanılan araçtır.",
+            "en": "If an application pastes a value from a form or URL straight into an SQL query, an attacker can send quotes and SQL commands that change what the query means: bypassing a login screen, reading other users' data or dropping tables.\n\nThe fix is not to \"clean\" the input but to use parameterised queries (prepared statements): data and command are sent separately and the data is never interpreted as code. sqlmap is the tool used to test for this flaw.",
+        },
+        "ornek": "SELECT * FROM kullanici WHERE ad = ?   -- güvenli: değer ayrı gönderilir",
+        "ilgili": ["sqlmap", "sql", "owasp_top10", "xss"],
+    },
+    {
+        "id": "xss",
+        "baslik": {"tr": "Siteler Arası Betik Çalıştırma (XSS)", "en": "Cross-Site Scripting (XSS)"},
+        "kisa": {"tr": "Bir sitenin, saldırganın yazdığı JavaScript'i başka kullanıcıların tarayıcısında çalıştırması.", "en": "A site running JavaScript written by an attacker in other users' browsers."},
+        "aciklama": {
+            "tr": "Site, kullanıcıdan gelen metni (yorum, arama kutusu) HTML olarak kaçışsız gösterirse, metnin içine konan <script> etiketi o sayfayı açan herkesin tarayıcısında çalışır. Saldırgan oturum çerezini çalabilir ya da kullanıcı adına işlem yapabilir.\n\nYansıyan XSS'te zararlı metin bağlantının içindedir, kalıcı XSS'te veritabanına kaydedilip herkese gösterilir. Savunma: çıktıyı her zaman bağlamına göre kaçışlamak (escape), Content-Security-Policy başlığı ve çerezlerde HttpOnly bayrağı.",
+            "en": "If a site shows user text (a comment, a search box) as HTML without escaping it, a <script> tag in that text runs in the browser of everyone who opens the page. The attacker can steal the session cookie or act on the user's behalf.\n\nIn reflected XSS the malicious text is inside a link; in stored XSS it is saved in the database and shown to everyone. Defence: always escape output for its context, a Content-Security-Policy header and the HttpOnly flag on cookies.",
+        },
+        "ilgili": ["sql_enjeksiyonu", "owasp_top10", "cerez", "csrf"],
+    },
+    {
+        "id": "csrf",
+        "baslik": {"tr": "Siteler Arası İstek Sahteciliği (CSRF)", "en": "Cross-Site Request Forgery (CSRF)"},
+        "kisa": {"tr": "Kullanıcının haberi olmadan, oturum açık olduğu bir siteye istek gönderilmesi.", "en": "Making a user's browser send a request to a site they are logged in to, without them knowing."},
+        "aciklama": {
+            "tr": "Tarayıcı bir siteye her istekte o sitenin çerezlerini kendiliğinden ekler. Kötü niyetli bir sayfa, görünmez bir form ile bankanıza \"para gönder\" isteği yollarsa ve oturumunuz açıksa istek sizin adınıza geçerli sayılabilir.\n\nSavunma: her formda tahmin edilemeyen bir CSRF belirteci, çerezlerde SameSite ayarı ve önemli işlemlerde parolayı yeniden sormak.",
+            "en": "A browser automatically attaches a site's cookies to every request to that site. If a malicious page sends a hidden \"transfer money\" form to your bank while you're logged in, the request may be accepted as yours.\n\nDefence: an unpredictable CSRF token in every form, the SameSite cookie setting, and asking for the password again for important actions.",
+        },
+        "ilgili": ["xss", "cerez", "owasp_top10"],
+    },
+    {
+        "id": "owasp_top10",
+        "baslik": {"tr": "OWASP Top 10", "en": "OWASP Top 10"},
+        "kisa": {"tr": "Web uygulamalarındaki en kritik 10 güvenlik riski listesi.", "en": "A list of the 10 most critical security risks in web applications."},
+        "aciklama": {
+            "tr": "OWASP (Open Worldwide Application Security Project) adlı kâr amacı gütmeyen topluluk, gerçek olay verilerinden yola çıkarak birkaç yılda bir bu listeyi yayımlar: erişim denetimi hataları, kriptografi hataları, enjeksiyon (SQL, komut), güvensiz tasarım, yanlış yapılandırma, eski bileşenler, kimlik doğrulama hataları gibi.\n\nWeb güvenliği öğrenmeye başlamak ve bir uygulamayı denetlerken kontrol listesi olarak kullanmak için iyi bir başlangıç noktasıdır.",
+            "en": "The non-profit OWASP (Open Worldwide Application Security Project) community publishes this list every few years based on real incident data: broken access control, cryptographic failures, injection (SQL, command), insecure design, misconfiguration, outdated components, authentication failures and so on.\n\nIt is a good starting point for learning web security and a checklist when reviewing an application.",
+        },
+        "ilgili": ["sql_enjeksiyonu", "xss", "csrf", "zafiyet"],
+    },
+    {
+        "id": "ters_kabuk",
+        "baslik": {"tr": "Ters Kabuk (Reverse Shell)", "en": "Reverse Shell"},
+        "kisa": {"tr": "Ele geçirilen makinenin, saldırgana kendisi bağlanıp komut satırı açması.", "en": "A compromised machine connecting out to the attacker and handing over a command line."},
+        "aciklama": {
+            "tr": "Güvenlik duvarları genellikle dışarıdan gelen bağlantıları engeller ama içeriden dışarıya çıkanlara izin verir. Ters kabukta hedef makine saldırganın dinlediği porta kendisi bağlanır ve bir kabuğu (bash) bu bağlantıya bağlar; böylece gelen bağlantı kuralları aşılmış olur.\n\nSızma testlerinde bir açığın gerçekten komut çalıştırmaya yol açtığını kanıtlamak için kullanılır. Savunma: dışarı çıkan trafiği de süzmek (egress filtreleme) ve beklenmeyen dış bağlantıları izlemek.",
+            "en": "Firewalls usually block incoming connections but allow outgoing ones. In a reverse shell the target machine connects to a port the attacker is listening on and attaches a shell (bash) to that connection, getting around the incoming rules.\n\nPenetration testers use it to prove that a flaw really leads to command execution. Defence: filter outgoing traffic too (egress filtering) and watch for unexpected outbound connections.",
+        },
+        "ornek": "nc -lvnp 4444      # dinleyen taraf (yalnızca kendi laboratuvarında)",
+        "ilgili": ["guvenlik_duvari", "exploit", "pentest", "port"],
+    },
+    {
+        "id": "port_taramasi",
+        "baslik": {"tr": "Port Taraması", "en": "Port Scanning"},
+        "kisa": {"tr": "Bir makinede hangi portların açık olduğunu ve arkalarında hangi servislerin çalıştığını bulma.", "en": "Finding which ports are open on a machine and which services run behind them."},
+        "aciklama": {
+            "tr": "Tarayıcı (ör. nmap) her porta bir paket gönderir ve cevaba göre portu açık, kapalı ya da filtreli sayar. Açık portlar saldırı yüzeyini gösterir: gereksiz açık bir servis, güncellenmemişse içeri girilecek kapı olabilir.\n\nKendi sistemini taramak iyi bir alışkanlıktır; başkasının sistemini izinsiz taramak çoğu yerde saldırı girişimi sayılır. Saldırı tespit sistemleri kısa sürede çok porta gelen istekleri kolayca fark eder.",
+            "en": "A scanner (e.g. nmap) sends a packet to each port and, based on the reply, marks it open, closed or filtered. Open ports show the attack surface: an unneeded open service can be a way in if it isn't updated.\n\nScanning your own system is a good habit; scanning someone else's without permission is treated as an attack attempt in most places. Intrusion detection systems easily notice many ports being probed in a short time.",
+        },
+        "ornek": "nmap -sV 127.0.0.1",
+        "ilgili": ["nmap", "port", "ids_ips", "guvenlik_duvari"],
+    },
+    {
+        "id": "adli_bilisim",
+        "baslik": {"tr": "Adli Bilişim (Digital Forensics)", "en": "Digital Forensics"},
+        "kisa": {"tr": "Bir olaydan sonra dijital delilleri bozmadan toplayıp inceleme bilimi.", "en": "The science of collecting and examining digital evidence after an incident without altering it."},
+        "aciklama": {
+            "tr": "İnceleme orijinal disk üzerinde değil, birebir kopyası (disk görüntüsü) üzerinde yapılır ve kopyanın özeti (SHA-256) alınarak değişmediği kanıtlanır. Silinmiş dosyalar, günlükler, tarayıcı geçmişi ve dosya zaman damgalarından olayın zaman çizelgesi çıkarılır.\n\nThe Sleuth Kit, TestDisk/PhotoRec ve Wireshark adli bilişimde kullanılan açık kaynak araçlardır.",
+            "en": "Work is done not on the original disk but on an exact copy (a disk image), and the copy's hash (SHA-256) is recorded to prove it hasn't changed. A timeline of the incident is built from deleted files, logs, browser history and file timestamps.\n\nThe Sleuth Kit, TestDisk/PhotoRec and Wireshark are open-source tools used in forensics.",
+        },
+        "ilgili": ["hash_fonksiyonu", "log_dosyasi", "wireshark_tshark"],
+    },
+    {
+        "id": "ctf",
+        "baslik": {"tr": "CTF (Bayrağı Yakala)", "en": "CTF (Capture the Flag)"},
+        "kisa": {"tr": "Gizlenmiş \"bayrak\" metinlerini bularak puan toplanan siber güvenlik yarışması.", "en": "A cybersecurity competition where you score points by finding hidden \"flag\" strings."},
+        "aciklama": {
+            "tr": "Her görevde bir yere CAROT{...} gibi bir bayrak saklanmıştır: şifreli bir metnin içine, bir günlük dosyasına, bir resmin meta verisine ya da açık bir servise. Bayrağı bulup gönderen puan alır. Kategoriler genellikle kriptografi, web, adli bilişim, tersine mühendislik ve ağdır.\n\nCTF'ler gerçek sistemlere zarar vermeden, yasal bir ortamda saldırı ve savunma tekniklerini öğrenmenin en yaygın yoludur. Poligon'un CTF modu sınıf içi yarışma düzenler.",
+            "en": "Each challenge hides a flag such as CAROT{...} somewhere: inside an encrypted text, a log file, an image's metadata or an exposed service. Whoever finds and submits it scores. Categories are usually cryptography, web, forensics, reverse engineering and networking.\n\nCTFs are the most common way to learn attack and defence techniques legally without harming real systems. Poligon's CTF mode runs in-class competitions.",
+        },
+        "ilgili": ["pentest", "kirmizi_mavi_takim", "steganografi"],
+    },
+    {
+        "id": "en_az_yetki",
+        "baslik": {"tr": "En Az Yetki İlkesi (Least Privilege)", "en": "Principle of Least Privilege"},
+        "kisa": {"tr": "Her kullanıcıya ve programa yalnızca işini yapmaya yetecek kadar yetki vermek.", "en": "Giving every user and program only the permissions it needs to do its job."},
+        "aciklama": {
+            "tr": "Bir hesap ya da servis ele geçirildiğinde saldırgan onun yetkileriyle sınırlı kalır. Günlük işleri root yerine normal kullanıcıyla yapmak, yalnızca gerektiğinde sudo kullanmak ve servisleri kendi kısıtlı kullanıcılarıyla çalıştırmak bu ilkenin uygulamalarıdır.\n\nCarotOS uygulamaları da yetkiyi yalnızca gereken adımda (pkexec ile) ister.",
+            "en": "When an account or service is compromised, the attacker is limited to its permissions. Doing daily work as a normal user instead of root, using sudo only when needed and running services as their own restricted users all apply this principle.\n\nCarotOS apps also ask for privileges only at the step that needs them (via pkexec).",
+        },
+        "ilgili": ["sudo", "root_kullanici", "yetki_yukseltme", "polkit"],
+    },
+    {
+        "id": "dizin_kesfi",
+        "baslik": {"tr": "Dizin Keşfi (Directory Brute Forcing)", "en": "Directory Discovery"},
+        "kisa": {"tr": "Bir web sitesinde bağlantısı verilmemiş dizin ve dosyaları kelime listesiyle deneyerek bulma.", "en": "Finding unlinked directories and files on a website by trying names from a wordlist."},
+        "aciklama": {
+            "tr": "Sitelerde menüde görünmeyen ama erişilebilen /admin, /yedek.zip, /.git gibi yollar unutulmuş olabilir. gobuster ve ffuf her adı tek tek isteyip sunucunun cevabına (200, 403, 404) bakar.\n\nÇok sayıda istek gönderdiği için sunucu günlüklerinde açıkça görünür; yalnızca kendi sitende ya da izinli testlerde kullanılmalıdır. Savunma: gereksiz dosyaları sunucuda bırakmamak ve dizin listelemeyi kapatmak.",
+            "en": "Sites may have forgotten paths that are reachable but not linked, like /admin, /backup.zip or /.git. gobuster and ffuf request each name one by one and look at the server's reply (200, 403, 404).\n\nIt sends many requests, so it is clearly visible in server logs; use it only on your own site or in authorised tests. Defence: don't leave unneeded files on the server and turn off directory listing.",
+        },
+        "ornek": "gobuster dir -u http://localhost -w kelimeler.txt",
+        "ilgili": ["kaba_kuvvet", "http_durum_kodu", "nikto"],
+    },
+    {
+        "id": "waf",
+        "baslik": {"tr": "Web Uygulama Güvenlik Duvarı (WAF)", "en": "Web Application Firewall (WAF)"},
+        "kisa": {"tr": "Web isteklerini inceleyip saldırı kalıplarını engelleyen süzgeç.", "en": "A filter that inspects web requests and blocks attack patterns."},
+        "aciklama": {
+            "tr": "Normal güvenlik duvarı port ve adrese bakar; WAF ise HTTP isteğinin içeriğine bakar ve SQL enjeksiyonu, XSS gibi bilinen kalıpları içeren istekleri durdurur. ModSecurity yaygın bir açık kaynak WAF'tır.\n\nEk bir katmandır, asıl çözüm değildir: kodun kendisi güvenli yazılmalıdır, çünkü WAF kuralları farklı yazımlarla atlatılabilir.",
+            "en": "A normal firewall looks at ports and addresses; a WAF looks at the content of the HTTP request and stops requests containing known patterns such as SQL injection or XSS. ModSecurity is a common open-source WAF.\n\nIt is an extra layer, not the real fix: the code itself must be written securely, because WAF rules can be bypassed with different spellings.",
+        },
+        "ilgili": ["guvenlik_duvari", "sql_enjeksiyonu", "xss"],
+    },
 ]

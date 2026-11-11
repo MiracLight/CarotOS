@@ -470,4 +470,80 @@ TERIMLER = [
         },
         "ilgili": ["kabuk", "bash"],
     },
+    {
+        "id": "polkit",
+        "baslik": {"tr": "polkit ve pkexec", "en": "polkit and pkexec"},
+        "kisa": {"tr": "Masaüstü uygulamalarının yalnızca gereken işlem için yönetici yetkisi istemesini sağlayan sistem.", "en": "The system that lets desktop apps ask for admin rights only for the action that needs them."},
+        "aciklama": {
+            "tr": "Bir uygulamanın tamamını root olarak çalıştırmak yerine, yalnızca tek bir komut pkexec ile root olarak çalıştırılır ve polkit kullanıcıdan parolasını ister. Mağaza'nın paket kurması ya da Güvenlik Paneli'nin \"Root ile çalıştır\" düğmesi bu yolu kullanır.\n\nBu, en az yetki ilkesinin masaüstündeki uygulamasıdır: arayüz normal kullanıcı olarak kalır.",
+            "en": "Instead of running a whole app as root, only a single command is run as root through pkexec and polkit asks the user for their password. The Store installing packages and the Security Panel's \"Run as root\" button use this route.\n\nIt is the desktop form of the principle of least privilege: the interface stays a normal user.",
+        },
+        "ilgili": ["sudo", "root_kullanici", "en_az_yetki"],
+    },
+    {
+        "id": "grub",
+        "baslik": {"tr": "GRUB (Önyükleyici)", "en": "GRUB (Bootloader)"},
+        "kisa": {"tr": "Bilgisayar açılırken işletim sistemini seçip çekirdeği başlatan program.", "en": "The program that picks the operating system and starts the kernel when the computer boots."},
+        "aciklama": {
+            "tr": "Açılışta gördüğünüz menü GRUB'dur: birden çok işletim sistemi varsa (ör. Windows) aralarından seçim yaptırır ve çekirdeği parametreleriyle (quiet splash gibi) yükler. Ayarları /etc/default/grub ve /etc/default/grub.d/ altındadır; değişiklikten sonra update-grub çalıştırılır.\n\nSecure Boot açık sistemlerde imzalı shim ve GRUB kullanılır; imza zinciri bozulursa sistem açılmaz.",
+            "en": "The menu you see at boot is GRUB: if there are several operating systems (e.g. Windows) it lets you choose and loads the kernel with its parameters (such as quiet splash). Its settings live in /etc/default/grub and /etc/default/grub.d/; run update-grub after a change.\n\nSystems with Secure Boot use signed shim and GRUB; if the signature chain breaks, the system won't boot.",
+        },
+        "ornek": "cat /proc/cmdline      # çekirdeğin hangi parametrelerle açıldığı",
+        "ilgili": ["kernel", "luks", "sayisal_imza"],
+    },
+    {
+        "id": "fstab",
+        "baslik": {"tr": "fstab", "en": "fstab"},
+        "kisa": {"tr": "Açılışta hangi diskin nereye bağlanacağını tanımlayan dosya (/etc/fstab).", "en": "The file that defines which disk is mounted where at boot (/etc/fstab)."},
+        "aciklama": {
+            "tr": "Her satır bir bölümü (UUID ile), bağlama noktasını (/, /home), dosya sistemini (ext4) ve seçenekleri tanımlar. Takas (swap) alanı da burada yer alır.\n\nHatalı bir satır sistemin açılmasını engelleyebilir; değiştirmeden önce yedek almak ve sonra \"sudo mount -a\" ile denemek iyi bir alışkanlıktır.",
+            "en": "Each line defines a partition (by UUID), its mount point (/, /home), file system (ext4) and options. Swap space is listed here too.\n\nA wrong line can stop the system from booting; back it up before changing it and test afterwards with \"sudo mount -a\".",
+        },
+        "ornek": "cat /etc/fstab",
+        "ilgili": ["mount", "swap", "dosya_sistemi"],
+    },
+    {
+        "id": "locale",
+        "baslik": {"tr": "Yerel Ayar (Locale)", "en": "Locale"},
+        "kisa": {"tr": "Sistemin dilini, tarih/sayı biçimini ve karakter kodlamasını belirleyen ayar.", "en": "The setting that decides the system's language, date/number format and character encoding."},
+        "aciklama": {
+            "tr": "tr_TR.UTF-8 gibi yazılır: dil_ÜLKE.kodlama. Türkçe yerelde tarih 12.11.2026, ondalık ayırıcı virgüldür ve program iletileri Türkçe çıkar (sha256sum başarıyı \"Tamam\" diye yazar).\n\nBetiklerde yerelden bağımsız çıktı gerekirse komut LC_ALL=C ile çalıştırılır. Yeni bir dil kullanmak için locale'in üretilmesi (locale-gen) gerekir.",
+            "en": "It is written like tr_TR.UTF-8: language_COUNTRY.encoding. In a Turkish locale the date is 12.11.2026, the decimal separator is a comma and program messages are in Turkish (sha256sum prints success as \"Tamam\").\n\nWhen a script needs locale-independent output, run the command with LC_ALL=C. To use a new language, its locale must be generated (locale-gen).",
+        },
+        "ornek": "locale      # geçerli ayarlar",
+        "ilgili": ["ortam_degiskeni", "utf8"],
+    },
+    {
+        "id": "flatpak",
+        "baslik": {"tr": "Flatpak", "en": "Flatpak"},
+        "kisa": {"tr": "Uygulamaları bağımlılıklarıyla birlikte korumalı bir alanda çalıştıran paket sistemi.", "en": "A package system that runs apps with their dependencies inside a sandbox."},
+        "aciklama": {
+            "tr": "apt paketleri sistem kütüphanelerini paylaşır ve Debian tarafından denetlenir; Flatpak uygulamaları kendi kütüphaneleriyle gelir ve çoğunlukla geliştiricisi tarafından Flathub'a yüklenir. Böylece Debian'da bulunmayan uygulamalar (ör. OnlyOffice) kurulabilir.\n\nKorumalı alanın izinleri uygulamaya göre değişir; Debian güvenlik ekibi bu uygulamaları denetlemez, kaynağına güvendiğiniz uygulamaları kurun.",
+            "en": "apt packages share system libraries and are reviewed by Debian; Flatpak apps bring their own libraries and are mostly uploaded to Flathub by their developers. This lets you install apps that aren't in Debian (e.g. OnlyOffice).\n\nSandbox permissions vary by app and the Debian security team doesn't review these apps, so install only those whose source you trust.",
+        },
+        "ornek": "flatpak install flathub org.onlyoffice.desktopeditors",
+        "ilgili": ["paket_yoneticisi", "sandbox", "apt"],
+    },
+    {
+        "id": "apparmor",
+        "baslik": {"tr": "AppArmor", "en": "AppArmor"},
+        "kisa": {"tr": "Programların hangi dosya ve yeteneklere erişebileceğini profillerle sınırlayan güvenlik modülü.", "en": "A security module that limits which files and capabilities programs can reach, using profiles."},
+        "aciklama": {
+            "tr": "Debian'da varsayılan olarak açıktır. Bir program profilinde izin verilmeyen bir dosyayı okumaya çalışırsa çekirdek bunu engeller ve günlüğe yazar; program ele geçirilse bile zarar sınırlı kalır.\n\nProfiller \"enforce\" (engelle) ya da \"complain\" (yalnızca kaydet) kipinde çalışır.",
+            "en": "It is on by default in Debian. If a program tries to read a file its profile doesn't allow, the kernel blocks it and logs it; even if the program is compromised, the damage stays limited.\n\nProfiles run in \"enforce\" (block) or \"complain\" (log only) mode.",
+        },
+        "ornek": "sudo aa-status",
+        "ilgili": ["sandbox", "en_az_yetki", "kernel"],
+    },
+    {
+        "id": "ssh_anahtari",
+        "baslik": {"tr": "SSH Anahtarı", "en": "SSH Key"},
+        "kisa": {"tr": "SSH'ta parola yerine kullanılan açık/özel anahtar çifti.", "en": "A public/private key pair used instead of a password for SSH."},
+        "aciklama": {
+            "tr": "ssh-keygen ile bir çift üretilir: açık anahtar sunucunun ~/.ssh/authorized_keys dosyasına konur, özel anahtar yalnızca sizde kalır (isteğe bağlı parolayla korunur). Giriş sırasında parola ağa hiç gönderilmez.\n\nSunucuda parola girişi kapatılırsa hydra gibi parola deneme saldırıları tamamen etkisiz kalır.",
+            "en": "A pair is generated with ssh-keygen: the public key goes into the server's ~/.ssh/authorized_keys, the private key stays with you only (optionally protected by a passphrase). No password is ever sent over the network during login.\n\nIf password login is turned off on the server, password-guessing attacks like hydra become completely useless.",
+        },
+        "ornek": "ssh-keygen -t ed25519",
+        "ilgili": ["ssh", "asimetrik_sifreleme", "kaba_kuvvet"],
+    },
 ]

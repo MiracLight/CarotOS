@@ -23,6 +23,7 @@ sys.path.insert(0, ACIKLA)
 import acikla_motor as M  # noqa: E402
 import dil  # noqa: E402
 import veri_guvenlik  # noqa: E402
+import veri_saldiri  # noqa: E402
 import veri_tehlike  # noqa: E402
 import veri_temel  # noqa: E402
 
@@ -152,7 +153,7 @@ class TehlikeKurallariTesti(unittest.TestCase):
 class CalistirmazTesti(unittest.TestCase):
     def test_kaynakta_komut_calistirma_yok(self):
         # Açıklayıcı hiçbir zaman komut çalıştırmamalı: süreç/exec/eval çağrıları kaynakta bulunmamalı.
-        for ad in ("acikla_motor.py", "veri_guvenlik.py", "veri_temel.py", "veri_tehlike.py"):
+        for ad in ("acikla_motor.py", "veri_guvenlik.py", "veri_saldiri.py", "veri_temel.py", "veri_tehlike.py"):
             kod = open(os.path.join(ACIKLA, ad), encoding="utf-8").read()
             kod = re.sub(r'"""[\s\S]*?"""', "", kod)                       # açıklama metinleri sayılmaz
             for yasak in (r"\bsubprocess\b", r"\bos\.system\b", r"\bos\.popen\b", r"\bos\.exec", r"\bexec\(", r"\beval\(",
@@ -172,8 +173,10 @@ class VeriButunluguTesti(unittest.TestCase):
         self.assertTrue(t["tr"].strip() and t["en"].strip(), yer)
 
     def test_butun_komutlar(self):
-        tum = {**veri_guvenlik.KOMUTLAR, **veri_temel.KOMUTLAR}
-        self.assertGreaterEqual(len(tum), 30)
+        tum = {**veri_saldiri.KOMUTLAR, **veri_guvenlik.KOMUTLAR, **veri_temel.KOMUTLAR}
+        self.assertEqual(len(tum), len(veri_saldiri.KOMUTLAR) + len(veri_guvenlik.KOMUTLAR) + len(veri_temel.KOMUTLAR),
+                         "ayni komut iki veri dosyasinda")
+        self.assertGreaterEqual(len(tum), 40)
         for ad, k in tum.items():
             self.kontrol_T(k["ozet"], ad)
             self.assertIn(k["gurultu"], M.SEVIYE_SIRASI, ad)
@@ -188,8 +191,9 @@ class VeriButunluguTesti(unittest.TestCase):
                 self.kontrol_T(t, (ad, alt))
             for prm, t in k.get("parametreler", {}).items():
                 self.kontrol_T(t, (ad, prm))
-            if "uyari" in k:
-                self.kontrol_T(k["uyari"], ad)
+            for alan in ("uyari", "nasil", "savunma"):
+                if alan in k:
+                    self.kontrol_T(k[alan], (ad, alan))
 
     def test_tehlike_kurallari(self):
         for k in veri_tehlike.SATIR_KURALLARI + veri_tehlike.PARCA_KURALLARI:
@@ -280,6 +284,79 @@ class BashBaglantisiTesti(unittest.TestCase):
                            capture_output=True, text=True, timeout=30,
                            env=dict(os.environ, PATH=bin_ + ":" + os.environ["PATH"]))
         self.assertEqual(s.stdout.strip().splitlines()[-1], "1", s.stdout + s.stderr)
+
+
+class SaldiriAraclariTesti(unittest.TestCase):
+    """Güvenlik Paneli'ndeki eğitim araçları ayrıntılı açıklanır (Panel'in 'Açıkla' düğmesi)."""
+
+    PANEL = os.path.join(INC, "opt", "carotos", "security-panel", "carotos-security-panel.py")
+
+    def panel_araclari(self):
+        kod = open(self.PANEL, encoding="utf-8").read()
+        return set(re.findall(r'"build": lambda v: \(?\s*\[\s*"([a-z0-9-]+)"', kod))
+
+    def test_paneldeki_her_arac_taninir_ve_ayrintili(self):
+        araclar = self.panel_araclari()
+        self.assertGreaterEqual(len(araclar), 10, araclar)
+        for arac in araclar:
+            with self.subTest(arac=arac):
+                ad, tanim = M._tanim_bul(arac)
+                self.assertIsNotNone(tanim, arac)
+        for ad, k in veri_saldiri.KOMUTLAR.items():
+            with self.subTest(arac=ad):
+                self.assertIn("nasil", k)
+                self.assertIn("savunma", k)
+                self.assertGreaterEqual(len(k["bayraklar"]), 6, ad)
+
+    def test_hedefe_dokunan_araclarda_etik_hatirlatma(self):
+        for arac in ("nmap", "nikto", "sqlmap", "hydra", "aircrack-ng"):
+            with self.subTest(arac=arac):
+                self.assertTrue(veri_saldiri.KOMUTLAR[arac].get("etik"), arac)
+                metin = M.acikla(f"{arac} -h 10.0.0.5", "tr")
+                self.assertIn(M.ETIKETLER["etik"]["tr"], metin)
+
+    def test_nmap_ayrintisi(self):
+        s = M.ayristir("sudo nmap -sS -sV -T4 -p 22,80 -oN out.txt 192.168.1.10")
+        p = s["parcalar"][0]
+        self.assertEqual(p["komut"], "nmap")
+        self.assertEqual([b["ad"] for b in p["bayraklar"]], ["-sS", "-sV", "-T4", "-p", "-oN"])
+        self.assertEqual(p["konumsal"], ["192.168.1.10"])
+        self.assertFalse(p["bilinmeyen"])
+        metin = M.metin_olustur(s, "tr")
+        for parca in ("Nasıl çalışır", "Savunma tarafı", "SYN", "-p 22,80"):
+            self.assertIn(parca, metin)
+
+    def test_gurultu_bayrakla_yukselir(self):
+        self.assertEqual(M.ayristir("nmap -sn 10.0.0.0/24")["parcalar"][0]["gurultu"], "orta")
+        self.assertEqual(M.ayristir("nmap -A 10.0.0.5")["parcalar"][0]["gurultu"], "yuksek")
+        self.assertEqual(M.ayristir("tcpdump -i eth0 -c 10")["parcalar"][0]["gurultu"], "dusuk")
+
+    def test_nc_kume_ve_takma_ad(self):
+        p = M.ayristir("netcat -lvnp 4444")["parcalar"][0]
+        self.assertEqual(p["komut"], "nc")
+        self.assertEqual([(b["ad"], b["deger"]) for b in p["bayraklar"]],
+                         [("-l", None), ("-v", None), ("-n", None), ("-p", "4444")])
+
+    def test_john_ve_hydra_bicimleri(self):
+        p = M.ayristir("john --wordlist=liste.txt --format=raw-md5 hash.txt")["parcalar"][0]
+        self.assertEqual([(b["ad"], b["deger"]) for b in p["bayraklar"]],
+                         [("--wordlist", "liste.txt"), ("--format", "raw-md5")])
+        p = M.ayristir("hydra -L k.txt -P p.txt -t 4 10.0.0.5 ssh")["parcalar"][0]
+        self.assertEqual(p["konumsal"], ["10.0.0.5", "ssh"])
+        self.assertEqual(p["gurultu"], "yuksek")
+
+
+class PanelAciklaDugmesiTesti(unittest.TestCase):
+    PANEL = SaldiriAraclariTesti.PANEL
+
+    def test_dugme_motoru_kullanir_ve_calistirmaz(self):
+        kod = open(self.PANEL, encoding="utf-8").read()
+        self.assertIn("import acikla_motor", kod)
+        self.assertIn("self.explain_btn", kod)
+        govde = kod[kod.index("    def explain_text(self):"):kod.index("    def _etik_onay(self, values):")]
+        self.assertIn("acikla_motor.acikla(", govde)
+        for yasak in ("subprocess", "Popen", "_worker", "pkexec", "threading"):
+            self.assertNotIn(yasak, govde)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 {
- "surum": "2.0",
+ "surum": "2.1",
  "kategoriler": [
   {
    "id": "grafik",
@@ -1037,24 +1037,6 @@
    "site": "https://wiki.gnome.org/Apps/EasyTAG"
   },
   {
-   "paket": "code",
-   "ad": "VS Code (Codium)",
-   "kategori": "gelistirme",
-   "ikon": "vscodium",
-   "ozet": {
-    "tr": "Eklentilerle genişleyen modern kod düzenleyici.",
-    "en": "Modern, extensible code editor."
-   },
-   "aciklama": {
-    "tr": "IntelliSense, hata ayıklama ve binlerce eklentiyle güçlü kod düzenleyici (VSCodium: telemetriz Code).",
-    "en": "A powerful editor with IntelliSense, debugging and thousands of extensions (VSCodium: Code without telemetry)."
-   },
-   "boyut": "~120 MB",
-   "lisans": "MIT",
-   "site": "https://vscodium.com",
-   "one_cikan": true
-  },
-  {
    "paket": "geany",
    "ad": "Geany",
    "kategori": "gelistirme",
@@ -1459,23 +1441,6 @@
    "site": "https://klavaro.sourceforge.io"
   },
   {
-   "paket": "anki",
-   "ad": "Anki",
-   "kategori": "egitim",
-   "ikon": "anki",
-   "ozet": {
-    "tr": "Aralıklı tekrarla ezber kartları.",
-    "en": "Flashcards with spaced repetition."
-   },
-   "aciklama": {
-    "tr": "Dil, tıp ve sınav hazırlığı için akıllı tekrar algoritmalı bilgi kartları.",
-    "en": "Flashcards with a smart spaced-repetition algorithm for languages, medicine and exam prep."
-   },
-   "boyut": "~60 MB",
-   "lisans": "AGPL-3.0",
-   "site": "https://apps.ankiweb.net"
-  },
-  {
    "paket": "wxmaxima",
    "ad": "wxMaxima",
    "kategori": "egitim",
@@ -1630,21 +1595,21 @@
    "site": "https://www.wesnoth.org"
   },
   {
-   "paket": "minetest",
-   "ad": "Minetest",
+   "paket": "luanti",
+   "ad": "Luanti",
    "kategori": "oyun",
-   "ikon": "minetest",
+   "ikon": "luanti",
    "ozet": {
     "tr": "Açık dünya, blok tabanlı inşa oyunu.",
     "en": "Open-world, block-based building game."
    },
    "aciklama": {
-    "tr": "Dünyaları keşfedip inşa ettiğiniz, mod desteği güçlü sandbox oyunu.",
-    "en": "An open-ended sandbox where you explore and build worlds, with strong mod support."
+    "tr": "Dünyaları keşfedip inşa ettiğiniz, mod desteği güçlü sandbox oyunu (eski adıyla Minetest).",
+    "en": "An open-ended sandbox where you explore and build worlds, with strong mod support (formerly Minetest)."
    },
    "boyut": "~20 MB",
    "lisans": "LGPL-2.1",
-   "site": "https://www.minetest.net"
+   "site": "https://www.luanti.org"
   },
   {
    "paket": "hedgewars",
@@ -2303,13 +2268,13 @@
    "site": "https://gsmartcontrol.shaduri.dev"
   },
   {
-   "paket": "hardinfo",
+   "paket": "hardinfo2",
    "ad": {
     "tr": "Donanım Bilgisi",
     "en": "Hardware Info"
    },
    "kategori": "sistem",
-   "ikon": "hardinfo",
+   "ikon": "hardinfo2",
    "ozet": {
     "tr": "Donanım bilgisi ve sistem kıyaslama aracı.",
     "en": "Hardware information and benchmark tool."
@@ -2320,24 +2285,7 @@
    },
    "boyut": "~6 MB",
    "lisans": "GPL-2.0",
-   "site": "https://github.com/lpereira/hardinfo"
-  },
-  {
-   "paket": "neofetch",
-   "ad": "Neofetch",
-   "kategori": "sistem",
-   "ikon": "utilities-terminal",
-   "ozet": {
-    "tr": "Terminalde sistem bilgisi ve logo gösterir.",
-    "en": "Shows system info and logo in the terminal."
-   },
-   "aciklama": {
-    "tr": "Terminalde dağıtım logosu ile birlikte sistem özetini şık biçimde gösterir.",
-    "en": "Prints a tidy system summary alongside the distro logo in the terminal."
-   },
-   "boyut": "~2 MB",
-   "lisans": "MIT",
-   "site": "https://github.com/dylanaraps/neofetch"
+   "site": "https://hardinfo2.org"
   },
   {
    "paket": "htop",
@@ -2667,7 +2615,7 @@
    "site": "https://www.clamav.net"
   },
   {
-   "paket": "keepassxc",
+   "paket": "keepassxc-full",
    "ad": "KeePassXC",
    "kategori": "guvenlik",
    "ikon": "keepassxc",
@@ -2774,6 +2722,1196 @@
    "boyut": "~1 MB",
    "lisans": "GPL-2.0",
    "site": "https://steghide.sourceforge.net"
+  },
+  {
+   "paket": "calligra",
+   "ad": "Calligra",
+   "kategori": "ofis",
+   "ikon": "calligra",
+   "ozet": {
+    "tr": "Kelime işlemci, hesap tablosu ve sunumdan oluşan KDE ofis paketi.",
+    "en": "KDE office suite with a word processor, spreadsheet and presentations."
+   },
+   "aciklama": {
+    "tr": "Words, Sheets ve Stage ile LibreOffice'e hafif bir alternatif; ODF biçimini kullanır, DOCX/XLSX dosyalarını açabilir.",
+    "en": "Words, Sheets and Stage make a lighter alternative to LibreOffice; uses ODF and can open DOCX/XLSX files."
+   },
+   "boyut": "~600 MB",
+   "lisans": "GPL-2.0",
+   "site": "https://calligra.org"
+  },
+  {
+   "paket": "lyx",
+   "ad": "LyX",
+   "kategori": "ofis",
+   "ikon": "lyx",
+   "ozet": {
+    "tr": "LaTeX tabanlı, ne gördüğün değil ne demek istediğin odaklı belge hazırlayıcı.",
+    "en": "LaTeX-based document processor focused on structure rather than looks."
+   },
+   "aciklama": {
+    "tr": "Tez, makale ve kitap için; formüller, kaynakça ve içindekiler kendiliğinden düzgün dizilir.",
+    "en": "For theses, papers and books; formulas, bibliography and table of contents are typeset properly for you."
+   },
+   "boyut": "~1,3 GB",
+   "lisans": "GPL-2.0",
+   "site": "https://www.lyx.org"
+  },
+  {
+   "paket": "ghostwriter",
+   "ad": "Ghostwriter",
+   "kategori": "ofis",
+   "ikon": "ghostwriter",
+   "ozet": {
+    "tr": "Dikkat dağıtmayan Markdown yazma aracı.",
+    "en": "Distraction-free Markdown editor."
+   },
+   "aciklama": {
+    "tr": "Canlı önizleme, odak modu ve kelime sayacıyla not, blog yazısı ve belge yazmak için sade bir düzenleyici.",
+    "en": "A clean editor for notes, blog posts and documents, with live preview, focus mode and word count."
+   },
+   "boyut": "~400 MB",
+   "lisans": "GPL-3.0",
+   "site": "https://ghostwriter.kde.org"
+  },
+  {
+   "paket": "homebank",
+   "ad": "HomeBank",
+   "kategori": "ofis",
+   "ikon": "homebank",
+   "ozet": {
+    "tr": "Kişisel bütçe ve harcama takibi.",
+    "en": "Personal budget and expense tracking."
+   },
+   "aciklama": {
+    "tr": "Hesaplarınızı, gelir-giderinizi ve bütçenizi grafiklerle izleyin; banka dökümlerini (CSV, OFX, QIF) içe aktarın.",
+    "en": "Track your accounts, income, expenses and budget with charts; import bank statements (CSV, OFX, QIF)."
+   },
+   "boyut": "~15 MB",
+   "lisans": "GPL-2.0",
+   "site": "https://www.gethomebank.org"
+  },
+  {
+   "paket": "dia",
+   "ad": "Dia",
+   "kategori": "ofis",
+   "ikon": "dia",
+   "ozet": {
+    "tr": "Akış şeması, ağ ve UML diyagramları çizme aracı.",
+    "en": "Flowchart, network and UML diagram editor."
+   },
+   "aciklama": {
+    "tr": "Hazır şekil kütüphaneleriyle akış şemaları, ağ topolojileri ve veritabanı diyagramları; Visio'ya basit bir alternatif.",
+    "en": "Flowcharts, network topologies and database diagrams with ready-made shape libraries; a simple alternative to Visio."
+   },
+   "boyut": "~50 MB",
+   "lisans": "GPL-2.0",
+   "site": "https://wiki.gnome.org/Apps/Dia"
+  },
+  {
+   "paket": "foliate",
+   "ad": "Foliate",
+   "kategori": "ofis",
+   "ikon": "com.github.johnfactotum.Foliate",
+   "ozet": {
+    "tr": "Şık ve sade e-kitap okuyucu.",
+    "en": "A clean, elegant e-book reader."
+   },
+   "aciklama": {
+    "tr": "EPUB, MOBI ve FB2 kitapları sayfa düzeni, gece modu, not ve sözlük desteğiyle okuyun.",
+    "en": "Read EPUB, MOBI and FB2 books with layout options, night mode, notes and dictionary lookup."
+   },
+   "boyut": "~480 MB",
+   "lisans": "GPL-3.0",
+   "site": "https://johnfactotum.github.io/foliate/"
+  },
+  {
+   "paket": "zathura",
+   "ad": "Zathura",
+   "kategori": "ofis",
+   "ikon": "org.pwmt.zathura",
+   "ozet": {
+    "tr": "Klavyeyle kullanılan, çok hafif PDF görüntüleyici.",
+    "en": "A very light, keyboard-driven PDF viewer."
+   },
+   "aciklama": {
+    "tr": "Vim tarzı kısayollarla PDF, DjVu ve PostScript belgelerinde hızlı gezinme; eski bilgisayarlar için ideal.",
+    "en": "Fast navigation through PDF, DjVu and PostScript files with Vim-style keys; ideal for older computers."
+   },
+   "boyut": "~60 MB",
+   "lisans": "Zlib",
+   "site": "https://pwmt.org/projects/zathura/"
+  },
+  {
+   "paket": "telegram-desktop",
+   "ad": "Telegram",
+   "kategori": "internet",
+   "ikon": "org.telegram.desktop",
+   "ozet": {
+    "tr": "Telegram mesajlaşma uygulamasının masaüstü sürümü.",
+    "en": "Desktop version of the Telegram messenger."
+   },
+   "aciklama": {
+    "tr": "Mesaj, grup, kanal ve dosya paylaşımı; telefonunuzdaki sohbetlerle eşitlenir.",
+    "en": "Messages, groups, channels and file sharing; syncs with the chats on your phone."
+   },
+   "boyut": "~570 MB",
+   "lisans": "GPL-3.0",
+   "site": "https://desktop.telegram.org"
+  },
+  {
+   "paket": "falkon",
+   "ad": "Falkon",
+   "kategori": "internet",
+   "ikon": "org.kde.falkon",
+   "ozet": {
+    "tr": "Hafif, Qt tabanlı web tarayıcısı.",
+    "en": "Lightweight Qt-based web browser."
+   },
+   "aciklama": {
+    "tr": "Yerleşik reklam engelleyicisi olan, Chromium motorlu (QtWebEngine) sade bir tarayıcı.",
+    "en": "A simple browser with a built-in ad blocker, powered by the Chromium engine (QtWebEngine)."
+   },
+   "boyut": "~370 MB",
+   "lisans": "GPL-3.0",
+   "site": "https://www.falkon.org"
+  },
+  {
+   "paket": "geary",
+   "ad": "Geary",
+   "kategori": "internet",
+   "ikon": "org.gnome.Geary",
+   "ozet": {
+    "tr": "Modern ve sade e-posta istemcisi.",
+    "en": "Modern, simple e-mail client."
+   },
+   "aciklama": {
+    "tr": "Konuşma görünümü, hızlı arama ve Gmail/Outlook/IMAP hesap desteğiyle kolay e-posta.",
+    "en": "Easy e-mail with conversation view, fast search and support for Gmail, Outlook and IMAP accounts."
+   },
+   "boyut": "~510 MB",
+   "lisans": "LGPL-2.1",
+   "site": "https://wiki.gnome.org/Apps/Geary"
+  },
+  {
+   "paket": "evolution",
+   "ad": "Evolution",
+   "kategori": "internet",
+   "ikon": "org.gnome.Evolution",
+   "ozet": {
+    "tr": "E-posta, takvim, kişiler ve görevler bir arada.",
+    "en": "E-mail, calendar, contacts and tasks in one."
+   },
+   "aciklama": {
+    "tr": "Outlook'a benzer tümleşik kişisel bilgi yöneticisi; Exchange, Google ve CalDAV hesaplarıyla çalışır.",
+    "en": "An integrated personal information manager similar to Outlook; works with Exchange, Google and CalDAV accounts."
+   },
+   "boyut": "~620 MB",
+   "lisans": "LGPL-2.1",
+   "site": "https://gitlab.gnome.org/GNOME/evolution/-/wikis/home"
+  },
+  {
+   "paket": "liferea",
+   "ad": "Liferea",
+   "kategori": "internet",
+   "ikon": "net.sourceforge.liferea",
+   "ozet": {
+    "tr": "RSS/Atom haber okuyucu.",
+    "en": "RSS/Atom feed reader."
+   },
+   "aciklama": {
+    "tr": "Takip ettiğiniz siteleri, blogları ve güvenlik duyurularını tek yerden okuyun; çevrimdışı okuma destekler.",
+    "en": "Read the sites, blogs and security advisories you follow in one place; supports offline reading."
+   },
+   "boyut": "~400 MB",
+   "lisans": "GPL-2.0",
+   "site": "https://lzone.de/liferea/"
+  },
+  {
+   "paket": "dino-im",
+   "ad": "Dino",
+   "kategori": "internet",
+   "ikon": "im.dino.Dino",
+   "ozet": {
+    "tr": "Uçtan uca şifreli, açık protokollü (XMPP) mesajlaşma.",
+    "en": "End-to-end encrypted messaging over an open protocol (XMPP)."
+   },
+   "aciklama": {
+    "tr": "OMEMO şifrelemeli birebir ve grup sohbeti, dosya paylaşımı; merkezi bir şirkete bağlı değildir.",
+    "en": "One-to-one and group chat with OMEMO encryption and file sharing; not tied to any single company."
+   },
+   "boyut": "~150 MB",
+   "lisans": "GPL-3.0",
+   "site": "https://dino.im"
+  },
+  {
+   "paket": "deluge",
+   "ad": "Deluge",
+   "kategori": "internet",
+   "ikon": "deluge",
+   "ozet": {
+    "tr": "Eklentilerle genişleyen BitTorrent istemcisi.",
+    "en": "BitTorrent client extensible with plugins."
+   },
+   "aciklama": {
+    "tr": "Hız sınırlama, zamanlayıcı ve uzaktan yönetimle torrent indirme (ör. Linux ISO'ları).",
+    "en": "Torrent downloads (e.g. Linux ISOs) with speed limits, a scheduler and remote control."
+   },
+   "boyut": "~160 MB",
+   "lisans": "GPL-3.0",
+   "site": "https://deluge-torrent.org"
+  },
+  {
+   "paket": "kodi",
+   "ad": "Kodi",
+   "kategori": "medya",
+   "ikon": "kodi",
+   "ozet": {
+    "tr": "Film, dizi, müzik ve fotoğraflar için medya merkezi.",
+    "en": "Media centre for films, series, music and photos."
+   },
+   "aciklama": {
+    "tr": "Arşivinizi kapak ve bilgilerle düzenler; uzaktan kumandayla televizyonda kullanmaya uygun tam ekran arayüz.",
+    "en": "Organises your library with artwork and info; a full-screen interface made for the TV and a remote control."
+   },
+   "boyut": "~210 MB",
+   "lisans": "GPL-2.0",
+   "site": "https://kodi.tv"
+  },
+  {
+   "paket": "strawberry",
+   "ad": "Strawberry",
+   "kategori": "medya",
+   "ikon": "org.strawberrymusicplayer.strawberry",
+   "ozet": {
+    "tr": "Büyük müzik arşivleri için çalar.",
+    "en": "Music player for large collections."
+   },
+   "aciklama": {
+    "tr": "Arşiv düzenleme, etiket düzenleme, şarkı sözleri ve kayıpsız (FLAC) çalma; Clementine'in devamı.",
+    "en": "Library management, tag editing, lyrics and lossless (FLAC) playback; the successor of Clementine."
+   },
+   "boyut": "~150 MB",
+   "lisans": "GPL-3.0",
+   "site": "https://www.strawberrymusicplayer.org"
+  },
+  {
+   "paket": "shotcut",
+   "ad": "Shotcut",
+   "kategori": "medya",
+   "ikon": "org.shotcut.Shotcut",
+   "ozet": {
+    "tr": "Kolay öğrenilen, güçlü video düzenleyici.",
+    "en": "Powerful, easy-to-learn video editor."
+   },
+   "aciklama": {
+    "tr": "Çok izli zaman çizelgesi, geçişler, filtreler ve 4K desteği; hemen her video biçimini dönüştürmeden açar.",
+    "en": "Multi-track timeline, transitions, filters and 4K support; opens almost any video format without converting."
+   },
+   "boyut": "~420 MB",
+   "lisans": "GPL-3.0",
+   "site": "https://www.shotcut.org"
+  },
+  {
+   "paket": "openshot-qt",
+   "ad": "OpenShot",
+   "kategori": "medya",
+   "ikon": "openshot-qt",
+   "ozet": {
+    "tr": "Yeni başlayanlar için video düzenleyici.",
+    "en": "Video editor for beginners."
+   },
+   "aciklama": {
+    "tr": "Sürükle-bırak düzenleme, başlıklar, animasyonlar ve hazır geçişlerle ilk videolarınızı hazırlayın.",
+    "en": "Make your first videos with drag-and-drop editing, titles, animations and ready-made transitions."
+   },
+   "boyut": "~500 MB",
+   "lisans": "GPL-3.0",
+   "site": "https://www.openshot.org"
+  },
+  {
+   "paket": "ardour",
+   "ad": "Ardour",
+   "kategori": "medya",
+   "ikon": "ardour",
+   "ozet": {
+    "tr": "Profesyonel ses kayıt ve miks stüdyosu (DAW).",
+    "en": "Professional audio recording and mixing studio (DAW)."
+   },
+   "aciklama": {
+    "tr": "Çok kanallı kayıt, düzenleme, miks ve eklenti desteği; podcast'ten albüme kadar.",
+    "en": "Multi-track recording, editing, mixing and plugin support; from podcasts to albums."
+   },
+   "boyut": "~190 MB",
+   "lisans": "GPL-2.0",
+   "site": "https://ardour.org"
+  },
+  {
+   "paket": "mixxx",
+   "ad": "Mixxx",
+   "kategori": "medya",
+   "ikon": "org.mixxx.Mixxx",
+   "ozet": {
+    "tr": "DJ yazılımı: iki deste, miks ve efektler.",
+    "en": "DJ software: two decks, mixing and effects."
+   },
+   "aciklama": {
+    "tr": "BPM algılama, senkron, efektler ve DJ denetleyicisi desteğiyle canlı miks.",
+    "en": "Live mixing with BPM detection, sync, effects and DJ controller support."
+   },
+   "boyut": "~230 MB",
+   "lisans": "GPL-2.0",
+   "site": "https://mixxx.org"
+  },
+  {
+   "paket": "simplescreenrecorder",
+   "ad": "SimpleScreenRecorder",
+   "kategori": "medya",
+   "ikon": "simplescreenrecorder",
+   "ozet": {
+    "tr": "Ekran ve ses kaydedici.",
+    "en": "Screen and audio recorder."
+   },
+   "aciklama": {
+    "tr": "Tüm ekranı ya da bir pencereyi sesle birlikte kaydedin; ders ve sunum videoları için hafif ve kararlı.",
+    "en": "Record the whole screen or a window with sound; light and stable for tutorials and presentations."
+   },
+   "boyut": "~70 MB",
+   "lisans": "GPL-3.0",
+   "site": "https://www.maartenbaert.be/simplescreenrecorder/"
+  },
+  {
+   "paket": "kolourpaint",
+   "ad": "KolourPaint",
+   "kategori": "grafik",
+   "ikon": "kolourpaint",
+   "ozet": {
+    "tr": "Paint benzeri basit çizim programı.",
+    "en": "Simple Paint-like drawing program."
+   },
+   "aciklama": {
+    "tr": "Hızlı çizim, ekran görüntüsü düzeltme ve simge hazırlama için kolay araçlar.",
+    "en": "Easy tools for quick drawings, touching up screenshots and making icons."
+   },
+   "boyut": "~280 MB",
+   "lisans": "BSD-2-Clause",
+   "site": "https://apps.kde.org/kolourpaint/"
+  },
+  {
+   "paket": "pencil2d",
+   "ad": "Pencil2D",
+   "kategori": "grafik",
+   "ikon": "org.pencil2d.Pencil2D",
+   "ozet": {
+    "tr": "Elle çizilen 2B animasyon programı.",
+    "en": "Hand-drawn 2D animation program."
+   },
+   "aciklama": {
+    "tr": "Kare kare çizim, soğan kabuğu görünümü ve ses izleriyle geleneksel animasyon öğrenin.",
+    "en": "Learn traditional animation with frame-by-frame drawing, onion skinning and sound tracks."
+   },
+   "boyut": "~70 MB",
+   "lisans": "GPL-2.0",
+   "site": "https://www.pencil2d.org"
+  },
+  {
+   "paket": "hugin",
+   "ad": "Hugin",
+   "kategori": "grafik",
+   "ikon": "hugin",
+   "ozet": {
+    "tr": "Fotoğraflardan panorama birleştirici.",
+    "en": "Panorama photo stitcher."
+   },
+   "aciklama": {
+    "tr": "Birden çok fotoğrafı otomatik hizalayıp kusursuz bir panoramaya dönüştürür.",
+    "en": "Automatically aligns several photos and blends them into a seamless panorama."
+   },
+   "boyut": "~140 MB",
+   "lisans": "GPL-2.0",
+   "site": "https://hugin.sourceforge.io"
+  },
+  {
+   "paket": "nomacs",
+   "ad": "nomacs",
+   "kategori": "grafik",
+   "ikon": "org.nomacs.ImageLounge",
+   "ozet": {
+    "tr": "Hızlı ve hafif resim görüntüleyici.",
+    "en": "Fast, light image viewer."
+   },
+   "aciklama": {
+    "tr": "Klasördeki resimlerde hızlı gezinme, küçük düzenlemeler, meta veri (EXIF) ve yan yana karşılaştırma.",
+    "en": "Quick browsing through folders, small edits, metadata (EXIF) and side-by-side comparison."
+   },
+   "boyut": "~120 MB",
+   "lisans": "GPL-3.0",
+   "site": "https://nomacs.org"
+  },
+  {
+   "paket": "gpick",
+   "ad": "Gpick",
+   "kategori": "grafik",
+   "ikon": "gpick",
+   "ozet": {
+    "tr": "Ekrandan renk seçici ve palet hazırlayıcı.",
+    "en": "Screen colour picker and palette maker."
+   },
+   "aciklama": {
+    "tr": "Ekranın herhangi bir yerinden renk alın, uyumlu paletler oluşturun ve CSS/HEX olarak kopyalayın.",
+    "en": "Pick colours from anywhere on screen, build matching palettes and copy them as CSS/HEX."
+   },
+   "boyut": "~5 MB",
+   "lisans": "BSD-3-Clause",
+   "site": "https://www.gpick.org"
+  },
+  {
+   "paket": "sweethome3d",
+   "ad": "Sweet Home 3D",
+   "kategori": "grafik",
+   "ikon": "sweethome3d",
+   "ozet": {
+    "tr": "Ev ve oda iç mekân tasarımı (2B plan, 3B görünüm).",
+    "en": "Interior design for homes and rooms (2D plan, 3D view)."
+   },
+   "aciklama": {
+    "tr": "Duvarları çizin, mobilya yerleştirin ve sonucu anında 3B olarak gezin.",
+    "en": "Draw walls, place furniture and walk through the result in 3D right away."
+   },
+   "boyut": "~380 MB",
+   "lisans": "GPL-2.0",
+   "site": "https://www.sweethome3d.com"
+  },
+  {
+   "paket": "openscad",
+   "ad": "OpenSCAD",
+   "kategori": "grafik",
+   "ikon": "openscad",
+   "ozet": {
+    "tr": "Kodla 3B model tasarlama (3B yazıcılar için).",
+    "en": "Design 3D models with code (for 3D printers)."
+   },
+   "aciklama": {
+    "tr": "Parçaları komutlarla tanımlayın; ölçüleri değiştirince model yeniden oluşur. STL olarak dışa aktarır.",
+    "en": "Describe parts with commands; change a measurement and the model rebuilds. Exports to STL."
+   },
+   "boyut": "~95 MB",
+   "lisans": "GPL-2.0",
+   "site": "https://openscad.org"
+  },
+  {
+   "paket": "thonny",
+   "ad": "Thonny",
+   "kategori": "gelistirme",
+   "ikon": "org.thonny.Thonny",
+   "ozet": {
+    "tr": "Yeni başlayanlar için Python geliştirme ortamı.",
+    "en": "Python IDE for beginners."
+   },
+   "aciklama": {
+    "tr": "Adım adım çalıştırma, değişkenleri canlı izleme ve sade arayüzüyle programlamayı öğrenmek için ideal.",
+    "en": "Ideal for learning to program, with step-by-step execution, live variable view and a clean interface."
+   },
+   "boyut": "~560 MB",
+   "lisans": "MIT",
+   "site": "https://thonny.org"
+  },
+  {
+   "paket": "kate",
+   "ad": "Kate",
+   "kategori": "gelistirme",
+   "ikon": "kate",
+   "ozet": {
+    "tr": "Güçlü, çok sekmeli metin ve kod düzenleyici.",
+    "en": "Powerful multi-tab text and code editor."
+   },
+   "aciklama": {
+    "tr": "Yüzlerce dil için renklendirme, LSP ile kod tamamlama, gömülü terminal ve proje görünümü.",
+    "en": "Highlighting for hundreds of languages, LSP code completion, an embedded terminal and project view."
+   },
+   "boyut": "~380 MB",
+   "lisans": "LGPL-2.0",
+   "site": "https://kate-editor.org"
+  },
+  {
+   "paket": "spyder",
+   "ad": "Spyder",
+   "kategori": "gelistirme",
+   "ikon": "spyder",
+   "ozet": {
+    "tr": "Bilim ve veri analizi için Python geliştirme ortamı.",
+    "en": "Python IDE for science and data analysis."
+   },
+   "aciklama": {
+    "tr": "Değişken gezgini, IPython konsolu ve grafiklerle NumPy/pandas çalışmaları için MATLAB benzeri ortam.",
+    "en": "A MATLAB-like environment for NumPy/pandas work with a variable explorer, IPython console and plots."
+   },
+   "boyut": "~1,3 GB",
+   "lisans": "MIT",
+   "site": "https://www.spyder-ide.org"
+  },
+  {
+   "paket": "arduino",
+   "ad": "Arduino IDE",
+   "kategori": "gelistirme",
+   "ikon": "arduino",
+   "ozet": {
+    "tr": "Arduino kartlarını programlama ortamı.",
+    "en": "Programming environment for Arduino boards."
+   },
+   "aciklama": {
+    "tr": "Kod yazıp tek tıkla karta yükleyin; seri monitör ve hazır örneklerle elektronik projelerine başlayın.",
+    "en": "Write code and upload it to the board in one click; start electronics projects with the serial monitor and examples."
+   },
+   "boyut": "~970 MB",
+   "lisans": "GPL-2.0",
+   "site": "https://www.arduino.cc"
+  },
+  {
+   "paket": "golang",
+   "ad": "Go",
+   "kategori": "gelistirme",
+   "ikon": "applications-development",
+   "ozet": {
+    "tr": "Go programlama dili (derleyici ve araçlar).",
+    "en": "The Go programming language (compiler and tools)."
+   },
+   "aciklama": {
+    "tr": "Hızlı derlenen, eşzamanlılığa uygun dil; birçok güvenlik aracı (ör. gobuster, ffuf) Go ile yazılmıştır.",
+    "en": "A fast-compiling language built for concurrency; many security tools (e.g. gobuster, ffuf) are written in Go."
+   },
+   "boyut": "~550 MB",
+   "lisans": "BSD-3-Clause",
+   "site": "https://go.dev"
+  },
+  {
+   "paket": "cargo",
+   "ad": "Rust (cargo)",
+   "kategori": "gelistirme",
+   "ikon": "applications-development",
+   "ozet": {
+    "tr": "Rust dili derleyicisi ve paket yöneticisi.",
+    "en": "Rust compiler and package manager."
+   },
+   "aciklama": {
+    "tr": "Bellek güvenliğini derleme anında sağlayan sistem programlama dili; cargo ile proje oluşturma ve derleme.",
+    "en": "A systems language that enforces memory safety at compile time; create and build projects with cargo."
+   },
+   "boyut": "~1,2 GB",
+   "lisans": "MIT / Apache-2.0",
+   "site": "https://www.rust-lang.org"
+  },
+  {
+   "paket": "neovim",
+   "ad": "Neovim",
+   "kategori": "gelistirme",
+   "ikon": "nvim",
+   "ozet": {
+    "tr": "Vim'in modern, genişletilebilir hâli.",
+    "en": "Modern, extensible Vim."
+   },
+   "aciklama": {
+    "tr": "Terminalde çalışan, Lua eklentileri ve yerleşik LSP desteğiyle hızlı kod düzenleyici.",
+    "en": "A fast terminal code editor with Lua plugins and built-in LSP support."
+   },
+   "boyut": "~40 MB",
+   "lisans": "Apache-2.0",
+   "site": "https://neovim.io"
+  },
+  {
+   "paket": "tuxpaint",
+   "ad": "Tux Paint",
+   "kategori": "egitim",
+   "ikon": "tuxpaint",
+   "ozet": {
+    "tr": "Çocuklar için çizim programı.",
+    "en": "Drawing program for children."
+   },
+   "aciklama": {
+    "tr": "Büyük düğmeler, eğlenceli sesler ve damgalarla 3 yaş üstü çocuklar için çizim.",
+    "en": "Drawing for children aged 3 and up, with big buttons, fun sounds and stamps."
+   },
+   "boyut": "~250 MB",
+   "lisans": "GPL-2.0",
+   "site": "https://tuxpaint.org"
+  },
+  {
+   "paket": "ktouch",
+   "ad": "KTouch",
+   "kategori": "egitim",
+   "ikon": "ktouch",
+   "ozet": {
+    "tr": "On parmak klavye kullanma eğitmeni.",
+    "en": "Touch-typing tutor."
+   },
+   "aciklama": {
+    "tr": "Türkçe Q/F dahil birçok klavye düzeni için dersler, hız ve doğruluk istatistikleri.",
+    "en": "Lessons for many keyboard layouts (including Turkish Q/F) with speed and accuracy statistics."
+   },
+   "boyut": "~360 MB",
+   "lisans": "GPL-2.0",
+   "site": "https://apps.kde.org/ktouch/"
+  },
+  {
+   "paket": "kturtle",
+   "ad": "KTurtle",
+   "kategori": "egitim",
+   "ikon": "kturtle",
+   "ozet": {
+    "tr": "Kaplumbağa grafikleriyle programlamaya giriş.",
+    "en": "Introduction to programming with turtle graphics."
+   },
+   "aciklama": {
+    "tr": "Basit komutlarla ekrandaki kaplumbağayı yönetip şekiller çizerek döngü ve koşulları öğrenin.",
+    "en": "Learn loops and conditions by steering an on-screen turtle with simple commands to draw shapes."
+   },
+   "boyut": "~220 MB",
+   "lisans": "GPL-2.0",
+   "site": "https://apps.kde.org/kturtle/"
+  },
+  {
+   "paket": "step",
+   "ad": "Step",
+   "kategori": "egitim",
+   "ikon": "step",
+   "ozet": {
+    "tr": "Etkileşimli fizik benzetimi.",
+    "en": "Interactive physics simulator."
+   },
+   "aciklama": {
+    "tr": "Cisimler, yaylar ve kuvvetler yerleştirip hareketi canlı izleyin; fizik derslerine görsel destek.",
+    "en": "Place bodies, springs and forces and watch the motion live; visual support for physics lessons."
+   },
+   "boyut": "~240 MB",
+   "lisans": "GPL-2.0",
+   "site": "https://apps.kde.org/step/"
+  },
+  {
+   "paket": "avogadro",
+   "ad": "Avogadro",
+   "kategori": "egitim",
+   "ikon": "avogadro",
+   "ozet": {
+    "tr": "Molekül çizme ve 3B görselleştirme.",
+    "en": "Molecule editor and 3D visualiser."
+   },
+   "aciklama": {
+    "tr": "Molekülleri kurun, döndürün ve inceleyin; kimya dersleri ve hesaplamalı kimya için.",
+    "en": "Build, rotate and inspect molecules; for chemistry lessons and computational chemistry."
+   },
+   "boyut": "~610 MB",
+   "lisans": "GPL-2.0",
+   "site": "https://avogadro.cc"
+  },
+  {
+   "paket": "kbruch",
+   "ad": "KBruch",
+   "kategori": "egitim",
+   "ikon": "kbruch",
+   "ozet": {
+    "tr": "Kesir alıştırmaları.",
+    "en": "Fraction exercises."
+   },
+   "aciklama": {
+    "tr": "Kesirlerle toplama, karşılaştırma ve sadeleştirme alıştırmaları; ilk ve ortaokul için.",
+    "en": "Exercises for adding, comparing and simplifying fractions; for primary and middle school."
+   },
+   "boyut": "~140 MB",
+   "lisans": "GPL-2.0",
+   "site": "https://apps.kde.org/kbruch/"
+  },
+  {
+   "paket": "kalgebra",
+   "ad": "KAlgebra",
+   "kategori": "egitim",
+   "ikon": "kalgebra",
+   "ozet": {
+    "tr": "Grafik çizen hesap makinesi.",
+    "en": "Graphing calculator."
+   },
+   "aciklama": {
+    "tr": "Fonksiyonların 2B ve 3B grafiklerini çizin, denklemleri ve türevleri hesaplayın.",
+    "en": "Plot functions in 2D and 3D and work out equations and derivatives."
+   },
+   "boyut": "~450 MB",
+   "lisans": "GPL-2.0",
+   "site": "https://apps.kde.org/kalgebra/"
+  },
+  {
+   "paket": "supertux",
+   "ad": "SuperTux",
+   "kategori": "oyun",
+   "ikon": "supertux2",
+   "ozet": {
+    "tr": "Tux'un kahramanı olduğu klasik platform oyunu.",
+    "en": "Classic platformer starring Tux."
+   },
+   "aciklama": {
+    "tr": "Zıpla, toplan ve düşmanları yen; onlarca bölüm ve kendi bölümünü yapma aracı.",
+    "en": "Jump, collect and defeat enemies; dozens of levels and a level editor."
+   },
+   "boyut": "~280 MB",
+   "lisans": "GPL-3.0",
+   "site": "https://www.supertux.org"
+  },
+  {
+   "paket": "gnome-chess",
+   "ad": "Satranç",
+   "kategori": "oyun",
+   "ikon": "org.gnome.Chess",
+   "ozet": {
+    "tr": "Bilgisayara ya da arkadaşına karşı satranç.",
+    "en": "Chess against the computer or a friend."
+   },
+   "aciklama": {
+    "tr": "Zorluk ayarlı bilgisayar rakibi (GNU Chess ile), 2B/3B tahta ve hamle geçmişi.",
+    "en": "A computer opponent with adjustable difficulty (with GNU Chess), 2D/3D board and move history."
+   },
+   "boyut": "~460 MB",
+   "lisans": "GPL-3.0",
+   "site": "https://wiki.gnome.org/Apps/Chess"
+  },
+  {
+   "paket": "freeciv-client-gtk3",
+   "ad": "Freeciv",
+   "kategori": "oyun",
+   "ikon": "freeciv-client",
+   "ozet": {
+    "tr": "Sıra tabanlı medeniyet kurma strateji oyunu.",
+    "en": "Turn-based civilisation-building strategy game."
+   },
+   "aciklama": {
+    "tr": "Taş Devri'nden uzay çağına bir medeniyeti yönetin; tek başına ya da ağ üzerinden çok oyunculu.",
+    "en": "Lead a civilisation from the Stone Age to the space age; single player or multiplayer over the network."
+   },
+   "boyut": "~75 MB",
+   "lisans": "GPL-2.0",
+   "site": "https://www.freeciv.org"
+  },
+  {
+   "paket": "widelands",
+   "ad": "Widelands",
+   "kategori": "oyun",
+   "ikon": "org.widelands.Widelands",
+   "ozet": {
+    "tr": "Ekonomi ağırlıklı gerçek zamanlı strateji oyunu.",
+    "en": "Economy-focused real-time strategy game."
+   },
+   "aciklama": {
+    "tr": "Yerleşim kurun, üretim zincirlerini yönetin ve topraklarınızı genişletin; Settlers tarzı.",
+    "en": "Build settlements, manage production chains and expand your land; in the style of Settlers."
+   },
+   "boyut": "~540 MB",
+   "lisans": "GPL-2.0",
+   "site": "https://www.widelands.org"
+  },
+  {
+   "paket": "xmoto",
+   "ad": "X-Moto",
+   "kategori": "oyun",
+   "ikon": "xmoto",
+   "ozet": {
+    "tr": "Fizik tabanlı motosiklet denge oyunu.",
+    "en": "Physics-based motorbike balance game."
+   },
+   "aciklama": {
+    "tr": "Engelli parkurlarda dengeni koruyarak tüm çilekleri topla; yüzlerce bölüm.",
+    "en": "Keep your balance on obstacle tracks and collect every strawberry; hundreds of levels."
+   },
+   "boyut": "~100 MB",
+   "lisans": "GPL-2.0",
+   "site": "https://xmoto.org"
+  },
+  {
+   "paket": "scummvm",
+   "ad": "ScummVM",
+   "kategori": "oyun",
+   "ikon": "org.scummvm.scummvm",
+   "ozet": {
+    "tr": "Klasik macera oyunlarını çalıştıran yorumlayıcı.",
+    "en": "Interpreter for classic adventure games."
+   },
+   "aciklama": {
+    "tr": "Monkey Island, Broken Sword gibi eski tıkla-ilerle oyunlarını (oyun dosyası sizden) modern sistemde oynatır; ücretsiz oyunlar da var.",
+    "en": "Plays old point-and-click games like Monkey Island and Broken Sword (you supply the game files) on modern systems; free games too."
+   },
+   "boyut": "~200 MB",
+   "lisans": "GPL-3.0",
+   "site": "https://www.scummvm.org"
+  },
+  {
+   "paket": "kpat",
+   "ad": "KPatience",
+   "kategori": "oyun",
+   "ikon": "kpat",
+   "ozet": {
+    "tr": "Onlarca çeşit solitaire (iskambil falı) oyunu.",
+    "en": "Dozens of solitaire card games."
+   },
+   "aciklama": {
+    "tr": "Klondike, Örümcek, FreeCell ve daha fazlası; ipucu ve geri alma desteği.",
+    "en": "Klondike, Spider, FreeCell and more, with hints and undo."
+   },
+   "boyut": "~520 MB",
+   "lisans": "GPL-2.0",
+   "site": "https://apps.kde.org/kpat/"
+  },
+  {
+   "paket": "catfish",
+   "ad": "Catfish",
+   "kategori": "araclar",
+   "ikon": "org.xfce.catfish",
+   "ozet": {
+    "tr": "Hızlı dosya arama aracı (Xfce).",
+    "en": "Fast file search tool (Xfce)."
+   },
+   "aciklama": {
+    "tr": "Dosyaları ada, türe ve değişme tarihine göre bulun; Thunar ile uyumlu.",
+    "en": "Find files by name, type and modification date; works well with Thunar."
+   },
+   "boyut": "~5 MB",
+   "lisans": "GPL-2.0",
+   "site": "https://docs.xfce.org/apps/catfish/start"
+  },
+  {
+   "paket": "fsearch",
+   "ad": "FSearch",
+   "kategori": "araclar",
+   "ikon": "io.github.cboxdoerfer.FSearch",
+   "ozet": {
+    "tr": "Anında sonuç veren dosya arama (Everything benzeri).",
+    "en": "Instant file search (similar to Everything)."
+   },
+   "aciklama": {
+    "tr": "Disk dizinini önceden tarar; yazarken milyonlarca dosya arasından anında sonuç gösterir.",
+    "en": "Indexes your disks ahead of time and shows results among millions of files as you type."
+   },
+   "boyut": "~5 MB",
+   "lisans": "GPL-2.0",
+   "site": "https://cboxdoerfer.github.io/fsearch/"
+  },
+  {
+   "paket": "ksnip",
+   "ad": "ksnip",
+   "kategori": "araclar",
+   "ikon": "org.ksnip.ksnip",
+   "ozet": {
+    "tr": "Not ekleyebildiğin ekran görüntüsü aracı.",
+    "en": "Screenshot tool with annotations."
+   },
+   "aciklama": {
+    "tr": "Bölge, pencere ya da tam ekran görüntüsü alıp ok, metin, bulanıklaştırma ve numara ekleyin.",
+    "en": "Capture a region, window or full screen and add arrows, text, blur and numbering."
+   },
+   "boyut": "~75 MB",
+   "lisans": "GPL-2.0",
+   "site": "https://github.com/ksnip/ksnip"
+  },
+  {
+   "paket": "gtkhash",
+   "ad": "GtkHash",
+   "kategori": "araclar",
+   "ikon": "org.gtkhash.gtkhash",
+   "ozet": {
+    "tr": "Dosya özeti (SHA-256, MD5) hesaplama ve doğrulama.",
+    "en": "File hash (SHA-256, MD5) calculator and checker."
+   },
+   "aciklama": {
+    "tr": "İndirdiğiniz dosyanın SHA-256 değerini hesaplayıp yayımlananla karşılaştırın; Thunar'a sağ tık menüsü ekler.",
+    "en": "Compute a download's SHA-256 and compare it with the published value; adds a Thunar right-click entry."
+   },
+   "boyut": "~2 MB",
+   "lisans": "GPL-2.0",
+   "site": "https://gtkhash.org"
+  },
+  {
+   "paket": "xarchiver",
+   "ad": "Xarchiver",
+   "kategori": "araclar",
+   "ikon": "xarchiver",
+   "ozet": {
+    "tr": "Hafif arşiv yöneticisi (zip, tar, 7z, rar).",
+    "en": "Lightweight archive manager (zip, tar, 7z, rar)."
+   },
+   "aciklama": {
+    "tr": "Arşivleri açın, oluşturun ve içine bakın; Thunar'daki 'Buraya çıkar' menüsüyle çalışır.",
+    "en": "Open, create and browse archives; works with Thunar's 'Extract here' menu."
+   },
+   "boyut": "~60 MB",
+   "lisans": "GPL-2.0",
+   "site": "https://github.com/ib/xarchiver"
+  },
+  {
+   "paket": "galculator",
+   "ad": "Galculator",
+   "kategori": "araclar",
+   "ikon": "galculator",
+   "ozet": {
+    "tr": "Bilimsel hesap makinesi.",
+    "en": "Scientific calculator."
+   },
+   "aciklama": {
+    "tr": "Bilimsel ve programcı kipleri (onaltılık, ikilik), ters Lehçe gösterim; çok hafif.",
+    "en": "Scientific and programmer modes (hex, binary) and RPN; very light."
+   },
+   "boyut": "~2 MB",
+   "lisans": "GPL-2.0",
+   "site": "http://galculator.mnim.org"
+  },
+  {
+   "paket": "plank",
+   "ad": "Plank",
+   "kategori": "araclar",
+   "ikon": "plank",
+   "ozet": {
+    "tr": "Ekranın altında sade bir uygulama rıhtımı (dock).",
+    "en": "A simple application dock at the bottom of the screen."
+   },
+   "aciklama": {
+    "tr": "Sık kullandığınız uygulamaları simgelerle başlatın; macOS tarzı rıhtım. Biraz bellek kullanır.",
+    "en": "Launch your favourite apps from icons; a macOS-style dock. Uses a little memory."
+   },
+   "boyut": "~6 MB",
+   "lisans": "GPL-3.0",
+   "site": "https://launchpad.net/plank"
+  },
+  {
+   "paket": "virt-manager",
+   "ad": "Sanal Makine Yöneticisi",
+   "kategori": "sistem",
+   "ikon": "virt-manager",
+   "ozet": {
+    "tr": "KVM ile sanal makine oluşturma ve yönetme.",
+    "en": "Create and manage virtual machines with KVM."
+   },
+   "aciklama": {
+    "tr": "Başka işletim sistemlerini ve güvenlik laboratuvarlarını sanal makinede güvenle deneyin.",
+    "en": "Safely try other operating systems and security labs in virtual machines."
+   },
+   "boyut": "~340 MB",
+   "lisans": "GPL-2.0",
+   "site": "https://virt-manager.org"
+  },
+  {
+   "paket": "gnome-boxes",
+   "ad": "Boxes",
+   "kategori": "sistem",
+   "ikon": "org.gnome.Boxes",
+   "ozet": {
+    "tr": "Tek tıkla sanal makine.",
+    "en": "One-click virtual machines."
+   },
+   "aciklama": {
+    "tr": "ISO dosyası seçip birkaç adımda sanal makine kurun; virt-manager'a göre çok daha basit.",
+    "en": "Pick an ISO file and set up a virtual machine in a few steps; much simpler than virt-manager."
+   },
+   "boyut": "~660 MB",
+   "lisans": "LGPL-2.0",
+   "site": "https://apps.gnome.org/Boxes/"
+  },
+  {
+   "paket": "btop",
+   "ad": "btop",
+   "kategori": "sistem",
+   "ikon": "utilities-terminal",
+   "ozet": {
+    "tr": "Renkli, grafikli terminal sistem izleyicisi.",
+    "en": "Colourful terminal system monitor with graphs."
+   },
+   "aciklama": {
+    "tr": "İşlemci, bellek, disk, ağ ve süreçleri grafiklerle izleyin; fareyle de kullanılır.",
+    "en": "Watch CPU, memory, disk, network and processes with graphs; mouse support too."
+   },
+   "boyut": "~2 MB",
+   "lisans": "Apache-2.0",
+   "site": "https://github.com/aristocratos/btop"
+  },
+  {
+   "paket": "ncdu",
+   "ad": "ncdu",
+   "kategori": "sistem",
+   "ikon": "utilities-terminal",
+   "ozet": {
+    "tr": "Diski ne kaplıyor? Terminalde hızlı disk kullanımı.",
+    "en": "What fills the disk? Fast disk usage in the terminal."
+   },
+   "aciklama": {
+    "tr": "Klasörleri boyuta göre sıralar; büyük dosyaları bulup oradan silebilirsiniz.",
+    "en": "Sorts folders by size; find big files and delete them right there."
+   },
+   "boyut": "~1 MB",
+   "lisans": "MIT",
+   "site": "https://dev.yorhel.nl/ncdu"
+  },
+  {
+   "paket": "cpu-x",
+   "ad": "CPU-X",
+   "kategori": "sistem",
+   "ikon": "io.github.thetumultuousunicornofdarkness.cpu-x",
+   "ozet": {
+    "tr": "İşlemci, anakart ve bellek ayrıntıları (CPU-Z benzeri).",
+    "en": "CPU, motherboard and memory details (similar to CPU-Z)."
+   },
+   "aciklama": {
+    "tr": "İşlemci modeli, saat hızları, önbellek, bellek ve ekran kartı bilgileri tek pencerede.",
+    "en": "CPU model, clock speeds, cache, memory and graphics card info in one window."
+   },
+   "boyut": "~16 MB",
+   "lisans": "GPL-3.0",
+   "site": "https://thetumultuousunicornofdarkness.github.io/CPU-X/"
+  },
+  {
+   "paket": "flatpak",
+   "ad": "Flatpak",
+   "kategori": "sistem",
+   "ikon": "package-x-generic",
+   "ozet": {
+    "tr": "Debian'da bulunmayan uygulamalar için kapalı kutu paket sistemi.",
+    "en": "Sandboxed package system for apps that aren't in Debian."
+   },
+   "aciklama": {
+    "tr": "Flathub'daki OnlyOffice, Signal, Discord gibi uygulamaları ayrı bir korumalı alanda kurmanızı sağlar. Bu uygulamalar Debian güvenlik ekibince denetlenmez; kaynağına güvendiğinizi kurun.",
+    "en": "Lets you install apps from Flathub such as OnlyOffice, Signal or Discord in a separate sandbox. These apps aren't reviewed by the Debian security team; install only what you trust."
+   },
+   "boyut": "~80 MB",
+   "lisans": "LGPL-2.1",
+   "site": "https://flatpak.org"
+  },
+  {
+   "paket": "stacer",
+   "ad": "Stacer",
+   "kategori": "sistem",
+   "ikon": "stacer",
+   "ozet": {
+    "tr": "Sistem izleme ve temizlik paneli.",
+    "en": "System monitoring and clean-up dashboard."
+   },
+   "aciklama": {
+    "tr": "Kaynak kullanımı, açılışta başlayan uygulamalar, servisler ve önbellek temizliği tek arayüzde.",
+    "en": "Resource usage, startup apps, services and cache clean-up in one interface."
+   },
+   "boyut": "~80 MB",
+   "lisans": "GPL-3.0",
+   "site": "https://github.com/oguzhaninan/Stacer"
+  },
+  {
+   "paket": "kleopatra",
+   "ad": "Kleopatra",
+   "kategori": "guvenlik",
+   "ikon": "org.kde.kleopatra",
+   "ozet": {
+    "tr": "GPG anahtarları ve imza doğrulama için grafik arayüz.",
+    "en": "Graphical interface for GPG keys and signature checks."
+   },
+   "aciklama": {
+    "tr": "Dosya şifreleyin, imzalayın ve imza doğrulayın (ör. CarotOS ISO'sunun SHA256SUMS imzası); anahtar yönetimi.",
+    "en": "Encrypt, sign and verify files (e.g. the CarotOS ISO's SHA256SUMS signature) and manage keys."
+   },
+   "boyut": "~370 MB",
+   "lisans": "GPL-2.0",
+   "site": "https://apps.kde.org/kleopatra/"
+  },
+  {
+   "paket": "gobuster",
+   "ad": "Gobuster",
+   "kategori": "guvenlik",
+   "ikon": "utilities-terminal",
+   "ozet": {
+    "tr": "Web dizin ve alt alan adı keşfi.",
+    "en": "Web directory and subdomain discovery."
+   },
+   "aciklama": {
+    "tr": "Kelime listesiyle bir web sitesindeki gizli dizinleri, dosyaları ve alt alan adlarını bulur. Yalnızca izinli hedeflerde.",
+    "en": "Finds hidden directories, files and subdomains on a website using a wordlist. Authorised targets only."
+   },
+   "boyut": "~10 MB",
+   "lisans": "Apache-2.0",
+   "site": "https://github.com/OJ/gobuster"
+  },
+  {
+   "paket": "ffuf",
+   "ad": "ffuf",
+   "kategori": "guvenlik",
+   "ikon": "utilities-terminal",
+   "ozet": {
+    "tr": "Hızlı web bulanıklaştırıcı (fuzzer).",
+    "en": "Fast web fuzzer."
+   },
+   "aciklama": {
+    "tr": "URL, parametre ve başlıklara kelime listesinden değerler deneyerek gizli içerikleri bulur. Yalnızca izinli hedeflerde.",
+    "en": "Finds hidden content by trying wordlist values in URLs, parameters and headers. Authorised targets only."
+   },
+   "boyut": "~10 MB",
+   "lisans": "MIT",
+   "site": "https://github.com/ffuf/ffuf"
+  },
+  {
+   "paket": "whatweb",
+   "ad": "WhatWeb",
+   "kategori": "guvenlik",
+   "ikon": "utilities-terminal",
+   "ozet": {
+    "tr": "Bir web sitesinin hangi teknolojileri kullandığını tanır.",
+    "en": "Identifies the technologies a website uses."
+   },
+   "aciklama": {
+    "tr": "Web sunucusu, CMS (WordPress vb.), çerçeveler ve sürümleri; keşif aşamasının ilk adımı.",
+    "en": "Web server, CMS (WordPress etc.), frameworks and versions; the first step of reconnaissance."
+   },
+   "boyut": "~65 MB",
+   "lisans": "GPL-2.0",
+   "site": "https://morningstarsecurity.com/research/whatweb"
+  },
+  {
+   "paket": "arp-scan",
+   "ad": "arp-scan",
+   "kategori": "guvenlik",
+   "ikon": "utilities-terminal",
+   "ozet": {
+    "tr": "Yerel ağdaki cihazları ARP ile hızla listeler.",
+    "en": "Quickly lists devices on the local network using ARP."
+   },
+   "aciklama": {
+    "tr": "Ağınızdaki her cihazın IP ve MAC adresini ve üreticisini gösterir; ağında tanımadığın cihaz var mı bak.",
+    "en": "Shows the IP, MAC address and vendor of every device on your network; see whether there are devices you don't recognise."
+   },
+   "boyut": "~20 MB",
+   "lisans": "GPL-3.0",
+   "site": "https://github.com/royhills/arp-scan"
+  },
+  {
+   "paket": "testdisk",
+   "ad": "TestDisk ve PhotoRec",
+   "kategori": "guvenlik",
+   "ikon": "utilities-terminal",
+   "ozet": {
+    "tr": "Silinen dosyaları ve kayıp bölümleri kurtarma.",
+    "en": "Recover deleted files and lost partitions."
+   },
+   "aciklama": {
+    "tr": "TestDisk bozulan bölüm tablolarını onarır, PhotoRec silinmiş fotoğraf ve belgeleri kurtarır (adli bilişimde de kullanılır).",
+    "en": "TestDisk repairs broken partition tables, PhotoRec recovers deleted photos and documents (also used in forensics)."
+   },
+   "boyut": "~5 MB",
+   "lisans": "GPL-2.0",
+   "site": "https://www.cgsecurity.org"
+  },
+  {
+   "paket": "sleuthkit",
+   "ad": "The Sleuth Kit",
+   "kategori": "guvenlik",
+   "ikon": "utilities-terminal",
+   "ozet": {
+    "tr": "Adli bilişim: disk görüntüsü inceleme araçları.",
+    "en": "Forensics: disk image analysis tools."
+   },
+   "aciklama": {
+    "tr": "Disk görüntülerindeki dosya sistemlerini, silinmiş dosyaları ve zaman çizelgesini inceleyin.",
+    "en": "Examine file systems, deleted files and timelines in disk images."
+   },
+   "boyut": "~30 MB",
+   "lisans": "IPL-1.0 / CPL-1.0",
+   "site": "https://www.sleuthkit.org"
   }
  ]
 }

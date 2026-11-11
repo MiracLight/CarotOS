@@ -129,10 +129,12 @@ def konu():
         (T("Dikkat", "Be careful"), [
             ("uyari", T("Açıklama bir yol göstericidir, güvenlik kontrolü değildir. Bilmediğin bir komutun "
                         "açıklaması rahatlatıcı görünse bile, kaynağına güvenmiyorsan çalıştırma. "
-                        "Saldırı araçlarının bayrakları şimdilik kapsam dışındadır.",
+                        "Test araçlarında (nmap, hydra…) açıklama, aracın nasıl çalıştığını ve savunmacının "
+                        "onu nasıl gördüğünü de anlatır; bunları yalnızca sana ait ya da izinli sistemlerde kullan.",
                         "The explanation is a guide, not a security check. Even if the explanation of an "
                         "unfamiliar command looks reassuring, do not run it if you do not trust where it came "
-                        "from. The flags of attack tools are out of scope for now.")),
+                        "from. For testing tools (nmap, hydra…) it also explains how the tool works and how a "
+                        "defender sees it; use them only on systems you own or are allowed to test.")),
         ]),
     ]
     return {

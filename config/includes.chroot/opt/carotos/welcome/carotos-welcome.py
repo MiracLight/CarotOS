@@ -831,12 +831,14 @@ PAGES = [
             }),
             ("code", "carotos-acikla tar xzf arsiv.tar.gz"),
             ("note", {
-                "tr": "Yapay zekâ değildir: hazır bir veri tabanıyla çalışır; kapsamı şimdilik temel Linux "
-                      "komutları ve savunma araçlarıdır. Değişkenleri ($ADI) ve takma adları çözmez, yalnızca "
-                      "bash'te çalışır. Bir komutu anlamadan çalıştırma.",
-                "en": "It is not an AI: it works from a ready-made database, and for now it covers the basic Linux "
-                      "commands and defensive tools. It doesn't resolve variables ($NAME) or aliases and works only "
-                      "in bash. Never run a command you don't understand.",
+                "tr": "Yapay zekâ değildir: hazır bir veri tabanıyla çalışır; temel Linux komutlarını, savunma "
+                      "araçlarını ve Güvenlik Paneli'ndeki test araçlarını (nmap, hydra, sqlmap…) tanır. Panel'deki "
+                      "\"Açıkla\" düğmesi de aynı açıklamayı gösterir. Değişkenleri ($ADI) ve takma adları çözmez, "
+                      "yalnızca bash'te çalışır. Bir komutu anlamadan çalıştırma.",
+                "en": "It is not an AI: it works from a ready-made database and knows the basic Linux commands, "
+                      "defensive tools and the testing tools in the Security Panel (nmap, hydra, sqlmap…). The "
+                      "Panel's \"Explain\" button shows the same explanation. It doesn't resolve variables ($NAME) or "
+                      "aliases and works only in bash. Never run a command you don't understand.",
             }),
         ],
     },
@@ -2710,7 +2712,7 @@ class WelcomeWindow(Gtk.Window):
         .note-box {{ background-color: {tema.rgba_metni(p['vurgu'], 0.10)};
                      border: 1px solid {tema.rgba_metni(p['vurgu'], 0.35)};
                      border-radius: 10px; }}
-        .note-mark {{ color: #ffffff; background-color: {p['vurgu']};
+        .note-mark {{ color: {p['ana_yazi']}; background-color: {p['vurgu']};
                       font-weight: bold; font-size: 88%; border-radius: 999px;
                       min-width: 19px; min-height: 19px; }}
         .note-text {{ color: {p['yazi']}; font-size: 95%; }}

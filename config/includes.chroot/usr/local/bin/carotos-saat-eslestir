@@ -1,5 +1,9 @@
 #!/bin/sh
-# CarotOS — panel saatini sistemin zaman dilimiyle eslestirir (her oturum acilisinda calisir).
+# CarotOS — panel saatini sistemin zaman dilimiyle eslestirir.
+#
+#   carotos-saat-eslestir           bir kez eslestirir
+#   carotos-saat-eslestir --izle    eslestirir, sonra oturum boyunca dilim degisikligini izler
+#                                   (oturum acilisinda autostart bu kipte calistirir)
 #
 # NEDEN VAR:
 # Xfce panelinin saat eklentisi, "timezone" ayari bos ise yerel saati GLib'e birakir
@@ -7,10 +11,63 @@
 # sonra dilim degisirse (kurulum sonrasi, ayarlardan, ag saatiyle) panel eski dilimde
 # kalir ve saati yanlis gosterir; eklentiyi silip yeniden eklemek bunu duzeltiyordu.
 # Burada sistemin gercek dilimi eklentiye ACIKCA yazilir: eklenti GLib'in yerel
-# onbellegine bagimli kalmaz ve degisiklik aninda uygulanir.
+# onbellegine bagimli kalmaz ve degisiklik aninda uygulanir. --izle kipinde oturum
+# sirasinda dilim degisirse (timedatectl set-timezone, tzdata ayari) panel kendiliginden
+# guncellenir; eklentiyi kaldirip eklemek gerekmez.
+#
+# Izleme ucuzdur: birkac saniyede bir /etc/localtime baglantisinin hedefine ve
+# /etc/timezone'un degisme zamanina bakar (timedatectl'i yalniz degisiklikte cagirir,
+# boylece systemd-timedated surekli uyandirilmaz).
 #
 # Guvenlik: dilim adi yalnizca [A-Za-z0-9_+/-] icerebilir ve /usr/share/zoneinfo altinda
 # gercekten var olmalidir; aksi halde hicbir sey yazilmaz (eklenti yerel saatte kalir).
+
+IZLENEN="${CAROTOS_SAAT_IZLENEN:-/etc/localtime /etc/timezone}"
+ARALIK="${CAROTOS_SAAT_ARALIK:-15}"
+case "$ARALIK" in '' | *[!0-9]*) ARALIK=15 ;; esac
+[ "$ARALIK" -ge 1 ] || ARALIK=15
+
+esitle() {
+    ZAMAN_DILIMI=$(timedatectl show -p Timezone --value 2>/dev/null)
+    [ -n "$ZAMAN_DILIMI" ] || ZAMAN_DILIMI=$(cat /etc/timezone 2>/dev/null)
+    [ -n "$ZAMAN_DILIMI" ] || ZAMAN_DILIMI=$(readlink /etc/localtime 2>/dev/null | sed 's#.*/zoneinfo/##')
+    [ -n "$ZAMAN_DILIMI" ] || return 0
+
+    case "$ZAMAN_DILIMI" in
+        *[!A-Za-z0-9_+/-]* | /* | *..*) return 0 ;;
+    esac
+    [ -f "/usr/share/zoneinfo/$ZAMAN_DILIMI" ] || return 0
+
+    # Betigin en son yazdigi deger saklanir: kullanici panelden BASKA bir sehir sectiyse (deger bos degil ve
+    # betigin yazdigindan farkli) ona dokunulmaz.
+    CFG="${XDG_CONFIG_HOME:-$HOME/.config}"
+    ISARET="$CFG/carotos/saat-dilimi"
+    SON=$(cat "$ISARET" 2>/dev/null)
+
+    for eklenti in $(xfconf-query -c xfce4-panel -l 2>/dev/null \
+        | grep -oE '/plugins/plugin-[0-9]+' | sort -u); do
+        tur=$(xfconf-query -c xfce4-panel -p "$eklenti" 2>/dev/null)
+        [ "$tur" = "clock" ] || continue
+        mevcut=$(xfconf-query -c xfce4-panel -p "$eklenti/timezone" 2>/dev/null)
+        [ "$mevcut" = "$ZAMAN_DILIMI" ] && continue
+        if [ -n "$mevcut" ] && [ "$mevcut" != "$SON" ]; then
+            continue
+        fi
+        xfconf-query -c xfce4-panel -p "$eklenti/timezone" -n -t string -s "$ZAMAN_DILIMI" 2>/dev/null \
+            || xfconf-query -c xfce4-panel -p "$eklenti/timezone" -s "$ZAMAN_DILIMI" 2>/dev/null
+    done
+
+    mkdir -p "$(dirname "$ISARET")" 2>/dev/null
+    printf '%s\n' "$ZAMAN_DILIMI" > "$ISARET" 2>/dev/null
+    return 0
+}
+
+# Izlenen dosyalarin "imzasi": baglanti hedefi + degisme zamani (dosya yoksa bos)
+imza() {
+    for d in $IZLENEN; do
+        printf '%s:%s:%s;' "$d" "$(readlink "$d" 2>/dev/null)" "$(stat -L -c %Y "$d" 2>/dev/null)"
+    done
+}
 
 # xfconfd hazir olana kadar bekle (en fazla 15 saniye)
 i=0
@@ -20,36 +77,16 @@ while [ "$i" -lt 15 ]; do
     sleep 1
 done
 
-ZAMAN_DILIMI=$(timedatectl show -p Timezone --value 2>/dev/null)
-[ -n "$ZAMAN_DILIMI" ] || ZAMAN_DILIMI=$(cat /etc/timezone 2>/dev/null)
-[ -n "$ZAMAN_DILIMI" ] || ZAMAN_DILIMI=$(readlink /etc/localtime 2>/dev/null | sed 's#.*/zoneinfo/##')
-[ -n "$ZAMAN_DILIMI" ] || exit 0
+esitle
 
-case "$ZAMAN_DILIMI" in
-    *[!A-Za-z0-9_+/-]* | /* | *..*) exit 0 ;;
-esac
-[ -f "/usr/share/zoneinfo/$ZAMAN_DILIMI" ] || exit 0
+[ "${1:-}" = "--izle" ] || exit 0
 
-# Betigin en son yazdigi deger saklanir: kullanici panelden BASKA bir sehir sectiyse (deger bos degil ve
-# betigin yazdigindan farkli) ona dokunulmaz.
-CFG="${XDG_CONFIG_HOME:-$HOME/.config}"
-ISARET="$CFG/carotos/saat-dilimi"
-SON=$(cat "$ISARET" 2>/dev/null)
-
-for eklenti in $(xfconf-query -c xfce4-panel -l 2>/dev/null \
-    | grep -oE '/plugins/plugin-[0-9]+' | sort -u); do
-    tur=$(xfconf-query -c xfce4-panel -p "$eklenti" 2>/dev/null)
-    [ "$tur" = "clock" ] || continue
-    mevcut=$(xfconf-query -c xfce4-panel -p "$eklenti/timezone" 2>/dev/null)
-    [ "$mevcut" = "$ZAMAN_DILIMI" ] && continue
-    if [ -n "$mevcut" ] && [ "$mevcut" != "$SON" ]; then
-        continue
+onceki=$(imza)
+while :; do
+    sleep "$ARALIK"
+    simdiki=$(imza)
+    if [ "$simdiki" != "$onceki" ]; then
+        onceki=$simdiki
+        esitle
     fi
-    xfconf-query -c xfce4-panel -p "$eklenti/timezone" -n -t string -s "$ZAMAN_DILIMI" 2>/dev/null \
-        || xfconf-query -c xfce4-panel -p "$eklenti/timezone" -s "$ZAMAN_DILIMI" 2>/dev/null
 done
-
-mkdir -p "$(dirname "$ISARET")" 2>/dev/null
-printf '%s\n' "$ZAMAN_DILIMI" > "$ISARET" 2>/dev/null
-
-exit 0

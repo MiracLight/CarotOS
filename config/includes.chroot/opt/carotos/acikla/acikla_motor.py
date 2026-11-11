@@ -26,11 +26,12 @@ if _BURASI not in sys.path:
 
 import dil  # noqa: E402
 import veri_guvenlik  # noqa: E402
+import veri_saldiri  # noqa: E402
 import veri_temel  # noqa: E402
 import veri_tehlike  # noqa: E402
 
-KOMUTLAR = {**veri_guvenlik.KOMUTLAR, **veri_temel.KOMUTLAR}
-TAKMA_ADLAR = {**veri_guvenlik.TAKMA_ADLAR, **veri_temel.TAKMA_ADLAR}   # örn. mkfs.ext4 -> mkfs
+KOMUTLAR = {**veri_saldiri.KOMUTLAR, **veri_guvenlik.KOMUTLAR, **veri_temel.KOMUTLAR}
+TAKMA_ADLAR = {**veri_saldiri.TAKMA_ADLAR, **veri_guvenlik.TAKMA_ADLAR, **veri_temel.TAKMA_ADLAR}   # örn. mkfs.ext4 -> mkfs
 
 SEVIYE_SIRASI = {"dusuk": 0, "orta": 1, "yuksek": 2}
 KONTROL_ISLEMLERI = {"|", "||", "&&", ";", "&", "|&"}
@@ -74,6 +75,8 @@ ETIKETLER = {
     "seviye_orta": T("orta", "medium"),
     "seviye_yuksek": T("yüksek", "high"),
     "arguman": T("Argümanlar", "Arguments"),
+    "nasil": T("Nasıl çalışır", "How it works"),
+    "savunma": T("Savunma tarafı", "The defender's side"),
     "etik": T("Yalnızca sana ait ya da yazılı izin aldığın sistemlerde kullan.",
               "Use it only on systems you own or have written permission to test."),
 }
@@ -259,6 +262,7 @@ def parca_coz(parca):
         "program": program, "komut": ad, "argumanlar": argumanlar, "sudo": sudo, "atamalar": atamalar,
         "bilinen": tanim is not None, "ozet": None, "bayraklar": [], "bilinmeyen": [], "konumsal": [],
         "gurultu": None, "root": None, "uyari": None, "gsd": None, "etik": False,
+        "nasil": None, "savunma": None,
         "altkomut": None, "parametreler": [],
         "yonlendirme": parca["yonlendirme"], "komut_yerine": parca["komut_yerine"],
     }
@@ -292,6 +296,8 @@ def parca_coz(parca):
     sonuc["uyari"] = tanim.get("uyari")
     sonuc["gsd"] = tanim.get("gsd")
     sonuc["etik"] = bool(tanim.get("etik"))
+    sonuc["nasil"] = tanim.get("nasil")
+    sonuc["savunma"] = tanim.get("savunma")
     return sonuc
 
 
@@ -397,6 +403,10 @@ def metin_olustur(sonuc: dict, kod: str = "tr") -> str:
         for op, hedef in p["yonlendirme"]:
             anahtar = "yonlendirme_oku" if "<" in op else ("yonlendirme_ekle" if ">>" in op else "yonlendirme_yaz")
             satirlar.append(f"  {op} {hedef}: {E(anahtar)}")
+        if p["nasil"]:
+            satirlar.append("  " + E("nasil") + ": " + _metin(p["nasil"], kod))
+        if p["savunma"]:
+            satirlar.append("  " + E("savunma") + ": " + _metin(p["savunma"], kod))
         if p["uyari"]:
             satirlar.append("  " + E("uyari") + ": " + _metin(p["uyari"], kod))
         if p["etik"]:

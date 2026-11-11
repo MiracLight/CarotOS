@@ -327,4 +327,57 @@ TERIMLER = [
         },
         "ilgili": ["hash_fonksiyonu"],
     },
+    {
+        "id": "luks",
+        "baslik": {"tr": "LUKS (Disk Şifreleme)", "en": "LUKS (Disk Encryption)"},
+        "kisa": {"tr": "Linux'ta bir disk bölümünü baştan sona şifreleyen standart.", "en": "The Linux standard for encrypting a whole disk partition."},
+        "aciklama": {
+            "tr": "Bilgisayar açılırken parola sorulur; parola olmadan disk okunamaz. Dizüstü bilgisayar çalınsa ya da disk sökülse bile veriler korunur. Takas alanı (swap) da şifreli bölümün içinde olmalıdır, yoksa bellekten taşan parolalar diske açık yazılabilir.\n\nParola doğrudan anahtar değildir: bir anahtar türetme işleviyle (argon2id) asıl şifreleme anahtarını açar. Parolayı unutursanız veri kurtarılamaz.",
+            "en": "A password is asked at boot; without it the disk can't be read. Data stays protected even if the laptop is stolen or the disk is removed. Swap must be inside the encrypted partition too, otherwise passwords spilling out of memory may be written to disk in plain form.\n\nThe password isn't the key itself: a key derivation function (argon2id) uses it to unlock the real encryption key. If you forget the password, the data can't be recovered.",
+        },
+        "ornek": "lsblk -f      # crypto_LUKS türündeki bölümler şifrelidir",
+        "ilgili": ["sifreleme", "aes", "anahtar_turetme", "swap"],
+    },
+    {
+        "id": "anahtar_turetme",
+        "baslik": {"tr": "Anahtar Türetme İşlevi (KDF)", "en": "Key Derivation Function (KDF)"},
+        "kisa": {"tr": "Bir paroladan, kırılması bilerek yavaşlatılmış biçimde şifreleme anahtarı üreten işlev.", "en": "A function that turns a password into an encryption key in a deliberately slow way."},
+        "aciklama": {
+            "tr": "PBKDF2, bcrypt, scrypt ve Argon2 bu işi yapar. Her denemeyi binlerce kez tekrar ettirip (ve Argon2'de bellek de harcatarak) parola tahminini çok pahalı hâle getirir: kullanıcı için 0,5 saniye fark edilmez, ama milyarlarca deneme yapmak isteyen saldırgan için yıllara dönüşür.\n\nLUKS, WPA2 ve modern parola özetleri (yescrypt) bu yöntemi kullanır.",
+            "en": "PBKDF2, bcrypt, scrypt and Argon2 do this job. By repeating every attempt thousands of times (and in Argon2's case also using memory) they make password guessing very expensive: half a second isn't noticeable for a user, but turns into years for an attacker wanting billions of tries.\n\nLUKS, WPA2 and modern password hashes (yescrypt) use this approach.",
+        },
+        "ilgili": ["hash_fonksiyonu", "tuzlama", "luks", "kaba_kuvvet"],
+    },
+    {
+        "id": "hmac",
+        "baslik": {"tr": "HMAC", "en": "HMAC"},
+        "kisa": {"tr": "Gizli bir anahtar ve özet işleviyle bir iletinin değiştirilmediğini ve kimden geldiğini doğrulama.", "en": "Verifying that a message wasn't altered and who it came from, using a secret key and a hash function."},
+        "aciklama": {
+            "tr": "Düz bir özeti (SHA-256) herkes yeniden hesaplayabilir; HMAC ise yalnızca anahtarı bilenin üretebileceği bir etiket çıkarır. Web servislerinin imzalı istekleri, oturum belirteçleri ve Poligon CTF'inde her öğrenciye özel bayrak üretimi HMAC kullanır.\n\nKarşılaştırma sabit sürede yapılmalıdır; aksi hâlde zamanlama farkından etiket tahmin edilebilir.",
+            "en": "Anyone can recompute a plain hash (SHA-256); HMAC produces a tag that only someone who knows the key can create. Signed web service requests, session tokens and Poligon CTF's per-student flag generation use HMAC.\n\nComparison must be constant-time, otherwise the tag can be guessed from timing differences.",
+        },
+        "ilgili": ["hash_fonksiyonu", "sha256", "sayisal_imza"],
+    },
+    {
+        "id": "saglama_toplami",
+        "baslik": {"tr": "Sağlama Toplamı (Checksum)", "en": "Checksum"},
+        "kisa": {"tr": "Bir dosyanın indirme sırasında bozulmadığını ya da değiştirilmediğini anlamak için hesaplanan özet.", "en": "A hash computed to check that a file wasn't corrupted or changed during download."},
+        "aciklama": {
+            "tr": "Yayıncı dosyanın SHA-256 değerini yayımlar, siz indirdiğiniz dosyanınkini hesaplayıp karşılaştırırsınız. Tek bir bit bile değişse değer tamamen farklı çıkar.\n\nSağlama toplamı tek başına sahteciliği önlemez: saldırgan hem dosyayı hem de değeri değiştirebilir. Bu yüzden SHA256SUMS dosyası ayrıca GPG ile imzalanır; imza doğrulanınca değerin gerçekten yayıncıdan geldiği kanıtlanır.",
+            "en": "The publisher posts the file's SHA-256 value; you compute it for your download and compare. If even a single bit changes, the value is completely different.\n\nA checksum alone doesn't stop forgery: an attacker can change both the file and the value. That's why the SHA256SUMS file is also signed with GPG; a valid signature proves the value really came from the publisher.",
+        },
+        "ornek": "sha256sum -c SHA256SUMS",
+        "ilgili": ["sha256", "pgp_gpg", "sayisal_imza", "parmak_izi"],
+    },
+    {
+        "id": "parmak_izi",
+        "baslik": {"tr": "Anahtar Parmak İzi (Fingerprint)", "en": "Key Fingerprint"},
+        "kisa": {"tr": "Bir açık anahtarı kısa ve karşılaştırılabilir biçimde tanımlayan özet değeri.", "en": "A hash that identifies a public key in a short, comparable form."},
+        "aciklama": {
+            "tr": "Bir GPG ya da SSH anahtarının parmak izi 40 karakterlik bir onaltılık dizidir. Bir anahtarın gerçekten beklediğiniz kişiye ait olduğunu, parmak izini birden çok bağımsız kaynaktan (site, GitHub, README) karşılaştırarak anlarsınız.\n\nSSH bir sunucuya ilk bağlanışta parmak izini gösterir; sonradan değişirse olası bir ortadaki adam saldırısı için uyarır.",
+            "en": "A GPG or SSH key's fingerprint is a 40-character hex string. You know a key really belongs to who you expect by comparing its fingerprint across several independent sources (website, GitHub, README).\n\nSSH shows the fingerprint on your first connection to a server and warns about a possible man-in-the-middle attack if it changes later.",
+        },
+        "ornek": "gpg --show-keys --fingerprint anahtar.asc",
+        "ilgili": ["pgp_gpg", "acik_anahtar", "mitm", "saglama_toplami"],
+    },
 ]

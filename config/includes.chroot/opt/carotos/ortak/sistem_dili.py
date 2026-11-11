@@ -23,8 +23,12 @@ HAZIRLIK = {
     "ru": {"locale": "ru_RU.UTF-8", "paketler": ("hunspell-ru",), "firefox": "ru", "ofis": "ru"},
     "es": {"locale": "es_ES.UTF-8", "paketler": ("hunspell-es",), "firefox": "es-es", "ofis": "es"},
     "pt": {"locale": "pt_BR.UTF-8", "paketler": ("hunspell-pt-br",), "firefox": "pt-br", "ofis": "pt-br"},
-    "ja": {"locale": "ja_JP.UTF-8", "paketler": ("fonts-noto-cjk",), "firefox": "ja", "ofis": "ja"},
-    "zh": {"locale": "zh_CN.UTF-8", "paketler": ("fonts-noto-cjk",), "firefox": "zh-cn", "ofis": "zh-cn"},
+    # Japonca/Cince: yazi tipi + girdi yontemi (fcitx5; Japonca icin Mozc). Yalniz bu dili secen kurar;
+    # im-config oturum acilisinda fcitx5'i baslatir (calisirken ~70-100 MB RAM, diger dillerde sifir).
+    "ja": {"locale": "ja_JP.UTF-8", "firefox": "ja", "ofis": "ja",
+           "paketler": ("fonts-noto-cjk", "fcitx5", "fcitx5-mozc", "fcitx5-frontend-gtk3", "im-config")},
+    "zh": {"locale": "zh_CN.UTF-8", "firefox": "zh-cn", "ofis": "zh-cn",
+           "paketler": ("fonts-noto-cjk", "fcitx5", "fcitx5-chinese-addons", "fcitx5-frontend-gtk3", "im-config")},
     "fr": {"locale": "fr_FR.UTF-8", "paketler": ("hunspell-fr",), "firefox": "fr", "ofis": "fr"},
 }
 # Dil paketi kurulu mu diye bakilacak ana paketler: biri kuruluysa onun dil paketi de eklenir

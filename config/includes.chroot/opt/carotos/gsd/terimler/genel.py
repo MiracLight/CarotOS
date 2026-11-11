@@ -478,4 +478,67 @@ TERIMLER = [
         },
         "ilgili": ["git"],
     },
+    {
+        "id": "markdown",
+        "baslik": {"tr": "Markdown", "en": "Markdown"},
+        "kisa": {"tr": "Düz metinde basit işaretlerle biçimlendirme yapmaya yarayan yazım dili.", "en": "A writing syntax for formatting plain text with simple marks."},
+        "aciklama": {
+            "tr": "# başlık, **kalın**, *eğik*, - madde ve [bağlantı](adres) gibi işaretler kullanılır; dosya her düzenleyicide okunabilir kalır ve HTML ya da PDF'e çevrilebilir. GitHub README dosyaları, notlar ve belgeler için yaygındır.",
+            "en": "Marks like # heading, **bold**, *italic*, - item and [link](address) are used; the file stays readable in any editor and can be turned into HTML or PDF. Common for GitHub READMEs, notes and docs.",
+        },
+        "ornek": "# Başlık\n- birinci madde\n**önemli** not",
+        "ilgili": ["latex", "git"],
+    },
+    {
+        "id": "latex",
+        "baslik": {"tr": "LaTeX", "en": "LaTeX"},
+        "kisa": {"tr": "Bilimsel belge ve formüller için kullanılan dizgi sistemi.", "en": "A typesetting system for scientific documents and formulas."},
+        "aciklama": {
+            "tr": "Belgenin görünüşünü değil yapısını yazarsınız (bölüm, denklem, kaynak); LaTeX sayfayı profesyonel biçimde dizer. Matematik formülleri, kaynakça ve çapraz başvurular için akademide standarttır. LyX ve TeXstudio işi kolaylaştıran düzenleyicilerdir.",
+            "en": "You write the document's structure, not its looks (section, equation, reference) and LaTeX typesets the page professionally. It is the academic standard for maths formulas, bibliographies and cross references. LyX and TeXstudio are editors that make it easier.",
+        },
+        "ornek": "$E = mc^2$",
+        "ilgili": ["markdown", "odf"],
+    },
+    {
+        "id": "odf",
+        "baslik": {"tr": "ODF (Açık Belge Biçimi)", "en": "ODF (Open Document Format)"},
+        "kisa": {"tr": "Ofis belgeleri için açık ve uluslararası standart dosya biçimi (.odt, .ods, .odp).", "en": "An open, international standard file format for office documents (.odt, .ods, .odp)."},
+        "aciklama": {
+            "tr": "ISO standardıdır ve herhangi bir şirkete bağlı değildir; LibreOffice ve Calligra'nın varsayılan biçimidir. Belgelerinizin yıllar sonra da açılabilmesini güvenceye alır.\n\nMicrosoft'un DOCX/XLSX biçimleriyle (OOXML) karşılıklı açılabilir; karmaşık sayfa düzenlerinde küçük farklar olabilir, paylaşmadan önce PDF'e çevirmek en güvenlisidir.",
+            "en": "It is an ISO standard not tied to any company and the default format of LibreOffice and Calligra. It makes sure your documents can still be opened years later.\n\nIt can be exchanged with Microsoft's DOCX/XLSX formats (OOXML); complex layouts may differ slightly, so converting to PDF before sharing is safest.",
+        },
+        "ilgili": ["acik_kaynak", "xml", "latex"],
+    },
+    {
+        "id": "ide",
+        "baslik": {"tr": "Tümleşik Geliştirme Ortamı (IDE)", "en": "Integrated Development Environment (IDE)"},
+        "kisa": {"tr": "Kod yazma, çalıştırma ve hata ayıklamayı tek pencerede toplayan program.", "en": "A program that brings writing, running and debugging code into one window."},
+        "aciklama": {
+            "tr": "Düzenleyici, otomatik tamamlama, derleyici/yorumlayıcı bağlantısı, hata ayıklayıcı ve sürüm denetimi bir aradadır. Yeni başlayanlar için Thonny, veri bilimi için Spyder, genel amaçlı için Kate ya da Geany iyi seçeneklerdir.",
+            "en": "Editor, auto-completion, compiler/interpreter integration, debugger and version control come together. Thonny for beginners, Spyder for data science and Kate or Geany for general use are good choices.",
+        },
+        "ilgili": ["hata_ayiklama", "derleyici", "versiyon_kontrolu"],
+    },
+    {
+        "id": "duzenli_ifade",
+        "baslik": {"tr": "Düzenli İfade (Regex)", "en": "Regular Expression (Regex)"},
+        "kisa": {"tr": "Metin içinde kalıp aramak için kullanılan küçük bir dil.", "en": "A small language for searching for patterns in text."},
+        "aciklama": {
+            "tr": "^ satır başı, $ satır sonu, . herhangi bir karakter, * tekrar, [0-9] rakam demektir. Günlüklerde IP adreslerini bulmak, belirli hata satırlarını süzmek ya da form girdisini doğrulamak için kullanılır. grep, sed ve hemen her programlama dili destekler.",
+            "en": "^ means start of line, $ end of line, . any character, * repetition, [0-9] a digit. It is used to find IP addresses in logs, filter specific error lines or validate form input. grep, sed and almost every programming language support it.",
+        },
+        "ornek": "grep -E 'Failed password .* from [0-9.]+' /var/log/auth.log",
+        "ilgili": ["grep", "log_dosyasi"],
+    },
+    {
+        "id": "utf8",
+        "baslik": {"tr": "UTF-8 (Karakter Kodlaması)", "en": "UTF-8 (Character Encoding)"},
+        "kisa": {"tr": "Dünyadaki tüm alfabeleri tek düzende saklayan karakter kodlaması.", "en": "A character encoding that stores every alphabet in the world in one scheme."},
+        "aciklama": {
+            "tr": "Latin harfleri 1 bayt, Türkçe ğ, ş, ı gibi harfler 2 bayt, Çince/Japonca karakterler 3 bayt, emoji 4 bayt yer kaplar. Eski kodlamalarla (ISO-8859-9, Windows-1254) açılan dosyalarda \"Ã§\" gibi bozuk karakterler görünmesinin nedeni kodlama uyuşmazlığıdır.",
+            "en": "Latin letters take 1 byte, Turkish letters like ğ, ş, ı take 2 bytes, Chinese/Japanese characters 3 bytes and emoji 4 bytes. Garbled characters like \"Ã§\" in files opened with old encodings (ISO-8859-9, Windows-1254) come from an encoding mismatch.",
+        },
+        "ilgili": ["bit_byte", "locale"],
+    },
 ]

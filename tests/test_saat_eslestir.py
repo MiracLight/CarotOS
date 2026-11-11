@@ -108,6 +108,47 @@ class SaatEslestirTesti(unittest.TestCase):
                 self.kur([("/plugins/plugin-8", "clock")], dilim=kotu)
                 self.assertNotIn("/plugins/plugin-8/timezone", self.calistir())
 
+    def test_izle_kipi_dilim_degisince_paneli_gunceller(self):
+        """Oturum sirasinda dilim degisirse eklentiyi kaldirip eklemeye gerek kalmadan panel guncellenir."""
+        import time
+        self.kur([("/plugins/plugin-8", "clock")])
+        dilim_dosyasi = os.path.join(self.kok, "dilim")
+        with open(dilim_dosyasi, "w") as f:
+            f.write("Europe/Istanbul\n")
+        with open(os.path.join(self.kok, "bin", "timedatectl"), "w") as f:
+            f.write(f"#!/bin/sh\ncat '{dilim_dosyasi}'\n")
+        izlenen = os.path.join(self.kok, "localtime")
+        os.symlink("/usr/share/zoneinfo/Europe/Istanbul", izlenen)
+        env = dict(os.environ, PATH=os.path.join(self.kok, "bin") + ":" + os.environ["PATH"],
+                   DEPO=self.depo, XDG_CONFIG_HOME=self.cfg, HOME=self.kok,
+                   CAROTOS_SAAT_IZLENEN=izlenen, CAROTOS_SAAT_ARALIK="1")
+        surec = subprocess.Popen([SH, BETIK, "--izle"], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.addCleanup(lambda: (surec.kill(), surec.wait()))
+
+        def deger():
+            for satir in open(self.depo).read().splitlines():
+                k, _, v = satir.partition("\t")
+                if k == "/plugins/plugin-8/timezone":
+                    return v
+            return None
+
+        def bekle(beklenen):
+            son = time.time() + 10
+            while time.time() < son:
+                if deger() == beklenen:
+                    return True
+                time.sleep(0.2)
+            return False
+
+        self.assertTrue(bekle("Europe/Istanbul"), deger())
+        self.assertIsNone(surec.poll(), "izleme kipi hemen cikmamali")
+        with open(dilim_dosyasi, "w") as f:
+            f.write("Europe/Berlin\n")
+        os.remove(izlenen)
+        os.symlink("/usr/share/zoneinfo/Europe/Berlin", izlenen)       # timedatectl set-timezone boyle yapar
+        self.assertTrue(bekle("Europe/Berlin"), deger())
+        self.assertEqual(self.isaret(), "Europe/Berlin")
+
     def test_zaten_dogruysa_degismez(self):
         self.kur([("/plugins/plugin-8", "clock"), ("/plugins/plugin-8/timezone", "Europe/Istanbul")], isaret=None)
         self.assertEqual(self.calistir()["/plugins/plugin-8/timezone"], "Europe/Istanbul")
@@ -124,7 +165,7 @@ class DosyaTesti(unittest.TestCase):
     def test_autostart_ve_hook_ve_paket(self):
         desk = open(os.path.join(INC, "etc", "skel", ".config", "autostart", "carotos-saat-eslestir.desktop"),
                     encoding="utf-8").read()
-        self.assertIn("Exec=/usr/local/bin/carotos-saat-eslestir", desk)
+        self.assertIn("Exec=/usr/local/bin/carotos-saat-eslestir --izle", desk)
         hook = open(os.path.join(KOK, "config", "hooks", "live", "9999-carotos-setup.hook.chroot"), encoding="utf-8").read()
         self.assertIn("chmod 755 /usr/local/bin/carotos-saat-eslestir", hook)
         paketler = open(os.path.join(KOK, "config", "package-lists", "carotos.list.chroot"), encoding="utf-8").read().split()

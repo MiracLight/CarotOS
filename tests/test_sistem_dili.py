@@ -55,6 +55,16 @@ class TabloTesti(unittest.TestCase):
             self.assertIn("fonts-noto-cjk", SD.paket_listesi(kod, set()))
         self.assertNotIn("fonts-noto-cjk", SD.paket_listesi("de", set()))
 
+    def test_cjk_dilleri_girdi_yontemi_kurar_digerleri_kurmaz(self):
+        """Japonca/Cince yazabilmek icin girdi yontemi gerekir; diger dillerde RAM'e yuk olmasin."""
+        self.assertIn("fcitx5-mozc", SD.paket_listesi("ja", set()))
+        self.assertIn("fcitx5-chinese-addons", SD.paket_listesi("zh", set()))
+        for kod in ("ja", "zh"):
+            for p in ("fcitx5", "fcitx5-frontend-gtk3", "im-config"):
+                self.assertIn(p, SD.paket_listesi(kod, set()), (kod, p))
+        for kod in ("tr", "en", "de", "ru", "es", "pt", "fr"):
+            self.assertFalse([p for p in SD.paket_listesi(kod, {"firefox-esr"}) if "fcitx" in p], kod)
+
     def test_tr_en_paket_gerektirmez(self):
         for kod in ("tr", "en"):
             self.assertEqual(SD.paket_listesi(kod, set()), [])
@@ -144,7 +154,8 @@ class BetikTesti(unittest.TestCase):
         self.assertEqual(self.komutlar[0], ["locale-gen"])
         self.assertEqual(self.komutlar[1], ["apt-get", "update"])
         self.assertEqual(self.komutlar[2][:4], ["apt-get", "install", "-y", "--no-install-recommends"])
-        self.assertEqual(sorted(self.komutlar[2][4:]), ["firefox-esr-l10n-ja", "fonts-noto-cjk"])
+        self.assertEqual(sorted(self.komutlar[2][4:]), ["fcitx5", "fcitx5-frontend-gtk3", "fcitx5-mozc",
+                                                        "firefox-esr-l10n-ja", "fonts-noto-cjk", "im-config"])
 
     def test_locale_satiri_yoksa_eklenir(self):
         with open(self.locale_gen, "w", encoding="utf-8") as f:
