@@ -23,7 +23,7 @@ done
 echo "tekrarlanabilir: tamam ($(echo $TUMU | wc -w) paket)"
 
 # hepsini tek seferde kur
-for p in $TUMU; do SURUM=1.4.0 bash "$AD/paket-yap.sh" "$p" "$T/a" >/dev/null; done
+for p in $TUMU; do bash "$AD/paket-yap.sh" "$p" "$T/a" >/dev/null; done
 "${DP[@]}" -i "$T"/a/*.deb >/dev/null 2>"$T/hata.txt" || { cat "$T/hata.txt"; hata "toplu kurulum (dosya cakismasi?)"; }
 for p in $UYGULAMALAR; do
     "${DP[@]}" -s "carotos-$p" | grep -q '^Status: install ok installed' || hata "carotos-$p kurulu degil"
@@ -42,14 +42,18 @@ done
 echo "kurulu dosya sayisi: $(find "$R" -path "$R/var" -prune -o \( -type f -o -type l \) -print | wc -l)"
 
 # yukseltme: yeni surumde bir terim dosyasi yok olsun, eski dosya kalmamali
-SURUM=1.4.1 bash "$AD/paket-yap.sh" gsd "$T/b" >/dev/null
-mkdir -p "$T/x" && dpkg-deb -R "$T/b/carotos-gsd_1.4.1_all.deb" "$T/x" && rm "$T/x/opt/carotos/gsd/terimler/ag.py" \
+SURUM=1.4.2 bash "$AD/paket-yap.sh" gsd "$T/b" >/dev/null
+mkdir -p "$T/x" && dpkg-deb -R "$T/b/carotos-gsd_1.4.2_all.deb" "$T/x" && rm "$T/x/opt/carotos/gsd/terimler/ag.py" \
   && (cd "$T/x" && find . -path ./DEBIAN -prune -o -type f -printf '%P\0' | sort -z | xargs -0 md5sum > DEBIAN/md5sums) \
   && dpkg-deb --root-owner-group -b "$T/x" "$T/b/yeni.deb" >/dev/null
 "${DP[@]}" -i "$T/b/yeni.deb" >/dev/null 2>&1 || hata "yukseltme"
 [ ! -e "$R/opt/carotos/gsd/terimler/ag.py" ] || hata "yukseltmede eski dosya kaldi"
-"${DP[@]}" -s carotos-gsd | grep -q '^Version: 1.4.1' || hata "surum yukselmedi"
+"${DP[@]}" -s carotos-gsd | grep -q '^Version: 1.4.2' || hata "surum yukselmedi"
 echo "yukseltme: tamam"
+
+# uygulamalar root olarak calisinca __pycache__ birakir (dpkg bilmez): kaldirma bunu da temizlemeli
+for p in $UYGULAMALAR; do mkdir -p "$R/opt/carotos/$p/__pycache__" && echo x > "$R/opt/carotos/$p/__pycache__/x.pyc"; done
+mkdir -p "$R/opt/carotos/ortak/__pycache__" && echo x > "$R/opt/carotos/ortak/__pycache__/x.pyc"
 
 # kaldirma: once uygulamalar (her biri tamamen gitmeli, ortak kalmali), sonra ortak ve keyring
 for p in $UYGULAMALAR; do
@@ -58,6 +62,7 @@ for p in $UYGULAMALAR; do
     [ -f "$R/opt/carotos/ortak/dil.py" ] || hata "ortak $p kaldirilirken silindi"
 done
 "${DP[@]}" -P carotos-ortak carotos-archive-keyring >/dev/null 2>&1 || hata "purge ortak/keyring"
+[ ! -e "$R/opt/carotos" ] || hata "/opt/carotos dizini kaldi"
 KALAN=$(cd "$R" && find . -path ./var -prune -o \( -type f -o -type l \) -print)
 [ -z "$KALAN" ] || { echo "$KALAN"; hata "kalinti dosya var"; }
 echo "kaldirma: tamam, kalinti yok"

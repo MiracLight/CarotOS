@@ -9,13 +9,15 @@ TUMU="ortak keyring gsd former health usb security-panel magaza carotene filenor
 PAKET="$1"; CIKTI="$2"
 AD="$(cd "$(dirname "$0")" && pwd)"
 KAYNAK="$(cd "$AD/../.." && pwd)/config/includes.chroot"
-SURUM="${SURUM:-1.4.0}"
+SURUM="${SURUM:-1.4.1}"
 
 # ---- paket tablosu ---------------------------------------------------------------------------------------
 # OPT: /opt/carotos/<OPT>   MASAUSTU: usr/share/applications/<ad>.desktop   EK: ek dosyalar (KAYNAK'a gore)
 # EXEC: OPT icindeki calistirilabilir dosyalar   BIN: "komut=OPT-icindeki-dosya" (/usr/bin baglari)
 # PNG_AD: ikonlar.b64'ten acilacak PNG adi   BAGIMLI/ONERILEN: ek paketler   ACIKLAMA: kisa + uzun aciklama
-OPT=""; MASAUSTU=""; EK=""; EXEC=""; BIN=""; PNG_AD=""; BAGIMLI=""; ONERILEN=""; ACIKLAMA=""
+OPT=""; MASAUSTU=""; EK=""; EXEC=""; BIN=""; PNG_AD=""; BAGIMLI=""; ONERILEN=""; ONERI=""; ACIKLAMA=""
+# ONERILEN -> Recommends (apt varsayilan kurar), ONERI -> Suggests (kurmaz). rkhunter Recommends'i exim4/ruby ceker:
+# guvenlik dagitiminda istenmez, bu yuzden Suggests (ISO'da hook'lar zaten kurar).
 HICOLOR="usr/share/icons/hicolor"
 UYG_BAGIMLI="python3, python3-gi, gir1.2-gtk-3.0, python3-gi-cairo, carotos-ortak (>= $SURUM)"
 case "$PAKET" in
@@ -32,7 +34,7 @@ former)
     ACIKLAMA="CarotOS Former: guvenlik uygulamalari rehberi
  CarotOS guvenlik araclari icin adim adim, canlandirmali baslangic rehberi." ;;
 health)
-    OPT=health; MASAUSTU=carotos-health; EXEC=carotos-health.py; BAGIMLI="$UYG_BAGIMLI"; ONERILEN="rkhunter, debsums"
+    OPT=health; MASAUSTU=carotos-health; EXEC=carotos-health.py; BAGIMLI="$UYG_BAGIMLI"; ONERI="rkhunter, debsums"
     EK="$HICOLOR/256x256/apps/carotos-health.png $HICOLOR/scalable/apps/carotos-health.svg"
     ACIKLAMA="CarotOS Sistem Sagligi: guvenlik ve sistem denetimi
  Sistemin guvenlik ayarlarini ve sagligini denetleyen, her bulguyu aciklayan arac." ;;
@@ -120,6 +122,25 @@ keyring)
     done ;;
 esac
 
+# ---- postrm ----------------------------------------------------------------------------------------------
+# Uygulama root olarak (pkexec) calisinca olusan __pycache__ dpkg'nin bilmedigi dosyalardir; kaldirmada dizin
+# bos kalsin diye uygulama dizini silinir. DPKG_ROOT: test ortaminda (dpkg --root) gercek /opt'a dokunmaz.
+if [ "$PAKET" != keyring ]; then
+    D="${OPT:-ortak}"
+    cat > "$S/DEBIAN/postrm" <<EOS
+#!/bin/sh
+set -e
+case "\$1" in
+    remove|purge)
+        rm -rf "\${DPKG_ROOT:-}/opt/carotos/$D"
+        rmdir "\${DPKG_ROOT:-}/opt/carotos" 2>/dev/null || true
+        ;;
+esac
+exit 0
+EOS
+    chmod 755 "$S/DEBIAN/postrm"
+fi
+
 # ---- izinler: dizin 755, dosya 644, betikler 755 ---------------------------------------------------------
 find "$S" -mindepth 1 -type d -exec chmod 755 {} +
 find "$S" -type f -not -path "$S/DEBIAN/*" -exec chmod 644 {} +
@@ -139,6 +160,7 @@ else
         echo "Architecture: all"; echo "Maintainer: CarotOS <archive@carotos.org>"; echo "Homepage: https://carotos.org"
         echo "Installed-Size: $KB"; echo "Depends: $BAGIMLI"
         [ -n "$ONERILEN" ] && echo "Recommends: $ONERILEN"
+        [ -n "$ONERI" ] && echo "Suggests: $ONERI"
         echo "Description: $ACIKLAMA"
     } > "$S/DEBIAN/control"
 fi

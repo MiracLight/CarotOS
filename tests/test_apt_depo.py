@@ -100,6 +100,11 @@ class DepoYapilandirmasi(unittest.TestCase):
         self.assertIn("SOURCE_DATE_EPOCH", p)                  # tekrarlanabilir derleme: ayni surum, ayni ozet
         self.assertIn("carotos-ortak (>=", p)                  # gsd, ortak katmana bagli
         self.assertNotIn("postinst", p)                        # postinst yok: simge/masaustu onbellegi trigger ile
+        self.assertIn("DEBIAN/postrm", p)                      # root'un biraktigi __pycache__ kaldirmada temizlenir
+        self.assertIn("${DPKG_ROOT:-}/opt/carotos/", p)        # test ortaminda gercek /opt'a dokunmaz
+        self.assertIn("remove|purge)", p)                      # yukseltmede (upgrade) silmez
+        self.assertNotRegex(p, r"(?m)^\s*ONERILEN=.*rkhunter")  # rkhunter Recommends exim4/ruby ceker: Suggests
+        self.assertIn('SURUM="${SURUM:-1.4.1}"', p)
         t = oku("test-paket.sh")
         for parca in ("yukseltmede eski dosya kaldi", "kalintisi", "kalinti dosya var", "tekrarlanabilir degil",
                       "dosya cakismasi", "gecersiz hedefe"):
