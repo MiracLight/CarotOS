@@ -1,0 +1,8 @@
+Origin: CarotOS
+Label: CarotOS
+Codename: stable
+Version: 1.4
+Architectures: amd64 source
+Components: main
+Description: CarotOS paket deposu (imza elle, cevrimdisi anahtarla atilir)
+ValidFor: 60d

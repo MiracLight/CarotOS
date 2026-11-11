@@ -1,0 +1,10 @@
+Package: carotos-archive-keyring
+Version: 2026.11.11
+Section: misc
+Priority: optional
+Architecture: all
+Maintainer: CarotOS <archive@carotos.org>
+Homepage: https://carotos.org
+Description: CarotOS paket deposu imza anahtari
+ apt.carotos.org deposunun imzalarini dogrulayan genel anahtar ve depo tanimi.
+ Anahtar yalniz bu depo icin gecerlidir (Signed-By), sistem geneline eklenmez.

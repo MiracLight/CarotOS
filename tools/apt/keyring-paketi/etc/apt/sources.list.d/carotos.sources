@@ -1,0 +1,5 @@
+Types: deb
+URIs: https://apt.carotos.org
+Suites: stable
+Components: main
+Signed-By: /usr/share/keyrings/carotos-archive-keyring.gpg
