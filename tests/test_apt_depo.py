@@ -87,8 +87,19 @@ class DepoYapilandirmasi(unittest.TestCase):
             self.assertEqual(f.read().count("Acquire-By-Hash"), 1)
         self.assertIn("by_hash.py", oku("depo-uret.sh"))
 
+    def test_paket_betigi_kurallari(self):
+        p = oku("paket-yap.sh")
+        self.assertIn("--root-owner-group", p)
+        self.assertNotIn("usr/local", p)                       # paket /usr/local'e yazmaz (Debian politikasi)
+        self.assertIn('rm -f "$S/opt/carotos/gsd/ikonlar.b64"', p)
+        self.assertIn("carotos-ortak (>=", p)                  # gsd, ortak katmana bagli
+        self.assertNotIn("postinst", p)                        # postinst yok: simge/masaustu onbellegi trigger ile
+        t = oku("test-paket.sh")
+        for parca in ("yukseltmede eski dosya kaldi", "gsd kalintisi", "kalinti dosya var"):
+            self.assertIn(parca, t)
+
     def test_betikler(self):
-        for ad in ("depo-uret.sh", "imzala-yukle.sh", "test-bos-depo.sh"):
+        for ad in ("depo-uret.sh", "imzala-yukle.sh", "test-bos-depo.sh", "paket-yap.sh", "test-paket.sh"):
             k = oku(ad)
             self.assertTrue(k.startswith("#!/bin/bash"), ad)
             self.assertIn("set -euo pipefail", k, ad)
