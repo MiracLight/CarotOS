@@ -171,6 +171,41 @@ class PencereTesti(unittest.TestCase):
         self.pompala(4.5)
         self.assertEqual(next(g for g in self.p.gorevler if g["id"] == "kodlama-1")["ipucu_acilan"], 1)
 
+    def test_poligon_vurgusu_korunur(self):
+        # tema.uygula ekran geneli: CTF penceresi baska vurgu verirse Poligon ana penceresinin rengi de degisir
+        import tema
+        from gorunum_ayari import VURGU
+        self.assertEqual(tema.AKTIF["vurgu"], tema.VURGULAR[VURGU])
+        import savunma_pencere
+        s = savunma_pencere.pencere_olustur("tr", "dark")
+        self.addCleanup(s.destroy)
+        self.assertEqual(tema.AKTIF["vurgu"], tema.VURGULAR[VURGU])
+
+    def test_sonuc_etiketi_tema_renk_sinifini_alir(self):
+        ctx = self.p.sonuc_etiketi.get_style_context()
+        self.p._sonuc_geldi(None, {"sonuc": "yanlis"})
+        self.assertTrue(ctx.has_class("hata-yazi"))
+        self.p._sonuc_geldi(None, {"sonuc": "dogru", "puan": 100})
+        self.assertTrue(ctx.has_class("basari-yazi"))
+        self.assertFalse(ctx.has_class("hata-yazi"))
+        self.p._sonuc_geldi(None, {"sonuc": "bekle", "bekleme_sn": 30})
+        self.assertTrue(ctx.has_class("uyari-yazi"))
+        self.assertFalse(ctx.has_class("basari-yazi"))
+
+    def test_onay_ortak_temadan_ve_elle_renk_yok(self):
+        import inspect
+        import re
+        kaynak = inspect.getsource(P)
+        self.assertNotIn("MessageDialog", kaynak)
+        self.assertIn("tema.onay_sor", kaynak)
+        import tema
+        # renkler paletten gelir; ctf_css kaynaginda elle yazilmis renk olmamali (acik temada leke olur)
+        self.assertEqual(re.findall(r"#[0-9a-fA-F]{6}", inspect.getsource(P.ctf_css)), [])
+        with open(tema.__file__, encoding="utf-8") as f:
+            tema_kaynak = f.read()
+        for s in P.SONUC_SINIFI.values():                       # siniflar ortak temada tanimli olmali
+            self.assertIn("." + s, tema_kaynak)
+
     def test_dil_degisimi_ve_baglanti_hatasi_cokertmez(self):
         self.p.dil = "en"
         self.p._metinleri_uygula()

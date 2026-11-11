@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ortak"))
 import dil_koprusu as _dil  # noqa: E402
 import olay_gunlugu  # noqa: E402
 import savunma_analiz as _a  # noqa: E402
-from ctf_pencere import ctf_css, pencere_ikonu_ata  # noqa: E402  (ortak sekme/liste/tablo gorunumu, ikon)
+from ctf_pencere import POLIGON_VURGU, ctf_css, pencere_ikonu_ata  # noqa: E402  (ortak gorunum, ikon)
 
 T = _a.T
 YENILEME_MS = 1000
@@ -70,7 +70,7 @@ def pencere_olustur(dil: str, gorunum: str = "dark", gunluk=None, durum_fn=None,
             self._bulgu_anahtari = None
             self._son_durum = 0.0
             self.set_default_size(860, 700)
-            palet = tema.uygula(gorunum, "guvenlik")
+            palet = tema.uygula(gorunum, POLIGON_VURGU)        # ekran geneli: Poligon vurgusu korunur
             css = Gtk.CssProvider()
             css.load_from_data(ctf_css(palet).encode())
             Gtk.StyleContext.add_provider_for_screen(self.get_screen(), css,

@@ -14,6 +14,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ortak"))
 import dil_koprusu as _dil  # noqa: E402
+from gorunum_ayari import VURGU as POLIGON_VURGU  # noqa: E402
+
+# sonuc rengi -> ortak temadaki yazi sinifi
+SONUC_SINIFI = {"yesil": "basari-yazi", "kirmizi": "hata-yazi", "sari": "uyari-yazi"}
 
 KATEGORI_SIRASI = ("kodlama", "kriptografi", "hash", "log", "adli")
 ZORLUK_SIRASI = {"kolay": 0, "orta": 1, "zor": 2}
@@ -53,7 +57,7 @@ def ctf_css(p: dict) -> str:
         return "rgba(%d,%d,%d,%s)" % (r, g, b, alfa)
     return f"""
 checkbutton.ctf-secim check {{ border-radius: 999px; -gtk-icon-source: none; }}
-checkbutton.ctf-secim check:checked {{ background-color: #15210a; border: 4px solid {p['vurgu']};
+checkbutton.ctf-secim check:checked {{ background-color: {p['zemin']}; border: 4px solid {p['vurgu']};
     min-width: 8px; min-height: 8px; }}
 notebook.ctf-sekme {{ background-color: transparent; border: none; }}
 notebook.ctf-sekme > header {{ background-color: transparent; border: none; border-bottom: 1px solid {p['cizgi']}; }}
@@ -179,7 +183,8 @@ def pencere_olustur(ctf, dil: str, ogrenci: str, gorunum: str = "dark", kayit_ta
             self._yeniden_ciziliyor = False
             self._kapali = False
             self.set_default_size(920, 620)
-            self._palet = tema.uygula(gorunum, "guvenlik")
+            # tema.uygula ekran genelidir: Poligon'un kendi vurgusu kullanilmazsa ana pencere de renk degistirir
+            self._palet = tema.uygula(gorunum, POLIGON_VURGU)
             self._css = Gtk.CssProvider()
             self._css.load_from_data(ctf_css(self._palet).encode())
             Gtk.StyleContext.add_provider_for_screen(self.get_screen(), self._css,
@@ -203,6 +208,7 @@ def pencere_olustur(ctf, dil: str, ogrenci: str, gorunum: str = "dark", kayit_ta
 
             self.not_etiketi = Gtk.Label(xalign=0, wrap=True)
             tema.sinif(self.not_etiketi, "soluk")
+            self.not_etiketi.set_no_show_all(True)          # bosken yer kaplamasin (yalniz hata varken gorunur)
             kok.pack_start(self.not_etiketi, False, False, 0)
 
             self.sekmeler = Gtk.Notebook()
@@ -348,8 +354,10 @@ def pencere_olustur(ctf, dil: str, ogrenci: str, gorunum: str = "dark", kayit_ta
             """Sunucu yanitlarini arayuze yazar (testlerde dogrudan cagrilir)."""
             if "hata" in d:
                 self.not_etiketi.set_text(sonuc_metni(d, self.dil)[0])
+                self.not_etiketi.show()
                 return
             self.not_etiketi.set_text("")
+            self.not_etiketi.hide()
             self.durum = d
             kod = d.get("durum", "hazir")
             tema.rozet_ayarla(self.durum_rozeti, self.t(DURUM_AD.get(kod, DURUM_AD["hazir"])), DURUM_RENK.get(kod, "gri"))
@@ -539,12 +547,9 @@ def pencere_olustur(ctf, dil: str, ogrenci: str, gorunum: str = "dark", kayit_ta
             return False
 
         def _onayla(self, metin) -> bool:
-            d = Gtk.MessageDialog(transient_for=self, modal=True, message_type=Gtk.MessageType.QUESTION,
-                                  buttons=Gtk.ButtonsType.YES_NO, text=metin)
-            try:
-                return d.run() == Gtk.ResponseType.YES
-            finally:
-                d.destroy()
+            # ortak temali onay penceresi (standart: tema.onay_sor)
+            return tema.onay_sor(self, self.t(T("İpucu açılsın mı?", "Open the hint?")), metin,
+                                 self.t(T("İpucunu aç", "Open hint")), self.t(T("Vazgeç", "Cancel")))
 
         def _bayrak_gonder(self, _w):
             g = self._gorev()
@@ -564,9 +569,9 @@ def pencere_olustur(ctf, dil: str, ogrenci: str, gorunum: str = "dark", kayit_ta
             metin, renk = sonuc_metni(yanit, self.dil)
             self.sonuc_etiketi.set_text(metin)
             ctx = self.sonuc_etiketi.get_style_context()
-            for eski in ("basari", "hata", "uyari", "soluk"):
+            for eski in list(SONUC_SINIFI.values()) + ["soluk"]:
                 ctx.remove_class(eski)
-            tema.sinif(self.sonuc_etiketi, {"yesil": "basari", "kirmizi": "hata", "sari": "uyari"}.get(renk, "soluk"))
+            tema.sinif(self.sonuc_etiketi, SONUC_SINIFI.get(renk, "soluk"))
             if yanit.get("sonuc") == "dogru":
                 self.bayrak_girisi.set_text("")
                 self._yenile_baslat()
