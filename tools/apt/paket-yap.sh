@@ -9,7 +9,14 @@ TUMU="ortak keyring gsd former health usb security-panel magaza carotene filenor
 PAKET="$1"; CIKTI="$2"
 AD="$(cd "$(dirname "$0")" && pwd)"
 KAYNAK="$(cd "$AD/../.." && pwd)/config/includes.chroot"
-SURUM="${SURUM:-1.4.1}"
+# Surumler paket basina: tools/apt/surumler ("ad surum ortak-en-az"). SURUM ortam degiskeni tabloyu ezer (yalniz test).
+# Kural: depoya bir kez giren surumun icerigi bir daha degismez; icerik degisirse tabloda surum artirilir
+# (tools/apt/surum-denetle.sh bunu yayin ozetleriyle denetler).
+SURUM="${SURUM:-}"; ORTAK_MIN=""
+if [ "$PAKET" != keyring ] && grep -qE "^$PAKET[[:space:]]" "$AD/surumler"; then
+    [ -n "$SURUM" ] || SURUM="$(awk -v p="$PAKET" '$1==p {print $2}' "$AD/surumler")"
+    ORTAK_MIN="$(awk -v p="$PAKET" '$1==p {print $3}' "$AD/surumler")"
+fi
 
 # ---- paket tablosu ---------------------------------------------------------------------------------------
 # OPT: /opt/carotos/<OPT>   MASAUSTU: usr/share/applications/<ad>.desktop   EK: ek dosyalar (KAYNAK'a gore)
@@ -19,7 +26,7 @@ OPT=""; MASAUSTU=""; EK=""; EXEC=""; BIN=""; PNG_AD=""; BAGIMLI=""; ONERILEN="";
 # ONERILEN -> Recommends (apt varsayilan kurar), ONERI -> Suggests (kurmaz). rkhunter Recommends'i exim4/ruby ceker:
 # guvenlik dagitiminda istenmez, bu yuzden Suggests (ISO'da hook'lar zaten kurar).
 HICOLOR="usr/share/icons/hicolor"
-UYG_BAGIMLI="python3, python3-gi, gir1.2-gtk-3.0, python3-gi-cairo, carotos-ortak (>= $SURUM)"
+UYG_BAGIMLI="python3, python3-gi, gir1.2-gtk-3.0, python3-gi-cairo, carotos-ortak (>= $ORTAK_MIN)"
 case "$PAKET" in
 ortak) ;;
 keyring) ;;

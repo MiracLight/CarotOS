@@ -1,0 +1,13 @@
+# Yayinlanan paketlerin SHA-256 ozetleri (surum-denetle.sh --kaydet ekler). Elle degistirmeyin.
+# Bicim: paket surum sha256. Ayni (paket, surum) icin ozet degisirse denetim hata verir: surumu artirin.
+# Not: ilk gunlerde yuklenen 1.4.0 paketlerinin baytlari kayip (depo dizininden cikarildi); kayit 1.4.1 ile baslar.
+carotos-archive-keyring 2026.11.11 821807c55bd8fc04790e28345a707352582ab1c583256732327d94ed71d2e7be
+carotos-carotene 1.4.1 278fedf778fca0dd19011383688c8365a3e6d4ba9c9c908f0dba92f1efc4d6ea
+carotos-filenor 1.4.1 ccf966187d8c0fd3e57e0f113ec4956216abedeefc507e3f8fe76308f36805b6
+carotos-former 1.4.1 9c7b7212135709383b6d32bcedabf0c2e1cb51b46bab707065a77d06439ea0e9
+carotos-gsd 1.4.1 a5903fe708fc000e0d369fcee17407d8bb97b544f0ab476d811d83b012df5f8e
+carotos-health 1.4.1 ea840687defb10b6ed2cb09d1f665a5196cc8d39ca56b9abcecc20b5bb28791e
+carotos-magaza 1.4.1 031547af65f347ee1040f8bdd448e02b5736489b35048c5d7c8c5c7e2dbfce1c
+carotos-ortak 1.4.1 aa793d87f1b2d965366ef967f3e9bb4ef68699d6133d2883194943dabccdeae5
+carotos-security-panel 1.4.1 b77d7a4db4390b439c3de6203279b47a41105f4955e5f04b31bfd59dbbab1a94
+carotos-usb 1.4.1 929bb0c239b69325b5ffb54546f38141652b564e4ee8af858490ea754fd50cd3

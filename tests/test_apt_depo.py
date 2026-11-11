@@ -104,14 +104,42 @@ class DepoYapilandirmasi(unittest.TestCase):
         self.assertIn("${DPKG_ROOT:-}/opt/carotos/", p)        # test ortaminda gercek /opt'a dokunmaz
         self.assertIn("remove|purge)", p)                      # yukseltmede (upgrade) silmez
         self.assertNotRegex(p, r"(?m)^\s*ONERILEN=.*rkhunter")  # rkhunter Recommends exim4/ruby ceker: Suggests
-        self.assertIn('SURUM="${SURUM:-1.4.1}"', p)
+        self.assertIn("$AD/surumler", p)                       # surum paket basina tablodan gelir
+        self.assertIn("carotos-ortak (>= $ORTAK_MIN)", p)
         t = oku("test-paket.sh")
         for parca in ("yukseltmede eski dosya kaldi", "kalintisi", "kalinti dosya var", "tekrarlanabilir degil",
                       "dosya cakismasi", "gecersiz hedefe"):
             self.assertIn(parca, t)
 
+    def test_surum_tablosu_ve_yayin_kaydi(self):
+        tablo = {}
+        for s in oku("surumler").splitlines():
+            if s.strip() and not s.lstrip().startswith("#"):
+                ad, sur, ortak_min = s.split()
+                self.assertRegex(sur, r"^\d+\.\d+\.\d+$", ad)
+                tablo[ad] = (sur, ortak_min)
+        self.assertEqual(set(tablo), {"ortak", "gsd", "former", "health", "usb", "security-panel", "magaza",
+                                      "carotene", "filenor"})
+        for ad, (sur, ortak_min) in tablo.items():
+            if ad != "ortak":
+                self.assertRegex(ortak_min, r"^\d+\.\d+\.\d+$", ad)
+                # uygulamanin istedigi en dusuk ortak, tablodaki ortak surumunu asamaz
+                self.assertLessEqual([int(x) for x in ortak_min.split(".")],
+                                     [int(x) for x in tablo["ortak"][0].split(".")], ad)
+        # yayin kaydi: her satir "paket surum sha256", ayni (paket, surum) tekrarlanmaz
+        gorulen = set()
+        for s in oku("yayin-ozetleri").splitlines():
+            if s.strip() and not s.lstrip().startswith("#"):
+                ad, sur, oz = s.split()
+                self.assertRegex(oz, r"^[0-9a-f]{64}$", s)
+                self.assertNotIn((ad, sur), gorulen, "ayni surum iki kez kayitli")
+                gorulen.add((ad, sur))
+        for ad, (sur, _) in tablo.items():
+            self.assertIn(("carotos-" + ad, sur), gorulen, "%s %s yayin kaydinda yok" % (ad, sur))
+        self.assertIn("icerik degisti ama surum ayni", oku("surum-denetle.sh"))
+
     def test_betikler(self):
-        for ad in ("depo-uret.sh", "imzala-yukle.sh", "test-bos-depo.sh", "paket-yap.sh", "test-paket.sh"):
+        for ad in ("depo-uret.sh", "imzala-yukle.sh", "test-bos-depo.sh", "paket-yap.sh", "test-paket.sh", "surum-denetle.sh"):
             k = oku(ad)
             self.assertTrue(k.startswith("#!/bin/bash"), ad)
             self.assertIn("set -euo pipefail", k, ad)

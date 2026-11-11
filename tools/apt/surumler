@@ -1,0 +1,14 @@
+# Paket surumleri (paket-yap.sh okur). Sutunlar: paket  surum  ortak-en-az
+# - Depoya bir kez giren surumun icerigi bir daha degismez. Icerik degisirse O paketin surumunu artirin.
+# - ortak-en-az: uygulamanin ihtiyac duydugu en dusuk carotos-ortak surumu. Elle artirilir (ortak'a uygulamanin
+#   kullandigi yeni bir ozellik eklendiginde); ortak her yukselince uygulamalar yeniden yayinlanmaz.
+# - keyring bu tabloda degil: kendi DEBIAN/control dosyasindaki surumu kullanir (tarih bicimli).
+ortak           1.4.1  -
+gsd             1.4.1  1.4.1
+former          1.4.1  1.4.1
+health          1.4.1  1.4.1
+usb             1.4.1  1.4.1
+security-panel  1.4.1  1.4.1
+magaza          1.4.1  1.4.1
+carotene        1.4.1  1.4.1
+filenor         1.4.1  1.4.1
