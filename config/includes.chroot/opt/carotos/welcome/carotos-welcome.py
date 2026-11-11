@@ -929,6 +929,58 @@ PAGES = [
         ],
     },
     {
+        "id": "dogrula",
+        "title": {"tr": "İndirdiğini doğrula", "en": "Verify what you download"},
+        "subtitle": {
+            "tr": "ISO dosyasının gerçekten CarotOS'tan geldiğini kontrol et",
+            "en": "Check that the ISO file really comes from CarotOS",
+        },
+        "body": [
+            ("p", {
+                "tr": "Değiştirilmiş bir ISO dosyası, kurduğun anda bilgisayarına zararlı yazılım sokabilir. İki "
+                      "kontrol bunu önler: özet (SHA-256) dosyanın indirirken bozulmadığını, imza ise dosyayı "
+                      "gerçekten CarotOS'un hazırladığını gösterir.",
+                "en": "A tampered ISO file can put malware on your computer the moment you install it. Two checks "
+                      "prevent this: the checksum (SHA-256) shows the file was not damaged while downloading, and "
+                      "the signature shows that CarotOS really made it.",
+            }),
+            ("p", {
+                "tr": "ISO ile aynı yerden iki küçük dosya daha indir: SHA256SUMS (özetler) ve SHA256SUMS.sign "
+                      "(imza). Üçünü aynı klasöre koy ve o klasörde terminali aç. CarotOS'ta imza anahtarı zaten "
+                      "kurulu, önce imzayı doğrula:",
+                "en": "Download two small files from the same place as the ISO: SHA256SUMS (the checksums) and "
+                      "SHA256SUMS.sign (the signature). Put all three in the same folder and open the terminal "
+                      "there. The signing key is already installed on CarotOS, so first verify the signature:",
+            }),
+            ("code", "gpgv --keyring /usr/share/keyrings/carotos-archive-keyring.gpg SHA256SUMS.sign SHA256SUMS"),
+            ("p", {
+                "tr": "\"CarotOS Archive\" ve \"imza iyi\" (İngilizce sistemde \"Good signature\") yazmalı. Sonra "
+                      "ISO'nun özetini denetle:",
+                "en": "It should say \"Good signature\" and \"CarotOS Archive\". Then check the ISO's checksum:",
+            }),
+            ("code", "sha256sum -c SHA256SUMS --ignore-missing"),
+            ("bullets", [
+                {"tr": "ISO'nun satırında \"Tamam\" (İngilizce sistemde \"OK\") yazmalı.",
+                 "en": "The ISO's line should say \"OK\" (\"Tamam\" on a Turkish system)."},
+                {"tr": "\"imza KÖTÜ\" (BAD signature) ya da \"BAŞARISIZ\" (FAILED) görürsen o dosyayı kullanma, "
+                       "yeniden indir.",
+                 "en": "If you see \"BAD signature\" or \"FAILED\", do not use that file; download it again."},
+                {"tr": "Başka bir sistemde önce CarotOS anahtarını carotos.org'dan al ve parmak izini karşılaştır: "
+                       "30E6 D4B0 C05E F002 1309 A1A0 9F93 5CD4 D5D0 A1F5",
+                 "en": "On another system, first get the CarotOS key from carotos.org and compare its fingerprint: "
+                       "30E6 D4B0 C05E F002 1309 A1A0 9F93 5CD4 D5D0 A1F5"},
+                {"tr": "Windows'ta aynı imzayı Gpg4win (Kleopatra) ile doğrulayabilirsin.",
+                 "en": "On Windows you can verify the same signature with Gpg4win (Kleopatra)."},
+            ]),
+            ("note", {
+                "tr": "Aynı anahtar CarotOS uygulama güncellemelerini (apt.carotos.org) de imzalar; apt bu imzayı "
+                      "her güncellemede kendiliğinden denetler.",
+                "en": "The same key also signs the CarotOS app updates (apt.carotos.org); apt checks that signature "
+                      "automatically on every update.",
+            }),
+        ],
+    },
+    {
         "id": "resources",
         "title": {"tr": "Daha fazlası", "en": "Going further"},
         "subtitle": {
@@ -2131,6 +2183,7 @@ class WelcomeWindow(Gtk.Window):
             label.set_selectable(True)
             label.set_line_wrap(True)                 # uzun komutlar kutudan tasmasin
             label.set_line_wrap_mode(Pango.WrapMode.CHAR)
+            label.set_max_width_chars(64)             # yoksa dogal genislik tum satir olur, kaydirma calismaz
             label.get_style_context().add_class("code-text")
             box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
             box.get_style_context().add_class("code-box")

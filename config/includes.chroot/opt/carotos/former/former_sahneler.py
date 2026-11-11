@@ -453,6 +453,29 @@ def _terminal_sayfasi(p, sayfa, gecmis):
     ]
 
 
+def dogrula_sahnesi() -> dict:
+    """ISO dogrulama: ayni klasorde ISO + SHA256SUMS + SHA256SUMS.sign; once imza (gpgv), sonra ozet (sha256sum).
+    Komutlar yalniz okur. Iki sayfa: imza, ozet."""
+    gecmis = ["carot@carotos:~/İndirilenler$ ls",
+              "carotos-1.4-amd64.iso  SHA256SUMS  SHA256SUMS.sign", ""]
+    o = []
+    for p, sayfa in (("d1", "bir"), ("d2", "iki")):
+        o += [
+            {"id": p + "_pencere", "tur": "cikti", "x": 10, "y": 34, "w": 740, "h": 290, "sayfa": sayfa,
+             "satirlar": list(gecmis)},
+            {"id": p + "_komut", "tur": "alan", "x": 10, "y": 330, "w": 600, "h": 38, "sayfa": sayfa, "deger": "",
+             "yer": T("Komutu buraya yaz", "Type the command here")},       # gpgv komutu iki satira kayar
+            {"id": p + "_tus", "tur": "rozet", "x": 624, "y": 337, "w": 126, "h": 24, "sayfa": sayfa, "renk": "gri",
+             "metin": T("Enter: çalıştır", "Enter: run")},
+            {"id": p + "_not", "tur": "metin", "x": 12, "y": 374, "w": 736, "h": 30, "sayfa": sayfa, "sar": True,
+             "boyut": 8.2, "renk": "soluk",
+             "metin": T("Bu komutlar yalnızca okur; hiçbir dosyayı değiştirmez.",
+                        "These commands only read; they change no files.")},
+        ]
+    return {"genislik": PW, "yukseklik": PH, "vurgu": "guvenlik", "sayfa": "bir",
+            "baslik": T("Terminal", "Terminal"), "ogeler": o}
+
+
 def acikla_sahnesi() -> dict:
     """Terminal penceresi: komutu yaz, Alt+E ile aciklamayi gor. Iki sayfa: sakin ornek, tehlikeli ornek."""
     gecmis = ["carot@carotos:~$ ls", "Belgeler  Masaüstü  arsiv.tar.gz", ""]

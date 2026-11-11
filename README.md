@@ -187,6 +187,29 @@ donanımınızla uyumlu olduğunu görebilirsiniz.
 > **Uyarı:** Kurulum, seçtiğiniz diskteki verileri siler. Kurulumdan önce
 > yedek alın.
 
+## İmza anahtarı
+
+CarotOS 1.4'ten itibaren ISO özetleri (`SHA256SUMS`) ve paket deposu
+(`apt.carotos.org`) aynı OpenPGP anahtarıyla imzalanır:
+
+```
+CarotOS Archive <archive@carotos.org>
+30E6 D4B0 C05E F002 1309  A1A0 9F93 5CD4 D5D0 A1F5
+```
+
+ISO, `SHA256SUMS` ve `SHA256SUMS.sign` aynı klasördeyken:
+
+```
+gpgv --keyring ./carotos-archive-keyring.gpg SHA256SUMS.sign SHA256SUMS
+sha256sum -c SHA256SUMS --ignore-missing
+```
+
+Anahtar dosyası bu depoda:
+`tools/apt/keyring-paketi/usr/share/keyrings/carotos-archive-keyring.gpg`
+(CarotOS'ta `/usr/share/keyrings/` altında kurulu gelir). Anahtarı nereden
+alırsanız alın, parmak izini yukarıdaki satırla karşılaştırın. Parmak izi
+site, GitHub ve README gibi birbirinden bağımsız yerlerde yayınlanır.
+
 ## Kullanıcılar ve yönetici yetkisi
 
 Root hesabı kilitlidir; yönetici işlemleri `sudo` üzerinden yapılır ve

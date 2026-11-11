@@ -40,18 +40,18 @@ KONULAR = [
      "baslik": T("Etik ve sorumluluk", "Ethics and responsibility"),
      "aciklama": T("Araçları nerede ve nasıl kullanmalı: izin, onay ve günlük.",
                    "Where and how to use the tools: permission, confirmation and the log.")},
-    {"id": "koruma", "sayfalar": ["usb", "carotpot", "carotene", "health"],
+    {"id": "koruma", "sayfalar": ["usb", "carotpot", "carotene", "health", "dogrula"],
      "baslik": T("Koruma ve savunma", "Protection and defence"),
-     "aciklama": T("USB denetimi, bal küpü, antivirüs ve sistem sağlığı.",
-                   "USB checks, the honeypot, antivirus and system health.")},
+     "aciklama": T("USB denetimi, bal küpü, antivirüs, sistem sağlığı ve indirdiğini doğrulama.",
+                   "USB checks, the honeypot, antivirus, system health and verifying your downloads.")},
     {"id": "ogrenme", "sayfalar": ["poligon", "former", "gsd", "filenor"],
      "baslik": T("Öğren ve dönüştür", "Learn and convert"),
      "aciklama": T("Poligon alıştırmaları, Former rehberi, sözlük ve dosya dönüştürücü.",
                    "Poligon practice, the Former guide, the glossary and the file converter.")},
     {"id": "gizlilik", "sayfalar": ["network", "disk"],
      "baslik": T("Ağ, gizlilik ve disk şifreleme", "Network, privacy and disk encryption"),
-     "aciklama": T("Sabit MAC, gizlilik varsayılanları, disk şifreleme ve swap.",
-                   "Stable MAC, the privacy defaults, disk encryption and swap.")},
+     "aciklama": T("Gizlilik varsayılanları, sahte MAC anahtarı, disk şifreleme ve swap.",
+                   "The privacy defaults, the fake MAC switch, disk encryption and swap.")},
 ]
 
 

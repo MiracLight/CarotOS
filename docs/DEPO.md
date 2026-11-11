@@ -125,3 +125,20 @@ dosyalarını yedekleyip kaldırır; dev VM 1.0 ilk geçiş testi olur). **Aşam
 - Kanal: şimdilik yalnızca `stable` (öneri). `testing` ileride.
 - Donanım anahtarı: ne zaman alınacak (aşama 2, imzalama alt anahtarı karta taşınır; ana anahtar çevrimdışı kalır).
 - Tek bakımcı riski: ana anahtarın yedeği ve "ben yokken" talimatı bu belgeye yazılır (anahtar töreni bittikten sonra).
+
+## 6. ISO imzası (her ISO yayınında, senin onayınla)
+
+Aynı anahtar ISO özetlerini de imzalar (apt deposuyla tek anahtar altyapısı).
+
+1. ISO'yu derle, VM'de dene, bir klasöre koy (yalnız yayınlanacak `.iso` dosyaları).
+2. Canlı oturumda, şifreli USB bağlıyken:
+   ```bash
+   export GNUPGHOME=/mnt/anahtar/gnupg
+   bash tools/iso/imzala-iso.sh <ISO-klasörü>
+   ```
+   Betik `SHA256SUMS` ve `SHA256SUMS.sign` üretir, sonra imzayı yalnız genel anahtarla doğrular
+   (`ISO-IMZA-TAMAM`). ISO'ya dokunmaz, yükleme yapmaz.
+3. ISO ile birlikte `SHA256SUMS` ve `SHA256SUMS.sign` download.carotos.org'a yüklenir; site ve GitHub notunda
+   parmak izi (`30E6 D4B0 C05E F002 1309  A1A0 9F93 5CD4 D5D0 A1F5`) ve doğrulama komutları yer alır.
+4. Kullanıcı tarafı: Karşılama > Koruma ve savunma > "İndirdiğini doğrula" ve Former "İndirdiğini doğrula".
+   Test: `tests/test_iso_imza.py` (parmak izi anahtar dosyasından hesaplanır; imzalama uçtan uca denenir).
