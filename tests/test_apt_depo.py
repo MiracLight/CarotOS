@@ -68,17 +68,13 @@ class DepoYapilandirmasi(unittest.TestCase):
         self.addCleanup(shutil.rmtree, depo, True)
         d = os.path.join(depo, "dists", "stable", "main", "binary-amd64")
         os.makedirs(d)
-        icerik = b"Package: x
-"
+        icerik = b"Package: x\n"
         with open(os.path.join(d, "Packages"), "wb") as f:
             f.write(icerik)
         ozet = hashlib.sha256(icerik).hexdigest()
         with open(os.path.join(depo, "dists", "stable", "Release"), "w", newline="") as f:
-            f.write("Origin: CarotOS
-Codename: stable
-SHA256:
- %s %d main/binary-amd64/Packages
-" % (ozet, len(icerik)))
+            f.write("Origin: CarotOS\nCodename: stable\nSHA256:\n %s %d main/binary-amd64/Packages\n"
+                    % (ozet, len(icerik)))
         self.assertEqual(m.calistir(depo), 1)
         with open(os.path.join(d, "by-hash", "SHA256", ozet), "rb") as f:
             self.assertEqual(f.read(), icerik)
