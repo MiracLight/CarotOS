@@ -91,11 +91,15 @@ class DepoYapilandirmasi(unittest.TestCase):
         p = oku("paket-yap.sh")
         self.assertIn("--root-owner-group", p)
         self.assertNotIn("usr/local", p)                       # paket /usr/local'e yazmaz (Debian politikasi)
-        self.assertIn('rm -f "$S/opt/carotos/gsd/ikonlar.b64"', p)
+        self.assertIn('rm -f "$S/opt/carotos/$PAKET/ikonlar.b64"', p)
+        self.assertIn("gsd|former)", p)
+        self.assertIn("keyring)", p)
+        self.assertIn("SOURCE_DATE_EPOCH", p)                  # tekrarlanabilir derleme: ayni surum, ayni ozet
         self.assertIn("carotos-ortak (>=", p)                  # gsd, ortak katmana bagli
         self.assertNotIn("postinst", p)                        # postinst yok: simge/masaustu onbellegi trigger ile
         t = oku("test-paket.sh")
-        for parca in ("yukseltmede eski dosya kaldi", "gsd kalintisi", "kalinti dosya var"):
+        for parca in ("yukseltmede eski dosya kaldi", "gsd kalintisi", "former kalintisi", "kalinti dosya var",
+                      "tekrarlanabilir degil"):
             self.assertIn(parca, t)
 
     def test_betikler(self):
