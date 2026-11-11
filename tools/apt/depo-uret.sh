@@ -11,4 +11,5 @@ cp "$AD/conf/distributions" "$AD/conf/options" "$CIKTI/conf/"
 grep -q '^SignWith' "$CIKTI/conf/distributions" && { echo "HATA: distributions icinde SignWith olmamali" >&2; exit 1; }
 for deb in "$@"; do "$REPREPRO" -b "$CIKTI" includedeb stable "$deb"; done
 "$REPREPRO" -b "$CIKTI" export
+python3 "$AD/by_hash.py" "$CIKTI"
 echo "Imzasiz depo hazir: $CIKTI/dists/stable/Release (imza yok)"

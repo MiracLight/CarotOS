@@ -56,6 +56,41 @@ class DepoYapilandirmasi(unittest.TestCase):
         self.assertIn("Architecture: all", c)
         self.assertRegex(c, r"(?m)^Version: \d{4}\.\d{2}\.\d{2}$")
 
+    def test_by_hash_betigi_imzadan_once_ve_dogru_calisir(self):
+        import importlib.util
+        import shutil
+        import tempfile
+        import hashlib
+        bh = importlib.util.spec_from_file_location("by_hash", os.path.join(APT, "by_hash.py"))
+        m = importlib.util.module_from_spec(bh)
+        bh.loader.exec_module(m)
+        depo = tempfile.mkdtemp(prefix="bh-")
+        self.addCleanup(shutil.rmtree, depo, True)
+        d = os.path.join(depo, "dists", "stable", "main", "binary-amd64")
+        os.makedirs(d)
+        icerik = b"Package: x
+"
+        with open(os.path.join(d, "Packages"), "wb") as f:
+            f.write(icerik)
+        ozet = hashlib.sha256(icerik).hexdigest()
+        with open(os.path.join(depo, "dists", "stable", "Release"), "w", newline="") as f:
+            f.write("Origin: CarotOS
+Codename: stable
+SHA256:
+ %s %d main/binary-amd64/Packages
+" % (ozet, len(icerik)))
+        self.assertEqual(m.calistir(depo), 1)
+        with open(os.path.join(d, "by-hash", "SHA256", ozet), "rb") as f:
+            self.assertEqual(f.read(), icerik)
+        with open(os.path.join(depo, "dists", "stable", "Release"), encoding="utf-8") as f:
+            r = f.read()
+        self.assertEqual(r.count("Acquire-By-Hash: yes"), 1)
+        self.assertLess(r.index("Acquire-By-Hash"), r.index("SHA256:"))
+        m.calistir(depo)                                                       # ikinci calistirma alan eklemez
+        with open(os.path.join(depo, "dists", "stable", "Release"), encoding="utf-8") as f:
+            self.assertEqual(f.read().count("Acquire-By-Hash"), 1)
+        self.assertIn("by_hash.py", oku("depo-uret.sh"))
+
     def test_betikler(self):
         for ad in ("depo-uret.sh", "imzala-yukle.sh", "test-bos-depo.sh"):
             k = oku(ad)

@@ -12,7 +12,7 @@ apt root olarak çalışır: **depo ele geçerse bütün kullanıcılarda root k
 - Anahtar **canlı CarotOS oturumunda** (RAM'de, kapanınca silinir) üretilir ve imzalama orada yapılır.
 - Claude özel anahtarı **görmez ve üretmez**. Bana yalnızca **genel anahtar ve parmak izi** gelir.
 - Otomatik sistem (CI) imza yapmaz: ben imzasız depo ağacını üretirim, **imzayı sen yaparsın**, yüklemeyi sen yaparsın.
-- `Valid-Until` (60 gün) ve düzenli yeniden imzalama (dondurma saldırısına karşı). Not: Debian trixie `reprepro` 5.3 `Acquire-By-Hash` desteklemiyor; "Hash Sum mismatch" riski `dists/*` önbellek atlama + `dists`i en son yükleme ile kapatılır.
+- `Valid-Until` (60 gün) ve düzenli yeniden imzalama (dondurma saldırısına karşı). Not: Debian trixie `reprepro` 5.3 `Acquire-By-Hash` üretmez; `tools/apt/by_hash.py` imzadan önce `by-hash/SHA256` dizinlerini ve Release alanını ekler (apt ile doğrulandı). Ek olarak `dists/*` önbellek atlama ve `dists`i en son yükleme.
 - Ana (sertifika) anahtar ile **imzalama alt anahtarı** ayrıdır; alt anahtarın 2 yıllık son kullanma tarihi olur.
 - Depo için **ayrı ve yalnızca o kovaya yetkili** R2 token'ı kullanılır (mevcut `downloads` token'ı bu iş için kullanılmaz).
 - Gizlilik notu (dürüstçe yazılır): `apt update` istekleri Cloudflare günlüğüne düşer; CarotOS telemetri toplamaz.
