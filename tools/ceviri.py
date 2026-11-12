@@ -129,8 +129,12 @@ def _json_ciftleri(obj):
 
 
 def json_dosyalari():
-    """Poligon gorev paketleri (gorevler/*.json, ctf/*.json): metinleri JSON'dadir."""
+    """Metinleri JSON'da duran veriler: Poligon gorev paketleri (gorevler/*.json, ctf/*.json) ve
+    Magaza katalogu (magaza/katalog.json: uygulama adi, ozet, aciklama, kategori adlari)."""
     sonuc = []
+    katalog = os.path.join(KOK, UYG, "magaza", "katalog.json")
+    if os.path.isfile(katalog):
+        sonuc.append((os.path.relpath(katalog, KOK).replace(os.sep, "/"), katalog))
     for alt in ("gorevler", "ctf"):
         yol = os.path.join(KOK, UYG, "poligon", alt)
         if not os.path.isdir(yol):

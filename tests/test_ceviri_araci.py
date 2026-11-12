@@ -106,6 +106,19 @@ class TaramaTesti(AracTabani):
         self.assertNotIn("English", metinler)            # baska dil kodu tasiyan tablo ceviri cifti degil
         self.assertNotIn("Yalnız Türkçe", [t for k in metinler.values() for t in k["tr"]])
 
+    def test_magaza_katalogu_taranir(self):
+        """Magaza uygulama ozet/aciklama/kategori metinleri de cevrilir (dil.metin en metniyle bakar)."""
+        uyg = os.path.join(self.gecici, *self.mod.UYG.split("/"))
+        os.makedirs(os.path.join(uyg, "magaza"))
+        katalog = {"kategoriler": [{"id": "ofis", "ad": {"tr": "Ofis", "en": "Office"}}],
+                   "uygulamalar": [{"paket": "x", "ad": "X", "ozet": {"tr": "Kısa", "en": "Short"},
+                                    "aciklama": {"tr": "Uzun", "en": "Long"}}]}
+        with open(os.path.join(uyg, "magaza", "katalog.json"), "w", encoding="utf-8") as f:
+            json.dump(katalog, f)
+        metinler, _ = self.mod.cikar()
+        for en in ("Office", "Short", "Long"):
+            self.assertIn("config/includes.chroot/opt/carotos/magaza/katalog.json", metinler[en]["yer"], en)
+
 
 class KomutlarTesti(AracTabani):
     def test_durum_kapsami(self):
