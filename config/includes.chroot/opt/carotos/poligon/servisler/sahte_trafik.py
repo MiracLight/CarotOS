@@ -24,6 +24,9 @@ import threading
 import time
 
 
+MAKS_GURULTU = 16               # gurultu akisi basina bir is parcacigi acilir; ust sinir
+
+
 class SahteTrafik:
     def __init__(self, flag: str, port: int, bind_adres: str = "127.0.0.1", araik_sn: float = 0.3,
                  gurultu: int = 0, kodlama: str = "duz"):
@@ -38,7 +41,10 @@ class SahteTrafik:
         self.araik_sn = araik_sn
         # Zorluk: kac tane flag TASIMAYAN sahte baglanti (gurultu) uretilsin
         # ve flag payload icinde duz mu yoksa hex kodlu mu gonderilsin.
-        self.gurultu = max(0, int(gurultu))
+        try:
+            self.gurultu = max(0, min(int(gurultu), MAKS_GURULTU))
+        except (TypeError, ValueError, OverflowError):
+            self.gurultu = 0
         self.kodlama = kodlama if kodlama in ("duz", "hex") else "duz"
         self._dinleyici: socket.socket | None = None
         self._calisiyor = False

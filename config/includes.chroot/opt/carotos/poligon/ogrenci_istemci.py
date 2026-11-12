@@ -121,6 +121,65 @@ def ogretmen_adresi(metin, port: int = OGRETMEN_PORTU):
     return "http://%s:%d" % (m, port)
 
 
+# Gorev kimligi yalnizca bu bicimde olabilir: sunucudan gelen kimlik dosya yoluna eklendigi icin
+# '../' ya da mutlak yol, gorev dizini disindaki bir dosyanin gorev tanimi olarak yuklenmesine yol acardi.
+GOREV_KIMLIGI = re.compile(r"[a-z0-9][a-z0-9_-]{0,63}\Z")
+# fail2ban jail adi: 'sudo fail2ban-client status <jail>' komutuna arguman olur ('-' ile baslayamaz)
+JAIL_ADI = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}\Z")
+MAKS_PARAMETRE = 32             # bir sorudaki ozel parametre sayisi
+
+
+def gorev_kimligi_gecerli_mi(gorev_id) -> bool:
+    return isinstance(gorev_id, str) and bool(GOREV_KIMLIGI.match(gorev_id))
+
+
+def port_araligi(deger):
+    """[alt, ust] bicimindeki port araligini (alt, ust) olarak doner; gecersizse None.
+    Kural ogretmen tarafindakiyle aynidir (soru_sablonlari._aralik_ayristir): 1024 <= alt < ust <= 65535."""
+    if not isinstance(deger, (list, tuple)) or len(deger) != 2:
+        return None
+    alt, ust = deger
+    if any(isinstance(d, bool) or not isinstance(d, int) for d in (alt, ust)):
+        return None
+    if not (1024 <= alt < ust <= 65535):
+        return None
+    return alt, ust
+
+
+def _basit_deger(v) -> bool:
+    if isinstance(v, bool) or v is None:
+        return True
+    if isinstance(v, int):
+        return -10 ** 9 <= v <= 10 ** 9
+    if isinstance(v, float):
+        return v == v and abs(v) <= 10 ** 9
+    return isinstance(v, str) and len(v) <= 500
+
+
+def parametreleri_temizle(p):
+    """Sunucudan gelen 'Soru Olustur' parametrelerini BICIM olarak sinirlar; uygun olmayanlari atar.
+
+    Kalanlar: kisa metin anahtarli; degeri sayi/kisa metin/mantiksal, bunlarin kisa listesi ya da tek
+    duzeyli sozlugu (orn. ipucu: {tr, en}). Deger ARALIKLARI burada degil, kullanildigi yerde
+    (gorevi_baslat, servisler, uretecler) sinirlanir. Hicbir girdide istisna firlatmaz."""
+    if not isinstance(p, dict):
+        return {}
+    temiz = {}
+    for k, v in p.items():
+        if len(temiz) >= MAKS_PARAMETRE:
+            break
+        if not isinstance(k, str) or not (1 <= len(k) <= 40):
+            continue
+        if _basit_deger(v):
+            temiz[k] = v
+        elif isinstance(v, (list, tuple)) and len(v) <= 16 and all(_basit_deger(x) for x in v):
+            temiz[k] = list(v)
+        elif (isinstance(v, dict) and len(v) <= 16
+              and all(isinstance(a, str) and len(a) <= 40 and _basit_deger(b) for a, b in v.items())):
+            temiz[k] = dict(v)
+    return temiz
+
+
 def _sinirli_int(deger, varsayilan: int, alt: int, ust: int) -> int:
     """Sunucudan gelen bir sayiyi guvenle tam sayiya cevirir: int (ya da tam degerli float) degilse
     varsayilan; sonuc alt..ust araligina kirpilir. Hicbir girdide istisna firlatmaz."""
@@ -162,7 +221,7 @@ def sudo_ile_calistir(komut: list[str], parola: str, zaman_asimi: float = 10) ->
     basarili=False, stderr sudo'nun kendi hata mesajını taşır."""
     try:
         sonuc = subprocess.run(
-            ["sudo", "-S", "-k", *komut],
+            ["sudo", "-S", "-k", "--", *komut],
             input=parola + "\n",
             capture_output=True,
             text=True,
@@ -280,11 +339,9 @@ class PoligonIstemci:
         zorlugun port araligini 'lo-hi' olarak doner (nmap gibi gorevler).
         Uygun degilse bos string."""
         p = self._zorluk_parametreleri()
-        ar = (p.get("gizli_port_araligi") or p.get("tuzak_port_araligi")
-              or p.get("port_araligi"))
-        if ar and len(ar) == 2:
-            return f"{ar[0]}-{ar[1]}"
-        return ""
+        ar = port_araligi(p.get("gizli_port_araligi") or p.get("tuzak_port_araligi")
+                          or p.get("port_araligi"))
+        return f"{ar[0]}-{ar[1]}" if ar else ""
 
     def metin_degiskenleri(self) -> dict[str, str]:
         """Senaryo/ipucu metinlerindeki ek yer tutucular. Şu an yalnızca
@@ -292,7 +349,9 @@ class PoligonIstemci:
         {sayi}); diğer görevlerde boş sözlük döner."""
         d: dict[str, str] = {}
         if self.tuzak_kullanici:
-            hizmetler = self._zorluk_parametreleri().get("hizmetler") or []
+            hizmetler = self._zorluk_parametreleri().get("hizmetler")
+            if not isinstance(hizmetler, (list, tuple)):
+                hizmetler = []
             d.update({
                 "{kullanici}": self.tuzak_kullanici,
                 "{tuzaklar}": ", ".join(str(h).upper() for h in hizmetler),
@@ -326,8 +385,12 @@ class PoligonIstemci:
         return None
 
     def gorevi_yukle(self, gorev_id: str) -> dict:
+        """Gorev tanimini YEREL gorev dizininden yukler. gorev_id sinif modunda sunucudan gelir;
+        yalnizca GOREV_KIMLIGI bicimi kabul edilir (yol ayirici, '..', mutlak yol iceremez)."""
+        if not gorev_kimligi_gecerli_mi(gorev_id):
+            raise ValueError(f"geçersiz görev kimliği: {gorev_id!r}")
         yol = GOREVLER_DIZINI / f"{gorev_id}.json"
-        if not yol.exists():
+        if not yol.is_file():
             # test/demo amaçlı: şablon dosyayı da kabul et
             yol = GOREVLER_DIZINI / "sablon-ve-ornek.json"
         self.gorev = _dk.zengin(json.loads(yol.read_text(encoding="utf-8")))
@@ -348,7 +411,10 @@ class PoligonIstemci:
         # açık görev bozulmaz, sonraki görev yeni dille üretilir (bkz. terim_sozlugu.py).
         dil = dil or getattr(self, "arayuz_dili", "tr")
         self.gorev_dili = dil
-        # önceki görevden kalan metin değişkenlerini temizle
+        # önceki görevden kalan metin değişkenlerini VE doğru cevabı temizle: cevap kutusu olmayan
+        # görevlerde (ufw, fail2ban, tuzak) önceki görevin cevabı "doğru" sayılmasın
+        self._dogru_cevap = None
+        self.hedef_parola = None
         self.tuzak_kullanici = None
         self.uretim_degiskenleri = {}
         self.dosya_yolu = None
@@ -380,10 +446,11 @@ class PoligonIstemci:
         elif yontem == "gizli_port":
             p = self._zorluk_parametreleri()
             kw = {}
-            if p.get("gizli_port_araligi"):
-                kw["gizli_port_araligi"] = tuple(p["gizli_port_araligi"])
+            ar = port_araligi(p.get("gizli_port_araligi"))
+            if ar:
+                kw["gizli_port_araligi"] = ar
             if p.get("gurultu_sayisi") is not None:
-                kw["gurultu_sayisi"] = p["gurultu_sayisi"]
+                kw["gurultu_sayisi"] = _sinirli_int(p["gurultu_sayisi"], 5, 1, 12)
             self._servis = SahteAgOrtami(bind_adres=hedef["bind_adres"], **kw)
             self._servis.baslat()
             self._servis.bekle_hazir()  # tüm portlar bağlanana kadar bekle
@@ -391,7 +458,7 @@ class PoligonIstemci:
 
         elif yontem == "hash_uret":
             p = self._zorluk_parametreleri()
-            basamak = p.get("basamak", 4)  # zorluk tanimli degilse eski davranis
+            basamak = _sinirli_int(p.get("basamak", 4), 4, 1, 8)  # zorluk tanimli degilse 4 (eski davranis)
             self.hedef_parola = parola_uret(basamak=basamak)
             self._servis = SahteHashDosyasi(
                 kullanici=hedef.get("sabit_kullanici", "ogrenci"),
@@ -407,7 +474,7 @@ class PoligonIstemci:
             self.gercek_port = _bos_port_bul(hedef["port"])
             kw = {}
             if p.get("tuzak_tablolar") is not None:
-                kw["tuzak_tablolar"] = p["tuzak_tablolar"]
+                kw["tuzak_tablolar"] = _sinirli_int(p["tuzak_tablolar"], 0, 0, 4)
             self._servis = SahteWebServisi(
                 gizli_deger=self._dogru_cevap,
                 port=self.gercek_port,
@@ -422,8 +489,8 @@ class PoligonIstemci:
             self.gercek_port = _bos_port_bul(hedef["port"])
             kw = {}
             if p.get("gurultu") is not None:
-                kw["gurultu"] = p["gurultu"]
-            if p.get("kodlama"):
+                kw["gurultu"] = _sinirli_int(p["gurultu"], 0, 0, 16)
+            if p.get("kodlama") in ("duz", "hex"):
                 kw["kodlama"] = p["kodlama"]
             self._servis = SahteTrafik(
                 flag=self._dogru_cevap,
@@ -468,11 +535,15 @@ class PoligonIstemci:
             # yapılır (tuzak_kaydini_dogrula); doğru cevap kutusu YOKTUR.
             p = self._zorluk_parametreleri()
             self.tuzak_kullanici = "ziyaretci-" + secrets.token_hex(2)
-            self.tuzak_gerekli = int(p.get("gerekli_giris", 1))
-            self._servis = TuzakLab(
+            self.tuzak_gerekli = _sinirli_int(p.get("gerekli_giris", 1), 1, 1, 50)
+            hizmetler = p.get("hizmetler")
+            if not (isinstance(hizmetler, (list, tuple)) and hizmetler
+                    and all(isinstance(h, str) for h in hizmetler)):
+                hizmetler = ["ftp"]
+            self._servis = TuzakLab(                     # hizmet adlarini ve araligi kendisi de dogrular
                 bind_adres=hedef["bind_adres"],
-                hizmetler=p.get("hizmetler") or ["ftp"],
-                port_araligi=tuple(p.get("tuzak_port_araligi") or (21000, 21999)),
+                hizmetler=hizmetler,
+                port_araligi=port_araligi(p.get("tuzak_port_araligi")) or (21000, 21999),
             )
             self._servis.baslat()
 
@@ -501,6 +572,10 @@ class PoligonIstemci:
     # Cevap doğrulama — YEREL, ağa doğru cevap gitmez
     # ------------------------------------------------------------------
     def cevabi_kontrol_et(self, girilen_cevap: str, ipucu_kullanildi: bool = False) -> bool:
+        if self._dogru_cevap is None:
+            # Bu gorev turunde yazilacak bir cevap yok (ufw, fail2ban, tuzak laboratuvari) ya da gorev
+            # baslamadi. Eskiden 'None' yazmak dogru sayiliyordu.
+            return False
         dogru = girilen_cevap.strip() == str(self._dogru_cevap).strip()
         gecen_sure = int(time.time() - (self._baslangic_zamani or time.time()))
         kazanilan = 0
@@ -557,6 +632,9 @@ class PoligonIstemci:
         (genelde önceden var olan) jail'in durumunu okur. Komutun
         başarıyla dönmesi ve beklenen başlığı içermesi yeterli sayılır."""
         jail = self.gorev["hedef"]["jail"] if self.gorev else ""
+        if not isinstance(jail, str) or not JAIL_ADI.match(jail):
+            # root olarak calisan komuta arguman olur: yalnizca duz bir jail adi kabul edilir
+            return False, f"geçersiz jail adı: {jail!r}"
         basarili, cikti, hata = sudo_ile_calistir(
             ["fail2ban-client", "status", jail], sudo_parolasi,
         )
@@ -781,7 +859,7 @@ class PoligonIstemci:
         self.ayar_surumu = _sinirli_int(cevap.get("ayar_surumu"), 0, 0, 10 ** 9)
         self.aktif_soru_no = _sinirli_int(cevap.get("aktif_soru_no"), 0, 0, 10 ** 9)
         acik = cevap.get("acik_gorevler")
-        return [g for g in acik if isinstance(g, str)][:16] if isinstance(acik, list) else []
+        return [g for g in acik if gorev_kimligi_gecerli_mi(g)][:16] if isinstance(acik, list) else []
 
     def atanan_zorluk(self, gorev_id: str) -> str:
         """Ogretmenin bu goreve atadigi zorlugu doner. acik_gorevleri_getir()
@@ -799,8 +877,8 @@ class PoligonIstemci:
         """Ogretmenin bu goreve 'Soru Olustur' ile atadigi OZEL parametreler.
         Yoksa None -> isimli zorluk on-ayari kullanilir. acik_gorevleri_getir()
         en son cagrildiginda alinan bilgiye dayanir."""
-        p = self._acik_ozel.get(gorev_id)
-        return dict(p) if isinstance(p, dict) and p else None
+        p = parametreleri_temizle(self._acik_ozel.get(gorev_id))
+        return p or None
 
     def sinif_baglanti_durumu(self) -> str:
         """Öğretmenle bağlantının durumunu tek bir sözcükle döner --

@@ -35,14 +35,23 @@ class SahteAgOrtami:
                 "(127.0.0.0/8) kabul edilir."
             )
         self.bind_adres = bind_adres
-        self.gizli_port_araligi = tuple(gizli_port_araligi)
-        self.gizli_port = secrets.randbelow(
-            self.gizli_port_araligi[1] - self.gizli_port_araligi[0]
-        ) + self.gizli_port_araligi[0]
+        try:
+            alt, ust = gizli_port_araligi
+        except (TypeError, ValueError):
+            raise ValueError(f"gecersiz gizli port araligi: {gizli_port_araligi!r}") from None
+        if (any(isinstance(d, bool) or not isinstance(d, int) for d in (alt, ust))
+                or not (1024 <= alt < ust <= 65535)):
+            # 1024 alti root ister (port sessizce acilamaz, soru cozulemez olur); 65535 ustu gecersizdir
+            raise ValueError(f"gecersiz gizli port araligi: {gizli_port_araligi!r}")
+        self.gizli_port_araligi = (alt, ust)
+        self.gizli_port = secrets.randbelow(ust - alt) + alt
         # Gurultu portlari: zorluga gore havuzdan rastgele N port secilir
         # (ne kadar cok, gizli portu ayirt etmek o kadar zor).
         import random as _random
-        sayi = max(1, min(gurultu_sayisi, len(GURULTU_HAVUZU)))
+        try:
+            sayi = max(1, min(int(gurultu_sayisi), len(GURULTU_HAVUZU)))
+        except (TypeError, ValueError, OverflowError):
+            sayi = 5
         self.gurultu_portlari = _random.sample(GURULTU_HAVUZU, sayi)
         self._soketler: list[socket.socket] = []
         self._threadler: list[threading.Thread] = []

@@ -734,5 +734,176 @@ class EszamansizBildirim(IlerlemeTabani):
         self.assertLess(time.time() - bas, 0.5)
 
 
+class BireyselTabani(unittest.TestCase):
+    """Ag kullanmayan (bireysel mod) istemci; gecmis defteri gecici dosyaya yazilir."""
+
+    def setUp(self):
+        import shutil
+        import tempfile
+        import gecmis_defteri
+        from pathlib import Path
+        dizin = tempfile.mkdtemp(prefix="poligon-test-")
+        self.addCleanup(shutil.rmtree, dizin, True)
+        eski = gecmis_defteri.GECMIS_DOSYASI
+        gecmis_defteri.GECMIS_DOSYASI = Path(dizin) / "gecmis.json"
+        self.addCleanup(setattr, gecmis_defteri, "GECMIS_DOSYASI", eski)
+        self.ist = ogrenci_istemci.PoligonIstemci("", "", "", "bireysel")
+        self.addCleanup(self.ist.gorevi_durdur)
+
+
+class P05GorevKimligi(BireyselTabani):
+    """P-05: sunucudan gelen gorev kimligi dogrulanmadan dosya yoluna ekleniyordu ('../', mutlak yol)."""
+
+    def test_dizin_disi_kimlikler_reddedilir(self):
+        import tempfile
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+            json.dump({"id": "DISARIDAN", "hedef": {}, "flag_uretimi": {"yontem": "sistem_kontrolu"}}, f)
+        self.addCleanup(os.remove, f.name)
+        disarida = f.name[:-len(".json")]
+        for kimlik in (disarida, "../" * 12 + disarida.lstrip("/"), "../nmap-01", "gorevler/nmap-01", "nmap-01.json",
+                       "a\\b", "", " ", "NMAP-01", "nmap 01", "nmap-01\n", "x" * 65, "-nmap", ".", "..", None, 5,
+                       ["nmap-01"]):
+            with self.assertRaises(ValueError, msg=repr(kimlik)):
+                self.ist.gorevi_yukle(kimlik)
+        self.assertIsNone(self.ist.gorev)
+
+    def test_gecerli_kimlikler_yuklenir(self):
+        self.assertEqual(self.ist.gorevi_yukle("nmap-01")["id"], "nmap-01")
+        # dosyasi olmayan gecerli kimlik: sablon gorev (eski davranis)
+        self.assertEqual(self.ist.gorevi_yukle("hydra-01")["id"], "hydra-01")
+        for dosya in os.listdir(os.path.join(POLIGON, "gorevler")):
+            self.assertTrue(ogrenci_istemci.gorev_kimligi_gecerli_mi(dosya[:-len(".json")]), dosya)
+
+    def test_sunucudan_gelen_gecersiz_kimlikler_elenir(self):
+        govde = json.dumps({"acik_gorevler": ["/etc/passwd", "../../x", "nmap-01", "A", "john-01"]})
+        s = SahteSunucu(http_yaniti(govde))
+        self.addCleanup(s.durdur)
+        ist = ogrenci_istemci.PoligonIstemci(s.adres, "1", SIFRE, "Ali")
+        self.assertEqual(ist.acik_gorevleri_getir(), ["nmap-01", "john-01"])
+
+    def test_gecersiz_jail_adi_sudo_calistirmaz(self):
+        cagrilar = []
+        eski = ogrenci_istemci.sudo_ile_calistir
+        ogrenci_istemci.sudo_ile_calistir = lambda *a, **k: cagrilar.append(a) or (True, "Status for the jail: x", "")
+        self.addCleanup(setattr, ogrenci_istemci, "sudo_ile_calistir", eski)
+        for jail in ("-h", "--help", "-c/tmp/x", "sshd; rm -rf /", "a b", "", "../x", "x" * 65, None, 5, ["sshd"]):
+            self.ist.gorev = {"id": "fail2ban-01", "hedef": {"jail": jail}}
+            basarili, mesaj = self.ist.fail2ban_durumunu_dogrula("parola")
+            self.assertFalse(basarili, repr(jail))
+        self.assertEqual(cagrilar, [])
+        self.ist.gorev = {"id": "fail2ban-01", "hedef": {"jail": "sshd"}, "puan": 10}
+        self.assertTrue(self.ist.fail2ban_durumunu_dogrula("parola")[0])
+        self.assertEqual(cagrilar, [(["fail2ban-client", "status", "sshd"], "parola")])
+
+    def test_sudo_komutu_secenek_olarak_yorumlanamaz(self):
+        import subprocess
+        gorulen = []
+
+        class Sonuc:
+            returncode, stdout, stderr = 0, "", ""
+        eski = subprocess.run
+        subprocess.run = lambda argv, **k: gorulen.append(argv) or Sonuc()
+        self.addCleanup(setattr, subprocess, "run", eski)
+        ogrenci_istemci.sudo_ile_calistir(["ufw", "status"], "p")
+        self.assertEqual(gorulen, [["sudo", "-S", "-k", "--", "ufw", "status"]])
+
+
+class P07SunucuParametreleri(BireyselTabani):
+    """P-07: sunucudan gelen gorev parametreleri istemcide sinirlanmiyordu."""
+
+    def test_parametreleri_temizle(self):
+        f = ogrenci_istemci.parametreleri_temizle
+        for bozuk in (None, 5, "x", [1, 2], [("a", 1)]):
+            self.assertEqual(f(bozuk), {})
+        girdi = {"gurultu": 3, "kodlama": "hex", "hizmetler": ["ftp", "telnet"], "gizli_port_araligi": [20000, 20999],
+                 "ipucu": {"tr": "ipucu", "en": "hint"}, "_etiket": "soru", "bayrak": True, "oran": 0.5}
+        self.assertEqual(f(girdi), girdi)
+        atilan = {5: "sayi anahtar", "": "bos anahtar", "k" * 41: "uzun anahtar", "uzun": "x" * 501,
+                  "dev": 10 ** 30, "nan": float("nan"), "sonsuz": float("inf"), "ic_ice": {"a": {"b": 1}},
+                  "liste_ic": [[1]], "uzun_liste": list(range(17)), "nesne": object()}
+        self.assertEqual(f(atilan), {})
+        self.assertEqual(len(f({"p%d" % i: i for i in range(200)})), ogrenci_istemci.MAKS_PARAMETRE)
+
+    def test_atanan_parametreler_temizlenir(self):
+        self.ist._acik_ozel = {"nmap-01": {"gurultu_sayisi": 5, "kotu": {"a": {"b": 1}}}, "bos": {"x": object()}}
+        self.assertEqual(self.ist.atanan_parametreler("nmap-01"), {"gurultu_sayisi": 5})
+        self.assertIsNone(self.ist.atanan_parametreler("bos"))
+        self.assertIsNone(self.ist.atanan_parametreler("yok"))
+
+    def test_port_araligi(self):
+        f = ogrenci_istemci.port_araligi
+        self.assertEqual(f([20000, 20999]), (20000, 20999))
+        self.assertEqual(f((1024, 65535)), (1024, 65535))
+        for bozuk in ([80, 90], [1023, 2000], [2000, 2000], [3000, 2000], [20000, 65536], [70000, 70010], ["a", "b"],
+                      [20000], [1, 2, 3], "20000-20999", None, 5, [True, 20000], [20000.0, 20999]):
+            self.assertIsNone(f(bozuk), repr(bozuk))
+
+    def test_servisler_kendi_sinirlarini_uygular(self):
+        from servisler.sahte_ag import SahteAgOrtami
+        from servisler.sahte_trafik import MAKS_GURULTU, SahteTrafik
+        import flag_uretici
+        self.assertEqual(SahteTrafik("f", 1, gurultu=100000).gurultu, MAKS_GURULTU)
+        self.assertEqual(MAKS_GURULTU, 16)
+        for bozuk in ("x", None, [1], float("inf")):
+            self.assertEqual(SahteTrafik("f", 1, gurultu=bozuk).gurultu, 0)
+        for bozuk in ((80, 80), (80, 90), (70000, 70010), ("a", "b"), (20000,), None, 5, (20999, 20000), (True, 30000)):
+            with self.assertRaises(ValueError, msg=repr(bozuk)):
+                SahteAgOrtami(gizli_port_araligi=bozuk)
+        ortam = SahteAgOrtami(gizli_port_araligi=(20000, 20010), gurultu_sayisi="çok")
+        self.assertTrue(20000 <= ortam.gizli_port < 20010)
+        self.assertEqual(len(ortam.gurultu_portlari), 5)
+        self.assertEqual(len(SahteAgOrtami(gurultu_sayisi=10 ** 9).gurultu_portlari), 12)
+        import time
+        bas = time.time()
+        parola = flag_uretici.parola_uret(basamak=10 ** 7)
+        self.assertLess(time.time() - bas, 1)
+        self.assertEqual(len(parola.lstrip("abcdefghijklmnopqrstuvwxyz")), flag_uretici.MAKS_BASAMAK)
+        for bozuk in ("3", None, 2.5, True, [3]):
+            self.assertEqual(len(flag_uretici.parola_uret(basamak=bozuk).lstrip("abcdefghijklmnopqrstuvwxyz")), 4)
+
+    def test_dusmanca_parametrelerle_gorev_baslar_ve_sinirli_kalir(self):
+        dusmanca = {"gurultu": 10 ** 9, "kodlama": ["x"], "gizli_port_araligi": [1, 5], "gurultu_sayisi": 10 ** 9,
+                    "tuzak_tablolar": "çok", "basamak": 10 ** 9, "gerekli_giris": "x", "hizmetler": 7,
+                    "tuzak_port_araligi": "abc"}
+        self.ist.ozel_parametreler = ogrenci_istemci.parametreleri_temizle(dusmanca)
+        self.ist.gorevi_yukle("tshark-01")
+        self.ist.gorevi_baslat()
+        self.assertLessEqual(self.ist._servis.gurultu, 16)
+        self.assertEqual(self.ist._servis.kodlama, "duz")
+        self.ist.gorevi_durdur()
+        self.ist.gorevi_yukle("nmap-01")
+        self.ist.gorevi_baslat()
+        self.assertLessEqual(len(self.ist._servis.gurultu_portlari), 12)
+        self.assertTrue(1024 <= self.ist._servis.gizli_port <= 65535)
+        self.assertEqual(self.ist.aralik_metni(), "")                # bozuk aralik metne dokulmez, cokertmez
+        self.ist.gorevi_durdur()
+        self.ist.gorevi_yukle("sqlmap-01")
+        self.ist.gorevi_baslat()
+        self.assertEqual(self.ist._servis.tuzak_tablolar, 0)
+        self.ist.gorevi_durdur()
+        self.ist.tuzak_kullanici = "ziyaretci"
+        self.assertEqual(self.ist.metin_degiskenleri()["{tuzaklar}"], "")
+
+
+class P13CevapKutusuOlmayanGorev(BireyselTabani):
+    """P-13: dogru cevabi olmayan gorevde 'None' ya da onceki gorevin cevabi dogru sayiliyordu."""
+
+    def test_cevap_yokken_hicbir_metin_dogru_degil(self):
+        for metin in ("None", "", "none", " None "):
+            self.assertFalse(self.ist.cevabi_kontrol_et(metin))
+
+    def test_onceki_gorevin_cevabi_tasinmaz(self):
+        self.ist.gorevi_yukle("nmap-01")
+        self.ist.gorevi_baslat()
+        eski = self.ist._dogru_cevap
+        self.assertTrue(self.ist.cevabi_kontrol_et(eski))
+        self.ist.gorevi_durdur()
+        self.ist.gorevi_yukle("ufw-01")
+        self.ist.gorevi_baslat()
+        self.assertIsNone(self.ist._dogru_cevap)
+        for metin in (eski, "None"):
+            self.assertFalse(self.ist.cevabi_kontrol_et(metin))
+
+
 if __name__ == "__main__":
     unittest.main()

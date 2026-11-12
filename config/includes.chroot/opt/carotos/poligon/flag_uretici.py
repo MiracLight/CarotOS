@@ -14,6 +14,8 @@ from __future__ import annotations
 import secrets
 from pathlib import Path
 
+MAKS_BASAMAK = 12               # parola_uret icin ust sinir (10**basamak hesaplanir)
+
 VARSAYILAN_KELIME_LISTESI = [
     "kaplumbaga", "guvenlik", "firewall", "sifreleme", "protokol",
     "yonlendirici", "anahtar", "erisim", "denetim", "izleme",
@@ -32,6 +34,9 @@ def parola_uret(kelime_listesi: list[str] | None = None,
     çağıran tüm görevler (hydra/sql/trafik) hiç etkilenmez."""
     kelimeler = kelime_listesi or VARSAYILAN_KELIME_LISTESI
     kelime = secrets.choice(kelimeler)
+    if isinstance(basamak, bool) or not isinstance(basamak, int):
+        basamak = 4
+    basamak = min(basamak, MAKS_BASAMAK)
     if basamak <= 0:
         return kelime
     alt = 10 ** (basamak - 1)      # örn. basamak=4 -> 1000
