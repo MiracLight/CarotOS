@@ -283,8 +283,9 @@ class AgUretecleri(unittest.TestCase):
                         self.assertEqual(http_al(port, f"/{sozluk_gizli}/")[0], 403)
                     if kesif != "robots":
                         # robots.txt gizli dizini ele vermez
-                        self.assertNotIn(sozluk_gizli if kesif == "cerez" else
-                                         [a for a in aday if http_al(port, f"/{a}/")[0] == 200][0],
+                        # ('/log/' aranir, 'log' degil: yem dizin 'blog' gizli dizin 'log'u icerir)
+                        self.assertNotIn("/%s/" % (sozluk_gizli if kesif == "cerez" else
+                                                   [a for a in aday if http_al(port, f"/{a}/")[0] == 200][0]),
                                          govde)
                 finally:
                     u.durdur()

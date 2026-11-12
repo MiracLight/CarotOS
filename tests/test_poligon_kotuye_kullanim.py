@@ -476,5 +476,263 @@ class P08SifresizBilgiSizintisi(Taban):
             self.assertIn('"%s"' % var, k.split('"""', 2)[2], var)
 
 
+class SahteSunucu:
+    """Her baglantiya ayni ham yaniti veren (ya da hic yanit vermeyen) tek amacli sunucu."""
+
+    def __init__(self, yanit=None, kapat=True):
+        import socket
+        import threading
+        self.yanit, self.kapat, self.istek_sayisi = yanit, kapat, 0
+        self._acik = []
+        self.s = socket.socket()
+        self.s.bind(("127.0.0.1", 0))
+        self.s.listen(16)
+        self.adres = "http://127.0.0.1:%d" % self.s.getsockname()[1]
+        threading.Thread(target=self._dongu, daemon=True).start()
+
+    def _dongu(self):
+        while True:
+            try:
+                c, _ = self.s.accept()
+            except OSError:
+                return
+            self.istek_sayisi += 1
+            try:
+                c.settimeout(2)
+                c.recv(65536)
+                if self.yanit is not None:
+                    c.sendall(self.yanit)
+                if self.kapat:
+                    # Okunmamis istek verisi varken kapatmak RST gonderir ve istemci yaniti goremez:
+                    # once yazma yonunu kapat, istemcinin gonderdiklerini tuket, sonra kapat.
+                    import socket as _s
+                    try:
+                        c.shutdown(_s.SHUT_WR)
+                        c.settimeout(0.5)
+                        while c.recv(65536):
+                            pass
+                    except OSError:
+                        pass
+                    c.close()
+                else:
+                    self._acik.append(c)
+            except OSError:
+                pass
+
+    def durdur(self):
+        self.s.close()
+        for c in self._acik:
+            c.close()
+
+
+def http_yaniti(govde, durum="200 OK", ek_baslik=""):
+    if isinstance(govde, str):
+        govde = govde.encode("utf-8")
+    return ("HTTP/1.0 %s\r\nContent-Type: application/json\r\n%s\r\n" % (durum, ek_baslik)).encode() + govde
+
+
+class P04IstemciDayanikliligi(unittest.TestCase):
+    """P-04, P-18, P-19: _istek yalnizca BaglantiHatasi firlatir; ust duzey yontemler hicbir sunucu
+    davranisinda istisna firlatmaz (aksi halde arayuzun 3 sn'lik zamanlayicisi kalici olarak dururdu)."""
+
+    def setUp(self):
+        eski = ogrenci_istemci.ISTEK_ZAMAN_ASIMI
+        ogrenci_istemci.ISTEK_ZAMAN_ASIMI = 0.6
+        self.addCleanup(setattr, ogrenci_istemci, "ISTEK_ZAMAN_ASIMI", eski)
+
+    def sahte(self, *a, **k):
+        s = SahteSunucu(*a, **k)
+        self.addCleanup(s.durdur)
+        return s
+
+    def kotu_sunucular(self):
+        return {
+            "yanit vermiyor": self.sahte(None, kapat=False),
+            "hemen kapatiyor": self.sahte(None),
+            "html hata sayfasi": self.sahte(http_yaniti("<html>proxy</html>", "502 Bad Gateway")),
+            "bos govde": self.sahte(http_yaniti("")),
+            "json listesi": self.sahte(http_yaniti("[1,2,3]")),
+            "json sayisi": self.sahte(http_yaniti("7")),
+            "bozuk http": self.sahte(b"\x00\x01\x02 anlamsiz\r\n\r\n"),
+            "yarim yanit": self.sahte(b"HTTP/1.0 200 OK\r\nContent-Length: 500\r\n\r\n{\"a\":"),
+            "dev yanit": self.sahte(http_yaniti(b'{"a":"' + b"x" * (ogrenci_istemci.MAKS_YANIT + 10) + b'"}')),
+            "derin json": self.sahte(http_yaniti("[" * 50000)),
+            "utf8 degil": self.sahte(http_yaniti(b'{"a":"\xff\xfe"}')),
+        }
+
+    def test_istek_yalnizca_baglanti_hatasi_firlatir(self):
+        for ad, sunucu in self.kotu_sunucular().items():
+            ist = ogrenci_istemci.PoligonIstemci(sunucu.adres, "1", SIFRE, "Ali")
+            for yontem, yol in (("GET", "/gorevler"), ("POST", "/katil")):
+                with self.assertRaises(ogrenci_istemci.BaglantiHatasi, msg=ad):
+                    ist._istek(yol, {}, yontem)
+
+    def test_ust_duzey_yontemler_istisna_firlatmaz(self):
+        for ad, sunucu in self.kotu_sunucular().items():
+            ist = ogrenci_istemci.PoligonIstemci(sunucu.adres, "1", SIFRE, "Ali")
+            ist.gorev = {"id": "x"}
+            self.assertEqual(ist.katil(), (False, "__BAGLANTI_HATASI__"), ad)
+            self.assertEqual(ist.sinif_baglanti_durumu(), "belirsiz", ad)
+            self.assertIsNone(ist.gorev_degisti_mi(), ad)
+            self.assertEqual(ist.yeni_mesajlari_getir(), [], ad)
+            self.assertFalse(ist.mesaj_gonder("selam"), ad)
+            ist._bildir("basladi")                                   # sessizce yutulur
+
+    def test_kapali_port_oda_kapandi_sayilir(self):
+        import socket
+        s = socket.socket()
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+        s.close()
+        ist = ogrenci_istemci.PoligonIstemci("http://127.0.0.1:%d" % port, "1", SIFRE, "Ali")
+        with self.assertRaises(ogrenci_istemci.OdaKapaliHatasi):
+            ist._istek("/gorevler", {}, "GET")
+        self.assertEqual(ist.sinif_baglanti_durumu(), "oda_kapandi")
+
+    def test_bozuk_alanli_gorev_yaniti_cokertmez(self):
+        govde = json.dumps({"acik_gorevler": ["nmap-01", 5, None, ["x"]], "zorluklar": {"nmap-01": 7, "a": "zor"},
+                            "parametreler": {"nmap-01": "dizgi", "b": {"x": 1}}, "varyantlar": {"nmap-01": "abc", "c": 3,
+                                                                                         "d": 1e400, "e": True},
+                            "hedef_adres": "8.8.8.8", "ayar_surumu": "çok", "aktif_soru_no": [1]})
+        ist = ogrenci_istemci.PoligonIstemci(self.sahte(http_yaniti(govde)).adres, "1", SIFRE, "Ali")
+        self.assertEqual(ist.acik_gorevleri_getir(), ["nmap-01"])
+        self.assertEqual(ist._acik_zorluklar, {"a": "zor"})
+        self.assertEqual(ist._acik_ozel, {"b": {"x": 1}})
+        self.assertEqual(ist._acik_varyantlar, {"c": 3})
+        self.assertIsNone(ist.sinif_hedef_adres)                     # loopback olmayan hedef adres yok sayilir
+        self.assertEqual((ist.ayar_surumu, ist.aktif_soru_no), (0, 0))
+        for govde in ('{"acik_gorevler": "nmap-01"}', '{"varyantlar": [1]}', "{}"):
+            ist = ogrenci_istemci.PoligonIstemci(self.sahte(http_yaniti(govde)).adres, "1", SIFRE, "Ali")
+            self.assertEqual(ist.acik_gorevleri_getir(), [])
+
+    def test_bozuk_mesaj_listesi_cokertmez(self):
+        govde = json.dumps({"mesajlar": [{"metin": "no yok"}, "dizgi", {"no": "3", "metin": "x"}, {"no": True},
+                                         {"no": 4, "metin": "gecerli", "kimden": "ogretmen"}]})
+        ist = ogrenci_istemci.PoligonIstemci(self.sahte(http_yaniti(govde)).adres, "1", SIFRE, "Ali")
+        self.assertEqual([m["no"] for m in ist.yeni_mesajlari_getir()], [4])
+        ist = ogrenci_istemci.PoligonIstemci(self.sahte(http_yaniti('{"mesajlar": 5}')).adres, "1", SIFRE, "Ali")
+        self.assertEqual(ist.yeni_mesajlari_getir(), [])
+
+    def test_yonlendirme_izlenmez(self):
+        hedef = self.sahte(http_yaniti('{"tamam": true, "anahtar": "calinti"}'))
+        yonlendiren = self.sahte(http_yaniti("", "302 Found", "Location: %s/katil\r\n" % hedef.adres))
+        ist = ogrenci_istemci.PoligonIstemci(yonlendiren.adres, "1", SIFRE, "Ali")
+        self.assertEqual(ist.katil(), (False, "__BAGLANTI_HATASI__"))
+        self.assertEqual(hedef.istek_sayisi, 0)                      # sifre ikinci adrese gitmedi
+
+    def test_vekil_sunucu_kullanilmaz(self):
+        vekil = self.sahte(http_yaniti('{"aktif": false}'))
+        gercek = self.sahte(http_yaniti('{"aktif": true}'))
+        for anahtar in ("http_proxy", "HTTP_PROXY", "all_proxy"):
+            eski = os.environ.get(anahtar)
+            os.environ[anahtar] = vekil.adres
+            self.addCleanup(lambda a=anahtar, e=eski: os.environ.pop(a, None) if e is None else os.environ.__setitem__(a, e))
+        ist = ogrenci_istemci.PoligonIstemci(gercek.adres, "1", SIFRE, "Ali")
+        self.assertEqual(ist.sinif_baglanti_durumu(), "aktif")
+        self.assertEqual((vekil.istek_sayisi, gercek.istek_sayisi), (0, 1))
+
+    def test_http_disi_adres_reddedilir(self):
+        for adres in ("file:///etc/passwd", "ftp://127.0.0.1", "https://127.0.0.1:8642", "127.0.0.1:8642"):
+            ist = ogrenci_istemci.PoligonIstemci(adres, "1", SIFRE, "Ali")
+            with self.assertRaises(ogrenci_istemci.BaglantiHatasi):
+                ist._istek("/gorevler", {}, "GET")
+
+    def test_arayuz_ag_cagrilarini_ana_is_parcaciginda_yapmaz(self):
+        k = kaynak("ogrenci_uygulama.py")
+        for cagri in ("self.istemci.sinif_baglanti_durumu()", "self.istemci.gorev_degisti_mi()",
+                      "self.istemci.yeni_mesajlari_getir()", "self.istemci.acik_gorevleri_getir()",
+                      "self.istemci.gorevi_degistir("):
+            self.assertNotIn(cagri, k, cagri)
+        for govde in (k.split("    def _ipucu_izlemeyi_baslat(self):", 1)[1].split("    def _mesajlari_ekle", 1)[0],
+                      k.split("    def _bekleme_izlemeyi_baslat(self):", 1)[1].split("    def _beklemeden_goreve", 1)[0]):
+            self.assertIn("threading.Thread(target=arka_plan", govde)
+            self.assertIn("GLib.idle_add(uygula", govde)
+            self.assertIn("except Exception", govde)
+            kontrol = govde.split("        def kontrol_et():", 1)[1]
+            self.assertNotIn("istemci.sinif", kontrol)
+            self.assertIn("return True", kontrol)
+        self.assertIn("istemci.eszamansiz_bildirim = True", k)
+
+
+class P17AdresAlani(unittest.TestCase):
+    """P-17: 'ip:port' gibi bir adres yakalanmayan InvalidURL ile ekrani 'Bağlanıyor…' yazisinda birakiyordu."""
+
+    def test_gecerli_adresler(self):
+        f = ogrenci_istemci.ogretmen_adresi
+        for girdi, beklenen in (("192.168.1.5", "http://192.168.1.5:8642"), (" 192.168.1.5 ", "http://192.168.1.5:8642"),
+                                ("192.168.1.5:8642", "http://192.168.1.5:8642"), ("http://10.0.0.7/", "http://10.0.0.7:8642"),
+                                ("HTTP://10.0.0.7:8642/", "http://10.0.0.7:8642"), ("ogretmen-pc", "http://ogretmen-pc:8642"),
+                                ("ogretmen.local", "http://ogretmen.local:8642"), ("localhost", "http://localhost:8642")):
+            self.assertEqual(f(girdi), beklenen, girdi)
+
+    def test_gecersiz_adresler(self):
+        f = ogrenci_istemci.ogretmen_adresi
+        for girdi in ("", "   ", "192.168.1.5:9999", "192.168.1.5:8642:8642", "999.1.1.1", "1.2.3", "1.2.3.4.5",
+                      "evil.com/x?", "kullanici@evil.com", "a b", "192.168.1.5/yol", "[::1]", "::1", "ör.nek", "-a.com",
+                      "a..b", "x" * 300, "http://", "file:///etc/passwd", "1.2.3.4#", "1.2.3.4\n5", None, 5):
+            self.assertIsNone(f(girdi), repr(girdi))
+
+    def test_arayuz_adresi_dogrular_ve_beklenmeyen_hatada_kilitlenmez(self):
+        k = kaynak("ogrenci_uygulama.py")
+        govde = k.split("    def _odaya_katil(self, _düğme):", 1)[1].split("\n    def ", 1)[0]
+        self.assertIn("ogretmen_adresi(adres)", govde)
+        self.assertIn('m["hata_adres"]', govde)
+        self.assertIn("except Exception", govde)
+        self.assertNotIn('f"http://{adres}:8642"', k)
+
+
+class KatilimRetKodlari(Taban):
+    """Sunucunun ret nedenleri kod olarak tasinir; ogrenci arayuzu kendi dilinde gosterir."""
+
+    def test_istemci_ret_kodunu_saklar(self):
+        self.katil_tamam("Ali")
+        for ad, sifre, kod in (("Ali", SIFRE, "isim_alinmis"), ("tum_sinif", SIFRE, "geçersiz isim"),
+                               ("Veli", "yanlis", "yanlış şifre")):
+            ist = ogrenci_istemci.PoligonIstemci(self.adres, "1234", sifre, ad)
+            self.assertFalse(ist.katil()[0])
+            self.assertEqual(ist.son_hata_kodu, kod)
+        self.oda.maks_ogrenci = 1
+        ist = ogrenci_istemci.PoligonIstemci(self.adres, "1234", SIFRE, "Can")
+        self.assertFalse(ist.katil()[0])
+        self.assertEqual(ist.son_hata_kodu, "sinif_dolu")
+
+    def test_her_ret_kodunun_iki_dilde_metni_var(self):
+        import ast
+        k = kaynak("ogrenci_uygulama.py")
+        tablo = ast.literal_eval(k.split("KATIL_HATA_ANAHTARI = ", 1)[1].split("}\n", 1)[0] + "}")
+        sunucu = kaynak("ogretmen_sunucu.py")
+        self.assertEqual(set(tablo), {"yanlış şifre", "cok_fazla_deneme", "isim_alinmis", "geçersiz isim",
+                                      "sinif_dolu", "adres_siniri"})
+        for kod, anahtar in tablo.items():
+            self.assertIn('"hata": "%s"' % kod, sunucu, kod)
+            self.assertEqual(k.count('        "%s": "' % anahtar), 2, anahtar)      # tr + en
+
+
+class EszamansizBildirim(IlerlemeTabani):
+    """Arayuz bildirimleri arka planda gonderir; sira korunur ve cagiran beklemez."""
+
+    def test_sira_korunur_ve_cagiran_beklemez(self):
+        import time
+        ist = ogrenci_istemci.PoligonIstemci(self.adres, "1234", SIFRE, "Veli")
+        self.assertTrue(ist.katil()[0])
+        ist.gorev = {"id": "hydra-01"}
+        ist.eszamansiz_bildirim = True
+        for i in range(20):
+            ist._bildir("yanlis_denedi", i, cevap="deneme%d" % i)
+        ist._bildir("tamamlandi", 99, cevap="son")
+        self.assertTrue(ist.bildirimleri_bekle(10))
+        self.assertEqual([k["cevap"] for k in self.oda.cevaplar["Veli"]], ["deneme%d" % i for i in range(20)] + ["son"])
+        self.assertEqual(self.oda.ogrenciler["Veli"]["durum"], "tamamlandi")
+        # ulasilamayan sunucuda cagri aninda doner
+        s = SahteSunucu(None, kapat=False)
+        self.addCleanup(s.durdur)
+        ist2 = ogrenci_istemci.PoligonIstemci(s.adres, "1", SIFRE, "x")
+        ist2.gorev = {"id": "hydra-01"}
+        ist2.eszamansiz_bildirim = True
+        bas = time.time()
+        ist2._bildir("basladi")
+        self.assertLess(time.time() - bas, 0.5)
+
+
 if __name__ == "__main__":
     unittest.main()

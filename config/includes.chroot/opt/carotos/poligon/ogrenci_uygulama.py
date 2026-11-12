@@ -13,6 +13,7 @@ import sys
 import json
 import os
 import threading
+import traceback
 from pathlib import Path
 
 import gi
@@ -23,12 +24,23 @@ from gi.repository import Gtk, GLib, GdkPixbuf  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ortak"))  # ortak grafit tema
-from ogrenci_istemci import BaglantiHatasi, GOREVLER_DIZINI, PoligonIstemci  # noqa: E402
+from ogrenci_istemci import BaglantiHatasi, GOREVLER_DIZINI, PoligonIstemci, ogretmen_adresi  # noqa: E402
 import gecmis_defteri  # noqa: E402
 import kullanici_defteri  # noqa: E402
 import gorunum_ayari as _gorunum  # noqa: E402
 import dil_koprusu as _dil  # noqa: E402
 import tema  # noqa: E402
+
+
+# Sunucunun /katil ret kodlari -> METIN anahtari (ogrenci kendi dilinde gorur)
+KATIL_HATA_ANAHTARI = {
+    "yanlış şifre": "katil_yanlis_sifre",
+    "cok_fazla_deneme": "katil_cok_deneme",
+    "isim_alinmis": "katil_isim_alinmis",
+    "geçersiz isim": "katil_isim_gecersiz",
+    "sinif_dolu": "katil_sinif_dolu",
+    "adres_siniri": "katil_adres_siniri",
+}
 
 
 def _gorev_sudo_gerektirir_mi(gorev_id: str) -> bool:
@@ -181,6 +193,14 @@ _METIN_HAM = {
         "baglan": "Katıl",
         "baglaniyor": "Bağlanıyor…",
         "hata_alan": "Tüm alanları doldur",
+        "hata_adres": "Öğretmen adresi geçersiz. Örnek: 192.168.1.10",
+        "katil_yanlis_sifre": "Oda şifresi yanlış",
+        "katil_cok_deneme": "Çok fazla yanlış deneme. Bir dakika bekle.",
+        "katil_isim_alinmis": "Bu isim bu sınıfta kullanılıyor",
+        "katil_isim_gecersiz": "Bu isim kullanılamaz. Başka bir isim yaz.",
+        "katil_sinif_dolu": "Sınıf dolu",
+        "katil_adres_siniri": "Bu adresten çok fazla katılım var",
+        "gorev_yuklenemedi": "Yeni soru yüklenemedi; yeniden deneniyor.",
         "hata_baglanti": "Öğretmen sunucusuna ulaşılamıyor",
         "gorev_yuklendi": "Görev yüklendi, hedef hazırlanıyor…",
         "guvenlik_paneli_ac": "Güvenlik Paneline Git",
@@ -272,6 +292,14 @@ _METIN_HAM = {
         "baglan": "Join",
         "baglaniyor": "Connecting…",
         "hata_alan": "Fill in all fields",
+        "hata_adres": "The teacher address is not valid. Example: 192.168.1.10",
+        "katil_yanlis_sifre": "Wrong room password",
+        "katil_cok_deneme": "Too many wrong attempts. Wait a minute.",
+        "katil_isim_alinmis": "This name is already in use in this class",
+        "katil_isim_gecersiz": "This name cannot be used. Enter a different name.",
+        "katil_sinif_dolu": "The class is full",
+        "katil_adres_siniri": "Too many students have joined from this address",
+        "gorev_yuklenemedi": "The new question could not be loaded; retrying.",
         "hata_baglanti": "Cannot reach the teacher's server",
         "gorev_yuklendi": "Task loaded, preparing target…",
         "guvenlik_paneli_ac": "Open Security Panel",
@@ -1034,12 +1062,15 @@ class PoligonPenceresi(Gtk.Window):
     def _odaya_katil(self, _düğme):
         m = METIN[self.dil]
         adres = self.adres_girisi.get_text().strip()
-        adres = adres.replace("http://", "").replace("https://", "").rstrip("/")
         kod = self.kod_girisi.get_text().strip()
         sifre = self.sifre_girisi.get_text().strip()
         ad = self.ad_girisi.get_text().strip()
         if not (adres and kod and sifre and ad):
             self.baglanti_durum_etiketi.set_text(m["hata_alan"])
+            return
+        tam_adres = ogretmen_adresi(adres)
+        if tam_adres is None:
+            self.baglanti_durum_etiketi.set_text(m["hata_adres"])
             return
 
         self.baglanti_durum_etiketi.set_text(m["baglaniyor"])
@@ -1047,12 +1078,11 @@ class PoligonPenceresi(Gtk.Window):
 
         def arka_planda():
             try:
-                istemci = PoligonIstemci(
-                    f"http://{adres}:8642", kod, sifre, ad
-                )
+                istemci = PoligonIstemci(tam_adres, kod, sifre, ad)
+                istemci.eszamansiz_bildirim = True   # ilerleme bildirimi arayuzu bekletmesin
                 basarili, hata_mesaji = istemci.katil()
                 if not basarili:
-                    GLib.idle_add(self._katilma_reddedildi, hata_mesaji)
+                    GLib.idle_add(self._katilma_reddedildi, hata_mesaji, istemci.son_hata_kodu)
                     return
                 # Katılma başarılı -- artık ilk görevi ZORLA yüklemiyoruz.
                 # Öğretmen bir görev atayana kadar "Öğretmenden soru
@@ -1060,6 +1090,9 @@ class PoligonPenceresi(Gtk.Window):
                 # açık görev gelince otomatik yükleyip görev ekranına geçer.
                 GLib.idle_add(self._beklemeye_gec, istemci)
             except BaglantiHatasi:
+                GLib.idle_add(self._katilma_hatasi)
+            except Exception:  # noqa: BLE001 -- ekran "Bağlanıyor…" yazısında kilitli kalmasın
+                traceback.print_exc()
                 GLib.idle_add(self._katilma_hatasi)
 
         threading.Thread(target=arka_planda, daemon=True).start()
@@ -1102,55 +1135,62 @@ class PoligonPenceresi(Gtk.Window):
 
     def _bekleme_izlemeyi_baslat(self):
         """3 saniyede bir: (1) atılma/oda-kapanma durumunu izler,
-        (2) öğretmen bir görev açtıysa onu (arka planda) yükleyip görev
-        ekranına geçer. gorev_verisi dolunca poll kendiliğinden durur.
-        Not: öğretmen genelde öğrenciler katıldıktan SONRA görev atadığı
-        için ilk kontrolün 3 sn gecikmesi pratikte hissedilmez."""
-        def kontrol_et():
-            if self.istemci is None or self.gorev_verisi is not None:
-                return False
-            if self._bekleme_yukleniyor:
-                return True  # yükleme sürüyor, bekle
-            durum = self.istemci.sinif_baglanti_durumu()
-            if durum == "atildi":
-                self.bekleme_spinner.stop()
-                self._oturumu_sonlandir(m_anahtar="atildin")
-                return False
-            if durum == "oda_kapandi":
-                self.bekleme_spinner.stop()
-                self._oturumu_sonlandir(m_anahtar="oda_kapandi")
-                return False
-            if durum == "belirsiz":
-                return True  # geçici ağ sorunu, sonraki turda tekrar dene
+        (2) öğretmen bir görev açtıysa onu yükleyip görev ekranına geçer.
+        gorev_verisi dolunca poll kendiliğinden durur.
+
+        Ağ çağrıları ve görev yükleme ARKA PLAN iş parçacığında yapılır;
+        sonuç ana iş parçacığında uygulanır. Böylece öğretmen makinesi
+        yavaş ya da geçici olarak ulaşılmazken arayüz donmaz, beklenmeyen
+        bir hata da zamanlayıcıyı durdurmaz (sonraki turda yeniden denenir)."""
+        self._bekleme_no = getattr(self, "_bekleme_no", 0) + 1
+        no = self._bekleme_no
+
+        def arka_plan(istemci):
+            sonuc = {"durum": "belirsiz", "gorev": None}
             try:
-                acik = self.istemci.acik_gorevleri_getir()
+                sonuc["durum"] = istemci.sinif_baglanti_durumu()
+                if sonuc["durum"] == "aktif":
+                    acik = istemci.acik_gorevleri_getir()
+                    if acik:
+                        secilen = acik[0]
+                        # Ogretmenin bu goreve atadigi zorlugu uygula (makine cevabi buna gore uretilir).
+                        istemci.zorluk = istemci.atanan_zorluk(secilen)
+                        istemci.ozel_parametreler = istemci.atanan_parametreler(secilen)
+                        istemci.varyant = istemci.atanan_varyant(secilen)
+                        istemci.gorevi_durdur()          # onceki yarim kalmis deneme servis birakmasin
+                        gorev = istemci.gorevi_yukle(secilen)
+                        istemci.gorevi_baslat(dil=self.dil)
+                        sonuc["gorev"] = gorev
             except BaglantiHatasi:
-                return True
-            if not acik:
-                return True  # hâlâ bekliyoruz
+                pass
+            except Exception:  # noqa: BLE001 -- yukleme basarisiz: sonraki turda yeniden denenir
+                traceback.print_exc()
+            GLib.idle_add(uygula, istemci, sonuc)
 
-            # Görev geldi -- yüklemeyi arka planda yap (yerel servis
-            # başlatmak UI'yi dondurmasın), sonra görev ekranına geç.
-            self._bekleme_yukleniyor = True
-            istemci = self.istemci
-            secilen = acik[0]
-            # Ogretmenin bu goreve atadigi zorlugu uygula (makine cevabi
-            # buna gore uretilir). acik_gorevleri_getir() yeni cagrildi.
-            istemci.zorluk = istemci.atanan_zorluk(secilen)
-            istemci.ozel_parametreler = istemci.atanan_parametreler(secilen)
-            istemci.varyant = istemci.atanan_varyant(secilen)
+        def uygula(istemci, sonuc):
+            self._bekleme_yukleniyor = False
+            if no != self._bekleme_no or self.istemci is not istemci or self.gorev_verisi is not None:
+                return False                             # oturum bu arada degisti
+            try:
+                if sonuc["durum"] == "atildi":
+                    self.bekleme_spinner.stop()
+                    self._oturumu_sonlandir(m_anahtar="atildin")
+                elif sonuc["durum"] == "oda_kapandi":
+                    self.bekleme_spinner.stop()
+                    self._oturumu_sonlandir(m_anahtar="oda_kapandi")
+                elif sonuc["gorev"] is not None:
+                    self._beklemeden_goreve(sonuc["gorev"])
+            except Exception:  # noqa: BLE001
+                traceback.print_exc()
+            return False
 
-            def yukle():
-                try:
-                    gorev = istemci.gorevi_yukle(secilen)
-                    istemci.gorevi_baslat(dil=self.dil)
-                    GLib.idle_add(self._beklemeden_goreve, gorev)
-                except Exception:
-                    # Yükleme başarısız -- bayrağı bırak, sonraki turda tekrar dene.
-                    self._bekleme_yukleniyor = False
-
-            threading.Thread(target=yukle, daemon=True).start()
-            return True  # gorev_verisi dolunca poll bir sonraki turda durur
+        def kontrol_et():
+            if no != self._bekleme_no or self.istemci is None or self.gorev_verisi is not None:
+                return False
+            if not self._bekleme_yukleniyor:
+                self._bekleme_yukleniyor = True
+                threading.Thread(target=arka_plan, args=(self.istemci,), daemon=True).start()
+            return True
 
         GLib.timeout_add_seconds(3, kontrol_et)
 
@@ -1162,17 +1202,21 @@ class PoligonPenceresi(Gtk.Window):
         self.istemci._yuklu_ayar_surumu = self.istemci.ayar_surumu
         self._katildi(self.istemci, gorev)
 
-    def _katilma_reddedildi(self, hata_mesaji: str):
+    def _katilma_reddedildi(self, hata_mesaji: str, kod=None):
         """Sunucu katılmayı reddetti -- yanlış şifre veya isim çakışması --
         YA DA sunucuya hiç ulaşılamadı (bkz. ogrenci_istemci.py::katil()
         içindeki "__BAGLANTI_HATASI__" işaret kodu). İşaret kodu görülürse
         arayüz kendi dilinde gösterir; sunucudan gelen gerçek bir reddetme
         mesajı ise (yanlış şifre vb.) olduğu gibi gösterilir -- o mesaj
         öğretmenin kendi sunucusundan geliyor, ayrı bir konu."""
+        m = METIN[self.dil]
         if hata_mesaji == "__BAGLANTI_HATASI__":
-            hata_mesaji = METIN[self.dil]["hata_baglanti"]
+            hata_mesaji = m["hata_baglanti"]
+        elif kod in KATIL_HATA_ANAHTARI:
+            hata_mesaji = m[KATIL_HATA_ANAHTARI[kod]]     # bilinen ret nedenleri arayuz dilinde
         self.baglanti_durum_etiketi.set_text(hata_mesaji)
         self.katil_dugmesi.set_sensitive(True)
+        return False
 
     def _gorev_yok_hatasi(self):
         self.baglanti_durum_etiketi.set_text(METIN[self.dil]["hata_gorev_yok"])
@@ -1564,54 +1608,81 @@ class PoligonPenceresi(Gtk.Window):
 
     # ------------------------------------------------------------------
     def _ipucu_izlemeyi_baslat(self):
+        """Görev ekranındayken 3 saniyede bir öğretmenle eşitlenir: atılma /
+        oda kapanması, yeni soru ya da ayar, öğretmen notları.
+
+        Ağ çağrıları ARKA PLAN iş parçacığında yapılır, sonuç ana iş
+        parçacığında uygulanır: öğretmen makinesi yavaşken arayüz donmaz.
+        Hiçbir hata zamanlayıcıyı durduramaz; GLib istisna fırlatan geri
+        çağrıyı kaldırdığı için eskiden tek bir ağ aksaması öğrencinin bir
+        daha yeni soru ve mesaj almamasına yol açıyordu."""
+        self._izleme_no = getattr(self, "_izleme_no", 0) + 1
+        no = self._izleme_no
+        self._izleme_suruyor = False
+
+        def arka_plan(istemci):
+            sonuc = {"durum": "belirsiz", "yeni_gorev": None, "mesajlar": []}
+            try:
+                # 1) Öğretmenle bağlantının durumu: atılmış ya da odası kapanmış
+                #    öğrenci için görev eşitlemesiyle uğraşmanın anlamı yok.
+                sonuc["durum"] = istemci.sinif_baglanti_durumu()
+                if sonuc["durum"] == "aktif":
+                    # 2) Öğretmen sınıfı başka bir soruya geçirdi mi?
+                    sonuc["yeni_gorev"] = istemci.gorev_degisti_mi()
+                    if not sonuc["yeni_gorev"]:
+                        # 3) Öğretmenden gelen yeni notlar
+                        sonuc["mesajlar"] = istemci.yeni_mesajlari_getir()
+            except Exception:  # noqa: BLE001
+                traceback.print_exc()
+            GLib.idle_add(uygula, istemci, sonuc)
+
+        def uygula(istemci, sonuc):
+            self._izleme_suruyor = False
+            if no != self._izleme_no or self.istemci is not istemci:
+                return False                             # oturum bu arada bitti ya da yenilendi
+            try:
+                if sonuc["durum"] == "atildi":
+                    self._oturumu_sonlandir(m_anahtar="atildin")
+                elif sonuc["durum"] == "oda_kapandi":
+                    self._oturumu_sonlandir(m_anahtar="oda_kapandi")
+                elif sonuc["yeni_gorev"]:
+                    self._otomatik_gorev_gecisi(sonuc["yeni_gorev"])
+                elif sonuc["mesajlar"]:
+                    self._mesajlari_ekle(sonuc["mesajlar"])
+            except Exception:  # noqa: BLE001
+                traceback.print_exc()
+            return False
+
         def kontrol_et():
-            if self.istemci is None:
-                return False
-
-            # 1) Öğretmenle bağlantının durumu ne? Bu, görev
-            # değişikliği kontrolünden ÖNCE gelmeli -- atılmış ya da
-            # odası kapanmış bir öğrenci için görev senkronizasyonuyla
-            # uğraşmanın anlamı yok.
-            durum = self.istemci.sinif_baglanti_durumu()
-            if durum == "atildi":
-                self._oturumu_sonlandir(m_anahtar="atildin")
-                return False  # döngüyü durdur, artık bu istemci geçersiz
-            if durum == "oda_kapandi":
-                self._oturumu_sonlandir(m_anahtar="oda_kapandi")
-                return False
-            if durum == "belirsiz":
-                return True  # geçici ağ sorunu, bir sonraki turda tekrar dene
-
-            # 2) Öğretmen sınıfı başka bir göreve geçirdi mi?
-            yeni_gorev_id = self.istemci.gorev_degisti_mi()
-            if yeni_gorev_id:
-                self._otomatik_gorev_gecisi(yeni_gorev_id)
-                return True  # görev değiştiyse mesaj kontrolünü bu turda atla
-
-            # 3) Öğretmenden (veya tüm sınıfa) gelen YENİ notları çek.
-            yeni = self.istemci.yeni_mesajlari_getir()
-            if yeni:
-                import time as _time
-                eklendi = False
-                for msj in yeni:
-                    # Yalnizca ogretmenin yazdiklari "ogretmen notu" olarak gosterilir. Sunucu baska bir
-                    # gonderenle (ya da bozuk bicimde) mesaj dondururse yok sayilir.
-                    if not isinstance(msj, dict) or msj.get("kimden") != "ogretmen":
-                        continue
-                    metin = msj.get("metin")
-                    if not isinstance(metin, str):
-                        continue
-                    try:
-                        saat = _time.strftime("%H:%M", _time.localtime(float(msj.get("zaman"))))
-                    except (TypeError, ValueError, OverflowError, OSError):
-                        saat = _time.strftime("%H:%M")
-                    self._sohbet_mesajlari.append({"metin": metin[:2000], "saat": saat})
-                    eklendi = True
-                if eklendi:
-                    self._sohbeti_ciz()
-            return True  # tekrarlamaya devam et
+            if no != self._izleme_no or self.istemci is None:
+                return False                             # bu oturum bitti: zamanlayici durur
+            if not self._izleme_suruyor and not getattr(self, "_gecis_suruyor", False):
+                self._izleme_suruyor = True
+                threading.Thread(target=arka_plan, args=(self.istemci,), daemon=True).start()
+            return True                                  # tekrarlamaya devam et
 
         GLib.timeout_add_seconds(3, kontrol_et)
+
+    def _mesajlari_ekle(self, yeni):
+        """Sunucudan gelen yeni mesajlari not gunlugune ekler."""
+        import time as _time
+        eklendi = False
+        for msj in yeni:
+            # Yalnizca ogretmenin yazdiklari "ogretmen notu" olarak gosterilir. Sunucu baska bir
+            # gonderenle (ya da bozuk bicimde) mesaj dondururse yok sayilir.
+            if not isinstance(msj, dict) or msj.get("kimden") != "ogretmen":
+                continue
+            metin = msj.get("metin")
+            if not isinstance(metin, str):
+                continue
+            try:
+                saat = _time.strftime("%H:%M", _time.localtime(float(msj.get("zaman"))))
+            except (TypeError, ValueError, OverflowError, OSError):
+                saat = _time.strftime("%H:%M")
+            self._sohbet_mesajlari.append({"metin": metin[:2000], "saat": saat})
+            eklendi = True
+        if eklendi:
+            self._sohbeti_ciz()
 
     def _oturumu_sonlandir(self, m_anahtar: str):
         """Öğrenciyi sınıf oturumundan çıkarıp bağlantı ekranına
@@ -1656,20 +1727,52 @@ class PoligonPenceresi(Gtk.Window):
     def _otomatik_gorev_gecisi(self, yeni_gorev_id: str):
         """Öğretmen sınıfı başka bir göreve geçirdiğinde çağrılır --
         eski yerel servisi durdurur, yeni görevi yükleyip başlatır,
-        ekranı günceller."""
-        m = METIN[self.dil]
+        ekranı günceller. Servis durdurma/başlatma ve 'başladı' bildirimi
+        saniyeler sürebildiği için ARKA PLANDA yapılır; ekran güncellemesi
+        _gorev_gecisi_bitti içinde ana iş parçacığındadır."""
+        if getattr(self, "_gecis_suruyor", False) or self.istemci is None:
+            return
+        istemci = self.istemci
         # Sadece zorluk mu degisti, yoksa bambaska bir goreve mi gecildi?
         onceki_id = self.gorev_verisi["id"] if self.gorev_verisi else None
         sadece_zorluk = (onceki_id == yeni_gorev_id)
         # Soru numarasi degismediyse bu bir AYAR degisikligidir (ör. hedef
         # adres), yeni ya da zorlugu degismis bir soru degil.
-        sadece_ayar = (self.istemci.aktif_soru_no == self.istemci._yuklu_soru_no)
+        sadece_ayar = (istemci.aktif_soru_no == istemci._yuklu_soru_no)
         # Yeni gorevin ogretmence atanan zorlugunu uygula. gorev_degisti_mi()
         # bunu tetiklerken acik_gorevleri_getir()'i cagirdigindan onbellek taze.
-        self.istemci.zorluk = self.istemci.atanan_zorluk(yeni_gorev_id)
-        self.istemci.ozel_parametreler = self.istemci.atanan_parametreler(yeni_gorev_id)
-        self.istemci.varyant = self.istemci.atanan_varyant(yeni_gorev_id)
-        yeni_gorev = self.istemci.gorevi_degistir(yeni_gorev_id)
+        istemci.zorluk = istemci.atanan_zorluk(yeni_gorev_id)
+        istemci.ozel_parametreler = istemci.atanan_parametreler(yeni_gorev_id)
+        istemci.varyant = istemci.atanan_varyant(yeni_gorev_id)
+        self._gecis_suruyor = True
+        self.gonder_dugmesi.set_sensitive(False)         # gecis surerken eski soruya cevap gonderilmesin
+
+        def arka_plan():
+            yeni_gorev = None
+            try:
+                yeni_gorev = istemci.gorevi_degistir(yeni_gorev_id)
+            except Exception:  # noqa: BLE001 -- yuklenemedi: sonraki turda yeniden denenir
+                traceback.print_exc()
+            GLib.idle_add(self._gorev_gecisi_bitti, istemci, yeni_gorev, sadece_zorluk, sadece_ayar)
+
+        threading.Thread(target=arka_plan, daemon=True).start()
+
+    def _gorev_gecisi_bitti(self, istemci, yeni_gorev, sadece_zorluk, sadece_ayar):
+        self._gecis_suruyor = False
+        if self.istemci is not istemci:
+            return False                                 # oturum bu arada bitti
+        m = METIN[self.dil]
+        import time as _time
+        saat = _time.strftime("%H:%M")
+        if yeni_gorev is None:
+            # Yeni soru baslatilamadi. Yuklu soru numarasi degismedigi icin izleme dongusu 3 sn sonra
+            # yeniden dener; ogrenciye bir kez bilgi verilir, cevap dugmesi kapali kalir.
+            if not getattr(self, "_gecis_hatasi_gosterildi", False):
+                self._gecis_hatasi_gosterildi = True
+                self._sohbet_mesajlari.append({"metin": m["gorev_yuklenemedi"], "saat": saat})
+                self._sohbeti_ciz()
+            return False
+        self._gecis_hatasi_gosterildi = False
         self.gorev_verisi = yeni_gorev
         self._son_sonuc = None
         self._ipucu_kullanildi = False
@@ -1680,17 +1783,16 @@ class PoligonPenceresi(Gtk.Window):
         self._metinleri_uygula()
         # Sohbet günlüğüne sistem notu düş, öğrenci neden ekranın
         # değiştiğini anlasın
-        import time as _time
-        saat = _time.strftime("%H:%M")
         if sadece_ayar:
             bildirim = m["ayar_degisti_bildirimi"]
         elif sadece_zorluk:
-            zorluk_etiketi = m.get(f"zorluk_{self.istemci.zorluk}", self.istemci.zorluk)
+            zorluk_etiketi = m.get(f"zorluk_{istemci.zorluk}", istemci.zorluk)
             bildirim = f"{m['zorluk_degisti_bildirimi']} {zorluk_etiketi}"
         else:
             bildirim = f"{m['yeni_gorev_bildirimi']} {yeni_gorev['baslik'][self.dil]}"
         self._sohbet_mesajlari.append({"metin": bildirim, "saat": saat})
         self._sohbeti_ciz()
+        return False
 
 
 def main():

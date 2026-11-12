@@ -16,10 +16,15 @@ Mimari:
 
 from __future__ import annotations
 
+import http.client
+import ipaddress
 import json
+import queue
+import re
 import secrets
 import sys
 import subprocess
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -67,6 +72,67 @@ def _bos_port_bul(tercih_edilen: int, deneme: int = 50) -> int:
 
 class BaglantiHatasi(Exception):
     pass
+
+
+OGRETMEN_PORTU = 8642
+ISTEK_ZAMAN_ASIMI = 5.0         # sn
+MAKS_YANIT = 1024 * 1024        # bayt: sunucu yaniti bundan buyukse okunmaz (bellek siniri)
+_ALAN_ADI = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*\Z")
+
+
+class _YonlendirmeYok(urllib.request.HTTPRedirectHandler):
+    """Ogretmen sunucusu hicbir zaman yonlendirme yapmaz; 3xx yanitlari izlenmez (oda sifresi ve
+    anahtar baska bir adrese tasinmasin)."""
+
+    def redirect_request(self, *_a, **_k):
+        return None
+
+
+# Vekil sunucu KULLANILMAZ: ogretmen ayni yerel agdadir. Ortamda http_proxy tanimliysa (okul aglari)
+# urllib yerel adresi vekile gonderir ve baglanti kurulamazdi.
+_ACICI = urllib.request.build_opener(urllib.request.ProxyHandler({}), _YonlendirmeYok())
+
+
+def ogretmen_adresi(metin, port: int = OGRETMEN_PORTU):
+    """Ogrencinin yazdigi adresi 'http://ADRES:PORT' bicimine cevirir; gecersizse None.
+
+    Kabul edilen: IPv4 adresi ya da makine adi; basinda http:// / https://, sonunda '/' ya da
+    ':8642' olabilir. Baska port, yol, kullanici bilgisi, bosluk iceren metin reddedilir (aksi halde
+    'ip:port:8642' gibi bir adres istisnaya, 'site/yol?' gibi bir adres sifrenin baska yere
+    gonderilmesine yol acardi)."""
+    if not isinstance(metin, str):
+        return None
+    m = metin.strip()
+    for on_ek in ("http://", "https://"):
+        if m.lower().startswith(on_ek):
+            m = m[len(on_ek):]
+            break
+    m = m.rstrip("/")
+    son_ek = ":%d" % port
+    if m.endswith(son_ek):
+        m = m[:-len(son_ek)]
+    if not m or len(m) > 253 or not _ALAN_ADI.match(m):
+        return None
+    if re.fullmatch(r"[0-9.]+", m):
+        try:
+            ipaddress.IPv4Address(m)
+        except ValueError:
+            return None
+    return "http://%s:%d" % (m, port)
+
+
+def _sinirli_int(deger, varsayilan: int, alt: int, ust: int) -> int:
+    """Sunucudan gelen bir sayiyi guvenle tam sayiya cevirir: int (ya da tam degerli float) degilse
+    varsayilan; sonuc alt..ust araligina kirpilir. Hicbir girdide istisna firlatmaz."""
+    if isinstance(deger, bool):
+        return varsayilan
+    if isinstance(deger, float):
+        if deger != deger or deger in (float("inf"), float("-inf")) or not deger.is_integer():
+            return varsayilan
+        deger = int(deger)
+    if not isinstance(deger, int):
+        return varsayilan
+    return max(alt, min(ust, deger))
 
 
 class OdaKapaliHatasi(BaglantiHatasi):
@@ -129,6 +195,12 @@ class PoligonIstemci:
         self.oda_sifre = oda_sifre
         self.ogrenci_adi = ogrenci_adi
         self.anahtar = ""          # /katil yanitinda gelir; CTF isteklerinde gonderilir
+        self.son_hata_kodu = None  # son basarisiz /katil yanitindaki 'hata' kodu (arayuz kendi dilinde gosterir)
+        # True ise ilerleme bildirimleri sirayla ARKA PLANDA gonderilir (arayuz donmasin diye arayuz acar).
+        # Varsayilan False: cagri donmeden bildirim gitmis olur (testler ve betikler icin).
+        self.eszamansiz_bildirim = False
+        self._bildirim_kuyrugu = None
+        self._bildirim_kilidi = threading.Lock()
         self.gorev: dict | None = None
         self.hedef_parola: str | None = None  # sadece 'parola_uret' yönteminde dolar (geriye uyumluluk)
         self._dogru_cevap: str | None = None   # HER görev türünde dolar, doğrulama bunu kullanır
@@ -414,6 +486,10 @@ class PoligonIstemci:
             raise ValueError(f"bilinmeyen flag_uretimi yöntemi: '{yontem}'")
 
         self._baslangic_zamani = time.time()
+        # Baslatilan soru, sunucudan en son okunan sorudur. Numara burada sabitlenir: sunucu puani
+        # yalnizca atanmis soru numarasiyla kabul eder; eskiden bu atama yalnizca arayuzde yapiliyordu.
+        self._yuklu_soru_no = self.aktif_soru_no
+        self._yuklu_ayar_surumu = self.ayar_surumu
         self._bildir("basladi")
 
     def gorevi_durdur(self) -> None:
@@ -527,22 +603,47 @@ class PoligonIstemci:
         return urllib.parse.quote(deger, safe="")
 
     def _istek(self, yol: str, gövde: dict, yontem: str = "POST") -> tuple[int, dict]:
-        veri = json.dumps(gövde).encode("utf-8")
-        r = urllib.request.Request(
-            self.ogretmen_adres + yol, data=veri, method=yontem,
-            headers={"Content-Type": "application/json"},
-        )
+        """Ogretmen sunucusuna bir istek gonderir; (HTTP durumu, JSON nesnesi) doner.
+
+        SOZLESME: bu yontem yalnizca BaglantiHatasi (ya da alt sinifi OdaKapaliHatasi) firlatir.
+        Zaman asimi, kopan baglanti, gecersiz adres, JSON olmayan / nesne olmayan / asiri buyuk yanit
+        dahil her ag ve ayristirma hatasi BaglantiHatasi'na cevrilir. Cagiranlar yalnizca bunu
+        yakaladigi icin, baska bir istisna arayuzun periyodik denetimini kalici olarak durdururdu."""
+        if not self.ogretmen_adres.lower().startswith("http://"):
+            raise BaglantiHatasi("gecersiz ogretmen adresi")
         try:
-            with urllib.request.urlopen(r, timeout=5) as resp:
-                return resp.status, json.loads(resp.read())
-        except urllib.error.HTTPError as e:
-            return e.code, json.loads(e.read())
+            veri = json.dumps(gövde).encode("utf-8")
+            r = urllib.request.Request(
+                self.ogretmen_adres + yol, data=veri, method=yontem,
+                headers={"Content-Type": "application/json"},
+            )
+            try:
+                resp = _ACICI.open(r, timeout=ISTEK_ZAMAN_ASIMI)
+                durum = resp.status
+            except urllib.error.HTTPError as e:
+                resp, durum = e, e.code
+            with resp:
+                ham = resp.read(MAKS_YANIT + 1)
+            if len(ham) > MAKS_YANIT:
+                raise BaglantiHatasi("sunucu yaniti cok buyuk")
+            cevap = json.loads(ham)
+            if not isinstance(cevap, dict):
+                raise BaglantiHatasi("sunucu yaniti JSON nesnesi degil")
+            return durum, cevap
+        except BaglantiHatasi:
+            raise
         except urllib.error.URLError as e:
             if isinstance(e.reason, ConnectionRefusedError):
                 raise OdaKapaliHatasi(
                     f"öğretmen sunucusuna bağlantı reddedildi (oda kapanmış olabilir): {e}"
                 ) from e
             raise BaglantiHatasi(f"öğretmen sunucusuna ulaşılamıyor: {e}") from e
+        except ConnectionRefusedError as e:
+            raise OdaKapaliHatasi(f"öğretmen sunucusuna bağlantı reddedildi: {e}") from e
+        except (OSError, http.client.HTTPException, ValueError, TypeError, RecursionError) as e:
+            # OSError: zaman asimi, kopan/sifirlanan baglanti. HTTPException: bozuk yanit, gecersiz URL.
+            # ValueError: JSON olmayan govde, UnicodeError.
+            raise BaglantiHatasi(f"öğretmen sunucusuyla iletişim hatası: {type(e).__name__}: {e}") from e
 
     def _bildir(self, durum: str, sure_sn: float = 0, cevap: str | None = None,
                 puan: int | None = None) -> None:
@@ -578,9 +679,50 @@ class PoligonIstemci:
                 yuk["soru_no"] = self._yuklu_soru_no
             if puan is not None:
                 yuk["puan"] = puan
-            self._istek("/ilerleme", yuk)
+            if self.eszamansiz_bildirim:
+                self._bildirimi_kuyruga_koy(yuk)
+            else:
+                self._istek("/ilerleme", yuk)
         except BaglantiHatasi:
             pass  # ağ sorunu görevi engellemez, sadece skor gecikir
+
+    def _bildirimi_kuyruga_koy(self, yuk: dict) -> None:
+        """Bildirimi sirayi koruyan tek bir arka plan is parcacigina verir (cagiran beklemez)."""
+        with self._bildirim_kilidi:
+            if self._bildirim_kuyrugu is None:
+                self._bildirim_kuyrugu = queue.Queue()
+                threading.Thread(target=self._bildirim_iscisi, args=(self._bildirim_kuyrugu,),
+                                 daemon=True).start()
+            self._bildirim_kuyrugu.put(yuk)
+
+    def _bildirim_iscisi(self, kuyruk) -> None:
+        while True:
+            try:
+                yuk = kuyruk.get(timeout=30)
+            except queue.Empty:
+                with self._bildirim_kilidi:
+                    if kuyruk.empty():                    # bosta: is parcacigi biter, gerekince yenisi acilir
+                        if self._bildirim_kuyrugu is kuyruk:
+                            self._bildirim_kuyrugu = None
+                        return
+                continue
+            try:
+                self._istek("/ilerleme", yuk)
+            except BaglantiHatasi:
+                pass
+            finally:
+                kuyruk.task_done()
+
+    def bildirimleri_bekle(self, sure: float = 10.0) -> bool:
+        """Kuyruktaki bildirimler gonderilene kadar (en cok 'sure' sn) bekler. Bittiyse True."""
+        bitis = time.time() + sure
+        while time.time() < bitis:
+            with self._bildirim_kilidi:
+                kuyruk = self._bildirim_kuyrugu
+            if kuyruk is None or kuyruk.unfinished_tasks == 0:
+                return True
+            time.sleep(0.02)
+        return False
 
     def katil(self) -> tuple[bool, str]:
         """Odaya katılmayı dener -- şifre ve isim çakışması kontrolü
@@ -598,6 +740,7 @@ class PoligonIstemci:
             # calisildigini bilmiyor.
             return False, "__BAGLANTI_HATASI__"
 
+        self.son_hata_kodu = None
         if durum == 200:
             self.anahtar = str(cevap.get("anahtar") or "")
             # Sunucu adi normallestirir (bastaki/sondaki bosluk, cift bosluk...). Sonraki isteklerde
@@ -606,7 +749,10 @@ class PoligonIstemci:
             if isinstance(kayitli, str) and 1 <= len(kayitli) <= 64:
                 self.ogrenci_adi = kayitli
             return True, ""
-        return False, cevap.get("mesaj") or cevap.get("hata", "Bilinmeyen hata")
+        hata = cevap.get("hata")
+        self.son_hata_kodu = hata if isinstance(hata, str) else None
+        mesaj = cevap.get("mesaj") or hata
+        return False, mesaj if isinstance(mesaj, str) and mesaj else "Bilinmeyen hata"
 
     def acik_gorevleri_getir(self) -> list[str]:
         """Öğretmen sunucusuna hangi görev(ler)in açık olduğunu sorar.
@@ -615,13 +761,27 @@ class PoligonIstemci:
         öğrenci katılmadan önce bunu bilmesi gerekiyor.
         """
         _, cevap = self._istek("/gorevler", {}, "GET")
-        self._acik_zorluklar = cevap.get("zorluklar", {}) or {}
-        self._acik_ozel = cevap.get("parametreler", {}) or {}
-        self._acik_varyantlar = {k: int(v) for k, v in (cevap.get("varyantlar", {}) or {}).items()}
-        self.sinif_hedef_adres = cevap.get("hedef_adres") or None
-        self.ayar_surumu = int(cevap.get("ayar_surumu", 0) or 0)
-        self.aktif_soru_no = int(cevap.get("aktif_soru_no", 0) or 0)
-        return cevap.get("acik_gorevler", [])
+        # Yanit GUVENILMEZ veridir (duz HTTP; sahte ya da araya giren bir sunucu olabilir): her alan
+        # tur denetiminden gecer, beklenmeyen deger yok sayilir ve hicbiri istisna firlatmaz.
+        zorluklar = cevap.get("zorluklar")
+        self._acik_zorluklar = ({k: v for k, v in zorluklar.items() if isinstance(k, str) and isinstance(v, str)}
+                                if isinstance(zorluklar, dict) else {})
+        ozel = cevap.get("parametreler")
+        self._acik_ozel = ({k: v for k, v in ozel.items() if isinstance(k, str) and isinstance(v, dict)}
+                           if isinstance(ozel, dict) else {})
+        self._acik_varyantlar = {}
+        varyantlar = cevap.get("varyantlar")
+        if isinstance(varyantlar, dict):
+            for k, v in varyantlar.items():
+                no = _sinirli_int(v, 0, 0, 10 ** 6)
+                if isinstance(k, str) and no:
+                    self._acik_varyantlar[k] = no
+        adres = cevap.get("hedef_adres")
+        self.sinif_hedef_adres = adres if isinstance(adres, str) and loopback_adres_mi(adres) else None
+        self.ayar_surumu = _sinirli_int(cevap.get("ayar_surumu"), 0, 0, 10 ** 9)
+        self.aktif_soru_no = _sinirli_int(cevap.get("aktif_soru_no"), 0, 0, 10 ** 9)
+        acik = cevap.get("acik_gorevler")
+        return [g for g in acik if isinstance(g, str)][:16] if isinstance(acik, list) else []
 
     def atanan_zorluk(self, gorev_id: str) -> str:
         """Ogretmenin bu goreve atadigi zorlugu doner. acik_gorevleri_getir()
@@ -719,10 +879,14 @@ class PoligonIstemci:
                     self._kodla(self.oda_sifre), self._kodla(self.anahtar)),
                 {}, "GET",
             )
-            mesajlar = cevap.get("mesajlar", [])
-            if mesajlar:
-                self._son_mesaj_no = max(m["no"] for m in mesajlar)
-            return mesajlar
+            mesajlar = cevap.get("mesajlar")
+            if not isinstance(mesajlar, list):
+                return []
+            gecerli = [m for m in mesajlar[:500]
+                       if isinstance(m, dict) and isinstance(m.get("no"), int) and not isinstance(m.get("no"), bool)]
+            if gecerli:
+                self._son_mesaj_no = max(self._son_mesaj_no, max(m["no"] for m in gecerli))
+            return gecerli
         except BaglantiHatasi:
             return []
 
