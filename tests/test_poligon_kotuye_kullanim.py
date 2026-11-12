@@ -424,5 +424,57 @@ class P03BaglantiSinirlari(Taban):
         self.assertEqual(self.sunucu.reddedilen, 0)
 
 
+class P08SifresizBilgiSizintisi(Taban):
+    """P-08: sifresiz /durum butun ogrenci adlarini veriyor, /aktif_mi ad yoklamaya izin veriyordu."""
+
+    def test_durum_yolu_kaldirildi(self):
+        self.katil_tamam("Ali")
+        kod, yanit = self.istek("GET", "/durum")
+        self.assertEqual(kod, 404)
+        self.assertNotIn("Ali", json.dumps(yanit))
+
+    def test_sifresiz_yollar_ogrenci_adi_vermez(self):
+        self.katil_tamam("Gizli Öğrenci")
+        self.oda.gorev_ata("hydra-01", "orta")
+        for yol in ("/gorevler", "/durum", "/", "/ogrenciler", "/sohbet", "/ctf/skor", "/aktif_mi?ogrenci=x"):
+            kod, yanit = self.istek("GET", yol)
+            self.assertNotIn("Gizli", json.dumps(yanit, ensure_ascii=False), yol)
+        self.assertEqual(self.istek("GET", "/gorevler")[0], 200)
+
+    def test_aktif_mi_sifre_ve_anahtar_ister(self):
+        anahtar = self.katil_tamam("Ali")
+        q = lambda **k: "/aktif_mi?" + urllib.parse.urlencode(k)   # noqa: E731
+        self.assertEqual(self.istek("GET", q(ogrenci="Ali"))[0], 403)                         # sifresiz
+        self.assertEqual(self.istek("GET", q(ogrenci="Ali", sifre="yanlis"))[0], 403)
+        # dogru sifre, anahtar yok/yanlis: var olan ad ile olmayan ad AYNI yaniti verir (ad yoklanamaz)
+        var = self.istek("GET", q(ogrenci="Ali", sifre=SIFRE, anahtar="0" * 32))
+        yok = self.istek("GET", q(ogrenci="Yok", sifre=SIFRE, anahtar="0" * 32))
+        self.assertEqual(var, yok)
+        self.assertEqual(var, (200, {"aktif": False}))
+        self.assertEqual(self.istek("GET", q(ogrenci="Ali", sifre=SIFRE, anahtar=anahtar)), (200, {"aktif": True}))
+
+    def test_istemci_atilmayi_ve_gecici_hatayi_ayirir(self):
+        ist = ogrenci_istemci.PoligonIstemci(self.adres, "1234", SIFRE, "Ali")
+        self.assertEqual(ist.katil(), (True, ""))
+        self.assertEqual(ist.sinif_baglanti_durumu(), "aktif")
+        self.oda.ogrenciyi_at("Ali")
+        self.assertEqual(ist.sinif_baglanti_durumu(), "atildi")
+        # Sunucu 429/5xx donerse bu "atildim" anlamina gelmez
+        ist2 = ogrenci_istemci.PoligonIstemci(self.adres, "1234", SIFRE, "Veli")
+        self.assertEqual(ist2.katil(), (True, ""))
+        ist2.oda_sifre = "yanlis"
+        self.assertEqual(ist2.sinif_baglanti_durumu(), "belirsiz")
+
+    def test_belge_kodla_uyumlu(self):
+        """P-24: modul basligindaki protokol listesi gercek yollarla ayni."""
+        k = kaynak("ogretmen_sunucu.py")
+        baslik = k.split('"""', 2)[1]
+        for yok in ("/ipucu_gonder", "GET  /ipucu?", "GET  /durum"):
+            self.assertNotIn(yok, baslik)
+        for var in ("/katil", "/ilerleme", "/mesaj", "/sohbet", "/aktif_mi", "/gorevler", "/ctf/durum"):
+            self.assertIn(var, baslik)
+            self.assertIn('"%s"' % var, k.split('"""', 2)[2], var)
+
+
 if __name__ == "__main__":
     unittest.main()

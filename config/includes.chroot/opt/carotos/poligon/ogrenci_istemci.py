@@ -658,10 +658,14 @@ class PoligonIstemci:
         if self.bireysel_mod:
             return "aktif"
         try:
-            _, cevap = self._istek(
-                "/aktif_mi?ogrenci=" + self._kodla(self.ogrenci_adi), {}, "GET",
+            kod, cevap = self._istek(
+                "/aktif_mi?ogrenci=%s&sifre=%s&anahtar=%s" % (
+                    self._kodla(self.ogrenci_adi), self._kodla(self.oda_sifre), self._kodla(self.anahtar)),
+                {}, "GET",
             )
-            return "aktif" if cevap.get("aktif", True) else "atildi"
+            if kod != 200:
+                return "belirsiz"      # 429 (cok deneme), 5xx...: atildigimi GOSTERMEZ, sonraki turda yine sor
+            return "atildi" if cevap.get("aktif") is False else "aktif"
         except OdaKapaliHatasi:
             return "oda_kapandi"
         except BaglantiHatasi:

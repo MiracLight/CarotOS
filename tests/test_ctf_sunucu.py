@@ -220,7 +220,7 @@ class CtfSunucuTesti(unittest.TestCase):
         self.assertTrue(veri == b"" or veri.startswith(b"HTTP/"))
 
     def test_ders_modu_ucnoktalari_bozulmadi(self):
-        self.assertEqual(istek(self.port, "/durum")[0], 200)
+        self.assertEqual(istek(self.port, "/durum")[0], 404)     # sifresiz ogrenci listesi kaldirildi (P-08)
         self.assertEqual(istek(self.port, "/gorevler")[0], 200)
         self.assertEqual(istek(self.port, "/yok")[0], 404)
 

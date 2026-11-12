@@ -9,14 +9,19 @@ Bu iki kural birbirine KARISTIRILMAMALI. Buradan saldiri trafigi
 GECMEZ -- sadece ilerleme/skor/ipucu JSON mesajlari.
 
 Protokol (hepsi JSON):
-  POST /katil         {ogrenci, sifre}  -> {tamam, anahtar}  (anahtar: ogrenciye ozel; CTF isteklerinde gerekir)
-  POST /ilerleme      {ogrenci, sifre, anahtar, gorev_id, durum, sure_sn}
+  POST /katil         {ogrenci, sifre}  -> {tamam, anahtar, ad}  (anahtar: ogrenciye ozel; ad: kaydedilen ad)
+  POST /ilerleme      {ogrenci, sifre, anahtar, gorev_id, durum, sure_sn[, cevap, soru_no, puan]}
   POST /mesaj         {ogrenci, sifre, anahtar, metin}   (ogrenci -> ogretmen sohbeti)
   GET  /sohbet?ogrenci=AD&sifre=...&anahtar=...&son_no=N (ogrenci kendi sohbetini ceker)
-  GET  /gorevler, /aktif_mi?ogrenci=AD              (sifresiz: gizli bilgi icermez)
-  POST /ipucu_gonder  {ogrenci, mesaj}                    (ogretmen kullanir)
-  GET  /ipucu?ogrenci=AD                                   (ogrenci sorar, bir kez okunur)
-  GET  /durum                                              (ogretmen paneli izler)
+  GET  /aktif_mi?ogrenci=AD&sifre=...&anahtar=...        (ogrenci: hala sinifta miyim?)
+  GET  /gorevler                                          (sifresiz: acik gorev ve ayarlari; ogrenci adi icermez)
+
+Sifresiz yanit veren TEK yol /gorevler'dir. Ogrenci adlari ve ilerlemeleri ag uzerinden hicbir yolda
+toplu olarak verilmez: ogretmen paneli oda durumunu surec icinden (OdaDurumu) okur. Ogretmenin
+ogrencilere yazdigi notlar da surec icinden eklenir (mesaj_ekle / tum_sinifa_yaz); agda bunun yolu yoktur.
+
+Sinirlar: govde 64 KB, yanlis sifre adres basina 60 sn'de 10, oda 200 ogrenci, adres basina 40 katilim,
+256 (adres basina 32) eszamanli baglanti, baglanti omru 20 sn.
 
 CTF (hakem sunucudur; hepsi oda sifresi + katilmis ogrenci ister; bkz. ctf_cekirdek.py):
   (CTF isteklerinin hepsi ayrica katilimda verilen 'anahtar' ister)
@@ -352,9 +357,10 @@ class OdaDurumu:
             return ad in self.ogrenciler
 
     def ogrenciyi_at(self, ad: str) -> None:
-        """Öğrenciyi listeden kaldırır. Kalıcı bir yasaklama değil --
-        öğrenci tekrar ilerleme bildirirse (veya yeniden katılırsa)
-        listeye normal şekilde geri döner. Sadece öğretmenin ekranını
+        """Öğrenciyi listeden kaldırır ve anahtarını geçersiz kılar: eski
+        anahtarla gelen ilerleme/mesaj/CTF istekleri reddedilir. Kalıcı
+        bir yasaklama değil -- öğrenci oda şifresiyle YENİDEN KATILIRSA
+        (yeni anahtar alarak) listeye geri döner. Öğretmenin ekranını
         (yanlışlıkla iki kez katılma, test amaçlı isim gibi durumlar
         için) temizlemesine yarar."""
         with self._kilit:
@@ -665,9 +671,7 @@ def _sunucu_sinifi_olustur(oda: OdaDurumu):
             ayristirilan = urlparse(self.path)
             sorgu = parse_qs(ayristirilan.query)
 
-            if ayristirilan.path == "/durum":
-                self._json_gonder(oda.anlik_goruntu())
-            elif ayristirilan.path == "/gorevler":
+            if ayristirilan.path == "/gorevler":
                 # Kimlik doğrulama gerekmez: hangi görevin açık olduğu
                 # gizli bir bilgi değil, öğrenci katılmadan önce bunu bilmeli.
                 self._json_gonder({
@@ -681,12 +685,16 @@ def _sunucu_sinifi_olustur(oda: OdaDurumu):
                 })
             elif ayristirilan.path == "/aktif_mi":
                 # Öğrenci istemcisi, öğretmen '✕' ile kendisini attı mı
-                # diye periyodik olarak bunu sorar. Kimlik doğrulama
-                # gerekmez -- /sohbet ve /gorevler ile aynı gerekçe:
-                # sadece kendi adının listede olup olmadığını öğreniyor,
-                # başka bir öğrenciye ait gizli bir bilgi sızmıyor.
+                # diye periyodik olarak bunu sorar. Oda şifresi ve öğrencinin
+                # KENDİ anahtarı gerekir: şifresiz olsaydı ağdaki herkes
+                # "bu ad sınıfta mı" diye ad ad yoklayabilirdi. Atılan
+                # öğrencinin anahtarı silindiği için yanıt 'aktif: false' olur;
+                # bilinmeyen ad ile yanlış anahtar ayırt edilemez.
+                if not self._yetkili_mi(sorgu.get("sifre", [""])[0]):
+                    return
                 ad = self._sorgu_adi(sorgu)
-                self._json_gonder({"aktif": ad is not None and oda.ogrenci_aktif_mi(ad)})
+                anahtar = sorgu.get("anahtar", [""])[0]
+                self._json_gonder({"aktif": ad is not None and oda.anahtar_dogru(ad, anahtar)})
             elif ayristirilan.path == "/sohbet":
                 # Öğrenci kendi sohbetindeki yeni mesajları çeker.
                 # son_no: en son gördüğü mesaj numarası (0 = tümü).
