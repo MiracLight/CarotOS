@@ -600,6 +600,11 @@ class PoligonIstemci:
 
         if durum == 200:
             self.anahtar = str(cevap.get("anahtar") or "")
+            # Sunucu adi normallestirir (bastaki/sondaki bosluk, cift bosluk...). Sonraki isteklerde
+            # anahtar o ada bagli oldugundan sunucunun kaydettigi ad kullanilir.
+            kayitli = cevap.get("ad")
+            if isinstance(kayitli, str) and 1 <= len(kayitli) <= 64:
+                self.ogrenci_adi = kayitli
             return True, ""
         return False, cevap.get("mesaj") or cevap.get("hata", "Bilinmeyen hata")
 

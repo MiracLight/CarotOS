@@ -33,6 +33,7 @@ import json
 import secrets
 import threading
 import time
+import unicodedata
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
@@ -44,6 +45,45 @@ MAKS_MESAJ = 1000               # sohbet mesaji ve cevap metni uzunlugu
 ISTEK_ZAMAN_ASIMI = 10.0        # sn: yarim kalan istek (govdesi gelmeyen) baglantiyi sonsuza dek tutamaz
 DENEME_PENCERESI = 60.0         # sn
 DENEME_LIMITI = 10              # pencerede yanlis sifre sayisi
+
+# Ogrenci adi olarak kullanilamayan adlar: sunucunun ic anlam yukledigi ya da ogretmenle
+# karistirilabilecek adlar. Karsilastirma ad_anahtari() uzerinden yapilir (buyuk/kucuk harf gozetmez).
+AYRILMIS_ADLAR = frozenset({"tum_sinif", "tum sinif", "ogretmen", "teacher", "sistem", "system",
+                            "sunucu", "server", "admin", "root"})
+_YASAK_KATEGORILER = frozenset({"Cc", "Cf", "Cs", "Co", "Cn", "Zl", "Zp"})
+
+
+class GecersizAd(ValueError):
+    """Ad bos, cok uzun, denetim/yon karakteri iceriyor ya da ayrilmis bir ad."""
+
+
+def ad_anahtari(ad: str) -> str:
+    """Tekillik karsilastirmasi icin anahtar: 'Ali', 'ALI', 'ALİ' ve 'alı' ayni sayilir
+    (Turkce i/ı/İ/I dahil), boylece skor tablosunda birbirinin aynisi gorunen iki ad olusmaz."""
+    a = unicodedata.normalize("NFKC", ad).casefold()
+    a = unicodedata.normalize("NFKD", a)
+    a = "".join(c for c in a if not unicodedata.combining(c))
+    return a.replace("ı", "i")
+
+
+def ad_temizle(ad):
+    """Gecerli bir ogrenci adini NORMALLESTIRILMIS halde doner, gecersizse None.
+
+    NFKC'ye cevrilir, bastaki/sondaki bosluk atilir, ic bosluklar teke indirilir. Denetim karakterleri,
+    yon degistiren/gorunmez bicim isaretleri ve ayrilmis adlar (tum_sinif, ogretmen...) reddedilir.
+    Ayni ad iki kez temizlenince degismez; bu yuzden her istekte guvenle uygulanabilir."""
+    if not isinstance(ad, str) or len(ad) > 4 * MAKS_AD:
+        return None
+    ad = unicodedata.normalize("NFKC", ad)
+    # Once karakter denetimi: satir sonu/sekme gibi denetim karakterleri bosluga cevrilip kabul EDILMEZ
+    if any(unicodedata.category(c) in _YASAK_KATEGORILER for c in ad):
+        return None
+    ad = " ".join(ad.split())
+    if not (1 <= len(ad) <= MAKS_AD):
+        return None
+    if ad_anahtari(ad) in AYRILMIS_ADLAR:
+        return None
+    return ad
 
 
 class OdaDurumu:
@@ -71,6 +111,8 @@ class OdaDurumu:
         # Katilimda her ogrenciye verilen gizli anahtar: oda sifresi tum sinifta ortak oldugu icin
         # CTF islemleri (bayrak, ipucu, dosya) baska bir ogrencinin adina yapilamasin diye bu da aranir.
         self._anahtarlar: dict[str, str] = {}
+        # Tekillik anahtari -> kayitli ad ('ALI' varken 'ali' katilamaz; bkz. ad_anahtari)
+        self._ad_anahtarlari: dict[str, str] = {}
         # Her öğrenci için BİRİKEN sohbet geçmişi (tek seferlik kuyruk değil):
         # ad -> [{"kimden","metin","zaman","no"}]. Mesajlar silinmez.
         self.sohbetler: dict[str, list] = {}
@@ -198,6 +240,8 @@ class OdaDurumu:
         with self._kilit:
             self.ogrenciler.pop(ad, None)
             self._anahtarlar.pop(ad, None)
+            for k in [k for k, v in self._ad_anahtarlari.items() if v == ad]:
+                del self._ad_anahtarlari[k]
 
     def sifre_dogru(self, sifre) -> bool:
         """Sabit sureli karsilastirma. ASCII disi ya da str olmayan degerde
@@ -222,17 +266,25 @@ class OdaDurumu:
         with self._kilit:
             self._basarisiz.setdefault(adres, []).append(time.monotonic())
 
-    def katil(self, ad: str, sifre: str) -> None:
+    def katil(self, ad: str, sifre: str) -> str:
         """Öğrenci odaya katılırken çağrılır. Şifre yanlışsa
-        PermissionError, isim zaten kullanımdaysa ValueError fırlatır.
+        PermissionError, isim geçersizse GecersizAd, isim zaten kullanımdaysa
+        ValueError fırlatır. Kaydedilen (normalleştirilmiş) adı döner.
         Aynı isim, önceki sahibi öğretmen tarafından atılana kadar (veya
         oda kapanana kadar) tekrar kullanılamaz -- kalıcı bir yasak
-        değil, sadece aynı anda iki öğrencinin aynı adı taşımasını önler."""
+        değil, sadece aynı anda iki öğrencinin aynı adı taşımasını önler.
+        Büyük/küçük harf farkı ayrı ad saymaz ('Ali' varken 'ALI' katılamaz)."""
         if not self.sifre_dogru(sifre):
             raise PermissionError("yanlış oda şifresi")
+        temiz = ad_temizle(ad)
+        if temiz is None:
+            raise GecersizAd("gecersiz isim")
+        ad = temiz
+        anahtar = ad_anahtari(ad)
         with self._kilit:
-            if ad in self.ogrenciler:
+            if ad in self.ogrenciler or anahtar in self._ad_anahtarlari:
                 raise ValueError(f"'{ad}' ismi zaten kullanılıyor")
+            self._ad_anahtarlari[anahtar] = ad
             self.ogrenciler[ad] = {
                 "gorev_id": None,
                 "durum": "basladi",
@@ -240,6 +292,7 @@ class OdaDurumu:
                 "son_gorulme": time.time(),
             }
             self._anahtarlar[ad] = secrets.token_hex(16)
+        return ad
 
     def anahtar_ver(self, ad: str) -> str:
         """Katilmis ogrencinin gizli anahtari (yalnizca /katil yanitinda ogrencinin kendisine doner)."""
@@ -309,18 +362,27 @@ class OdaDurumu:
     def mesaj_ekle(self, ogrenci: str, kimden: str, metin: str) -> dict:
         """Bir ogrencinin sohbetine mesaj ekler.
         kimden: 'ogretmen' | 'ogrenci'
-        ogrenci='tum_sinif' ise o anki tum ogrencilere yazar."""
+        ogrenci='tum_sinif' VE kimden='ogretmen' ise o anki tum ogrencilere yazar (bkz. tum_sinifa_yaz).
+        Yayin yalnizca ogretmene aciktir: 'tum_sinif' ogrenci adi olarak alinamaz (AYRILMIS_ADLAR) ve
+        bir ogrenci mesaji hicbir kosulda baska ogrencilerin sohbetine dusmez."""
+        if kimden not in ("ogretmen", "ogrenci"):
+            raise ValueError("gecersiz gonderen")
         with self._kilit:
             self._mesaj_sayaci += 1
             no = self._mesaj_sayaci
             temel = {"kimden": kimden, "metin": metin, "zaman": time.time(), "no": no}
-            if ogrenci == "tum_sinif":
+            if ogrenci == "tum_sinif" and kimden == "ogretmen":
                 temel["tum_sinif"] = True
                 for ad in self.ogrenciler:
                     self.sohbetler.setdefault(ad, []).append(dict(temel))
             else:
                 self.sohbetler.setdefault(ogrenci, []).append(temel)
             return temel
+
+    def tum_sinifa_yaz(self, metin: str) -> dict:
+        """Ogretmenin tum sinifa yazdigi not. Yalnizca surec icinden (ogretmen arayuzu) cagrilir;
+        ag uzerinden bu islemi tetikleyen bir yol YOKTUR."""
+        return self.mesaj_ekle("tum_sinif", "ogretmen", metin)
 
     def sohbet_getir(self, ogrenci: str, son_no: int = 0) -> list:
         """son_no'dan buyuk numarali mesajlari doner.
@@ -398,11 +460,13 @@ def _sunucu_sinifi_olustur(oda: OdaDurumu):
 
         @staticmethod
         def _ad(veri: dict):
-            """Gecerli ogrenci adi (1..MAKS_AD karakterlik str) ya da None."""
-            ad = veri.get("ogrenci")
-            if isinstance(ad, str) and 1 <= len(ad) <= MAKS_AD:
-                return ad
-            return None
+            """Gecerli ogrenci adi (normallestirilmis; bkz. ad_temizle) ya da None."""
+            return ad_temizle(veri.get("ogrenci"))
+
+        @staticmethod
+        def _sorgu_adi(sorgu: dict):
+            """GET sorgusundaki ogrenci adi: govdedekiyle AYNI kuraldan gecer (yoksa/gecersizse None)."""
+            return ad_temizle(sorgu.get("ogrenci", [""])[0])
 
         def _yetkili_mi(self, sifre) -> bool:
             """Oda sifresi dogruysa True. Yanlis denemeler adres basina sayilir;
@@ -442,8 +506,8 @@ def _sunucu_sinifi_olustur(oda: OdaDurumu):
                 # gerekmez -- /sohbet ve /gorevler ile aynı gerekçe:
                 # sadece kendi adının listede olup olmadığını öğreniyor,
                 # başka bir öğrenciye ait gizli bir bilgi sızmıyor.
-                ad = sorgu.get("ogrenci", [""])[0]
-                self._json_gonder({"aktif": oda.ogrenci_aktif_mi(ad)})
+                ad = self._sorgu_adi(sorgu)
+                self._json_gonder({"aktif": ad is not None and oda.ogrenci_aktif_mi(ad)})
             elif ayristirilan.path == "/sohbet":
                 # Öğrenci kendi sohbetindeki yeni mesajları çeker.
                 # son_no: en son gördüğü mesaj numarası (0 = tümü).
@@ -451,7 +515,7 @@ def _sunucu_sinifi_olustur(oda: OdaDurumu):
                 # sinif agi cihazlari okuyamaz.
                 if not self._yetkili_mi(sorgu.get("sifre", [""])[0]):
                     return
-                ad = sorgu.get("ogrenci", [""])[0]
+                ad = self._sorgu_adi(sorgu)
                 if not self._anahtar_tamam(ad, sorgu.get("anahtar", [""])[0]):
                     return
                 try:
@@ -467,7 +531,7 @@ def _sunucu_sinifi_olustur(oda: OdaDurumu):
         def _anahtar_tamam(self, ad, anahtar) -> bool:
             """Ogrencinin KENDI anahtarini gostermesi: oda sifresi tum sinifta ortak oldugu icin tek basina
             baska bir ogrenci adina ilerleme/mesaj/CTF islemi yapilmasini engellemez. Yanit hatada gonderilmistir."""
-            if oda.anahtar_dogru(ad, anahtar):
+            if isinstance(ad, str) and oda.anahtar_dogru(ad, anahtar):
                 return True
             self._json_gonder({"hata": "gecersiz_anahtar"}, 403)
             return False
@@ -489,7 +553,7 @@ def _sunucu_sinifi_olustur(oda: OdaDurumu):
 
         def _ctf_oku(self, yol, sorgu) -> None:
             import ctf_cekirdek
-            ad = sorgu.get("ogrenci", [""])[0]
+            ad = self._sorgu_adi(sorgu)
             if not self._ctf_ogrenci(sorgu.get("sifre", [""])[0], ad, sorgu.get("anahtar", [""])[0]):
                 return
             ctf = oda.ctf_oturumu()
@@ -548,10 +612,13 @@ def _sunucu_sinifi_olustur(oda: OdaDurumu):
                 if not self._yetkili_mi(veri.get("sifre")):
                     return
                 try:
-                    oda.katil(ad=ad, sifre=veri["sifre"])
-                    self._json_gonder({"tamam": True, "anahtar": oda.anahtar_ver(ad)})
+                    ad = oda.katil(ad=ad, sifre=veri["sifre"])
+                    # 'ad': sunucunun kaydettigi (normallestirilmis) ad; istemci sonraki isteklerde bunu kullanir
+                    self._json_gonder({"tamam": True, "anahtar": oda.anahtar_ver(ad), "ad": ad})
                 except PermissionError:
                     self._json_gonder({"hata": "yanlış şifre"}, 403)
+                except GecersizAd:
+                    self._json_gonder({"hata": "geçersiz isim"}, 400)
                 except ValueError:
                     self._json_gonder({
                         "hata": "isim_alinmis",

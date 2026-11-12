@@ -1592,10 +1592,23 @@ class PoligonPenceresi(Gtk.Window):
             yeni = self.istemci.yeni_mesajlari_getir()
             if yeni:
                 import time as _time
+                eklendi = False
                 for msj in yeni:
-                    saat = _time.strftime("%H:%M", _time.localtime(msj.get("zaman", _time.time())))
-                    self._sohbet_mesajlari.append({"metin": msj["metin"], "saat": saat})
-                self._sohbeti_ciz()
+                    # Yalnizca ogretmenin yazdiklari "ogretmen notu" olarak gosterilir. Sunucu baska bir
+                    # gonderenle (ya da bozuk bicimde) mesaj dondururse yok sayilir.
+                    if not isinstance(msj, dict) or msj.get("kimden") != "ogretmen":
+                        continue
+                    metin = msj.get("metin")
+                    if not isinstance(metin, str):
+                        continue
+                    try:
+                        saat = _time.strftime("%H:%M", _time.localtime(float(msj.get("zaman"))))
+                    except (TypeError, ValueError, OverflowError, OSError):
+                        saat = _time.strftime("%H:%M")
+                    self._sohbet_mesajlari.append({"metin": metin[:2000], "saat": saat})
+                    eklendi = True
+                if eklendi:
+                    self._sohbeti_ciz()
             return True  # tekrarlamaya devam et
 
         GLib.timeout_add_seconds(3, kontrol_et)

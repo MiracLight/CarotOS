@@ -1417,7 +1417,7 @@ class OgretmenPenceresi(Gtk.Window):
             return
         tum_sinifa = self.tum_sinif_kutusu.get_active()
         if tum_sinifa:
-            self.oda.mesaj_ekle("tum_sinif", "ogretmen", metin)
+            self.oda.tum_sinifa_yaz(metin)
             self.ipucu_durum_etiketi.set_text(m["gonderildi_tum"])
         else:
             if not self.secili_ogrenci:
