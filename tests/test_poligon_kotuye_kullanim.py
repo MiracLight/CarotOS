@@ -161,5 +161,174 @@ class P14AdKurallari(Taban):
         self.assertEqual(list(self.oda.ogrenciler), ["ALI"])
 
 
+class IlerlemeTabani(Taban):
+    def setUp(self):
+        super().setUp()
+        self.anahtar = self.katil_tamam("Ali")
+
+    def ilerleme(self, **alanlar):
+        govde = {"ogrenci": "Ali", "sifre": SIFRE, "anahtar": self.anahtar, "gorev_id": "hydra-01",
+                 "durum": "basladi", "sure_sn": 1}
+        govde.update(alanlar)
+        return self.istek("POST", "/ilerleme", govde)
+
+    def ham_ilerleme(self, ek):
+        """ek: JSON nesnesinin sonuna eklenecek ham metin (NaN gibi json.dumps'in uretmeyecegi degerler icin)."""
+        ham = ('{"ogrenci":"Ali","sifre":"%s","anahtar":"%s","gorev_id":"hydra-01","durum":"tamamlandi",%s}'
+               % (SIFRE, self.anahtar, ek)).encode("utf-8")
+        return self.istek("POST", "/ilerleme", ham=ham)
+
+
+class P02SonluOlmayanSayilar(IlerlemeTabani):
+    """P-02: sure_sn icin NaN kabul ediliyor, ogretmen panelindeki int() cokup liste zamanlayicisini durduruyordu."""
+
+    def test_nan_ve_sonsuz_reddedilir(self):
+        onceki = dict(self.oda.ogrenciler["Ali"])
+        for ek in ('"sure_sn":NaN', '"sure_sn":Infinity', '"sure_sn":-Infinity', '"sure_sn":1e999',
+                   '"sure_sn":1,"puan":1e999', '"sure_sn":1,"soru_no":NaN', '"sure_sn":1,"puan":-1e999'):
+            kod, yanit = self.ham_ilerleme(ek)
+            self.assertEqual(kod, 400, ek)
+        self.assertEqual(self.oda.ogrenciler["Ali"], onceki)
+
+    def test_sure_araliga_kirpilir(self):
+        for gelen, beklenen in ((10 ** 12, ogretmen_sunucu.MAKS_SURE_SN), (-5, 0), (12.5, 12.5),
+                                (10 ** 400, ogretmen_sunucu.MAKS_SURE_SN)):
+            self.assertEqual(self.ilerleme(sure_sn=gelen)[0], 200, gelen)
+            self.assertEqual(self.oda.ogrenciler["Ali"]["sure_sn"], beklenen)
+            int(self.oda.ogrenciler["Ali"]["sure_sn"])          # ogretmen panelinin yaptigi cevrim
+
+    def test_ogretmen_paneli_zamanlayicisi_istisnaya_dayanikli(self):
+        k = kaynak("ogretmen_uygulama.py")
+        govde = k.split("    def _listeyi_guncelle(self):", 1)[1].split("    def _listeyi_ciz(self):", 1)[0]
+        self.assertIn("try:", govde)
+        self.assertIn("except Exception", govde)
+        self.assertIn("return True", govde)
+        self.assertIn("GLib.timeout_add(800, self._listeyi_guncelle)", k)
+
+
+class P06Sinirlar(IlerlemeTabani):
+    """P-06: puan, soru_no, cevap kaydi ve ogrenci sayisinda ust sinir yoktu."""
+
+    def test_puan_gorevin_en_yuksek_puaniyla_sinirlanir(self):
+        no = self.oda.gorev_ata("hydra-01", "zor")
+        self.assertEqual(self.ilerleme(durum="tamamlandi", cevap="x", soru_no=no, puan=10 ** 9)[0], 200)
+        ozet = self.oda.sinif_ozeti()[0]
+        sinir = ogretmen_sunucu.gorev_en_yuksek_puan("hydra-01")
+        self.assertTrue(0 < sinir < ogretmen_sunucu.GENEL_PUAN_SINIRI)
+        self.assertEqual((ozet["cozulen"], ozet["puan"]), (1, sinir))
+
+    def test_atanmamis_soru_ve_yanlis_gorev_puanlanmaz(self):
+        no = self.oda.gorev_ata("hydra-01", "orta")
+        for alanlar in ({"soru_no": 999}, {"soru_no": no + 1}, {"soru_no": no, "gorev_id": "nmap-01"},
+                        {"soru_no": no, "gorev_id": "../../etc/passwd"}, {"soru_no": 0}, {}):
+            self.assertEqual(self.ilerleme(durum="tamamlandi", cevap="x", puan=100, **alanlar)[0], 200, alanlar)
+        self.assertEqual(self.oda.cozulen_sorular.get("Ali", {}), {})
+        self.assertEqual(self.oda.sinif_ozeti()[0]["puan"], 0)
+        # cevap kayitlarindaki soru numarasi da atanan araligin disina cikamaz
+        self.assertTrue(all(0 <= k["soru_no"] <= no for k in self.oda.cevaplar["Ali"]))
+
+    def test_cozulen_kayit_sayisi_atanan_soru_sayisini_asamaz(self):
+        for _ in range(3):
+            self.oda.gorev_ata("hydra-01", "orta")
+        for no in range(0, 300):
+            self.ilerleme(durum="tamamlandi", cevap="x", soru_no=no, puan=10)
+        self.assertEqual(sorted(self.oda.cozulen_sorular["Ali"]), [1, 2, 3])
+
+    def test_cevap_kaydi_sinirlidir(self):
+        eski = ogretmen_sunucu.MAKS_CEVAP_KAYDI
+        ogretmen_sunucu.MAKS_CEVAP_KAYDI = 5
+        self.addCleanup(setattr, ogretmen_sunucu, "MAKS_CEVAP_KAYDI", eski)
+        for i in range(12):
+            self.ilerleme(durum="yanlis_denedi", cevap="deneme%d" % i)
+        self.assertEqual([k["cevap"] for k in self.oda.cevaplar["Ali"]], ["deneme%d" % i for i in range(7, 12)])
+
+    def test_gecersiz_alan_turleri_400(self):
+        for alanlar in ({"durum": "uydurma"}, {"durum": "x" * 70}, {"soru_no": "3"}, {"soru_no": 1.5},
+                        {"puan": True}, {"puan": [1]}, {"sure_sn": "5"}, {"sure_sn": True}, {"gorev_id": 7},
+                        {"gorev_id": "g" * 65}, {"cevap": 5}, {"cevap": "c" * 1001}):
+            self.assertEqual(self.ilerleme(**alanlar)[0], 400, alanlar)
+
+    def test_sinif_doludur(self):
+        self.oda.maks_ogrenci = 3
+        self.katil_tamam("Veli")
+        self.katil_tamam("Ayşe")
+        kod, yanit = self.katil("Can")
+        self.assertEqual((kod, yanit["hata"]), (409, "sinif_dolu"))
+        self.oda.ogrenciyi_at("Veli")
+        self.katil_tamam("Can")
+
+    def test_adres_basina_katilim_sinirlidir(self):
+        self.oda.adres_basina = 2
+        self.katil_tamam("Veli")                                    # Ali + Veli = 2 (hepsi 127.0.0.1)
+        kod, yanit = self.katil("Can")
+        self.assertEqual((kod, yanit["hata"]), (429, "adres_siniri"))
+        self.assertNotIn("Can", self.oda.ogrenciler)
+        self.oda.ogrenciyi_at("Ali")
+        self.katil_tamam("Can")
+
+    def test_varsayilan_sinirlar(self):
+        self.assertEqual((self.oda.maks_ogrenci, self.oda.adres_basina), (200, 40))
+
+
+class P09AtilmaYarisi(IlerlemeTabani):
+    """P-09: anahtar denetimi ile yazma ayri kilit bolumlerindeydi; atilan ogrenci anahtarsiz geri yazilabiliyordu."""
+
+    def test_atilan_ogrenci_ilerleme_ile_geri_gelmez(self):
+        self.oda.ogrenciyi_at("Ali")
+        self.assertFalse(self.oda.ilerleme_bildir("Ali", self.anahtar, "hydra-01", "basladi", 0))
+        self.assertEqual(self.ilerleme()[0], 403)
+        self.assertNotIn("Ali", self.oda.ogrenciler)
+        self.katil_tamam("Ali")                                     # ad kilitli kalmadi
+
+    def test_yaris_altinda_hayalet_olusmaz(self):
+        import threading
+        dur = threading.Event()
+        anahtarlar = [self.anahtar]
+
+        def bildir():
+            while not dur.is_set():
+                self.oda.ilerleme_bildir("Ali", anahtarlar[-1], "hydra-01", "basladi", 0)
+        isler = [threading.Thread(target=bildir, daemon=True) for _ in range(4)]
+        for t in isler:
+            t.start()
+        try:
+            for _ in range(300):
+                self.oda.ogrenciyi_at("Ali")
+                self.assertNotIn("Ali", self.oda.ogrenciler)
+                self.assertEqual(self.oda.anahtar_ver("Ali"), "")
+                self.oda.katil("Ali", SIFRE)
+                anahtarlar.append(self.oda.anahtar_ver("Ali"))
+        finally:
+            dur.set()
+            for t in isler:
+                t.join(2)
+
+    def test_yanlis_anahtar_hicbir_sey_yazmaz(self):
+        onceki = dict(self.oda.ogrenciler["Ali"])
+        for anahtar in ("", "0" * 32, None, 5, ["x"]):
+            self.assertFalse(self.oda.ilerleme_bildir("Ali", anahtar, "hydra-01", "tamamlandi", 5, "x", 0, 50))
+        self.assertEqual(self.oda.ogrenciler["Ali"], onceki)
+        self.assertEqual(self.oda.cevaplar, {})
+
+
+class P12YakalanmayanIstisnalar(Taban):
+    """P-12: derin ic ice JSON ve Infinity yanitsiz baglanti kopmasina yol aciyordu."""
+
+    def test_derin_json_400(self):
+        for ham in (b"[" * 60000, b'{"a":' * 12000, b"9" * 5000):
+            kod, yanit = self.istek("POST", "/katil", ham=ham)
+            self.assertEqual(kod, 400)
+            self.assertEqual(yanit["hata"], "geçersiz JSON")
+
+    def test_beklenmeyen_hata_500_doner_sunucu_ayakta_kalir(self):
+        def patla(*_a, **_k):
+            raise RuntimeError("beklenmeyen")
+        self.oda.katil = patla
+        kod, yanit = self.katil("Veli")
+        self.assertEqual((kod, yanit), (500, {"hata": "sunucu_hatasi"}))
+        del self.oda.katil
+        self.katil_tamam("Veli")
+
+
 if __name__ == "__main__":
     unittest.main()

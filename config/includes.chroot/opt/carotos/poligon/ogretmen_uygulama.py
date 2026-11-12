@@ -20,6 +20,7 @@ import socket
 import subprocess
 import sys
 import threading
+import traceback
 from pathlib import Path
 
 import gi
@@ -1580,6 +1581,15 @@ class OgretmenPenceresi(Gtk.Window):
         return ek
 
     def _listeyi_guncelle(self):
+        """800 ms'lik zamanlayicinin geri cagrisi. GLib, istisna firlatan geri cagriyi KALDIRIR; tek bir
+        bozuk kayit yuzunden ogrenci listesinin bir daha hic guncellenmemesi icin istisna burada tutulur."""
+        try:
+            self._listeyi_ciz()
+        except Exception:  # noqa: BLE001
+            traceback.print_exc()
+        return True
+
+    def _listeyi_ciz(self):
         m = METIN[self.dil]
         gorunum = self.oda.anlik_goruntu()
         ogrenciler = gorunum["ogrenciler"]
@@ -1621,7 +1631,10 @@ class OgretmenPenceresi(Gtk.Window):
 
         for ad, bilgi in sorted(ogrenciler.items()):
             durum = bilgi["durum"]
-            sure = int(bilgi.get("sure_sn", 0))
+            try:
+                sure = int(bilgi.get("sure_sn", 0) or 0)
+            except (TypeError, ValueError, OverflowError):
+                sure = 0
             durum_metni = m[DURUM_ANAHTARI.get(durum, "durum_basladi")]
             durum_sinifi = {
                 "tamamlandi": "durum-tamamlandi",

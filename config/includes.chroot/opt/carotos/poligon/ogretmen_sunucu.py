@@ -30,6 +30,8 @@ CTF (hakem sunucudur; hepsi oda sifresi + katilmis ogrenci ister; bkz. ctf_cekir
 from __future__ import annotations
 
 import json
+import os
+import re
 import secrets
 import threading
 import time
@@ -53,8 +55,109 @@ AYRILMIS_ADLAR = frozenset({"tum_sinif", "tum sinif", "ogretmen", "teacher", "si
 _YASAK_KATEGORILER = frozenset({"Cc", "Cf", "Cs", "Co", "Cn", "Zl", "Zp"})
 
 
+MAKS_OGRENCI = 200              # bir odadaki en fazla ogrenci
+ADRES_BASINA_OGRENCI = 40       # tek bir IP adresinden en fazla katilim (NAT arkasindaki bir sinif sigar,
+                                # tek bir cihaz sinifi sahte adlarla dolduramaz)
+MAKS_CEVAP_KAYDI = 500          # ogrenci basina saklanan cevap denemesi (eskiler dusurulur)
+MAKS_SURE_SN = 24 * 3600        # bildirilen sure bu araliga kirpilir
+GENEL_PUAN_SINIRI = 1000        # gorev dosyasi okunamazsa tek soru icin ust sinir
+GECERLI_DURUMLAR = frozenset({"basladi", "tamamlandi", "yanlis_denedi", "atlandi"})
+_GOREV_KIMLIGI = re.compile(r"[a-z0-9][a-z0-9_-]{0,63}\Z")
+_GOREVLER_DIZINI = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gorevler")
+_puan_onbellegi: dict[str, int] = {}
+
+
 class GecersizAd(ValueError):
     """Ad bos, cok uzun, denetim/yon karakteri iceriyor ya da ayrilmis bir ad."""
+
+
+class SinifDolu(Exception):
+    """Oda MAKS_OGRENCI ogrenciye ulasti."""
+
+
+class AdresSiniri(Exception):
+    """Ayni IP adresinden ADRES_BASINA_OGRENCI katilim var."""
+
+
+def gorev_en_yuksek_puan(gorev_id) -> int:
+    """Gorev dosyasindaki en yuksek puan (zorluklarin en buyugu). Ogrencinin bildirdigi puan bununla
+    sinirlanir. Kimlik gecersizse 0; dosya yoksa ya da okunamazsa GENEL_PUAN_SINIRI."""
+    if not isinstance(gorev_id, str) or not _GOREV_KIMLIGI.match(gorev_id):
+        return 0
+    if gorev_id in _puan_onbellegi:
+        return _puan_onbellegi[gorev_id]
+    sinir = GENEL_PUAN_SINIRI
+    # Istemciyle ayni kural: gorevin kendi dosyasi yoksa sablon dosyasi kullanilir (orn. hydra-01)
+    for dosya in (gorev_id + ".json", "sablon-ve-ornek.json"):
+        try:
+            with open(os.path.join(_GOREVLER_DIZINI, dosya), encoding="utf-8") as f:
+                puan = json.load(f).get("puan")
+        except (OSError, ValueError, AttributeError):
+            continue
+        degerler = list(puan.values()) if isinstance(puan, dict) else [puan]
+        degerler = [p for p in degerler if isinstance(p, int) and not isinstance(p, bool) and p >= 0]
+        if degerler:
+            sinir = min(max(degerler), GENEL_PUAN_SINIRI)
+        break
+    _puan_onbellegi[gorev_id] = sinir
+    return sinir
+
+
+def json_coz(ham: bytes):
+    """Istek govdesini cozer. NaN/Infinity (ve 1e999 gibi sonsuza tasan sayilar) ile asiri derin
+    ic ice yapilar ValueError verir: bunlar gecerli JSON degildir ve ileride int()/siralama gibi
+    islemleri cokertir (ogretmen paneli zamanlayicisini durdurabiliyordu)."""
+    def sabit(ad):
+        raise ValueError("sonlu olmayan sayi: " + ad)
+
+    def kayan(metin):
+        deger = float(metin)
+        if deger != deger or deger in (float("inf"), float("-inf")):
+            raise ValueError("sonlu olmayan sayi")
+        return deger
+
+    try:
+        return json.loads(ham.decode("utf-8"), parse_constant=sabit, parse_float=kayan)
+    except RecursionError:
+        raise ValueError("cok derin JSON") from None
+
+
+def _tam_sayi_alani(veri: dict, anahtar: str, ust: int) -> int:
+    """Istege bagli tam sayi alani: yoksa/None ise 0; int (ya da tam degerli float) degilse ValueError.
+    Sonuc 0..ust araligina kirpilir."""
+    deger = veri.get(anahtar)
+    if deger is None:
+        return 0
+    if isinstance(deger, bool) or not isinstance(deger, (int, float)):
+        raise ValueError(anahtar)
+    if isinstance(deger, float):
+        if not deger.is_integer():
+            raise ValueError(anahtar)
+        deger = int(deger)
+    return max(0, min(deger, ust))
+
+
+def ilerleme_alanlari(veri: dict) -> dict:
+    """/ilerleme govdesini dogrular ve OdaDurumu.ilerleme_bildir icin hazirlar.
+    Eksik zorunlu alan KeyError, gecersiz deger ValueError verir."""
+    gorev_id, durum = veri["gorev_id"], veri["durum"]
+    sure_sn = veri.get("sure_sn", 0) or 0
+    cevap = veri.get("cevap")
+    if not (isinstance(gorev_id, str) and len(gorev_id) <= MAKS_AD):
+        raise ValueError("gorev_id")
+    if not (isinstance(durum, str) and durum in GECERLI_DURUMLAR):
+        raise ValueError("durum")
+    if isinstance(sure_sn, bool) or not isinstance(sure_sn, (int, float)):
+        raise ValueError("sure_sn")
+    if not (cevap is None or (isinstance(cevap, str) and len(cevap) <= MAKS_MESAJ)):
+        raise ValueError("cevap")
+    return {
+        "gorev_id": gorev_id, "durum": durum,
+        "sure_sn": max(0, min(sure_sn, MAKS_SURE_SN)),      # int icin de tasmadan calisir
+        "cevap": cevap,
+        "soru_no": _tam_sayi_alani(veri, "soru_no", 10 ** 6),
+        "puan": _tam_sayi_alani(veri, "puan", GENEL_PUAN_SINIRI),
+    }
 
 
 def ad_anahtari(ad: str) -> str:
@@ -113,6 +216,13 @@ class OdaDurumu:
         self._anahtarlar: dict[str, str] = {}
         # Tekillik anahtari -> kayitli ad ('ALI' varken 'ali' katilamaz; bkz. ad_anahtari)
         self._ad_anahtarlari: dict[str, str] = {}
+        # Katilim sinirlari (testler ve ozel kurulumlar ornek uzerinden degistirebilir)
+        self.maks_ogrenci = MAKS_OGRENCI
+        self.adres_basina = ADRES_BASINA_OGRENCI
+        self._adresler: dict[str, str] = {}            # ad -> katildigi IP adresi
+        # Atanan her sorunun gorevi: soru_no -> gorev_id. Ag uzerinden bildirilen puan yalnizca
+        # gercekten atanmis bir soru icin ve o gorevin en yuksek puaniyla sinirli olarak yazilir.
+        self._soru_gorevleri: dict[int, str] = {}
         # Her öğrenci için BİRİKEN sohbet geçmişi (tek seferlik kuyruk değil):
         # ad -> [{"kimden","metin","zaman","no"}]. Mesajlar silinmez.
         self.sohbetler: dict[str, list] = {}
@@ -189,6 +299,7 @@ class OdaDurumu:
             self.gorev_parametreleri = {}  # hazir soru -> ozel parametre yok
             self.gorev_varyantlari = {gorev_id: int(varyant)} if varyant else {}
             self.aktif_soru_no += 1
+            self._soru_gorevleri[self.aktif_soru_no] = gorev_id
             return self.aktif_soru_no
 
     def ozel_soru_ata(self, gorev_id: str, parametreler: dict, etiket: str = "") -> int:
@@ -208,6 +319,7 @@ class OdaDurumu:
             self.gorev_parametreleri = {gorev_id: parametreler}
             self.gorev_varyantlari = {gorev_id: varyant} if varyant else {}
             self.aktif_soru_no += 1
+            self._soru_gorevleri[self.aktif_soru_no] = gorev_id
             return self.aktif_soru_no
 
     def set_hedef_adres(self, adres: str) -> str:
@@ -240,6 +352,7 @@ class OdaDurumu:
         with self._kilit:
             self.ogrenciler.pop(ad, None)
             self._anahtarlar.pop(ad, None)
+            self._adresler.pop(ad, None)
             for k in [k for k, v in self._ad_anahtarlari.items() if v == ad]:
                 del self._ad_anahtarlari[k]
 
@@ -266,10 +379,11 @@ class OdaDurumu:
         with self._kilit:
             self._basarisiz.setdefault(adres, []).append(time.monotonic())
 
-    def katil(self, ad: str, sifre: str) -> str:
+    def katil(self, ad: str, sifre: str, adres: str | None = None) -> str:
         """Öğrenci odaya katılırken çağrılır. Şifre yanlışsa
         PermissionError, isim geçersizse GecersizAd, isim zaten kullanımdaysa
-        ValueError fırlatır. Kaydedilen (normalleştirilmiş) adı döner.
+        ValueError, oda doluysa SinifDolu, aynı adresten çok katılım varsa
+        AdresSiniri fırlatır. Kaydedilen (normalleştirilmiş) adı döner.
         Aynı isim, önceki sahibi öğretmen tarafından atılana kadar (veya
         oda kapanana kadar) tekrar kullanılamaz -- kalıcı bir yasak
         değil, sadece aynı anda iki öğrencinin aynı adı taşımasını önler.
@@ -284,6 +398,12 @@ class OdaDurumu:
         with self._kilit:
             if ad in self.ogrenciler or anahtar in self._ad_anahtarlari:
                 raise ValueError(f"'{ad}' ismi zaten kullanılıyor")
+            if len(self.ogrenciler) >= self.maks_ogrenci:
+                raise SinifDolu()
+            if adres is not None and sum(1 for a in self._adresler.values() if a == adres) >= self.adres_basina:
+                raise AdresSiniri()
+            if adres is not None:
+                self._adresler[ad] = adres
             self._ad_anahtarlari[anahtar] = ad
             self.ogrenciler[ad] = {
                 "gorev_id": None,
@@ -307,35 +427,67 @@ class OdaDurumu:
             return False
         return secrets.compare_digest(anahtar.encode("utf-8"), gercek.encode("utf-8"))
 
+    def ilerleme_bildir(self, ad: str, anahtar, gorev_id: str, durum: str, sure_sn: float,
+                        cevap: str | None = None, soru_no: int = 0, puan: int = 0) -> bool:
+        """AG UZERINDEN gelen ilerleme (istek isleyicisi bunu cagirir). Alanlar ilerleme_alanlari()
+        ile dogrulanmis olmalidir. Ogrencinin anahtari yanlissa ya da ogrenci artik sinifta degilse
+        False doner ve HICBIR SEY yazilmaz.
+
+        Anahtar denetimi ile yazma TEK kilit altindadir: araya 'ogrenciyi at' girip atilan ogrencinin
+        anahtarsiz olarak listeye geri yazilmasi (adin kilitlenmesi) mumkun degildir.
+
+        Puan yalnizca gercekten atanmis bir soru icin (soru_no o goreve aitse) ve gorevin en yuksek
+        puaniyla sinirli olarak yazilir; boylece elle gonderilen bir istek skoru sisiremez ve
+        'cozulen_sorular' atanan soru sayisindan fazla kayit tutamaz."""
+        with self._kilit:
+            gercek = self._anahtarlar.get(ad)
+            if (not gercek or ad not in self.ogrenciler or not isinstance(anahtar, str)
+                    or not secrets.compare_digest(anahtar.encode("utf-8"), gercek.encode("utf-8"))):
+                return False
+            soru_no = soru_no if 0 <= soru_no <= self.aktif_soru_no else 0
+            puanlanir = (self._soru_gorevleri.get(soru_no) == gorev_id if soru_no
+                         else (self.aktif_soru_no == 0 and gorev_id in self.acik_gorevler))
+            puan = max(0, min(puan, gorev_en_yuksek_puan(gorev_id)))
+            self._ilerleme_yaz(ad, gorev_id, durum, sure_sn, cevap, soru_no, puan, puanlanir)
+            return True
+
     def ilerleme_guncelle(self, ad: str, sifre: str, gorev_id: str,
                            durum: str, sure_sn: float,
                            cevap: str | None = None, soru_no: int = 0,
                            puan: int = 0) -> None:
+        """SUREC ICI kullanim (ogretmen tarafi, testler): degerler oldugu gibi yazilir ve ogrenci
+        listede yoksa eklenir. Ag isteklerinde KULLANILMAZ -- bkz. ilerleme_bildir."""
         if not self.sifre_dogru(sifre):
             raise PermissionError("yanlış oda şifresi")
         with self._kilit:
-            self.ogrenciler[ad] = {
+            self._ilerleme_yaz(ad, gorev_id, durum, sure_sn, cevap, int(soru_no or 0), int(puan or 0), True)
+
+    def _ilerleme_yaz(self, ad, gorev_id, durum, sure_sn, cevap, soru_no, puan, puanlanir) -> None:
+        """Kilit ALINMIS olarak cagrilir."""
+        self.ogrenciler[ad] = {
+            "gorev_id": gorev_id,
+            "durum": durum,
+            "sure_sn": sure_sn,
+            "son_gorulme": time.time(),
+        }
+        # Gerçek bir cevap denemesi ise cevap günlüğüne ekle (başladı/
+        # atlandı gibi durumlarda cevap metni olmaz).
+        if cevap is not None and durum in ("tamamlandi", "yanlis_denedi"):
+            kayitlar = self.cevaplar.setdefault(ad, [])
+            kayitlar.append({
+                "soru_no": soru_no,
                 "gorev_id": gorev_id,
-                "durum": durum,
-                "sure_sn": sure_sn,
-                "son_gorulme": time.time(),
-            }
-            # Gerçek bir cevap denemesi ise cevap günlüğüne ekle (başladı/
-            # atlandı gibi durumlarda cevap metni olmaz).
-            if cevap is not None and durum in ("tamamlandi", "yanlis_denedi"):
-                self.cevaplar.setdefault(ad, []).append({
-                    "soru_no": int(soru_no or 0),
-                    "gorev_id": gorev_id,
-                    "cevap": cevap,
-                    "dogru": durum == "tamamlandi",
-                    "zaman": time.time(),
-                })
-            # Dogru cevapta puani kaydet (soru basina en iyi deneme).
-            if durum == "tamamlandi":
-                d = self.cozulen_sorular.setdefault(ad, {})
-                no = int(soru_no or 0)
-                if int(puan or 0) >= d.get(no, {}).get("puan", -1):
-                    d[no] = {"puan": int(puan or 0), "gorev_id": gorev_id}
+                "cevap": cevap,
+                "dogru": durum == "tamamlandi",
+                "zaman": time.time(),
+            })
+            if len(kayitlar) > MAKS_CEVAP_KAYDI:
+                del kayitlar[:len(kayitlar) - MAKS_CEVAP_KAYDI]
+        # Dogru cevapta puani kaydet (soru basina en iyi deneme).
+        if durum == "tamamlandi" and puanlanir:
+            d = self.cozulen_sorular.setdefault(ad, {})
+            if puan >= d.get(soru_no, {}).get("puan", -1):
+                d[soru_no] = {"puan": puan, "gorev_id": gorev_id}
 
     def sinif_ozeti(self) -> list:
         """Her ogrenci icin ozet: cozulen soru sayisi, toplam puan, deneme
@@ -453,7 +605,7 @@ def _sunucu_sinifi_olustur(oda: OdaDurumu):
             if uzunluk > MAKS_GOVDE:
                 raise OverflowError("govde cok buyuk")
             ham = self.rfile.read(uzunluk) if uzunluk else b"{}"
-            veri = json.loads(ham.decode("utf-8"))
+            veri = json_coz(ham)
             if not isinstance(veri, dict):
                 raise ValueError("JSON nesnesi bekleniyordu")
             return veri
@@ -482,7 +634,26 @@ def _sunucu_sinifi_olustur(oda: OdaDurumu):
             self._json_gonder({"hata": "yanlış şifre"}, 403)
             return False
 
+        def _guvenli(self, islev) -> None:
+            """Isleyicide beklenmeyen bir hata istemciyi yanitsiz birakmasin ve stderr'e iz dokmesin:
+            500 doner. Soket hatalarinda (istemci gitti, zaman asimi) baglanti sessizce kapatilir."""
+            try:
+                islev()
+            except OSError:
+                self.close_connection = True
+            except Exception:  # noqa: BLE001
+                try:
+                    self._json_gonder({"hata": "sunucu_hatasi"}, 500)
+                except OSError:
+                    self.close_connection = True
+
         def do_GET(self) -> None:  # noqa: N802
+            self._guvenli(self._get)
+
+        def do_POST(self) -> None:  # noqa: N802
+            self._guvenli(self._post)
+
+        def _get(self) -> None:
             ayristirilan = urlparse(self.path)
             sorgu = parse_qs(ayristirilan.query)
 
@@ -592,7 +763,7 @@ def _sunucu_sinifi_olustur(oda: OdaDurumu):
             except ctf_cekirdek.CtfHata as h:
                 self._ctf_hata(h)
 
-        def do_POST(self) -> None:  # noqa: N802
+        def _post(self) -> None:
             try:
                 veri = self._json_oku()
             except OverflowError:
@@ -612,13 +783,17 @@ def _sunucu_sinifi_olustur(oda: OdaDurumu):
                 if not self._yetkili_mi(veri.get("sifre")):
                     return
                 try:
-                    ad = oda.katil(ad=ad, sifre=veri["sifre"])
+                    ad = oda.katil(ad=ad, sifre=veri["sifre"], adres=self.client_address[0])
                     # 'ad': sunucunun kaydettigi (normallestirilmis) ad; istemci sonraki isteklerde bunu kullanir
                     self._json_gonder({"tamam": True, "anahtar": oda.anahtar_ver(ad), "ad": ad})
                 except PermissionError:
                     self._json_gonder({"hata": "yanlış şifre"}, 403)
                 except GecersizAd:
                     self._json_gonder({"hata": "geçersiz isim"}, 400)
+                except SinifDolu:
+                    self._json_gonder({"hata": "sinif_dolu"}, 409)
+                except AdresSiniri:
+                    self._json_gonder({"hata": "adres_siniri"}, 429)
                 except ValueError:
                     self._json_gonder({
                         "hata": "isim_alinmis",
@@ -633,34 +808,19 @@ def _sunucu_sinifi_olustur(oda: OdaDurumu):
                     return
                 if not self._yetkili_mi(veri.get("sifre")):
                     return
-                if not self._anahtar_tamam(ad, veri.get("anahtar")):
-                    return
                 try:
-                    gorev_id, durum = veri["gorev_id"], veri["durum"]
-                    sure_sn = veri.get("sure_sn", 0) or 0
-                    cevap = veri.get("cevap")
-                    if not (isinstance(gorev_id, str) and isinstance(durum, str)
-                            and len(gorev_id) <= MAKS_AD and len(durum) <= MAKS_AD
-                            and isinstance(sure_sn, (int, float))
-                            and not isinstance(sure_sn, bool)
-                            and (cevap is None or (isinstance(cevap, str)
-                                                   and len(cevap) <= MAKS_MESAJ))):
-                        raise ValueError("gecersiz alan")
-                    oda.ilerleme_guncelle(
-                        ad=ad, sifre=veri["sifre"],
-                        gorev_id=gorev_id, durum=durum,
-                        sure_sn=sure_sn,
-                        cevap=cevap,
-                        soru_no=int(veri.get("soru_no", 0) or 0),
-                        puan=int(veri.get("puan", 0) or 0),
-                    )
-                    self._json_gonder({"tamam": True})
-                except PermissionError:
-                    self._json_gonder({"hata": "yanlış şifre"}, 403)
+                    alanlar = ilerleme_alanlari(veri)
                 except KeyError as e:
                     self._json_gonder({"hata": f"eksik alan: {e}"}, 400)
+                    return
                 except (TypeError, ValueError):
                     self._json_gonder({"hata": "geçersiz alan"}, 400)
+                    return
+                # Anahtar denetimi ve yazma tek adimda (bkz. OdaDurumu.ilerleme_bildir)
+                if oda.ilerleme_bildir(ad, veri.get("anahtar"), **alanlar):
+                    self._json_gonder({"tamam": True})
+                else:
+                    self._json_gonder({"hata": "gecersiz_anahtar"}, 403)
             elif ayristirilan.path == "/mesaj":
                 # Bu yolu yalnizca ogrenci istemcisi kullanir; ogretmen mesajlarini
                 # surec icinden oda.mesaj_ekle ile gonderir. Bu yuzden oda sifresi
