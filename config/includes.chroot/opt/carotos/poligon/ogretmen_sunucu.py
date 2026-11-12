@@ -33,6 +33,7 @@ import json
 import os
 import re
 import secrets
+import socket
 import threading
 import time
 import unicodedata
@@ -45,6 +46,13 @@ MAKS_GOVDE = 64 * 1024          # bayt
 MAKS_AD = 64                    # ogrenci adi / gorev kimligi / durum uzunlugu
 MAKS_MESAJ = 1000               # sohbet mesaji ve cevap metni uzunlugu
 ISTEK_ZAMAN_ASIMI = 10.0        # sn: yarim kalan istek (govdesi gelmeyen) baglantiyi sonsuza dek tutamaz
+# Yukaridaki zaman asimi her okuma icin AYRI sayilir: birkac saniyede bir tek bayt gonderen baglanti onu
+# hic asmaz. Bu yuzden istegin tamami icin ayrica bir ust sinir ve eszamanli baglanti sinirlari vardir;
+# sunucu ogretmen uygulamasiyla ayni surecte calistigindan is parcacigi/dosya tanitici tukenmesi
+# uygulamanin kendisini de durdururdu.
+ISTEK_TOPLAM_SURE = 20.0        # sn: bir baglantinin (baslik + govde + yanit) toplam omru
+MAKS_BAGLANTI = 256             # ayni anda islenen toplam baglanti
+ADRES_BASINA_BAGLANTI = 32      # tek bir IP adresinden ayni anda (NAT arkasindaki sinif sigar)
 DENEME_PENCERESI = 60.0         # sn
 DENEME_LIMITI = 10              # pencerede yanlis sifre sayisi
 
@@ -851,10 +859,96 @@ def _sunucu_sinifi_olustur(oda: OdaDurumu):
     return Handler
 
 
-def sunucu_baslat(oda: OdaDurumu, bind_adres: str, port: int) -> ThreadingHTTPServer:
+class SinirliSunucu(ThreadingHTTPServer):
+    """Baglanti sayisini ve baglanti omrunu sinirlayan HTTP sunucusu.
+
+    * Toplamda maks_baglanti, tek adresten adres_basina_baglanti eszamanli baglanti islenir; fazlasi
+      is parcacigi ACILMADAN hemen kapatilir (istemci 'baglanti kesildi' gorur ve yeniden dener).
+    * istek_toplam_sure'yi asan baglanti bir gozcu tarafindan kapatilir: yavas yavas bayt gonderip
+      is parcacigini suresiz tutmak (slowloris) mumkun degildir.
+    """
+
+    daemon_threads = True
+
+    def __init__(self, *a, **k):
+        super().__init__(*a, **k)
+        self.maks_baglanti = MAKS_BAGLANTI
+        self.adres_basina_baglanti = ADRES_BASINA_BAGLANTI
+        self.istek_toplam_sure = ISTEK_TOPLAM_SURE
+        self.reddedilen = 0                                  # sinir yuzunden kapatilan baglanti sayisi
+        self._bag_kilit = threading.Lock()
+        self._adres_sayisi: dict[str, int] = {}
+        self._aktif: dict[socket.socket, float] = {}         # baglanti -> baslangic (monotonic)
+        self._kapandi = threading.Event()
+        threading.Thread(target=self._gozcu, daemon=True).start()
+
+    def aktif_baglanti(self) -> int:
+        with self._bag_kilit:
+            return len(self._aktif)
+
+    def process_request(self, request, client_address):
+        adres = client_address[0]
+        with self._bag_kilit:
+            dolu = (len(self._aktif) >= self.maks_baglanti
+                    or self._adres_sayisi.get(adres, 0) >= self.adres_basina_baglanti)
+            if dolu:
+                self.reddedilen += 1
+            else:
+                self._aktif[request] = time.monotonic()
+                self._adres_sayisi[adres] = self._adres_sayisi.get(adres, 0) + 1
+        if dolu:
+            self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request, client_address)
+        except BaseException:
+            self._birak(request, adres)                      # is parcacigi acilamadi
+            raise
+
+    def process_request_thread(self, request, client_address):
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self._birak(request, client_address[0])
+
+    def _birak(self, request, adres) -> None:
+        with self._bag_kilit:
+            if self._aktif.pop(request, None) is None:
+                return
+            kalan = self._adres_sayisi.get(adres, 0) - 1
+            if kalan > 0:
+                self._adres_sayisi[adres] = kalan
+            else:
+                self._adres_sayisi.pop(adres, None)
+
+    def _gozcu(self) -> None:
+        """Toplam suresini asan baglantilari kapatir (okumada bekleyen is parcacigi boylece uyanir)."""
+        while not self._kapandi.wait(min(1.0, max(0.05, self.istek_toplam_sure / 4))):
+            simdi = time.monotonic()
+            with self._bag_kilit:
+                eski = [b for b, t in self._aktif.items() if simdi - t > self.istek_toplam_sure]
+            for b in eski:
+                try:
+                    b.shutdown(socket.SHUT_RDWR)
+                except OSError:
+                    pass
+
+    def handle_error(self, request, client_address):
+        """Istemci kaynakli soket hatalari (kesilen baglanti, zaman asimi) stderr'i doldurmasin."""
+        import sys as _sys
+        if isinstance(_sys.exc_info()[1], OSError):
+            return
+        super().handle_error(request, client_address)
+
+    def server_close(self):
+        self._kapandi.set()
+        super().server_close()
+
+
+def sunucu_baslat(oda: OdaDurumu, bind_adres: str, port: int) -> SinirliSunucu:
     """bind_adres burada BİLEREK '0.0.0.0' veya sınıfın LAN adresi olabilir.
     sahte_giris.py'deki 127.0.0.1 kısıtlaması bu fonksiyona UYGULANMAZ."""
-    sunucu = ThreadingHTTPServer((bind_adres, port), _sunucu_sinifi_olustur(oda))
+    sunucu = SinirliSunucu((bind_adres, port), _sunucu_sinifi_olustur(oda))
     thread = threading.Thread(target=sunucu.serve_forever, daemon=True)
     thread.start()
     return sunucu

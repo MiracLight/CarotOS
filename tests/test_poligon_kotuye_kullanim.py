@@ -330,5 +330,99 @@ class P12YakalanmayanIstisnalar(Taban):
         self.katil_tamam("Veli")
 
 
+class P03BaglantiSinirlari(Taban):
+    """P-03: her baglantiya sinirsiz is parcacigi aciliyor, yavas bayt gonderen baglanti suresiz acik kaliyordu."""
+
+    YARIM = b"POST /katil HTTP/1.0\r\nContent-Length: 60000\r\n\r\n"
+
+    def _ac(self, veri=None):
+        import socket
+        s = socket.create_connection(("127.0.0.1", self.port), timeout=5)
+        self.addCleanup(s.close)
+        if veri:
+            s.sendall(veri)
+        return s
+
+    def _bekle(self, kosul, sure=5.0):
+        import time
+        bitis = time.time() + sure
+        while time.time() < bitis:
+            if kosul():
+                return True
+            time.sleep(0.05)
+        return kosul()
+
+    def _kapandi_mi(self, s):
+        """Karsi taraf baglantiyi kapattiysa True (okuma bos doner ya da sifirlanir)."""
+        import socket
+        s.settimeout(0.2)
+        try:
+            return s.recv(1) == b""
+        except socket.timeout:
+            return False
+        except OSError:
+            return True
+
+    def test_adres_basina_eszamanli_baglanti_sinirlidir(self):
+        self.sunucu.adres_basina_baglanti = 8
+        acik = [self._ac(self.YARIM) for _ in range(8)]
+        self.assertTrue(self._bekle(lambda: self.sunucu.aktif_baglanti() == 8))
+        fazla = [self._ac(self.YARIM) for _ in range(20)]
+        self.assertTrue(self._bekle(lambda: self.sunucu.reddedilen == 20))
+        self.assertEqual(self.sunucu.aktif_baglanti(), 8)            # fazlasi icin is parcacigi acilmadi
+        self.assertTrue(all(self._kapandi_mi(s) for s in fazla))
+        self.assertFalse(any(self._kapandi_mi(s) for s in acik))
+        for s in acik:
+            s.close()
+        self.assertTrue(self._bekle(lambda: self.sunucu.aktif_baglanti() == 0))
+        self.katil_tamam("Ali")                                      # yer acilinca sunucu normal calisir
+
+    def test_toplam_baglanti_sinirlidir(self):
+        self.sunucu.maks_baglanti = 5
+        [self._ac(self.YARIM) for _ in range(5)]
+        self.assertTrue(self._bekle(lambda: self.sunucu.aktif_baglanti() == 5))
+        s = self._ac(self.YARIM)
+        self.assertTrue(self._bekle(lambda: self._kapandi_mi(s)))
+        self.assertEqual(self.sunucu.aktif_baglanti(), 5)
+
+    def test_yavas_bayt_gonderen_baglanti_toplam_surede_kapatilir(self):
+        import time
+        self.sunucu.istek_toplam_sure = 1.0
+        s = self._ac(self.YARIM)
+        bas = time.time()
+        kapandi = False
+        while time.time() - bas < 6:
+            try:
+                s.sendall(b"x")                                      # okuma zaman asimini (10 sn) hic doldurmaz
+            except OSError:
+                kapandi = True
+                break
+            if self._kapandi_mi(s):
+                kapandi = True
+                break
+            time.sleep(0.2)
+        self.assertTrue(kapandi, "yavas baglanti toplam sure dolmasina ragmen acik kaldi")
+        self.assertLess(time.time() - bas, 4)
+        self.assertTrue(self._bekle(lambda: self.sunucu.aktif_baglanti() == 0))
+        self.katil_tamam("Ali")
+
+    def test_varsayilanlar_ve_normal_yuk(self):
+        self.assertEqual((self.sunucu.maks_baglanti, self.sunucu.adres_basina_baglanti), (256, 32))
+        self.assertEqual(self.sunucu.istek_toplam_sure, 20.0)
+        import threading
+        sonuc = []
+
+        def is_(i):
+            sonuc.append(self.katil("Ogrenci %d" % i)[0])
+        isler = [threading.Thread(target=is_, args=(i,)) for i in range(30)]
+        for t in isler:
+            t.start()
+        for t in isler:
+            t.join(10)
+        self.assertEqual(sonuc, [200] * 30)                          # 30 es zamanli gercek ogrenci reddedilmez
+        self.assertTrue(self._bekle(lambda: self.sunucu.aktif_baglanti() == 0))
+        self.assertEqual(self.sunucu.reddedilen, 0)
+
+
 if __name__ == "__main__":
     unittest.main()
