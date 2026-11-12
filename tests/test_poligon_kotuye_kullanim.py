@@ -905,5 +905,199 @@ class P13CevapKutusuOlmayanGorev(BireyselTabani):
             self.assertFalse(self.ist.cevabi_kontrol_et(metin))
 
 
+class P11GeciciDosya(unittest.TestCase):
+    """P-11: john gorevi /tmp altinda ongorulebilir bir yola yaziyor, parolayi komut satirinda veriyordu."""
+
+    def setUp(self):
+        import shutil
+        if not shutil.which("openssl"):
+            self.skipTest("openssl yok")
+
+    def test_ozel_dizin_ve_izinler(self):
+        import stat
+        from servisler.sahte_hash import SahteHashDosyasi
+        h = SahteHashDosyasi("ogrenci", "kule1234")
+        self.addCleanup(h.durdur)
+        dizin = os.path.dirname(h.dosya_yolu)
+        self.assertNotIn(str(os.getpid()), os.path.basename(dizin))             # ad tahmin edilemez
+        self.assertNotEqual(h.dosya_yolu, SahteHashDosyasi("ogrenci", "x").dosya_yolu)
+        self.assertEqual(stat.S_IMODE(os.stat(dizin).st_mode), 0o700)
+        h.baslat()
+        self.assertEqual(stat.S_IMODE(os.stat(h.dosya_yolu).st_mode), 0o600)
+        with open(h.dosya_yolu, encoding="utf-8") as f:
+            satir = f.read()
+        self.assertRegex(satir, r"\Aogrenci:\$1\$[A-Za-z0-9]{8}\$[A-Za-z0-9./]{22}\n\Z")
+        h.durdur()
+        self.assertFalse(os.path.exists(dizin))
+
+    def test_parola_komut_satirinda_gorunmez(self):
+        import subprocess
+        from servisler.sahte_hash import SahteHashDosyasi
+        gorulen = []
+        eski = subprocess.run
+
+        def izle(argv, **k):
+            gorulen.append(list(argv))
+            return eski(argv, **k)
+        subprocess.run = izle
+        self.addCleanup(setattr, subprocess, "run", eski)
+        h = SahteHashDosyasi("ogrenci", "cokgizli4821")
+        self.addCleanup(h.durdur)
+        h.baslat()
+        self.assertEqual(len(gorulen), 1)
+        self.assertNotIn("cokgizli4821", " ".join(gorulen[0]))
+        self.assertIn("-stdin", gorulen[0])
+
+    def test_uretilen_ozet_parolayla_dogrulanir(self):
+        import subprocess
+        from servisler.sahte_hash import SahteHashDosyasi
+        h = SahteHashDosyasi("ogrenci", "kalkan77")
+        self.addCleanup(h.durdur)
+        h.baslat()
+        with open(h.dosya_yolu, encoding="utf-8") as f:
+            ozet = f.read().strip().split(":", 1)[1]
+        tuz = ozet.split("$")[2]
+        yeniden = subprocess.run(["openssl", "passwd", "-1", "-salt", tuz, "-stdin"], input="kalkan77\n",
+                                 capture_output=True, text=True, check=True).stdout.strip()
+        self.assertEqual(ozet, yeniden)
+
+    def test_sembolik_bag_izlenmez(self):
+        import tempfile
+        from servisler.sahte_hash import SahteHashDosyasi
+        with tempfile.TemporaryDirectory() as d:
+            hedef = os.path.join(d, "onemli.txt")
+            with open(hedef, "w") as f:
+                f.write("dokunma")
+            bag = os.path.join(d, "bag.txt")
+            try:
+                os.symlink(hedef, bag)
+            except (OSError, NotImplementedError):
+                self.skipTest("sembolik bag olusturulamiyor")
+            h = SahteHashDosyasi("ogrenci", "x1", dosya_yolu=bag)
+            with self.assertRaises(OSError):
+                h.baslat()
+            with open(hedef) as f:
+                self.assertEqual(f.read(), "dokunma")
+
+
+class P20Defterler(unittest.TestCase):
+    """P-20: gecmis defteri yerinde yeniden yaziliyordu; kullanici dosyalari herkesce okunabiliyordu."""
+
+    def setUp(self):
+        import shutil
+        import tempfile
+        from pathlib import Path
+        import gecmis_defteri
+        import kullanici_defteri
+        self.dizin = Path(tempfile.mkdtemp(prefix="poligon-defter-"))
+        self.addCleanup(shutil.rmtree, self.dizin, True)
+        self.g, self.k = gecmis_defteri, kullanici_defteri
+        for mod, ad, deger in ((gecmis_defteri, "GECMIS_DOSYASI", self.dizin / "gecmis.json"),
+                               (kullanici_defteri, "DIZIN", self.dizin / "kullanicilar")):
+            self.addCleanup(setattr, mod, ad, getattr(mod, ad))
+            setattr(mod, ad, deger)
+
+    def test_gecmis_birikir_ve_gecici_dosya_kalmaz(self):
+        for i in range(5):
+            self.g.kaydet("nmap-01", "nmap", "tamamlandi", i, 10)
+        self.assertEqual(self.g.ozet(), {"toplam_tamamlanan": 5, "toplam_puan": 50})
+        self.assertEqual(sorted(p.name for p in self.dizin.iterdir()), ["gecmis.json"])
+
+    def test_yazma_yarida_kesilirse_eski_defter_korunur(self):
+        self.g.kaydet("nmap-01", "nmap", "tamamlandi", 1, 10)
+        once = self.g.GECMIS_DOSYASI.read_text(encoding="utf-8")
+        eski = os.replace
+
+        def patla(*_a):
+            raise OSError("disk dolu")
+        os.replace = patla
+        try:
+            self.g.kaydet("john-01", "john", "tamamlandi", 1, 99)            # sessizce yutulur
+        finally:
+            os.replace = eski
+        self.assertEqual(self.g.GECMIS_DOSYASI.read_text(encoding="utf-8"), once)
+        self.assertEqual(sorted(p.name for p in self.dizin.iterdir()), ["gecmis.json"])
+
+    def test_bozuk_defter_ezilmez_kenara_alinir(self):
+        self.g.GECMIS_DOSYASI.write_text('[{"gorev_id": "nmap-01", "durum": "tamamlandi", "puan": 5', encoding="utf-8")
+        self.g.kaydet("john-01", "john", "tamamlandi", 1, 7)
+        self.assertEqual(self.g.ozet(), {"toplam_tamamlanan": 1, "toplam_puan": 7})
+        bozuk = self.dizin / "gecmis.json.bozuk"
+        self.assertTrue(bozuk.is_file())
+        self.assertIn("nmap-01", bozuk.read_text(encoding="utf-8"))
+
+    def test_kullanici_dosyalari_yalnizca_sahibine_acik(self):
+        import stat
+        if os.name == "nt":
+            self.skipTest("POSIX izinleri")
+        kullanici = self.k.olustur("Ali", "1234")
+        self.assertEqual(stat.S_IMODE(os.stat(self.k.DIZIN).st_mode), 0o700)
+        yol = self.k.DIZIN / (kullanici["id"] + ".json")
+        self.assertEqual(stat.S_IMODE(os.stat(yol).st_mode), 0o600)
+        self.assertEqual(self.k.dogrula("Ali", "1234")["id"], kullanici["id"])
+        with self.assertRaises(self.k.IsimAlinmis):
+            self.k.olustur("Ali", "5678")
+
+
+class P23ServisKaynaklari(unittest.TestCase):
+    """P-23: sahte servislerde sinirsiz arabellek ve kapatilmayan soketler."""
+
+    def test_satir_sonu_gelmeyen_veri_baglantiyi_kapatir(self):
+        import socket
+        from servisler.sahte_giris import MAKS_SATIR, SahteGirisServisi
+        port = ogrenci_istemci._bos_port_bul(45210)
+        servis = SahteGirisServisi("ogrenci", "p", port)
+        servis.baslat()
+        self.addCleanup(servis.durdur)
+        c = socket.create_connection(("127.0.0.1", port), timeout=3)
+        self.addCleanup(c.close)
+        self.assertTrue(c.recv(100).startswith(b"220"))
+        kapandi = False
+        try:
+            for _ in range(40):
+                c.sendall(b"A" * 1024)
+            c.settimeout(3)
+            kapandi = c.recv(10) == b""
+        except OSError:
+            kapandi = True
+        self.assertTrue(kapandi, "sunucu %d bayti asan satiri kabul etmeye devam etti" % MAKS_SATIR)
+        # normal giris hala calisir
+        c2 = socket.create_connection(("127.0.0.1", port), timeout=3)
+        self.addCleanup(c2.close)
+        c2.recv(100)
+        c2.sendall(b"USER ogrenci\r\n")
+        self.assertTrue(c2.recv(100).startswith(b"331"))
+        c2.sendall(b"PASS p\r\n")
+        self.assertTrue(c2.recv(100).startswith(b"230"))
+
+    def test_web_servisi_durunca_port_hemen_serbest(self):
+        import socket
+        from servisler.sahte_web import SahteWebServisi
+        port = ogrenci_istemci._bos_port_bul(45310)
+        servis = SahteWebServisi("gizli", port)
+        servis.baslat()
+        servis.durdur()
+        with self.assertRaises(OSError):
+            socket.create_connection(("127.0.0.1", port), timeout=1)
+        s = socket.socket()
+        self.addCleanup(s.close)
+        s.bind(("127.0.0.1", port))                                  # SO_REUSEADDR olmadan da baglanabilir
+
+    def test_durdurma_acik_soket_birakmaz(self):
+        import gc
+        import warnings
+        from servisler.sahte_giris import SahteGirisServisi
+        from servisler.sahte_savunma_hedefi import BasitDinleyici
+        with warnings.catch_warnings(record=True) as uyarilar:
+            warnings.simplefilter("always", ResourceWarning)
+            for sinif, arg in ((SahteGirisServisi, ("u", "p", ogrenci_istemci._bos_port_bul(45410))),
+                               (BasitDinleyici, (ogrenci_istemci._bos_port_bul(45510),))):
+                servis = sinif(*arg)
+                servis.baslat()
+                servis.durdur()
+            gc.collect()
+        self.assertEqual([str(u.message) for u in uyarilar if issubclass(u.category, ResourceWarning)], [])
+
+
 if __name__ == "__main__":
     unittest.main()

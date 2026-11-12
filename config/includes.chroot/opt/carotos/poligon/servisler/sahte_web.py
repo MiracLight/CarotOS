@@ -129,6 +129,7 @@ class SahteWebServisi:
     def durdur(self) -> None:
         if self._sunucu:
             self._sunucu.shutdown()
+            self._sunucu.server_close()      # dinleme soketi hemen kapanir, port serbest kalir
             self._sunucu = None
         if self._baglanti_tutucu:
             self._baglanti_tutucu.close()

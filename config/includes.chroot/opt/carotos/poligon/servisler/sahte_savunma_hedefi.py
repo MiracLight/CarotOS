@@ -47,12 +47,14 @@ class BasitDinleyici:
     def durdur(self) -> None:
         self._calisiyor = False
         if self._soket:
+            uyandir = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
-                socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect_ex(
-                    (self.bind_adres, self.port)
-                )
+                uyandir.settimeout(1)
+                uyandir.connect_ex((self.bind_adres, self.port))
             except OSError:
                 pass
+            finally:
+                uyandir.close()
             self._soket.close()
 
     def _dinle(self) -> None:

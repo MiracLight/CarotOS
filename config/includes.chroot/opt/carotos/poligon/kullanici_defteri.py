@@ -24,6 +24,7 @@ ortamda da test edilebilir.
 from __future__ import annotations
 
 import json
+import os
 import re
 import secrets
 from pathlib import Path
@@ -38,7 +39,13 @@ class IsimAlinmis(Exception):
 
 
 def _dizini_hazirla() -> None:
+    """Dizin yalnizca sahibine aciktir (0700): icindeki dosyalar ad + okul numarasi tasir ve ayni
+    makinedeki diger hesaplarin bunlari okumasina gerek yoktur."""
     DIZIN.mkdir(parents=True, exist_ok=True)
+    try:
+        os.chmod(DIZIN, 0o700)
+    except OSError:
+        pass
 
 
 def _oku_hepsi() -> list[dict]:
@@ -100,10 +107,9 @@ def olustur(ad: str, sifre: str) -> dict:
         raise IsimAlinmis(ad)
     kullanici = {"ad": ad, "id": _id_uret(), "sifre": sifre}
     yol = DIZIN / f"{kullanici['id']}.json"
-    yol.write_text(
-        json.dumps(kullanici, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
+    fd = os.open(yol, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(json.dumps(kullanici, ensure_ascii=False, indent=2) + "\n")
     return kullanici
 
 

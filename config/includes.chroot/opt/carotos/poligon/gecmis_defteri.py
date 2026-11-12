@@ -18,6 +18,7 @@ CarotOS'taki diğer kullanıcı-ayarları dosyalarıyla aynı basitlikte.
 from __future__ import annotations
 
 import json
+import os
 import time
 from pathlib import Path
 
@@ -44,6 +45,9 @@ def kaydet(gorev_id: str, arac: str, durum: str, sure_sn: float = 0, puan: int =
     try:
         GECMIS_DOSYASI.parent.mkdir(parents=True, exist_ok=True)
         gecmis = _ham_oku()
+        if not gecmis and _bozuk_mu():
+            # Okunamayan dosyanin uzerine yazmak butun gecmisi silerdi: kenara al, yeni defter baslat
+            os.replace(GECMIS_DOSYASI, GECMIS_DOSYASI.with_name(GECMIS_DOSYASI.name + ".bozuk"))
         gecmis.append({
             "gorev_id": gorev_id,
             "arac": arac,
@@ -52,11 +56,36 @@ def kaydet(gorev_id: str, arac: str, durum: str, sure_sn: float = 0, puan: int =
             "puan": puan,
             "zaman": time.time(),
         })
-        GECMIS_DOSYASI.write_text(
-            json.dumps(gecmis, ensure_ascii=False, indent=2), encoding="utf-8",
-        )
+        _atomik_yaz(GECMIS_DOSYASI, json.dumps(gecmis, ensure_ascii=False, indent=2))
     except OSError:
         pass
+
+
+def _bozuk_mu() -> bool:
+    """Dosya var ama gecerli bir JSON listesi degilse True."""
+    try:
+        return not isinstance(json.loads(GECMIS_DOSYASI.read_text(encoding="utf-8")), list)
+    except FileNotFoundError:
+        return False
+    except (OSError, ValueError):
+        return True
+
+
+def _atomik_yaz(yol: Path, metin: str) -> None:
+    """Once gecici dosyaya yazar, sonra yerine tasir: yazma yarida kesilirse (kapanma, disk dolu)
+    eski dosya oldugu gibi kalir, yarim yazilmis bir defter olusmaz."""
+    gecici = yol.with_name(f"{yol.name}.yeni-{os.getpid()}")
+    try:
+        with open(gecici, "w", encoding="utf-8") as f:
+            f.write(metin)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(gecici, yol)
+    finally:
+        try:
+            gecici.unlink()
+        except OSError:
+            pass
 
 
 def tumunu_oku() -> list:

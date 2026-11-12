@@ -27,6 +27,21 @@ import socket
 import threading
 
 
+MAKS_SATIR = 4096               # bayt: tek bir komut satiri icin ust sinir
+
+
+def _uyandir(adres: str, port: int) -> None:
+    """accept() cagrisini uyandirmak icin kendine kisa bir baglanti acar ve KAPATIR."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.settimeout(1)
+        s.connect_ex((adres, port))
+    except OSError:
+        pass
+    finally:
+        s.close()
+
+
 class SahteGirisServisi:
     """127.0.0.1 disina ASLA baglanmayan, tek kullanicili sahte giris servisi."""
 
@@ -58,13 +73,7 @@ class SahteGirisServisi:
     def durdur(self) -> None:
         self._calisiyor = False
         if self._soket:
-            try:
-                # kendine sahte bir baglanti acip accept() cagrisini uyandir
-                socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect_ex(
-                    (self.bind_adres, self.port)
-                )
-            except OSError:
-                pass
+            _uyandir(self.bind_adres, self.port)
             self._soket.close()
 
     def _dinle(self) -> None:
@@ -88,6 +97,8 @@ class SahteGirisServisi:
                     break
                 arabellek += veri
                 if b"\r\n" not in arabellek and b"\n" not in arabellek:
+                    if len(arabellek) > MAKS_SATIR:
+                        break            # satir sonu gelmeyen veri sinirsiz biriktirilmez
                     continue
                 satir = arabellek.decode("utf-8", errors="ignore").strip()
                 arabellek = b""
