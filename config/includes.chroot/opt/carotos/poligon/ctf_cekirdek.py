@@ -3,15 +3,19 @@
 
 Ilke: HAKEM SUNUCUDUR. Istemci yalnizca bayrak metnini gonderir; dogrulamayi ve puani sunucu yapar.
   * Bayrak her ogrenci icin oturum sirrindan HMAC ile turetilir: bir ogrencinin bayragi digerine yaramaz.
-  * Sunucu bayragi saklamaz; dosyayi yeniden uretip karsilastirir (sabit sureli karsilastirma).
+  * Sunucu bayragi diske yazmaz; dosyayi oturum sirrindan yeniden uretip karsilastirir (sabit sureli
+    karsilastirma). Uretilen dosyalar bellekte sinirli bir onbellekte tutulur (her istekte yeniden uretim
+    sunucuyu yavaslatmasin diye).
   * Puan zamanla azalir (cozen sayisina gore), ilk cozum bonusu ve ipucu cezasi vardir.
   * Yanlis denemede bekleme (kaba kuvveti yavaslatir), sure ve skor dondurma vardir.
   * Skor, degistirilemez bir olay listesinden (cozumler + ipuclari) HER SEFERINDE yeniden hesaplanir.
 
-Saat enjekte edilebilir (testler gercek zaman beklemez).
+Saat enjekte edilebilir (testler gercek zaman beklemez). Varsayilan saat TEKDUZEDIR (time.monotonic):
+yarisma sirasinda sistem saati duzeltilirse (NTP, elle ayar) kalan sure uzamaz ya da kisalmaz.
 """
 from __future__ import annotations
 
+import collections
 import csv
 import hashlib
 import hmac
@@ -34,6 +38,7 @@ YANLIS_BEKLEME = 30.0              # sn: son yanlis denemeden itibaren beklenir
 ILK_COZUM_ORANI = 0.10             # ilk cozene taban puanin %10'u bonus
 MIN_ORAN = 0.30                    # puan, tabanin en fazla %30'una kadar duser
 AZALMA_VARSAYILAN = 10             # bu kadar cozumde en dusuk puana inilir
+URETIM_ONBELLEGI = 256             # bellekte tutulan (ogrenci, gorev) dosyasi sayisi (en eski kullanilan atilir)
 
 DURUMLAR = ("hazir", "surec", "bitti")
 
@@ -86,7 +91,7 @@ def _hmac(sir: bytes, *parcalar: str) -> bytes:
 class CtfOturumu:
     """Bir CTF yarismasinin tum durumu (bellek ici; oda kapaninca biter)."""
 
-    def __init__(self, gorevler: dict | None = None, saat=time.time, sir: bytes | None = None,
+    def __init__(self, gorevler: dict | None = None, saat=time.monotonic, sir: bytes | None = None,
                  azalma: int = AZALMA_VARSAYILAN):
         self.gorevler = dict(gorevler if gorevler is not None else gorevleri_yukle())
         self.saat = saat
@@ -102,6 +107,7 @@ class CtfOturumu:
         self.ipuclari: list[dict] = []             # {ogrenci, gorev, no, ceza, zaman}
         self._yanlislar: dict[str, list[float]] = {}
         self.deneme_sayisi: dict[tuple, int] = {}  # (ogrenci, gorev) -> toplam deneme
+        self._uretimler: collections.OrderedDict = collections.OrderedDict()   # (ogrenci, gorev) -> (ad, icerik, bayrak)
 
     # -- yonetim (ogretmen) -----------------------------------------------------------------------------
     def baslat(self, sure_dk: float, gorev_idleri: list[str] | None = None, dondurma_dk: float = 0) -> None:
@@ -125,6 +131,7 @@ class CtfOturumu:
             self.cozumler, self.ipuclari = [], []
             self._yanlislar, self.deneme_sayisi = {}, {}
             self._sir = secrets.token_bytes(32)    # her yarisma yeni bayraklar uretir
+            self._uretimler.clear()                # eski sirla uretilmis dosyalar gecersiz
 
     def bitir(self) -> None:
         with self._kilit:
@@ -150,10 +157,21 @@ class CtfOturumu:
 
     # -- gorev dosyasi ve bayrak -----------------------------------------------------------------------------
     def _uret(self, ogrenci: str, gorev_id: str):
+        """(dosya_adi, icerik, bayrak). Kilit ALINMIS olarak cagrilir. Sonuc belirlenimci oldugu icin
+        onbellege alinir: bir ogrenci /ctf/dosya'yi art arda isteyerek sunucuyu mesgul edemez."""
+        anahtar = (ogrenci, gorev_id)
+        kayit = self._uretimler.get(anahtar)
+        if kayit is not None:
+            self._uretimler.move_to_end(anahtar)
+            return kayit
         g = self.gorevler[gorev_id]
         rng = random.Random(int.from_bytes(_hmac(self._sir, "rng", gorev_id, ogrenci)[:16], "big"))
         ctx = U.Baglam(rng, _hmac(self._sir, "bayrak", gorev_id, ogrenci).hex())
-        return U.URETICILER[g["uretici"]](ctx, g.get("parametreler") or {})
+        kayit = U.URETICILER[g["uretici"]](ctx, g.get("parametreler") or {})
+        self._uretimler[anahtar] = kayit
+        while len(self._uretimler) > URETIM_ONBELLEGI:
+            self._uretimler.popitem(last=False)
+        return kayit
 
     def dosya(self, ogrenci: str, gorev_id: str) -> tuple[str, str]:
         with self._kilit:
@@ -259,14 +277,18 @@ class CtfOturumu:
             if self.durum() == "hazir":
                 return []
             acilan = {(i["ogrenci"], i["gorev"], i["no"]) for i in self.ipuclari}
+            # Skor tablosu donukken gorev basina cozen sayisi ve guncel puan da donma anindaki haliyle
+            # verilir; yoksa dondurmanin gizledigi bilgi (kim hala cozuyor) bu listeden okunurdu.
+            kesim = self.dondurma if (self.dondurma is not None and
+                                      (self.donuk_mu() or self.durum() == "bitti")) else None
             sonuc = []
             for gid in self.acik_idler:
                 g = self.gorevler[gid]
                 ipuclari = g.get("ipuclari", [])
                 sonuc.append({
                     "id": gid, "kategori": g["kategori"], "zorluk": g["zorluk"], "baslik": g["baslik"],
-                    "aciklama": g["aciklama"], "puan": self._deger(gid, self._cozen_sayisi(gid) + 1),
-                    "cozen": self._cozen_sayisi(gid), "cozuldu": self._cozdu_mu(ogrenci, gid),
+                    "aciklama": g["aciklama"], "puan": self._deger(gid, self._cozen_sayisi(gid, kesim) + 1),
+                    "cozen": self._cozen_sayisi(gid, kesim), "cozuldu": self._cozdu_mu(ogrenci, gid),
                     "ipucu_sayisi": len(ipuclari),
                     "ipucu_acilan": sum(1 for k in range(len(ipuclari)) if (ogrenci, gid, k) in acilan),
                     "ipucu_cezalari": [int(i["ceza"]) for i in ipuclari],

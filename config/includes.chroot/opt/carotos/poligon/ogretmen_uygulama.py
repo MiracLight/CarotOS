@@ -262,6 +262,8 @@ _METIN_HAM = {
         "ctf_baslik": "CTF yarışması",
         "menu_skor": "Skor Tablosu",
         "oda_acik": "Oda açık · {n} öğrenci",
+        "port_dolu_basligi": "Sınıf sunucusu başlatılamadı",
+        "port_dolu_mesaji": "8642 numaralı port kullanımda. Açık başka bir Poligon öğretmen penceresi varsa onu kapatıp yeniden deneyin.",
         "kpi_katilan": "Katılan öğrenci",
         "kpi_bitiren": "Bitirenler",
         "kpi_soru": "Aktif soru no",
@@ -358,6 +360,8 @@ _METIN_HAM = {
         "ctf_baslik": "CTF contest",
         "menu_skor": "Scoreboard",
         "oda_acik": "Room open · {n} students",
+        "port_dolu_basligi": "The class server could not be started",
+        "port_dolu_mesaji": "Port 8642 is in use. If another Poligon teacher window is open, close it and try again.",
         "kpi_katilan": "Students joined",
         "kpi_bitiren": "Finished",
         "kpi_soru": "Active question #",
@@ -465,7 +469,13 @@ class OgretmenPenceresi(Gtk.Window):
         self._on_secili_gorev = gorev_id
         self._gercek_ip = _yerel_ip_adresini_bul()
         self._ip_gorunur = False
-        self.sunucu = sunucu_baslat(self.oda, "0.0.0.0", 8642)
+        try:
+            self.sunucu = sunucu_baslat(self.oda, "0.0.0.0", 8642)
+        except OSError as e:
+            # Port dolu (genellikle ikinci bir ogretmen penceresi): yarim kurulmus pencereyi birak,
+            # cagiran anlasilir bir ileti gostersin (bkz. _ogretmen_penceresini_ac).
+            self.destroy()
+            raise PortDolu(str(e)) from e
 
         self._olcek = 1.0  # ekran kucukse __init__ sonunda hesaplanip dusurulur
         self._css_uygula()
@@ -1700,6 +1710,10 @@ class OgretmenPenceresi(Gtk.Window):
             self.secili_ogrenci = None
 
 
+class PortDolu(RuntimeError):
+    """Sinif sunucusu 8642 portunu acamadi."""
+
+
 def _root_parolasi_dogrula(parola: str) -> bool:
     """Sistemin (sudo) parolasını doğrular. Öğretmen uygulaması bu
     doğrulama geçilmeden açılmaz -- öğrencilerin panele erişememesi
@@ -1799,7 +1813,17 @@ class OgretmenGirisPenceresi(Gtk.Window):
 
 
 def _ogretmen_penceresini_ac(gorev_id: str):
-    pencere = OgretmenPenceresi(gorev_id=gorev_id)
+    try:
+        pencere = OgretmenPenceresi(gorev_id=gorev_id)
+    except PortDolu:
+        m = METIN[_sistem_dilini_belirle()]
+        kutu = Gtk.MessageDialog(modal=True, message_type=Gtk.MessageType.ERROR,
+                                 buttons=Gtk.ButtonsType.OK, text=m["port_dolu_basligi"])
+        kutu.format_secondary_text(m["port_dolu_mesaji"])
+        kutu.run()
+        kutu.destroy()
+        Gtk.main_quit()
+        return
 
     def kapanirken(_pencere):
         pencere.sunucu.shutdown()

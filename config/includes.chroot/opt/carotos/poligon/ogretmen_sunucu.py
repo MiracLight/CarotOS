@@ -879,7 +879,8 @@ class SinirliSunucu(ThreadingHTTPServer):
     daemon_threads = True
 
     def __init__(self, *a, **k):
-        super().__init__(*a, **k)
+        # Alanlar ust sinif kurulmadan ONCE atanir: port doluysa ust sinif kurucusu server_close()
+        # cagirir ve o da _kapandi'ya bakar (yoksa soket kapatilamadan AttributeError olusurdu).
         self.maks_baglanti = MAKS_BAGLANTI
         self.adres_basina_baglanti = ADRES_BASINA_BAGLANTI
         self.istek_toplam_sure = ISTEK_TOPLAM_SURE
@@ -888,6 +889,7 @@ class SinirliSunucu(ThreadingHTTPServer):
         self._adres_sayisi: dict[str, int] = {}
         self._aktif: dict[socket.socket, float] = {}         # baglanti -> baslangic (monotonic)
         self._kapandi = threading.Event()
+        super().__init__(*a, **k)                            # port doluysa OSError (gozcu baslamaz)
         threading.Thread(target=self._gozcu, daemon=True).start()
 
     def aktif_baglanti(self) -> int:

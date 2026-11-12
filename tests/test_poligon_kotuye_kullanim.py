@@ -1099,5 +1099,121 @@ class P23ServisKaynaklari(unittest.TestCase):
         self.assertEqual([str(u.message) for u in uyarilar if issubclass(u.category, ResourceWarning)], [])
 
 
+class CtfTabani(unittest.TestCase):
+    def setUp(self):
+        import ctf_cekirdek
+        self.C = ctf_cekirdek
+        self.an = [1000.0]
+        self.o = ctf_cekirdek.CtfOturumu(saat=lambda: self.an[0])
+        self.gid = sorted(self.o.gorevler)[0]
+
+    def coz(self, ogrenci, gid=None):
+        gid = gid or self.gid
+        sonuc = self.o.gonder(ogrenci, gid, self.o._uret(ogrenci, gid)[2])
+        self.assertEqual(sonuc["sonuc"], "dogru", sonuc)
+
+    def gorev(self, ogrenci):
+        return next(g for g in self.o.ogrenci_gorevleri(ogrenci) if g["id"] == self.gid)
+
+
+class P15DondurmaSizintisi(CtfTabani):
+    """P-15: skor donukken /ctf/durum guncel cozen sayisini ve puani vermeye devam ediyordu."""
+
+    def test_donukken_cozen_sayisi_ve_puan_donma_anindaki_gibi(self):
+        self.o.baslat(10, [self.gid], dondurma_dk=5)
+        self.an[0] += 60
+        self.coz("Ali")
+        once = self.gorev("Can")
+        self.assertEqual(once["cozen"], 1)
+        self.an[0] += 5 * 60                                         # dondurma basladi
+        self.assertTrue(self.o.donuk_mu())
+        for ad in ("Veli", "Ayse", "Deniz"):
+            self.coz(ad)
+        donuk = self.gorev("Can")
+        self.assertEqual((donuk["cozen"], donuk["puan"]), (once["cozen"], once["puan"]))
+        self.assertTrue(self.gorev("Veli")["cozuldu"])               # ogrenci KENDI cozumunu gorur
+        self.assertEqual(self.o.gorev_istatistigi()[0]["cozen"], 4)  # ogretmen gercek durumu gorur
+        self.assertEqual(len(self.o.skor_tablosu()["satirlar"]), 1)
+        self.an[0] += 10 * 60                                        # bitti: ogrenci gorunumu donuk kalir
+        self.assertEqual(self.gorev("Can")["cozen"], 1)
+
+    def test_dondurma_yokken_guncel_deger(self):
+        self.o.baslat(10, [self.gid])
+        self.coz("Ali")
+        self.coz("Veli")
+        self.assertEqual(self.gorev("Can")["cozen"], 2)
+
+
+class P16DosyaOnbellegi(CtfTabani):
+    """P-16: /ctf/dosya her istekte dosyayi genel kilit altinda yeniden uretiyordu."""
+
+    def test_ayni_dosya_yeniden_uretilmez(self):
+        self.o.baslat(10, [self.gid])
+        uretici_adi = self.o.gorevler[self.gid]["uretici"]
+        gercek = self.C.U.URETICILER[uretici_adi]
+        sayac = []
+        self.C.U.URETICILER[uretici_adi] = lambda ctx, p: sayac.append(1) or gercek(ctx, p)
+        self.addCleanup(self.C.U.URETICILER.__setitem__, uretici_adi, gercek)
+        ilk = self.o.dosya("Ali", self.gid)
+        for _ in range(200):
+            self.assertEqual(self.o.dosya("Ali", self.gid), ilk)
+        self.o.gonder("Ali", self.gid, "CAROT{yanlis}")
+        self.assertEqual(len(sayac), 1)
+        self.o.dosya("Veli", self.gid)
+        self.assertEqual(len(sayac), 2)
+
+    def test_onbellek_sinirli_ve_yeni_yarismada_temizlenir(self):
+        eski = self.C.URETIM_ONBELLEGI
+        self.C.URETIM_ONBELLEGI = 4
+        self.addCleanup(setattr, self.C, "URETIM_ONBELLEGI", eski)
+        self.o.baslat(10, [self.gid])
+        for i in range(30):
+            self.o.dosya("ogrenci%d" % i, self.gid)
+        self.assertEqual(len(self.o._uretimler), 4)
+        bayrak = self.o._uret("Ali", self.gid)[2]
+        self.o.bitir()
+        self.o.baslat(10, [self.gid])
+        self.assertEqual(len(self.o._uretimler), 0)
+        self.assertNotEqual(self.o._uret("Ali", self.gid)[2], bayrak)   # yeni yarisma, yeni bayrak
+        self.assertEqual(self.o.gonder("Ali", self.gid, bayrak)["sonuc"], "yanlis")
+
+
+class P22TekduzeSaat(unittest.TestCase):
+    """P-22: CTF suresi duvar saatine bagliydi; saat duzeltmesi yarismayi uzatip kisaltabiliyordu."""
+
+    def test_varsayilan_saat_tekduze(self):
+        import time
+        import ctf_cekirdek
+        o = ctf_cekirdek.CtfOturumu()
+        self.assertIs(o.saat, time.monotonic)
+        o.baslat(10)
+        gercek = time.time
+        time.time = lambda: gercek() + 86400                         # sistem saati bir gun ileri alindi
+        try:
+            self.assertEqual(o.durum(), "surec")
+            self.assertTrue(595 <= o.kalan_sn() <= 600)
+        finally:
+            time.time = gercek
+
+
+class P21PortDolu(Taban):
+    """P-21: 8642 doluyken ogretmen penceresi yakalanmayan OSError ile aciliyordu."""
+
+    def test_ayni_porta_ikinci_sunucu_oserror(self):
+        with self.assertRaises(OSError):
+            ogretmen_sunucu.sunucu_baslat(ogretmen_sunucu.OdaDurumu("1", "x"), "127.0.0.1", self.port)
+
+    def test_arayuz_port_hatasini_yakalar_ve_iletir(self):
+        k = kaynak("ogretmen_uygulama.py")
+        baslatma = k.split('self.sunucu = sunucu_baslat(self.oda, "0.0.0.0", 8642)', 1)
+        self.assertIn("try:", baslatma[0][-80:])
+        self.assertIn("raise PortDolu", baslatma[1][:400])
+        acilis = k.split("def _ogretmen_penceresini_ac(gorev_id: str):", 1)[1].split("\ndef ", 1)[0]
+        self.assertIn("except PortDolu:", acilis)
+        self.assertIn('m["port_dolu_mesaji"]', acilis)
+        for anahtar in ("port_dolu_basligi", "port_dolu_mesaji"):
+            self.assertEqual(k.count('        "%s": "' % anahtar), 2, anahtar)
+
+
 if __name__ == "__main__":
     unittest.main()
