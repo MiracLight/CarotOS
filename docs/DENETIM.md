@@ -150,3 +150,94 @@ P-10 dışındaki 23 bulgu düzeltildi; her adım ayrı commit, dal `1.4`.
 **Açık kalan.** P-10 (düz HTTP, bütün arayüzlerde dinleme) karar bekliyor; seçenekler 1.5'te.
 
 **Ayrı depo.** `CarotOS-Poligon` deposu bu değişikliklerle henüz eşitlenmedi.
+
+---
+
+## 2. Diğer uygulamalar ve sistem betikleri (13 Kasım 2026)
+
+### 2.1 Yöntem
+
+Poligon dışındaki 11 uygulama ve derleme/açılışta root olarak çalışan betikler sekiz ajanla, salt okunur olarak denetlendi. Yetki, ağ ya da güvenilmeyen dosya işleyen kod Opus'a, içerik ağırlıklı uygulamalar Sonnet'e verildi. Ajanlar depoyu değiştirmedi; her biri Poligon raporuyla aynı biçimde bulgu yazdı. Raporların tamamı `docs/denetim/` altındadır.
+
+Yüksek önemdeki 13 bulgunun hepsini denetimi yöneten oturum ayrıca doğruladı (kod okunarak; Açıklayıcı bulguları motora metin verilerek). Orta ve düşük bulgular ajan bulgusudur; düzeltme sırasında tek tek doğrulanacak.
+
+### 2.2 Özet
+
+| Rapor | Önek | Model | Yüksek | Orta | Düşük | Dosya |
+|---|---|---|---|---|---|---|
+| CarotPot | C | Opus | 3 | 3 | 5 | `docs/denetim/carotpot.md` |
+| Güvenlik Paneli + ortak | G, O | Opus | 2 | 8 | 8 | `docs/denetim/panel-ortak.md` |
+| Carotene + Mağaza | T, M | Opus | 2 | 6 | 8 | `docs/denetim/carotene-magaza.md` |
+| Filenor | F | Opus | 0 | 5 | 6 | `docs/denetim/filenor.md` |
+| Kancalar, açılış betikleri, systemd | S | Opus | 0 | 2 | 5 | `docs/denetim/sistem.md` |
+| USB Denetimi + Sistem Sağlığı | U, H | Sonnet | 2 | 10 | 10 | `docs/denetim/usb-saglik.md` |
+| Karşılama + Komut Açıklayıcı | K, A | Sonnet | 4 | 5 | 7 | `docs/denetim/karsilama-acikla.md` |
+| Former + GSD | R, D | Sonnet | 0 | 3 | 9 | `docs/denetim/former-gsd.md` |
+| **Toplam** | | | **13** | **42** | **58** | 113 bulgu |
+
+Former + GSD raporunda ayrıca 20 satırlık bir içerik hatası tablosu vardır.
+
+### 2.3 Yüksek bulgular
+
+| No | Uygulama | Bulgu | Konum | Doğrulama | Durum |
+|---|---|---|---|---|---|
+| G-01 | Güvenlik Paneli | Root argüman denetimi tırnak ve ters bölüyle aşılıyor; tcpdump filtresine yazılan `"-z" /yol/betik.sh` root olarak komut çalıştırır. Denetim `str.split`, argv ise `shlex.split` kullanıyor. | `security-panel/carotos-security-panel.py:161-169`, `:248-249` | Kod okundu | Açık |
+| G-03 | Güvenlik Paneli | Etik koruma `0.0.0.0/0`, `127.0.0.1/0`, `::1/0` gibi geniş önekli hedefleri "yerel" sayıyor; uyarı ve günlük kaydı olmadan bütün adres uzayı taranır. | `ortak/etik_koruma.py:117-122` | Kod okundu | Açık |
+| T-01 | Carotene | Adında satır sonu olan klasör, bulgunun başka (temiz) bir dosyayı göstermesine yol açar; "Sil" o dosyayı siler. Tarama ile işlem arasında dosya kimliği saklanmıyor. | `ortak/tarama_motoru.py:96-113`, `:158-171` | Kod okundu | Açık |
+| T-02 | Carotene, USB Denetimi | Yarıda kalan ya da başarısız tarama "tehdit yok" görünür: `clamscan` bellek yetmeyip öldürülünce, tanım hatasında ve bulgu satırı okunamadığında sonuç TEMİZ. | `ortak/tarama_motoru.py:184-195` | Kod okundu | Açık |
+| C-01 | CarotPot | Eşzamanlılık sınırı bağlantı kabul edildikten sonra uygulanıyor ve toplam süre sınırı yok: 64 yavaş bağlantı bütün tuzakları körleştirir, bekleyen bağlantılar sınırsız birikir. | `carotpot/carotpot.py:352-376` | Kod okundu | Açık |
+| C-02 | CarotPot | Başlatma, tuzak portlarına `ufw`'de kaynak kısıtı olmadan izin açıyor; tuzak portu dinleyemese de izin kalıyor (aynı porttaki gerçek hizmet ağa açılır). Durdurma, kullanıcının aynı porta eklediği kendi kuralını da siliyor. | `carotpot/carotpot-yonet:136-192` | Kod okundu | Açık |
+| C-03 | CarotPot | Olay veritabanının boyut sınırı yok; canlı sistemde `/var` bellekte olduğundan olay yağdırmak belleği doldurur. | `carotpot/carotpot.py:220-246` | Kod okundu | Açık |
+| H-01 | Sistem Sağlığı | "Root ile tam denetim" her zaman `NameError: dil` ile çöküyor: `--audit-json` yolu `import dil` satırından önce çıkıyor. Root gerektiren beş denetim hiç çalışmıyor. 1.4'te dil katmanıyla girmiş bir gerileme. | `health/carotos-health.py:1417`, `:1434-1436`, `:1456` | Kod okundu | Açık |
+| U-01 | USB Denetimi | Belleğin kökündeki boş bir `.disk/info` (ya da `live/vmlinuz`) belleği "canlı ortam" saydırıp taramayı ve bildirimi tamamen atlatır. | `usb/carotos-usb-check.py:165-184` | Kod okundu | Açık |
+| A-01 | Komut Açıklayıcı | Sözcük ortasındaki `#` yorum sayılıyor: `echo a#b; rm -rf /` satırında `rm` hiç gösterilmez, uyarı çıkmaz. | `acikla/acikla_motor.py:98` | Denendi | Açık |
+| A-02 | Komut Açıklayıcı | Yeni satır komut ayırıcı sayılmıyor: iki satırlık yapıştırmada ikinci satırdaki komut açıklanmaz. | `acikla/acikla_motor.py` | Denendi | Açık |
+| A-03 | Komut Açıklayıcı | Başka komut çalıştıran sarmalayıcıların içi çözümlenmiyor (`bash -c '…'`, `sudo --user root …`, `find -exec`). | `acikla/acikla_motor.py` | Denendi | Açık |
+| A-04 | Komut Açıklayıcı | `curl … \| sh` ailesinin yaygın biçimleri uyarı almıyor (`\| /bin/sh`, `bash <(curl …)`, `base64 -d \| sh`). | `acikla/acikla_motor.py` | Denendi | Açık |
+
+Açıklayıcı'nın temel sözü ("komut asla çalıştırılmaz") sağlam çıktı: gerçek bash'te Alt+E ile `$(…)`, ters tırnak, `;`, `|` içeren satırların hiçbiri çalışmadı. A bulguları aracın yanlış güven vermesiyle ilgilidir.
+
+### 2.4 Aynı kök nedene dayanan bulgular
+
+Bunlar tek düzeltmeyle kapanır; ayrı ayrı sayılmış olsalar da iş tektir.
+
+| Kök neden | Bulgular | Tek düzeltme |
+|---|---|---|
+| Root olarak çalışacak programın kullanıcının `PATH`'inden bulunması | G-12, T-03, O-01, M-04, H-03 | `ortak/` içinde yalnızca sistem dizinlerinde arayan tek bir yardımcı; hepsi onu kullanır. |
+| Alt süreç çıktısında geçersiz UTF-8'in okuyucuyu öldürmesi | G-07, M-01, U-04, A-09 | `errors="replace"` ve okuyucu ölürse sürecin sonlandırılması. |
+| `pkexec` ile root olmuş sürece `terminate()` çağrısı (`PermissionError`) | O-03, K-01, M-02, G-09 | İptalin ne yapabildiğini dürüstçe gösteren ortak davranış; mümkün olan yerde ebeveyn ölünce çocuğu sonlandıran sarmalayıcı. |
+| Başarısız taramanın "temiz" görünmesi | T-02, U-03 | Tek tarama motoru; yeni "kısmen tamamlandı" ve "yarıda kesildi" durumları. |
+| Bozuk kayıt defterinin sessizce boş sayılıp ezilmesi | O-04, T-04, G-13, K-05 | Poligon P-20'deki desen: atomik yazma, bozuk dosyayı kenara alma, tür denetimi. |
+| Root betiğinin modül dizinini denetlememesi | S-07 (ve panel raporundaki Ş-05) | `carotos-dil-hazirla` dizin ve bayt kodu önbelleğini de denetler. |
+
+### 2.5 Karar bekleyenler
+
+Kullanıcıya görünen davranışı değiştirdikleri için düzeltmeden önce karar gerekir.
+
+| Konu | Bulgular | Seçenekler | Öneri |
+|---|---|---|---|
+| Kurulu sistemde güvenlik duvarı varsayılanı | S-01 | (a) `ufw` kurulumda etkin gelsin, (b) kapalı kalsın ve Karşılama'da açması önerilsin | (a). Bir güvenlik dağıtımının kendi sağlık denetiminden uyarı alması tutarsız. Poligon ve CarotPot gerekli portları zaten kendileri açıyor. VM'de derleme ve deneme gerekir. |
+| CarotOS'un dayandığı paketlerin Mağaza'dan kaldırılması | M-03 | (a) hiç kaldırılamaz, (b) ek onayla kaldırılabilir | (b). Kullanıcının sistemi; ama tek tıkla `clamav` ya da `firefox-esr` gitmemeli. |
+| Tek sözcüklü makine adları (ör. `sunucu`) etik korumada | G-05 | (a) "dış hedef" sayılsın (elle onay), (b) "özel ağ" kalsın ama onay hatırlanmasın | (b). Sınıf içi makine adları yaygın; kalıcı onay kalkınca `0x08080808` hilesi de etkisizleşir. |
+| CarotPot'un açtığı `ufw` izinleri | C-02 | (a) yalnızca özel ağ adreslerinden, (b) olduğu gibi | (a). Tuzak zaten yalnızca özel ağ kaynaklarını kabul ediyor; izin de aynı kapsamda olmalı. |
+| "Root ile çalıştır" düğmesinin beş araçtan kalkması | G-02 | Düğme yalnızca root isteyen araçlarda görünür | Yapılsın; kodun zaten amaçladığı davranış bu, bir hata yüzünden görünüyor. |
+| Poligon sınıf ağı düz HTTP | P-10 | 1.5'te | Karşılama ve Former'a "güvenilen ağda kullanın" notu; TLS 1.5'e. |
+
+### 2.6 Düzeltme düzeni
+
+Ajanlar aynı dosyaya aynı anda dokunmasın diye iş dosya sahipliğine göre bölünür. Ajanlar commit atmaz; her ekibin değişikliğini denetimi yöneten oturum okur, tam test paketini çalıştırır ve commit eder. Yeni arayüz metinleri tr/en olarak eklenir, yedi dile çeviri tek seferde merkezden yapılır.
+
+| Ekip | Dosyalar | Bulgular | Model |
+|---|---|---|---|
+| Tarama | `ortak/tarama_motoru.py`, `carotene/`, `usb/` | T-01…T-05, U-01…U-10, O-01, O-04 | Opus |
+| Panel | `security-panel/`, `ortak/etik_koruma.py` | G-01…G-14 | Opus |
+| CarotPot | `carotpot/`, `carotpot*.service` | C-01…C-11 | Opus |
+| Açıklayıcı | `acikla/`, `usr/share/carotos/acikla.bash` | A-01…A-10 | Opus |
+| Mağaza | `magaza/` | M-01…M-07 | Opus |
+| Sistem | `config/hooks/`, `usr/local/sbin/`, `etc/` | S-01…S-07 | Opus |
+| Sağlık | `health/` | H-01…H-12 | Sonnet |
+| Filenor | `filenor/` | F-01…F-11 | Sonnet |
+| Karşılama | `welcome/`, `ortak/dil.py` | K-01…K-07, O-02, O-03 | Sonnet |
+| Rehber | `former/`, `gsd/` | R-, D- ve içerik tablosu | Sonnet |
+
+Sıra: önce 13 yüksek bulgu ve onlarla aynı dosyadaki ortalar; sonra kalan ortalar; en son düşükler ve içerik. Sistem ekibinin değişiklikleri VM'de derleme gerektirir ve ayrıca doğrulanır.
