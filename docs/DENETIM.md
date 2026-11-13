@@ -210,18 +210,18 @@ Bunlar tek düzeltmeyle kapanır; ayrı ayrı sayılmış olsalar da iş tektir.
 | Bozuk kayıt defterinin sessizce boş sayılıp ezilmesi | O-04, T-04, G-13, K-05 | Poligon P-20'deki desen: atomik yazma, bozuk dosyayı kenara alma, tür denetimi. |
 | Root betiğinin modül dizinini denetlememesi | S-07 (ve panel raporundaki Ş-05) | `carotos-dil-hazirla` dizin ve bayt kodu önbelleğini de denetler. |
 
-### 2.5 Karar bekleyenler
+### 2.5 Kararlar (13 Kasım 2026)
 
-Kullanıcıya görünen davranışı değiştirdikleri için düzeltmeden önce karar gerekir.
+Kullanıcıya görünen davranışı değiştiren konularda proje sahibinin verdiği kararlar. Düzeltmeler bunlara göre yapılır.
 
-| Konu | Bulgular | Seçenekler | Öneri |
+| Konu | Bulgular | Karar | Gerekçe ve kapsam |
 |---|---|---|---|
-| Kurulu sistemde güvenlik duvarı varsayılanı | S-01 | (a) `ufw` kurulumda etkin gelsin, (b) kapalı kalsın ve Karşılama'da açması önerilsin | (a). Bir güvenlik dağıtımının kendi sağlık denetiminden uyarı alması tutarsız. Poligon ve CarotPot gerekli portları zaten kendileri açıyor. VM'de derleme ve deneme gerekir. |
-| CarotOS'un dayandığı paketlerin Mağaza'dan kaldırılması | M-03 | (a) hiç kaldırılamaz, (b) ek onayla kaldırılabilir | (b). Kullanıcının sistemi; ama tek tıkla `clamav` ya da `firefox-esr` gitmemeli. |
-| Tek sözcüklü makine adları (ör. `sunucu`) etik korumada | G-05 | (a) "dış hedef" sayılsın (elle onay), (b) "özel ağ" kalsın ama onay hatırlanmasın | (b). Sınıf içi makine adları yaygın; kalıcı onay kalkınca `0x08080808` hilesi de etkisizleşir. |
-| CarotPot'un açtığı `ufw` izinleri | C-02 | (a) yalnızca özel ağ adreslerinden, (b) olduğu gibi | (a). Tuzak zaten yalnızca özel ağ kaynaklarını kabul ediyor; izin de aynı kapsamda olmalı. |
-| "Root ile çalıştır" düğmesinin beş araçtan kalkması | G-02 | Düğme yalnızca root isteyen araçlarda görünür | Yapılsın; kodun zaten amaçladığı davranış bu, bir hata yüzünden görünüyor. |
-| Poligon sınıf ağı düz HTTP | P-10 | 1.5'te | Karşılama ve Former'a "güvenilen ağda kullanın" notu; TLS 1.5'e. |
+| Kurulu sistemde güvenlik duvarı varsayılanı | S-01 | **Kapalı kalır; Karşılama'da açması önerilir.** | Dağıtımın amacı siber güvenliği öğretmek; sıradan kullanıcı da düşünülmeli. Karşılama'ya güvenlik duvarını tanıtan ve açmayı öneren bir adım eklenir (yeni içerik: Karşılama + Former + 7 dil). |
+| CarotOS'un dayandığı paketlerin Mağaza'dan kaldırılması | M-03 | **Ek onayla kaldırılabilir.** | Onay iletisi hangi CarotOS uygulamasının bozulacağını adıyla söyler. Yasaklama yok. |
+| Tek sözcüklü makine adları etik korumada | G-05 | **"Özel ağ" kalır, onay hatırlanmaz.** | Sınıf içi makine adları yaygın. `0x…` gibi sayı biçimleri ad değil IP adresi olarak sınıflanır (karar gerektirmez). |
+| CarotPot'un kapsamı ve `ufw` izinleri | C-02 | **Varsayılan: yalnızca yerel ağ. Ayarlarda açık bir "internetten gelen bağlantıları da kabul et" seçeneği.** | CarotPot bir laboratuvar aracı gibi görünse de gerçek bir araçtır; gerçek tuzak kurmak isteyen bunu rahatça yapabilmeli. Seçenek kapalıyken tuzaklar ve `ufw` izni yalnızca özel ağ adreslerini kapsar; açıkken ikisi birlikte her adrese açılır ve kullanıcıya ne yaptığı anlatılır. Tuzak portu dinleyemezse izin geri alınır; durdurma kullanıcının kendi kuralına dokunmaz. Yeni özellik: Karşılama + Former + 7 dil. |
+| "Root ile çalıştır" düğmesi | G-02 | **Root gerekmeyen beş araçtan kalkar.** | Kodun zaten amaçladığı davranış. |
+| Poligon sınıf ağı düz HTTP | P-10 | **Şimdi: Karşılama ve Former'a not. Şifreleme (TLS) CarotOS 1.5'te.** | Not yapıcı bir dille yazılır ("sınıf içi kullanım için tasarlandı; güvendiğin bir ağda kullan"); doğru bilgi olduğu için eklenir. |
 
 ### 2.6 Düzeltme düzeni
 
@@ -229,6 +229,7 @@ Ajanlar aynı dosyaya aynı anda dokunmasın diye iş dosya sahipliğine göre b
 
 | Ekip | Dosyalar | Bulgular | Model |
 |---|---|---|---|
+| Ortak (yönetici oturum) | `ortak/yetkili.py`, `ortak/dil.py` | Root programlarının yalnızca sistem dizinlerinde aranması için ortak yardımcı (`sistem_yolu`, `temiz_ortam`); O-02 | — |
 | Tarama | `ortak/tarama_motoru.py`, `carotene/`, `usb/` | T-01…T-05, U-01…U-10, O-01, O-04 | Opus |
 | Panel | `security-panel/`, `ortak/etik_koruma.py` | G-01…G-14 | Opus |
 | CarotPot | `carotpot/`, `carotpot*.service` | C-01…C-11 | Opus |
@@ -237,7 +238,7 @@ Ajanlar aynı dosyaya aynı anda dokunmasın diye iş dosya sahipliğine göre b
 | Sistem | `config/hooks/`, `usr/local/sbin/`, `etc/` | S-01…S-07 | Opus |
 | Sağlık | `health/` | H-01…H-12 | Sonnet |
 | Filenor | `filenor/` | F-01…F-11 | Sonnet |
-| Karşılama | `welcome/`, `ortak/dil.py` | K-01…K-07, O-02, O-03 | Sonnet |
+| Karşılama | `welcome/` | K-01…K-07, O-03; güvenlik duvarı adımı, Poligon ve CarotPot notları | Sonnet |
 | Rehber | `former/`, `gsd/` | R-, D- ve içerik tablosu | Sonnet |
 
 Sıra: önce 13 yüksek bulgu ve onlarla aynı dosyadaki ortalar; sonra kalan ortalar; en son düşükler ve içerik. Sistem ekibinin değişiklikleri VM'de derleme gerektirir ve ayrıca doğrulanır.
