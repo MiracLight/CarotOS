@@ -247,7 +247,8 @@ def T(sozluk, kod, anahtar=None, dizin=None, **kw):
     for aday in adaylar:
         try:
             return aday.format(**kw)
-        except (KeyError, IndexError, ValueError, AttributeError):
+        except (KeyError, IndexError, ValueError, AttributeError, TypeError):
+            # TypeError: bicim belirteci ({x:>5}) desteklemeyen bir nesneye uygulandi (orn. istisna nesnesi)
             continue
     return sablon
 

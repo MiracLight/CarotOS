@@ -237,6 +237,12 @@ class SablonTesti(DilTabani):
         s = {"tr": "{tool} çalışıyor…", "en": "{tool} running…"}
         self.assertEqual(dil.T(s, "de", tool="nmap"), "nmap läuft…")
 
+    def test_bicim_belirteci_desteklemeyen_nesne_cokertmez(self):
+        """O-02: '{err:>5}' bir istisna nesnesine uygulaninca TypeError olusur; T asla istisna atmaz."""
+        s = {"tr": "hata {err:>5}", "en": "error {err:>5}"}
+        self.assertEqual(dil.T(s, "tr", err=ValueError("x")), "hata {err:>5}")
+        self.assertEqual(dil.T({"tr": "hata {err}", "en": "error {err}"}, "en", err=ValueError("x")), "error x")
+
     def test_kw_yoksa_metin_oldugu_gibi(self):
         self.assertEqual(dil.T({"tr": "a {x}", "en": "a {x}"}, "en"), "a {x}")
 
