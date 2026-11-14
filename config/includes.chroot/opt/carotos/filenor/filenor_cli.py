@@ -109,11 +109,16 @@ def calistir_isler(isler, args, arac=False):
         sonuc.append(d)
     if k.zip_yolu:
         sonuc.append({"zip": k.zip_yolu})
+    if k.zip_hata:
+        sonuc.append({"zip_hata": hata_metni(k.zip_hata, DIL)})
+        kod = max(kod, 1)
     if args.json:
         yaz(json.dumps(sonuc, ensure_ascii=False, indent=2))
     else:
         for d in sonuc:
-            if "zip" in d:
+            if "zip_hata" in d:
+                yaz("HATA ZIP -", d["zip_hata"], file=sys.stderr)
+            elif "zip" in d:
                 yaz("ZIP:", d["zip"])
             elif d["durum"] == "tamam":
                 for s in d["sonuc"]:

@@ -11,7 +11,7 @@ Tasarım ilkeleri
     çalışmıyor" durumu olmaz.
   * Çıktı asla ezilmez: ad.ext doluysa "ad (1).ext". Ara dosyalar çıktı
     klasöründeki gizli bir iş klasörüne yazılır, bitince atomik taşınır, her
-    durumda temizlenir.
+    durumda temizlenir (uygulama kapansa bile atexit ile).
   * Harici araçlar (ffmpeg, LibreOffice, poppler, qpdf, tesseract) liste
     argümanıyla çağrılır (kabuk yok), zaman aşımı ve iptal desteklidir.
   * Modül yoksa/araç yoksa neyin eksik olduğu ve nasıl kurulacağı söylenir.
@@ -19,6 +19,7 @@ Tasarım ilkeleri
 
 from __future__ import annotations
 
+import atexit
 import csv
 import functools
 import glob
@@ -32,6 +33,7 @@ import subprocess
 import tempfile
 import threading
 import time
+import zipfile
 from dataclasses import dataclass, field, fields
 from typing import Callable, Iterable, Optional
 
@@ -40,11 +42,29 @@ from filenor_dil import FilenorHata, Iptal, hata_metni, mesaj  # noqa: F401
 
 S.ortam_hazirla()      # PATH'te olmayan ama kurulu araclari (Windows) bu surece tanit
 
+try:    # F-01: gorsel diye eklenen PostScript/EPS dosyasi Ghostscript'e gitmesin
+    from PIL import EpsImagePlugin as _eps
+    _eps.gs_binary = False
+except Exception:  # Pillow yok ya da eski: _gorsel_ac formats siniri yine korur
+    pass
+
 SURUM = "1.0"
 
 # ---------------------------------------------------------------------------
 # Biçim tabloları
 # ---------------------------------------------------------------------------
+# Filenor'un okudugu raster bicimleri (Pillow adlariyla). Pillow bicimi icerige bakarak secer;
+# uzanti ne olursa olsun yalniz bunlar acilir (EPS/PS gibi araci tetikleyenler acilmaz).
+RASTER = ["JPEG", "MPO", "PNG", "WEBP", "GIF", "BMP", "DIB", "TIFF", "ICO", "AVIF", "HEIF"]
+
+# Animasyonlu GIF/WebP cikti: kare sayisi x genislik x yukseklik ust siniri (bellek: kare basina 4 bayta kadar)
+ANIMASYON_PIKSEL_SINIRI = 200_000_000
+# PDF -> gorsel: tek islemde en fazla sayfa; sure tavani (sn)
+SAYFA_SINIRI = 1000
+SAYFA_SURE_TAVANI = 3600.0
+# Dosya adi (UTF-8 bayt) ust siniri: dosya sistemleri 255 bayt ister, ek/sayac icin pay birakilir
+AD_BAYT_SINIRI = 200
+
 HAM = {"cr2", "nef", "arw", "dng", "orf", "sr2", "rw2", "raf"}
 GORSEL = {"jpg", "png", "webp", "gif", "bmp", "tiff", "ico", "avif", "heic", "heif"}
 GORSEL_YAZ = ["jpg", "png", "webp", "avif", "gif", "bmp", "tiff", "ico"]
@@ -370,6 +390,42 @@ def kontrol(ext: str, hedef: str) -> Optional[FilenorHata]:
 
 
 # ---------------------------------------------------------------------------
+# Etkin süreç ve iş klasörü kaydı: uygulama kapanırken yetim kalmasın (F-05)
+# ---------------------------------------------------------------------------
+_AKTIF_KILIT = threading.Lock()
+_AKTIF_SUREC: set = set()
+_AKTIF_DIZIN: set = set()
+
+
+def _kayit_ekle(kume: set, oge) -> None:
+    with _AKTIF_KILIT:
+        kume.add(oge)
+
+
+def _kayit_cikar(kume: set, oge) -> None:
+    with _AKTIF_KILIT:
+        kume.discard(oge)
+
+
+def temizle_hepsi() -> None:
+    """Çıkışta çalışan araç süreçlerini (süreç grubuyla) öldürür, iş klasörlerini siler."""
+    with _AKTIF_KILIT:
+        surecler = list(_AKTIF_SUREC)
+        dizinler = list(_AKTIF_DIZIN)
+    for p in surecler:
+        try:
+            if p.poll() is None:
+                S.oldur(p)
+        except Exception:
+            pass
+    for d in dizinler:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+atexit.register(temizle_hepsi)
+
+
+# ---------------------------------------------------------------------------
 # Oturum: iptal, ilerleme, zaman aşımı, geçici alan
 # ---------------------------------------------------------------------------
 class Oturum:
@@ -388,6 +444,7 @@ class Oturum:
     def taban(self) -> str:
         if not self._taban:
             self._taban = tempfile.mkdtemp(prefix="filenor-")
+            _kayit_ekle(_AKTIF_DIZIN, self._taban)
         return self._taban
 
     def lo_profil(self, yeni: bool = False) -> str:
@@ -410,6 +467,7 @@ class Oturum:
     def kapat(self) -> None:
         if self._taban:
             shutil.rmtree(self._taban, ignore_errors=True)
+            _kayit_cikar(_AKTIF_DIZIN, self._taban)
             self._taban = None
 
     def __enter__(self):
@@ -439,6 +497,7 @@ def calistir(o: Oturum, komut: list[str], arac: str, *, satir_cb: Optional[Calla
                                 stdin=subprocess.DEVNULL, **S.popen_ayarlari())
     except FileNotFoundError:
         raise FilenorHata("arac_eksik", arac=arac)
+    _kayit_ekle(_AKTIF_SUREC, proc)
     neden = {"v": None}
     bitti = threading.Event()
     sinir = zaman if zaman is not None else o.zaman_asimi
@@ -483,6 +542,7 @@ def calistir(o: Oturum, komut: list[str], arac: str, *, satir_cb: Optional[Calla
         th_e.join(timeout=2)
         if proc.poll() is None:
             _oldur(proc)
+        _kayit_cikar(_AKTIF_SUREC, proc)
         for akis in (proc.stdout, proc.stderr):
             try:
                 akis.close()
@@ -516,11 +576,18 @@ def _dosya_adi_temizle(ad: str) -> str:
     return ad
 
 
+def _bayt_kirp(ad: str, sinir: int = AD_BAYT_SINIRI) -> str:
+    """Adı UTF-8 olarak en çok `sinir` bayta kırpar (karakteri ortadan bölmez)."""
+    ham = ad.encode("utf-8", "ignore")
+    if len(ham) <= sinir:
+        return ad
+    return ham[:sinir].decode("utf-8", "ignore")
+
+
 def benzersiz_yol(dizin: str, ad: str, ext: str) -> str:
     """dizin içinde ad.ext boşsa onu, doluysa 'ad (1).ext' ... yer ayırarak döndürür."""
     ext = ext.lstrip(".")
-    ad = _dosya_adi_temizle(ad) or "dosya"
-    ad = ad[:180]
+    ad = _bayt_kirp(_dosya_adi_temizle(ad) or "dosya")
     n = 0
     while True:
         son = f"{ad}.{ext}" if n == 0 else f"{ad} ({n}).{ext}"
@@ -533,10 +600,12 @@ def benzersiz_yol(dizin: str, ad: str, ext: str) -> str:
             n += 1
             if n > 9999:
                 raise FilenorHata("bilinmeyen", ayrinti="adlandırma")
+        except OSError as e:
+            raise FilenorHata("cikti_yazilamaz", yol=dizin, ayrinti=str(e)[:200])
 
 
 def benzersiz_klasor(dizin: str, ad: str) -> str:
-    ad = _dosya_adi_temizle(ad) or "cikti"
+    ad = _bayt_kirp(_dosya_adi_temizle(ad) or "cikti")
     n = 0
     while True:
         yol = os.path.join(dizin, ad if n == 0 else f"{ad} ({n})")
@@ -547,6 +616,18 @@ def benzersiz_klasor(dizin: str, ad: str) -> str:
             n += 1
             if n > 9999:
                 raise FilenorHata("bilinmeyen", ayrinti="adlandırma")
+        except OSError as e:
+            raise FilenorHata("cikti_yazilamaz", yol=dizin, ayrinti=str(e)[:200])
+
+
+def _bos_alan_denetle(dizin: str, gerekli: int) -> None:
+    """Dizinin diskinde en az `gerekli` bayt boş yer yoksa dönüşüme başlamaz (F-07)."""
+    try:
+        bos = shutil.disk_usage(dizin).free
+    except OSError:
+        return
+    if bos < gerekli:
+        raise FilenorHata("disk_yetersiz", gerekli=insan_boyut(int(gerekli)), bos=insan_boyut(int(bos)))
 
 
 def girdi_denetle(yol: str) -> str:
@@ -624,15 +705,32 @@ def _qpdf_aralik(sayfalar: list[int]) -> str:
 # ---------------------------------------------------------------------------
 # PDF yardımcıları
 # ---------------------------------------------------------------------------
+def _qpdf_gizli(o: Oturum, gizli: list[str], kom: list[str], kabul=(0,)):
+    """Parola içeren qpdf argümanlarını 0600 izinli argüman dosyasıyla (@dosya) verir; komut
+    satırında (ps) görünmez. Dosya iş bitince silinir."""
+    for s in gizli:
+        if "\n" in s or "\r" in s or "\0" in s:
+            raise FilenorHata("parola_gecersiz")
+    fd, yol = tempfile.mkstemp(prefix="arg-", dir=o.taban)     # mkstemp: 0600
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
+            f.write("\n".join(gizli) + "\n")
+        return calistir(o, ["qpdf", "@" + yol] + kom, "qpdf", kabul=kabul)
+    finally:
+        try:
+            os.unlink(yol)
+        except OSError:
+            pass
+
+
 def pdf_bilgi(o: Oturum, yol: str, parola: str = "") -> dict:
     """{'sayfa': n, 'sifreli': bool}. Parola gerekiyorsa FilenorHata('sifreli_pdf')."""
     d = araclar_durumu()
     if d["qpdf"]:
-        kom = ["qpdf", "--show-npages"]
         if parola:
-            kom.append(f"--password={parola}")
-        kom.append(yol)
-        rc, out, err = calistir(o, kom, "qpdf", kabul=(0, 2, 3))
+            rc, out, err = _qpdf_gizli(o, [f"--password={parola}"], ["--show-npages", yol], kabul=(0, 2, 3))
+        else:
+            rc, out, err = calistir(o, ["qpdf", "--show-npages", yol], "qpdf", kabul=(0, 2, 3))
         if rc == 0:
             try:
                 return {"sayfa": int(out.strip().splitlines()[-1]), "sifreli": bool(parola)}
@@ -643,8 +741,9 @@ def pdf_bilgi(o: Oturum, yol: str, parola: str = "") -> dict:
             raise FilenorHata("sifreli_pdf")
         raise FilenorHata("okunamadi", ayrinti=_son_satirlar(err or out))
     if d["pdfinfo"]:
-        kom = ["pdfinfo"] + (["-upw", parola] if parola else []) + [yol]
-        rc, out, err = calistir(o, kom, "pdfinfo", kabul=(0, 1))
+        if parola:      # pdfinfo parolayı yalnız komut satırından alır (ps'te görünür): qpdf şart
+            raise FilenorHata("arac_eksik", arac="qpdf")
+        rc, out, err = calistir(o, ["pdfinfo", yol], "pdfinfo", kabul=(0, 1))
         if rc != 0:
             if "password" in err.lower():
                 raise FilenorHata("sifreli_pdf")
@@ -667,7 +766,7 @@ def pdf_hazirla(o: Oturum, kaynak: str, isd: str, parola: str = "") -> str:
         raise FilenorHata("sifreli_pdf")
     pdf_bilgi(o, kaynak, parola)  # yanlış parola -> sifreli_pdf
     hedef = os.path.join(isd, "cozulmus.pdf")
-    calistir(o, ["qpdf", f"--password={parola}", "--decrypt", kaynak, hedef], "qpdf", kabul=(0, 3))
+    _qpdf_gizli(o, [f"--password={parola}"], ["--decrypt", kaynak, hedef], kabul=(0, 3))
     return hedef
 
 
@@ -727,7 +826,12 @@ def _motor_sec(ext: str, hedef: str) -> Callable:
 
 def _is_calistir(o: Oturum, kaynak: str, ext: str, hedef: str, cikti_dizin: str, sec: Secenek,
                  motor: Callable, stem: Optional[str] = None) -> list[str]:
+    try:
+        _bos_alan_denetle(cikti_dizin, max(64 * 1024 * 1024, 2 * os.path.getsize(kaynak)))
+    except OSError:
+        pass
     isd = tempfile.mkdtemp(prefix=".filenor-", dir=cikti_dizin)
+    _kayit_ekle(_AKTIF_DIZIN, isd)
     try:
         o.ilerle(0, os.path.basename(kaynak))
         dosyalar, ek = motor(o, kaynak, ext, hedef, isd, sec)
@@ -737,23 +841,34 @@ def _is_calistir(o: Oturum, kaynak: str, ext: str, hedef: str, cikti_dizin: str,
             raise FilenorHata("cikti_yok")
         stem = stem or os.path.splitext(os.path.basename(kaynak))[0]
         sonuc: list[str] = []
-        if len(dosyalar) == 1:
-            son = benzersiz_yol(cikti_dizin, stem, hedef)
-            os.replace(dosyalar[0], son)
-            sonuc.append(son)
-        else:
-            kl = benzersiz_klasor(cikti_dizin, stem + (ek or "_sayfalar"))
-            for d in dosyalar:
-                son = os.path.join(kl, os.path.basename(d))
-                os.replace(d, son)
+        try:
+            if len(dosyalar) == 1:
+                son = benzersiz_yol(cikti_dizin, stem, hedef)
+                os.replace(dosyalar[0], son)
                 sonuc.append(son)
+            else:
+                kl = benzersiz_klasor(cikti_dizin, _bayt_kirp(stem, AD_BAYT_SINIRI - 20) + (ek or "_sayfalar"))
+                for d in dosyalar:
+                    son = os.path.join(kl, os.path.basename(d))
+                    os.replace(d, son)
+                    sonuc.append(son)
+        except OSError as e:
+            raise FilenorHata("cikti_yazilamaz", yol=cikti_dizin, ayrinti=str(e)[:200])
         o.ilerle(100, os.path.basename(kaynak))
         return sonuc
     finally:
         shutil.rmtree(isd, ignore_errors=True)
+        _kayit_cikar(_AKTIF_DIZIN, isd)
 
 
 # --------------------------- görsel -----------------------------------------
+def _raster_formatlar() -> list:
+    """RASTER içinden bu Pillow kurulumunda kayıtlı olanlar (kayıtsız ad KeyError verir)."""
+    from PIL import Image
+    Image.init()
+    return [f for f in RASTER if f in Image.OPEN]
+
+
 def _gorsel_ac(o: Oturum, yol: str, ext: str):
     from PIL import Image, UnidentifiedImageError
     try:
@@ -771,7 +886,7 @@ def _gorsel_ac(o: Oturum, yol: str, ext: str):
         if ext in ("heic", "heif"):
             import pillow_heif  # type: ignore
             pillow_heif.register_heif_opener()
-        im = Image.open(yol)
+        im = Image.open(yol, formats=_raster_formatlar())
         im.load() if getattr(im, "n_frames", 1) <= 1 else im.seek(0)
         return im
     except FilenorHata:
@@ -795,15 +910,19 @@ def _duz_rgb(img):
 
 
 def gorsel_isle(img, hedef: str, cikti: str, sec: Secenek, *, hepsi: bool = False, korunacak_exif=None,
-                icc=None) -> None:
+                icc=None, kontrol=None) -> None:
     """Pillow görüntüsünü hedef biçimde yazar (yeniden boyutlandırma dahil)."""
     from PIL import Image, ImageSequence
     kalite = sec.kalite
     cerceveler = None
     sureler = None
     if hepsi and getattr(img, "n_frames", 1) > 1 and hedef in ("gif", "webp"):
+        if img.n_frames * img.width * img.height > ANIMASYON_PIKSEL_SINIRI:
+            raise FilenorHata("cok_buyuk", kare=img.n_frames, genislik=img.width, yukseklik=img.height)
         cerceveler, sureler = [], []
         for fr in ImageSequence.Iterator(img):
+            if kontrol:
+                kontrol()
             cerceveler.append(fr.copy())
             sureler.append(fr.info.get("duration", 80))
     if sec.max_kenar and sec.max_kenar > 0:
@@ -922,7 +1041,7 @@ def _e_gorsel_ic(o: Oturum, img, hedef: str, isd: str, sec: Secenek) -> Sonuc:
             dpi = 150.0
             im.save(cikti, "PDF", resolution=dpi)
         else:
-            gorsel_isle(img, hedef, cikti, sec, hepsi=True, korunacak_exif=exif, icc=icc)
+            gorsel_isle(img, hedef, cikti, sec, hepsi=True, korunacak_exif=exif, icc=icc, kontrol=o.kontrol_iptal)
     except FilenorHata:
         raise
     except (OSError, ValueError, KeyError) as e:
@@ -937,7 +1056,8 @@ def _e_gif_video(o: Oturum, kaynak: str, ext: str, hedef: str, isd: str, sec: Se
     vf = "scale=trunc(iw/2)*2:trunc(ih/2)*2"
     if sec.max_kenar > 0:
         vf = f"scale=-2:'min({int(sec.max_kenar)},ih)',scale=trunc(iw/2)*2:trunc(ih/2)*2"
-    kom = ["ffmpeg", "-hide_banner", "-nostdin", "-y", "-v", "error", "-i", kaynak, "-an", "-vf", vf]
+    kom = ["ffmpeg", "-hide_banner", "-nostdin", "-y", "-v", "error"] + ffmpeg_girdi_siniri(kaynak) \
+        + ["-i", kaynak, "-an", "-vf", vf]
     if hedef == "mp4":
         kom += ["-c:v", "libx264", "-preset", "veryfast", "-crf", str(CRF264[sec.kalite]),
                 "-pix_fmt", "yuv420p", "-movflags", "+faststart"]
@@ -947,6 +1067,20 @@ def _e_gif_video(o: Oturum, kaynak: str, ext: str, hedef: str, isd: str, sec: Se
     kom.append(cikti)
     calistir(o, kom, "ffmpeg")
     return [cikti], ""
+
+
+# F-02: ffmpeg içeriği yoklayıp başka bir demuxer seçebilir (DASH/HLS/concat manifestosu başka yerel
+# dosyaları açar). Yalnız düz kapsayıcı çözücülere izin verilir; protokol yalnız 'file'.
+FF_MEDYA_BICIM = ("mov,mp4,m4a,3gp,3g2,mj2,matroska,webm,avi,flv,asf,mpegts,mpeg,mpegvideo,"
+                  "ogg,mp3,wav,flac,aac,aiff,ac3,amr")
+FF_GORSEL_BICIM = ("image2,gif,png_pipe,jpeg_pipe,webp_pipe,bmp_pipe,tiff_pipe,jpegls_pipe,"
+                   "pgm_pipe,ppm_pipe,pam_pipe,qdraw_pipe,sgi_pipe,tga_pipe,svg_pipe,exr_pipe")
+
+
+def ffmpeg_girdi_siniri(yol: str) -> list[str]:
+    """ffmpeg/ffprobe'a '-i'den ÖNCE verilecek protokol ve biçim beyaz listesi."""
+    bicim = FF_GORSEL_BICIM if tur(uzanti(yol)) in ("gorsel", "ham", "svg") else FF_MEDYA_BICIM
+    return ["-protocol_whitelist", "file", "-format_whitelist", bicim]
 
 
 def guvenli_girdi(isd: str, kaynak: str, ext: str) -> str:
@@ -962,7 +1096,8 @@ def guvenli_girdi(isd: str, kaynak: str, ext: str) -> str:
 
 # --------------------------- ses / video ------------------------------------
 def medya_bilgi(o: Oturum, yol: str) -> dict:
-    _, out, _ = calistir(o, ["ffprobe", "-v", "error", "-print_format", "json", "-show_format", "-show_streams", yol],
+    _, out, _ = calistir(o, ["ffprobe", "-v", "error"] + ffmpeg_girdi_siniri(yol)
+                         + ["-print_format", "json", "-show_format", "-show_streams", yol],
                          "ffprobe", zaman=60)
     try:
         j = json.loads(out)
@@ -989,7 +1124,7 @@ def _e_medya(o: Oturum, kaynak: str, ext: str, hedef: str, isd: str, sec: Secene
     kom = ["ffmpeg", "-hide_banner", "-nostdin", "-y", "-v", "error", "-progress", "pipe:1", "-nostats"]
     if sec.baslangic > 0:
         kom += ["-ss", f"{sec.baslangic:.3f}"]
-    kom += ["-i", kaynak]
+    kom += ffmpeg_girdi_siniri(kaynak) + ["-i", kaynak]
     if sec.bitis > 0 and sec.bitis > sec.baslangic:
         kom += ["-t", f"{sec.bitis - max(sec.baslangic, 0):.3f}"]
     meta = ["-map_metadata", "-1"] if sec.meta_temizle else ["-map_metadata", "0"]
@@ -1075,7 +1210,10 @@ def _pdf_sayfalari_gorsele(o: Oturum, pdf: str, hedef: str, isd: str, sec: Secen
     pdf = pdf_hazirla(o, pdf, isd, sec.parola)
     n = pdf_bilgi(o, pdf)["sayfa"]
     sayfalar = sayfa_listesi(sec.sayfa_araligi, n)
+    if len(sayfalar) > SAYFA_SINIRI:
+        raise FilenorHata("cok_sayfa", n=len(sayfalar), sinir=SAYFA_SINIRI)
     dpi = max(36, min(600, int(sec.dpi)))
+    _bos_alan_denetle(isd, len(sayfalar) * dpi * dpi * 48)
     # Bitişik değilse önce istenen sayfaları ayır
     bitisik = sayfalar == list(range(sayfalar[0], sayfalar[-1] + 1))
     islenecek = pdf
@@ -1091,7 +1229,7 @@ def _pdf_sayfalari_gorsele(o: Oturum, pdf: str, hedef: str, isd: str, sec: Secen
     if hedef == "jpg":
         kom += ["-jpegopt", f"quality={JPG_KALITE[sec.kalite]}"]
     kom += [islenecek, onek]
-    calistir(o, kom, "pdftoppm", zaman=max(300.0, 5.0 * len(sayfalar)))
+    calistir(o, kom, "pdftoppm", zaman=min(SAYFA_SURE_TAVANI, max(300.0, 5.0 * len(sayfalar))))
     ham = sorted(glob.glob(onek + "-*"), key=lambda s: int(re.search(r"-(\d+)\.\w+$", s).group(1)))
     if not ham:
         raise FilenorHata("cikti_yok")
@@ -1103,14 +1241,14 @@ def _pdf_sayfalari_gorsele(o: Oturum, pdf: str, hedef: str, isd: str, sec: Secen
         ad = os.path.join(isd, f"sayfa_{no:0{hane}d}.{hedef}")
         if hedef == "webp":
             from PIL import Image
-            with Image.open(ph) as im:
+            with Image.open(ph, formats=["PNG", "JPEG"]) as im:
                 im.save(ad, "WEBP", quality=WEBP_KALITE[sec.kalite])
             os.remove(ph)
         else:
             os.replace(ph, ad)
         if sec.max_kenar > 0 and hedef != "webp":
             from PIL import Image
-            with Image.open(ad) as im:
+            with Image.open(ad, formats=["PNG", "JPEG"]) as im:
                 im.load()
                 im.thumbnail((sec.max_kenar, sec.max_kenar), Image.LANCZOS)
                 im.save(ad)
@@ -1218,6 +1356,10 @@ def lo_calistir(o: Oturum, girdi: str, cikti_dizin: str, filtre: str, infilter: 
     soffice = _soffice_bul()
     if not soffice:
         raise FilenorHata("arac_eksik", arac="libreoffice")
+    if os.path.basename(girdi).startswith("."):
+        # LibreOffice çıktıyı girdinin adıyla yazar; noktayla başlayan ad gizli sayılıp elenir
+        girdi = guvenli_girdi(tempfile.mkdtemp(prefix="lo-girdi-", dir=o.taban), girdi,
+                              os.path.splitext(girdi)[1].lstrip(".") or "bin")
     onceki = set(os.listdir(cikti_dizin))
     son_hata = ""
     for deneme in (0, 1):
@@ -1433,6 +1575,7 @@ class Kosucu(threading.Thread):
         self.bitti_cb = bitti_cb
         self.iptal = threading.Event()
         self.zip_yolu: Optional[str] = None
+        self.zip_hata: Optional[FilenorHata] = None
 
     def iptal_et(self) -> None:
         self.iptal.set()
@@ -1445,6 +1588,21 @@ class Kosucu(threading.Thread):
                 pass
 
     def run(self) -> None:
+        try:
+            self._calis()
+        except Exception as e:      # ne olursa olsun bitti_cb çağrılır; arayüz/CLI takılı kalmaz
+            for is_ in self.isler:
+                if is_.durum in ("bekliyor", "calisiyor"):
+                    is_.durum = "hata"
+                    is_.hata = FilenorHata("bilinmeyen", ayrinti=f"{type(e).__name__}: {e}"[:300])
+        finally:
+            if self.bitti_cb:
+                try:
+                    self.bitti_cb(self.isler)
+                except Exception:
+                    pass
+
+    def _calis(self) -> None:
         with Oturum(iptal=self.iptal) as o:
             for i, is_ in enumerate(self.isler):
                 if self.iptal.is_set():
@@ -1481,26 +1639,42 @@ class Kosucu(threading.Thread):
                 is_.sure = time.monotonic() - bas
                 self._bildir(i)
             if self.secenek.zip_yap and not self.iptal.is_set():
-                self._zip_yap()
-        if self.bitti_cb:
-            try:
-                self.bitti_cb(self.isler)
-            except Exception:
-                pass
+                try:
+                    self._zip_yap()
+                except FilenorHata as h:
+                    self.zip_hata = h
+                except (OSError, ValueError, zipfile.BadZipFile) as e:
+                    self.zip_hata = FilenorHata("zip_hata", ayrinti=str(e)[:200])
 
     def _calistir_is(self, o: Oturum, is_: Is, hedef_dizin: str) -> list[str]:
         return donustur(is_.kaynak, is_.hedef, hedef_dizin, self.secenek, o)
 
     def _zip_yap(self) -> None:
-        import zipfile
         tum = [s for i in self.isler if i.durum == "tamam" for s in i.sonuc]
         if len(tum) < 2:
             return
-        kok = os.path.commonpath([os.path.dirname(t) for t in tum])
-        self.zip_yolu = benzersiz_yol(kok, "filenor", "zip")
-        with zipfile.ZipFile(self.zip_yolu, "w", zipfile.ZIP_DEFLATED) as z:
-            for t in tum:
-                z.write(t, os.path.relpath(t, kok))
+        try:
+            ortak = os.path.commonpath([os.path.dirname(t) for t in tum])
+        except ValueError:
+            ortak = os.path.dirname(tum[0])
+        # ZIP'in yeri: ortak klasör yazılabiliyorsa orası; değilse çıktı klasörü; o da değilse ilk çıktının klasörü
+        yer = ortak
+        for aday in (ortak, self.cikti_dizin, os.path.dirname(tum[0])):
+            if aday and os.path.isdir(aday) and os.access(aday, os.W_OK | os.X_OK):
+                yer = aday
+                break
+        yol = benzersiz_yol(yer, "filenor", "zip")
+        try:
+            with zipfile.ZipFile(yol, "w", zipfile.ZIP_DEFLATED) as z:
+                for t in tum:
+                    z.write(t, os.path.relpath(t, ortak))
+        except BaseException:
+            try:
+                os.unlink(yol)       # yarım ZIP bırakma
+            except OSError:
+                pass
+            raise
+        self.zip_yolu = yol
 
 
 # ---------------------------------------------------------------------------

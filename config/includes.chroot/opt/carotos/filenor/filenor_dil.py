@@ -136,6 +136,21 @@ MESAJ = {
         "tr": "Kurulum tamamlanamadı (çıkış kodu {cikis}). İnternet bağlantısını ve paket kilidini kontrol edin",
         "en": "The installation did not finish (exit code {cikis}). Check the network and that no other package manager is running"},
     "bilinmeyen": {"tr": "Beklenmeyen hata: {ayrinti}", "en": "Unexpected error: {ayrinti}"},
+    "cok_buyuk": {
+        "tr": "Bu animasyon çok büyük ({kare} kare, {genislik}x{yukseklik}); belleği doldurabilir. Daha küçük bir dosya ya da ilk kare için tek kareli bir biçim deneyin",
+        "en": "This animation is too large ({kare} frames, {genislik}x{yukseklik}) and could exhaust memory. Try a smaller file"},
+    "zip_hata": {
+        "tr": "ZIP dosyası oluşturulamadı: {ayrinti}. Dönüştürülen dosyalar yerinde duruyor",
+        "en": "The ZIP file could not be created: {ayrinti}. The converted files are untouched"},
+    "cok_sayfa": {
+        "tr": "Çok fazla sayfa ({n}); tek seferde en fazla {sinir}. Sayfa aralığı seçin",
+        "en": "Too many pages ({n}); at most {sinir} at a time. Choose a page range"},
+    "disk_yetersiz": {
+        "tr": "Diskte yeterli boş yer yok (gerekli yaklaşık {gerekli}, boş {bos})",
+        "en": "Not enough free disk space (about {gerekli} needed, {bos} free)"},
+    "parola_gecersiz": {
+        "tr": "Parola satır sonu karakteri içeremez",
+        "en": "The password cannot contain line breaks"},
 }
 
 # Eksik arac icin kullaniciya yol gosteren kisa ipucu.

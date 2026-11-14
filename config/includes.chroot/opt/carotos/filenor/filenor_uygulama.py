@@ -23,6 +23,7 @@ from __future__ import annotations
 import os
 import sys
 import threading
+import time
 
 sys.dont_write_bytecode = True
 
@@ -121,10 +122,17 @@ def ac(yol: str) -> None:
     S.ac(yol)
 
 
-def klasor_dosyalari(klasor: str, sinir: int = 1000) -> list[str]:
+def klasor_dosyalari(klasor: str, sinir: int = 1000, bakilacak: int = 50000, sure: float = 5.0) -> list[str]:
+    """Klasördeki desteklenen dosyalar. Eşleşme sayısı (sinir), bakılan girdi sayısı (bakilacak) ve süre
+    (sure, sn) ile sınırlıdır: ev dizini gibi dev ağaçta arayüz donmaz."""
     uzantilar = set(M.kaynak_uzantilari())
     sonuc: list[str] = []
+    bas = time.monotonic()
+    gorulen = 0
     for kok, dizinler, dosyalar in os.walk(klasor):
+        gorulen += len(dizinler) + len(dosyalar)
+        if gorulen > bakilacak or time.monotonic() - bas > sure:
+            return sonuc
         dizinler[:] = sorted(d for d in dizinler if not d.startswith("."))
         for d in sorted(dosyalar):
             if d.startswith("."):
@@ -980,6 +988,9 @@ class Panel:
             parcalar.append(self.t("bitti_hata", n=hata))
         if iptal:
             parcalar.append(self.t("bitti_iptal", n=iptal))
+        zh = getattr(k, "zip_hata", None)
+        if zh:
+            parcalar.append(hata_metni(zh, self.uyg.lang))
         self.durum_metin.set_text(" · ".join(parcalar))
         tum = [s for x in isler if x.durum == "tamam" for s in x.sonuc]
         if k and getattr(k, "zip_yolu", None):
@@ -1076,9 +1087,14 @@ class Uygulama(Gtk.Window):
         return {"donustur": self.paneller["donustur"], "araclar": self.paneller["araclar"]}.get(self.aktif)
 
     def _kapaniyor(self, *_):
+        bekle = []
         for p in self.paneller.values():
             if p.kosucu and p.calisiyor:
                 p.kosucu.iptal_et()
+                bekle.append(p.kosucu)
+        son = time.monotonic() + 3.0         # araç süreçleri öldürülsün, iş klasörü silinsin (F-05)
+        for k in bekle:
+            k.join(timeout=max(0.0, son - time.monotonic()))
         if Gtk.main_level() > 0:
             Gtk.main_quit()
 
