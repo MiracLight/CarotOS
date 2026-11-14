@@ -58,7 +58,7 @@ class TemaKurStatikTesti(unittest.TestCase):
         self.assertEqual(tk.ORTAM["DEBIAN_FRONTEND"], "noninteractive")
 
     def test_sabit_paket_listesi(self):
-        self.assertEqual(tk.PAKETLER, ("orchis-gtk-theme", "papirus-icon-theme", "bibata-cursor-theme",
+        self.assertEqual(tk.PAKETLER, ("orchis-gtk-theme", "papirus-icon-theme",
                                        "fonts-inter", "fonts-jetbrains-mono", "picom", "plank", "rofi"))
         self.assertNotIn("xfce4-appmenu-plugin", tk.PAKETLER)
 
@@ -242,16 +242,18 @@ class SahteMasaustu:
         return 0, ""
 
     def _gsettings(self, a):
-        assert a[1] == md.PLANK_SEMA, a
+        dock = a[1].rstrip("/").rsplit("/", 1)[-1]
+        assert dock in ("dock1", "dock2"), a
+        anahtar = a[2] if dock == "dock1" else dock + "/" + a[2]      # dock2 anahtarlari "dock2/<ad>"
         if a[0] == "get":
-            return 0, self.gsettings.get(a[2], "@as []" if a[2] == "dock-items" else "'varsayilan'") + "\n"
+            return 0, self.gsettings.get(anahtar, "@as []" if a[2] == "dock-items" else "'varsayilan'") + "\n"
         if a[0] == "set":
             if self.gsettings_hata:
                 return 1, ""
-            self.gsettings[a[2]] = a[3]
+            self.gsettings[anahtar] = a[3]
             return 0, ""
         if a[0] == "reset":
-            self.gsettings.pop(a[2], None)
+            self.gsettings.pop(anahtar, None)
             return 0, ""
         return 1, ""
 
@@ -367,8 +369,7 @@ class ModernlestirUygulaTesti(ModernlestirTabani):
         self.assertEqual(self.x("xsettings", "/Net/ThemeName"), "Orchis-Dark-Compact")
         self.assertEqual(self.x("xfwm4", "/general/theme"), "Orchis-Dark")      # Compact'ta xfwm4 yok
         self.assertEqual(self.x("xsettings", "/Net/IconThemeName"), "Papirus-Dark")
-        self.assertEqual(self.x("xsettings", "/Gtk/CursorThemeName"), "Bibata-Modern-Ice")
-        self.assertEqual(self.x("xsettings", "/Gtk/CursorThemeSize"), "24")
+        self.assertEqual(self.x("xsettings", "/Gtk/CursorThemeName"), "Breeze_Light")   # imlec DEGISMEZ
         self.assertEqual(self.x("xsettings", "/Gtk/FontName"), "Inter 10")
         self.assertEqual(self.x("xsettings", "/Gtk/MonospaceFontName"), "JetBrains Mono 10")
         self.assertEqual(self.x("xfwm4", "/general/title_alignment"), "center")
@@ -426,18 +427,29 @@ class ModernlestirUygulaTesti(ModernlestirTabani):
 
     def test_dock_ogeleri(self):
         self.assertEqual(self.calistir("uygula"), 0, self.ciktilar)
-        dizin = os.path.join(self.config, "plank", "dock1", "launchers")
-        ogeler = sorted(os.listdir(dizin))
-        self.assertEqual(ogeler, sorted([
+        alt = os.path.join(self.config, "plank", "dock1", "launchers")
+        yan = os.path.join(self.config, "plank", "dock2", "launchers")
+        # ALT dock: yalnizca sistem (dosyalar, terminal, tarayici); CarotOS uygulamalari yok
+        self.assertEqual(sorted(os.listdir(alt)), sorted([
+            "carotos-thunar.dockitem", "carotos-xfce4-terminal.dockitem",
+            "carotos-xfce4-web-browser.dockitem"]))
+        # SOL yan dock: butun CarotOS uygulamalari (welcome bu sahte sistemde yok: konmadi)
+        self.assertEqual(sorted(os.listdir(yan)), sorted([
             "carotos-carotos-magaza.dockitem", "carotos-carotos-security-panel.dockitem",
-            "carotos-carotos-carotene.dockitem", "carotos-thunar.dockitem",
-            "carotos-xfce4-terminal.dockitem", "carotos-xfce4-web-browser.dockitem"]))
-        # carotos-welcome.desktop bu sahte sistemde yok: konmadi
-        icerik = self.oku(os.path.join(dizin, "carotos-carotos-magaza.dockitem"))
+            "carotos-carotos-carotene.dockitem"]))
+        self.assertEqual(self.masa.gsettings["dock2/position"], "'left'")
+        self.assertEqual(self.masa.gsettings["position"], "'bottom'")
+        self.assertEqual(self.masa.gsettings["dock2/hide-mode"], "'none'")
+        icerik = self.oku(os.path.join(yan, "carotos-carotos-magaza.dockitem"))
         self.assertTrue(icerik.startswith("[PlankDockItemPreferences]\nLauncher=file://"))
         self.assertIn(os.path.join(self.uyg, "carotos-magaza.desktop").replace(os.sep, "/").split(":")[-1],
                       icerik.replace("%3A", ":"))
-        self.assertIn("carotos-carotos-magaza.dockitem", self.masa.gsettings["dock-items"])
+        self.assertIn("carotos-carotos-magaza.dockitem", self.masa.gsettings["dock2/dock-items"])
+        self.assertIn("carotos-thunar.dockitem", self.masa.gsettings["dock-items"])
+        self.assertIn(("autostart", "carotos-plank-yan.desktop"),
+                      [tuple(os.path.relpath(p, self.config).split(os.sep)) for p in
+                       (os.path.join(self.config, "autostart", "carotos-plank-yan.desktop"),)
+                       if os.path.exists(p)])
 
     def test_geri_al_tam_eski_duruma(self):
         once_dosya = self.ev_dosyalari()
@@ -451,7 +463,7 @@ class ModernlestirUygulaTesti(ModernlestirTabani):
         self.assertNotIn("plank", self.masa.calisan)
         # plank anahtarlari uygulamadan once okunan degerlere doner
         for anahtar, deger in self.masa.gsettings.items():
-            self.assertEqual(deger, "@as []" if anahtar == "dock-items" else "'varsayilan'", anahtar)
+            self.assertEqual(deger, "@as []" if anahtar.endswith("dock-items") else "'varsayilan'", anahtar)
 
     def test_ikinci_uygulama_yedegi_ezmez(self):
         self.assertEqual(self.calistir("uygula"), 0, self.ciktilar)

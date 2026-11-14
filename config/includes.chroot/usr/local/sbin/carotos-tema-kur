@@ -31,7 +31,6 @@ DPKG_QUERY = "/usr/bin/dpkg-query"
 PAKETLER = (
     "orchis-gtk-theme",
     "papirus-icon-theme",
-    "bibata-cursor-theme",
     "fonts-inter",
     "fonts-jetbrains-mono",
     "picom",

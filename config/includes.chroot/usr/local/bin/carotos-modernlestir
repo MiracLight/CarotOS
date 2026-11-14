@@ -4,18 +4,19 @@
 
 Kullanim:  carotos-modernlestir uygula | geri-al | durum
 
-Paketler (Orchis, Papirus, Bibata, Inter, JetBrains Mono, picom, plank, rofi) once
+Paketler (Orchis, Papirus, Inter, JetBrains Mono, picom, plank, rofi) once
 /usr/local/sbin/carotos-tema-kur ile kurulmus olmalidir; bu betik paket kurmaz.
 
 uygula   Degisecek her xfconf degerinin, dosyanin ve gsettings anahtarinin ESKI halini
          ~/.local/state/carotos/sleek-yedek.json dosyasina (0600, atomik) yazar, sonra:
-           - GTK/xfwm4 temasi, simgeler, imlec (24), Inter 10, ortali baslik
+           - GTK/xfwm4 temasi, simgeler, Inter 10, ortali baslik (imlec DEGISMEZ: Breeze korunur)
            - picom (yuvarlak kose, golge; gercek makinede bulanıklik+solma; sanal makinede
              xrender, bulanıklik/solma kapali) + xfwm4'un kendi birlestiricisi kapatilir
            - ust panel ince (30) ve yari saydam (gtk.css blogu), saat bicimi; eklenti yerlesimine
              dokunulmaz. Yalniz baslaticidan olusan ikinci panel (alt dock) plank ile cakismasin diye
              panel listesinden cikarilir (ayarlari silinmez; geri al ile doner)
-           - plank (alt orta, akilli gizleme, buyutme), rofi (Super+Space), terminal (JetBrains Mono,
+           - plank: ALT dock (sistem: terminal, dosyalar, tarayici, uygulama arama, ayarlar) ve SOL yan
+             dock (butun CarotOS uygulamalari); rofi (Super+Space), terminal (JetBrains Mono,
              saydam, marka renkleri), autostart dosyalari
          Ikinci kez calistirilinca ILK yedek korunur (yalniz yeni anahtarlar eklenir).
          Bir adim basarisiz olursa yedekten her sey eski haline getirilir.
@@ -50,23 +51,30 @@ DESKTOP_ISARETI = "X-CarotOS-Sleek=true"
 
 TEMA_ADAYLARI = ("Orchis-Dark-Compact", "Orchis-Dark")
 SIMGE_ADAYLARI = ("Papirus-Dark",)
-IMLEC_ADAYLARI = ("Bibata-Modern-Ice", "Bibata-Modern-Classic")
-IMLEC_BOYU = 24
 UI_YAZI = "Inter"
 MONO_YAZI = "JetBrains Mono"
 PANEL_BOYU = 30
 SAAT_BICIMI = "%a %d %b  %H:%M"
 KISAYOL = "<Super>space"
 DOCK_PANEL_TURLERI = {"launcher", "separator", "showdesktop", "directorymenu"}
-PLANK_SEMA = "net.launchpad.plank.dock.settings:/net/launchpad/plank/docks/dock1/"
+PLANK_SEMA_SABLON = "net.launchpad.plank.dock.settings:/net/launchpad/plank/docks/%s/"
+PLANK_SEMA = PLANK_SEMA_SABLON % "dock1"      # alt dock (geriye uyum)
+YAN_DOCK = "dock2"                             # sol yan dock: plank -n dock2
 # Karsilama "Varsayilan dock simgeleri": her grup icin ilk VAR olan .desktop alinir
+# ALT dock: sistemle ilgili seyler
 DOCK_VARSAYILAN = (
-    ("carotos-magaza.desktop",),
-    ("carotos-security-panel.desktop",),
-    ("carotos-carotene.desktop",),
-    ("xfce4-file-manager.desktop", "thunar.desktop"),
     ("xfce4-terminal-emulator.desktop", "xfce4-terminal.desktop"),
-    ("carotos-welcome.desktop",),
+    ("xfce4-file-manager.desktop", "thunar.desktop"),
+    ("xfce4-web-browser.desktop", "firefox-esr.desktop", "firefox.desktop"),
+    ("xfce4-appfinder.desktop",),
+    ("xfce4-settings-manager.desktop",),
+)
+# SOL yan dock: butun CarotOS uygulamalari (once bu sira, sonra kalan carotos-*.desktop dosyalari)
+YAN_DOCK_SIRA = (
+    "carotos-welcome.desktop", "carotos-magaza.desktop", "carotos-security-panel.desktop",
+    "carotos-carotene.desktop", "carotos-carotpot.desktop", "carotos-health.desktop",
+    "carotos-usb-check.desktop", "carotos-filenor.desktop", "carotos-former.desktop",
+    "carotos-gsd.desktop", "carotos-poligon.desktop",
 )
 GEREKLI_PROGRAMLAR = ("xfconf-query", "picom", "plank", "rofi", "gsettings")
 
@@ -372,9 +380,13 @@ def css_blogu():
         "  background-color: rgba(0, 18, 57, 0.75);",
         "  border: none;",
         "}",
-        ".xfce4-panel button { border-radius: 8px; }",
+        "/* gorev listesi: sekme gorunumu */",
+        ".xfce4-panel button { margin: 3px 2px 0 2px; padding: 0 10px;"
+        " background-color: rgba(255, 255, 255, 0.06); border-radius: 8px 8px 0 0; }",
+        ".xfce4-panel button:hover { background-color: rgba(255, 255, 255, 0.12); }",
         ".xfce4-panel #tasklist-button:checked,",
-        ".xfce4-panel button:checked { border-bottom: 2px solid %s; }" % RENK_VURGU,
+        ".xfce4-panel button:checked { background-color: rgba(81, 150, 214, 0.28);"
+        " border-bottom: 3px solid %s; }" % RENK_VURGU,
         "menu, .menu, .context-menu { border-radius: 12px; padding: 6px; }",
         "menu menuitem, .menu menuitem { border-radius: 8px; padding: 6px 10px; }",
         "#whiskermenu-window { border-radius: 14px; }",
@@ -607,6 +619,14 @@ def panel_plani(o, plan):
     return baslaticilar
 
 
+def _sema_anahtar(anahtar):
+    """'position' -> (dock1 semasi, 'position'); 'dock2/position' -> (dock2 semasi, 'position')."""
+    if "/" in anahtar:
+        dock, ad = anahtar.split("/", 1)
+        return PLANK_SEMA_SABLON % dock, ad
+    return PLANK_SEMA, anahtar
+
+
 def _dockitem_adi(desktop_yolu):
     taban = os.path.basename(desktop_yolu)[:-len(".desktop")]
     return "carotos-" + re.sub(r"[^A-Za-z0-9._-]", "_", taban) + ".dockitem"
@@ -637,12 +657,6 @@ def plan_olustur(o):
     simge = _ilk_var(SIMGE_ADAYLARI, o.simgeler, "index.theme")
     if simge:
         plan["xfconf"].append(("xsettings", "/Net/IconThemeName", "string", simge))
-    imlec = _ilk_var(IMLEC_ADAYLARI, o.simgeler, "cursors")
-    if imlec:
-        plan["xfconf"] += [("xsettings", "/Gtk/CursorThemeName", "string", imlec),
-                           ("xsettings", "/Gtk/CursorThemeSize", "int", IMLEC_BOYU)]
-    else:
-        plan["uyarilar"].append("Bibata imleci bulunamadi; imlec degismedi")
     inter = yazi_tipi_var(o, UI_YAZI)
     mono = yazi_tipi_var(o, MONO_YAZI)
     if inter:
@@ -689,6 +703,8 @@ def plan_olustur(o):
         "CarotOS picom", [o.prog("picom"), "--config", picom])
     plan["dosyalar"][o.yol("autostart", "carotos-plank.desktop")] = autostart_metni(
         "CarotOS plank", [o.prog("plank")])
+    plan["dosyalar"][o.yol("autostart", "carotos-plank-yan.desktop")] = autostart_metni(
+        "CarotOS plank yan", [o.prog("plank"), "-n", YAN_DOCK])
 
     # 4) Dock: varsayilanlar + gizlenen paneldeki baslaticilar
     secilen = []
@@ -701,23 +717,49 @@ def plan_olustur(o):
     for yol in panel_baslaticilari:
         if yol not in secilen:
             secilen.append(yol)
-    baslatici_dizini = o.yol("plank", "dock1", "launchers")
-    adlar = []
-    for yol in secilen:
-        ad = _dockitem_adi(yol)
-        if ad in adlar:
+    # SOL yan dock: butun CarotOS uygulamalari
+    yan = []
+    for ad in YAN_DOCK_SIRA:
+        yol = _uygulama_yolu(o, ad)
+        if yol:
+            yan.append(yol)
+    try:
+        kalan = sorted(a for a in os.listdir(o.uygulamalar) if a.startswith("carotos-") and a.endswith(".desktop"))
+    except OSError:
+        kalan = []
+    for ad in kalan:
+        yol = os.path.join(o.uygulamalar, ad)
+        if yol in yan:
             continue
-        adlar.append(ad)
-        plan["dosyalar"][os.path.join(baslatici_dizini, ad)] = (
-            "[PlankDockItemPreferences]\nLauncher=file://%s\n" % urllib.parse.quote(yol))
-    _, mevcut = o.calistir([o.prog("gsettings"), "get", PLANK_SEMA, "dock-items"])
-    ogeler = _gvariant_dizi(mevcut)
-    ogeler += [a for a in adlar if a not in ogeler]
-    plan["gsettings"] = [
-        ("position", "'bottom'"), ("alignment", "'center'"), ("hide-mode", "'intelligent'"),
-        ("zoom-enabled", "true"), ("zoom-percent", "150"), ("icon-size", "44"),
-        ("dock-items", "[" + ", ".join("'%s'" % a for a in ogeler) + "]"),
-    ]
+        try:
+            if re.search(r"^NoDisplay=true", oku(yol, 65536) or "", re.M):
+                continue
+        except UygulamaHatasi:
+            continue
+        yan.append(yol)
+    plan["gsettings"] = []
+    for dock, yollar, ayarlar in (
+            ("dock1", secilen, (("position", "'bottom'"), ("alignment", "'center'"),
+                                ("hide-mode", "'intelligent'"), ("zoom-enabled", "true"),
+                                ("zoom-percent", "150"), ("icon-size", "44"))),
+            (YAN_DOCK, yan, (("position", "'left'"), ("alignment", "'center'"),
+                             ("hide-mode", "'none'"), ("zoom-enabled", "true"),
+                             ("zoom-percent", "130"), ("icon-size", "44")))):
+        baslatici_dizini = o.yol("plank", dock, "launchers")
+        adlar = []
+        for yol in yollar:
+            ad = _dockitem_adi(yol)
+            if ad in adlar:
+                continue
+            adlar.append(ad)
+            plan["dosyalar"][os.path.join(baslatici_dizini, ad)] = (
+                "[PlankDockItemPreferences]\nLauncher=file://%s\n" % urllib.parse.quote(yol))
+        _, mevcut = o.calistir([o.prog("gsettings"), "get", PLANK_SEMA_SABLON % dock, "dock-items"])
+        ogeler = _gvariant_dizi(mevcut)
+        ogeler += [a for a in adlar if a not in ogeler]
+        on = "" if dock == "dock1" else dock + "/"
+        plan["gsettings"] += [(on + k, v) for k, v in ayarlar]
+        plan["gsettings"].append((on + "dock-items", "[" + ", ".join("'%s'" % a for a in ogeler) + "]"))
 
     plan["xfconf"].append(("xfwm4", "/general/use_compositing", "bool", False))
     return plan
@@ -789,7 +831,8 @@ def yedegi_genislet(o, plan, yedek):
         yedek["terminalrc"]["anahtarlar"].setdefault(k, v)
     for anahtar, _ in plan["gsettings"]:
         if anahtar not in yedek["gsettings"]:
-            kod, cikti = o.calistir([o.prog("gsettings"), "get", PLANK_SEMA, anahtar])
+            sema, ad = _sema_anahtar(anahtar)
+            kod, cikti = o.calistir([o.prog("gsettings"), "get", sema, ad])
             yedek["gsettings"][anahtar] = cikti.strip() if kod == 0 and cikti.strip() else None
     yedek["css"] = True
     return yedek
@@ -852,7 +895,8 @@ def _uygula_plan(o, plan):
     yeni_trc, _ = terminalrc_ayarla(oku(trc), plan["terminalrc"])
     atomik_yaz(trc, yeni_trc, 0o644)
     for anahtar, deger in plan["gsettings"]:
-        kod, _ = o.calistir([o.prog("gsettings"), "set", PLANK_SEMA, anahtar, deger])
+        sema, ad = _sema_anahtar(anahtar)
+        kod, _ = o.calistir([o.prog("gsettings"), "set", sema, ad, deger])
         if kod != 0:
             raise UygulamaHatasi("plank ayari yazilamadi: %s" % anahtar)
     # birlestirici devri: xfwm4 kapanir, picom baslar
@@ -863,6 +907,9 @@ def _uygula_plan(o, plan):
         raise UygulamaHatasi("picom baslatilamadi")
     if not surec_calisiyor(o, "plank"):
         o.baslat([o.prog("plank")])
+    kod, _ = o.calistir([o.prog("pgrep"), "-u", str(o.uid), "-f", "plank -n " + YAN_DOCK])
+    if kod != 0:
+        o.baslat([o.prog("plank"), "-n", YAN_DOCK])
     if plan["paneller"] is not None:
         paneli_yeniden_kur(o, lambda: xq_yaz(o, "xfce4-panel", "/panels", "dizi:int", plan["paneller"]))
 
@@ -915,8 +962,9 @@ def geri_yukle(o, yedek):
     except (OSError, UygulamaHatasi) as exc:
         hatalar.append(str(exc))
     for anahtar, eski in yedek.get("gsettings", {}).items():
-        argv = ([o.prog("gsettings"), "set", PLANK_SEMA, anahtar, eski] if eski is not None
-                else [o.prog("gsettings"), "reset", PLANK_SEMA, anahtar])
+        sema, ad = _sema_anahtar(anahtar)
+        argv = ([o.prog("gsettings"), "set", sema, ad, eski] if eski is not None
+                else [o.prog("gsettings"), "reset", sema, ad])
         if o.calistir(argv)[0] != 0:
             hatalar.append("plank ayari geri yuklenemedi: %s" % anahtar)
     if panel_kaydi is not None:
