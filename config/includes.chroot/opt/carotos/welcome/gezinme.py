@@ -40,10 +40,10 @@ KONULAR = [
      "baslik": T("Etik ve sorumluluk", "Ethics and responsibility"),
      "aciklama": T("Araçları nerede ve nasıl kullanmalı: izin, onay ve günlük.",
                    "Where and how to use the tools: permission, confirmation and the log.")},
-    {"id": "koruma", "sayfalar": ["usb", "carotpot", "carotene", "health", "dogrula"],
+    {"id": "koruma", "sayfalar": ["usb", "carotpot", "carotene", "guvenlik_duvari", "health", "dogrula"],
      "baslik": T("Koruma ve savunma", "Protection and defence"),
-     "aciklama": T("USB denetimi, bal küpü, antivirüs, sistem sağlığı ve indirdiğini doğrulama.",
-                   "USB checks, the honeypot, antivirus, system health and verifying your downloads.")},
+     "aciklama": T("USB denetimi, bal küpü, antivirüs, güvenlik duvarı, sistem sağlığı ve indirdiğini doğrulama.",
+                   "USB checks, the honeypot, antivirus, the firewall, system health and verifying your downloads.")},
     {"id": "ogrenme", "sayfalar": ["poligon", "former", "gsd", "filenor"],
      "baslik": T("Öğren ve dönüştür", "Learn and convert"),
      "aciklama": T("Poligon alıştırmaları, Former rehberi, sözlük ve dosya dönüştürücü.",
@@ -71,7 +71,7 @@ class Gezinme:
 
     def __init__(self, bitenler=(), konular=None):
         self.konular = {k["id"]: k for k in (konular or KONULAR)}
-        self.bitenler = {b for b in bitenler if b in self.konular}
+        self.bitenler = {b for b in bitenler if isinstance(b, str) and b in self.konular}
         self.durum = self.BASLANGIC_DURUMU
         self.konu_id = None
         self.pos = 0

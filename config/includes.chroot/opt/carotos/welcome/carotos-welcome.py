@@ -18,6 +18,8 @@ import shutil
 import subprocess
 import os
 import sys
+import tempfile
+import threading
 
 # Ortak grafit tema: kurulu sistemde /opt/carotos/ortak, depoda kardes klasor
 sys.dont_write_bytecode = True      # ortak klasore __pycache__ yazilmasin
@@ -565,6 +567,12 @@ PAGES = [
                        "the app shows patterns as findings and explains how ufw and fail2ban protect. Only "
                        "metadata is logged, never passwords."},
             ]),
+            ("note", {
+                "tr": "Poligon sınıf içi kullanım için tasarlandı; güvendiğin bir ağda kullan. "
+                      "Sınıf modundaki bağlantı henüz şifreli değil; şifreleme CarotOS 1.5'te gelecek.",
+                "en": "Poligon is designed for use inside a classroom; use it on a network you trust. "
+                      "The class-mode connection is not encrypted yet; encryption is planned for CarotOS 1.5.",
+            }),
         ],
     },
     {
@@ -597,6 +605,19 @@ PAGES = [
                 {"tr": "Tamamen yereldir; hiçbir veri dışarı gönderilmez.",
                  "en": "Entirely local; no data is sent anywhere."},
             ]),
+            ("note", {
+                "tr": "CarotPot varsayılan olarak yalnızca yerel ağdan bağlantı kabul eder; güvenlik "
+                      "duvarında yalnızca gerçekten açılan tuzak portlarına, yalnızca yerel ağa izin verir "
+                      "ve bu izinler tuzak kapanınca kendiliğinden silinir. İstersen Ayarlar'dan "
+                      "internetten gelen bağlantıları da açabilirsin; makinen internete açıksa gerçek "
+                      "saldırı denemelerini kaydedersin, bu yüzden yalnızca bilerek aç.",
+                "en": "By default CarotPot accepts connections from the local network only; in the "
+                      "firewall it allows only the trap ports that are really opened, only for the local "
+                      "network, and these permissions are removed automatically when the trap closes. If "
+                      "you like, you can also allow connections from the internet in Settings; if your "
+                      "machine is exposed to the internet you will record real attack attempts, so turn it "
+                      "on only on purpose.",
+            }),
         ],
     },
     {
@@ -626,6 +647,55 @@ PAGES = [
                 {"tr": "İmza veritabanı tek düğmeyle güncellenir.",
                  "en": "The signature database updates with a single button."},
             ]),
+        ],
+    },
+    {
+        "id": "guvenlik_duvari",
+        "title": {"tr": "Güvenlik duvarı", "en": "Firewall"},
+        "subtitle": {
+            "tr": "Ağdan gelen bağlantıları süzen koruma; ne zaman açmalı?",
+            "en": "The shield that filters incoming connections; when to turn it on",
+        },
+        "body": [
+            ("p", {
+                "tr": "Güvenlik duvarı, bilgisayarına ağdan gelmek isteyen bağlantıları kurallara "
+                      "göre kabul eden ya da geri çeviren bir kapıcı gibidir. CarotOS'ta bu iş ufw ile "
+                      "yapılır.",
+                "en": "A firewall works like a doorkeeper: it accepts or turns away connections that "
+                      "try to reach your computer from the network, following rules. In CarotOS this is "
+                      "done with ufw.",
+            }),
+            ("p", {
+                "tr": "CarotOS'ta güvenlik duvarı bilerek kapalı gelir; böylece nmap, CarotPot ve "
+                      "Poligon gibi ağ araçlarını ilk günden rahatça deneyebilirsin. Evde ve kendi "
+                      "ağında bu sakin bir başlangıçtır.",
+                "en": "In CarotOS the firewall comes turned off on purpose, so you can try network tools "
+                      "such as nmap, CarotPot and Poligon comfortably from day one. At home and on your "
+                      "own network this is a calm starting point.",
+            }),
+            ("bullets", [
+                {"tr": "Ne zaman açmalı: kafe, okul, yurt ya da herhangi bir ortak ağdayken; "
+                       "tanımadığın kişilerle aynı ağı paylaştığında.",
+                 "en": "When to turn it on: in a café, school, dorm or any shared network; whenever you "
+                       "share the network with people you do not know."},
+                {"tr": "CarotOS Güvenlik Paneli'nde: ufw aracını seç, eylem olarak “Etkinleştir”i seçip "
+                       "çalıştır.",
+                 "en": "In the CarotOS Security Panel: pick the ufw tool, choose “Enable” as the action "
+                       "and run it."},
+                {"tr": "Terminalde aşağıdaki komutu kullanabilirsin. Kapatmak için "
+                       "sudo ufw disable yazman yeter.",
+                 "en": "In the terminal you can use the command below. To turn it off again, "
+                       "just type sudo ufw disable."},
+            ]),
+            ("code", "sudo ufw enable"),
+            ("note", {
+                "tr": "Durumu istediğin zaman sudo ufw status ile ya da CarotOS Sistem Sağlığı'ndan "
+                      "görebilirsin. Güvenlik duvarını açınca, ağdan bağlanmasını beklediğin bir "
+                      "hizmet varsa (örneğin Poligon sınıf modu) önce ona izin vermen gerekebilir.",
+                "en": "You can check the state any time with sudo ufw status or in CarotOS System Health. "
+                      "Once the firewall is on, a service you expect to be reachable from the network "
+                      "(for example Poligon class mode) may need to be allowed first.",
+            }),
         ],
     },
     {
@@ -834,11 +904,15 @@ PAGES = [
                 "tr": "Yapay zekâ değildir: hazır bir veri tabanıyla çalışır; temel Linux komutlarını, savunma "
                       "araçlarını ve Güvenlik Paneli'ndeki test araçlarını (nmap, hydra, sqlmap…) tanır. Panel'deki "
                       "\"Açıkla\" düğmesi de aynı açıklamayı gösterir. Değişkenleri ($ADI) ve takma adları çözmez, "
-                      "yalnızca bash'te çalışır. Bir komutu anlamadan çalıştırma.",
+                      "yalnızca bash'te çalışır. $(...), ters tırnak, sudo, sh -c gibi sarmalayıcıların "
+                      "içindeki komut ayrı parça olarak açıklanır; ama komutun çıktısı çözülmez (hiçbir şey "
+                      "çalıştırılmadığı için). Bir komutu anlamadan çalıştırma.",
                 "en": "It is not an AI: it works from a ready-made database and knows the basic Linux commands, "
                       "defensive tools and the testing tools in the Security Panel (nmap, hydra, sqlmap…). The "
                       "Panel's \"Explain\" button shows the same explanation. It doesn't resolve variables ($NAME) or "
-                      "aliases and works only in bash. Never run a command you don't understand.",
+                      "aliases and works only in bash. A command inside $(...), backticks, "
+                      "sudo or sh -c is explained as a separate part; its output is not resolved (nothing "
+                      "is run, so there is no output). Never run a command you don't understand.",
             }),
         ],
     },
@@ -1162,6 +1236,12 @@ DIL_HAZIRLIK = {
     "dh_hayir": {"tr": "Şimdi değil", "en": "Not now"},
     "dh_iptal": {"tr": "İptal", "en": "Cancel"},
     "dh_calisiyor": {"tr": "Hazırlanıyor… pencereyi kapatmayın.", "en": "Preparing… please keep this window open."},
+    "dh_iptal_edilemedi": {
+        "tr": "Hazırlık yönetici yetkisiyle çalıştığı için durdurulamadı; arka planda bitecek. "
+              "Bitene kadar yazılım kurmayı ya da güncellemeyi denemeyin. Masaüstü dili değiştirilmedi.",
+        "en": "Setup runs with administrator rights, so it could not be stopped; it will finish in the "
+              "background. Please do not install or update software until it ends. The desktop language "
+              "was not changed."},
     "dh_hata": {
         "tr": "Hazırlık tamamlanamadı. İnternet bağlantısını kontrol edin. CarotOS uygulamaları yine "
               "seçtiğiniz dilde açılır.",
@@ -1191,29 +1271,73 @@ DIL_ALT_ADI = {"tr": "Turkish", "en": "İngilizce", "de": "German", "ru": "Russi
                "fr": "French"}
 
 
-def load_settings():
+def atomik_yaz(path, metin, izin=0o600):
+    """Dosyayi gecici dosya + os.replace ile yazar (yarida kesilirse eski dosya bozulmaz).
+
+    Basarisizsa OSError firlatir; cagiran karar verir."""
+    klasor = os.path.dirname(path) or "."
+    fd, gecici = tempfile.mkstemp(prefix=".carotos-tmp-", dir=klasor)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", errors="surrogateescape") as fh:
+            fh.write(metin)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.chmod(gecici, izin)
+        os.replace(gecici, path)
+    except BaseException:
+        try:
+            os.unlink(gecici)
+        except OSError:
+            pass
+        raise
+
+
+def _bozugu_kenara_al(path):
+    """Bozuk/beklenmedik biciminde bir dosyayi silmeden '.bozuk' adiyla kenara alir (K-05)."""
+    try:
+        os.replace(path, path + ".bozuk")
+    except OSError:
+        pass
+
+
+def ayarlari_dogrula(stored):
+    """Ayar dosyasindan okunan degerleri tur ve deger kumesiyle dogrular (K-05).
+    Sorunlu anahtar varsayilana doner; uygulama acilista cokmez."""
     data = dict(DEFAULTS)
+    if not isinstance(stored, dict):
+        return data
+    if stored.get("theme") in ("dark", "light"):
+        data["theme"] = stored["theme"]
+    if isinstance(stored.get("lang"), str):
+        data["lang"] = stored["lang"]
+    if isinstance(stored.get("show_on_startup"), bool):
+        data["show_on_startup"] = stored["show_on_startup"]
+    wp = stored.get("wallpaper")
+    if isinstance(wp, str) and "\x00" not in wp:
+        data["wallpaper"] = wp
+    bk = stored.get("biten_konular")
+    if isinstance(bk, list):
+        data["biten_konular"] = [b for b in bk if isinstance(b, str)]
+    return data
+
+
+def load_settings():
+    stored = None
     try:
         with open(CONFIG_FILE, "r", encoding="utf-8") as fh:
             stored = json.load(fh)
-        if isinstance(stored, dict):
-            for key in DEFAULTS:
-                if key in stored:
-                    data[key] = stored[key]
     except (OSError, ValueError):
         pass
+    data = ayarlari_dogrula(stored)
     data["lang"] = dil.gecerli(data.get("lang"))     # bozuk/bilinmeyen kayitli dil -> en
-    if not isinstance(data.get("biten_konular"), list):
-        data["biten_konular"] = []
     return data
 
 
 def save_settings(data):
     try:
         os.makedirs(CONFIG_DIR, exist_ok=True)
-        with open(CONFIG_FILE, "w", encoding="utf-8") as fh:
-            json.dump(data, fh, indent=2)
-    except OSError:
+        atomik_yaz(CONFIG_FILE, json.dumps(data, indent=2))
+    except (OSError, ValueError, TypeError):
         pass
 
 
@@ -1298,8 +1422,8 @@ def apply_wallpaper(path):
     props = []
     try:
         r = subprocess.run(["xfconf-query", "-c", "xfce4-desktop", "-l"],
-                           capture_output=True, text=True, timeout=8)
-        props = [ln.strip() for ln in r.stdout.splitlines()
+                           capture_output=True, text=True, timeout=5)
+        props =[ln.strip() for ln in r.stdout.splitlines()
                  if ln.strip().endswith("/last-image")]
     except (OSError, subprocess.SubprocessError):
         props = []
@@ -1314,7 +1438,7 @@ def apply_wallpaper(path):
     try:
         subprocess.run(["xfdesktop", "--reload"],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                       timeout=8)
+                       timeout=5)
     except (OSError, subprocess.SubprocessError):
         pass
     return ok
@@ -1360,11 +1484,11 @@ def xfconf(channel, prop, value):
     if not shutil.which("xfconf-query"):
         return False
     try:
-        subprocess.run(["xfconf-query", "-c", channel, "-p", prop,
-                        "-s", value],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                       timeout=8)
-        return True
+        r = subprocess.run(["xfconf-query", "-c", channel, "-p", prop,
+                            "-s", value],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                           timeout=5)
+        return r.returncode == 0        # K-03: basarisiz komut basarili sayilmaz
     except (OSError, subprocess.SubprocessError):
         return False
 
@@ -1421,8 +1545,12 @@ def apply_sibling_settings(lang, theme):
                 loaded = json.load(fh)
             if isinstance(loaded, dict):
                 data = loaded
-        except (OSError, ValueError):
+            else:
+                _bozugu_kenara_al(path)         # K-05: liste vb. kokluyse silmeden kenara al
+        except FileNotFoundError:
             pass
+        except (OSError, ValueError):
+            _bozugu_kenara_al(path)             # bozuk JSON/UTF-8: sessizce ezme, .bozuk olarak sakla
         data["lang"] = lang
         data["theme"] = theme
         if folder == "carotos-panel":
@@ -1451,9 +1579,8 @@ def apply_sibling_settings(lang, theme):
             data["tema"] = theme
         try:
             os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path, "w", encoding="utf-8") as fh:
-                json.dump(data, fh, indent=2)
-        except OSError:
+            atomik_yaz(path, json.dumps(data, indent=2))
+        except (OSError, ValueError, TypeError):
             continue
 
 
@@ -1481,12 +1608,14 @@ def _write_xsessionrc(locale):
 
     existing = ""
     try:
-        with open(path, "r", encoding="utf-8") as fh:
+        with open(path, "r", encoding="utf-8", errors="surrogateescape") as fh:
             existing = fh.read()
     except OSError:
         pass
 
-    if XSESSION_START in existing and XSESSION_END in existing:
+    # Isaretciler yalnizca tam birer kez ve dogru sirada ise yerinde degistirilir (K-04)
+    if (existing.count(XSESSION_START) == 1 and existing.count(XSESSION_END) == 1
+            and existing.index(XSESSION_START) < existing.index(XSESSION_END)):
         before = existing.split(XSESSION_START)[0]
         after = existing.split(XSESSION_END, 1)[1]
         content = before + block + after
@@ -1495,11 +1624,9 @@ def _write_xsessionrc(locale):
                    else "") + block + "\n"
 
     try:
-        with open(path, "w", encoding="utf-8") as fh:
-            fh.write(content)
-        os.chmod(path, 0o644)
+        atomik_yaz(path, content, 0o644)
         return True
-    except OSError:
+    except (OSError, ValueError):
         return False
 
 
@@ -1508,7 +1635,7 @@ def _write_dmrc(locale):
     path = os.path.join(GLib.get_home_dir(), ".dmrc")
     session = None
     try:
-        with open(path, "r", encoding="utf-8") as fh:
+        with open(path, "r", encoding="utf-8", errors="replace") as fh:
             for line in fh:
                 if line.strip().lower().startswith("session="):
                     session = line.split("=", 1)[1].strip()
@@ -1519,10 +1646,9 @@ def _write_dmrc(locale):
         lines.append(f"Session={session}")
     lines.append(f"Language={locale}")
     try:
-        with open(path, "w", encoding="utf-8") as fh:
-            fh.write("\n".join(lines) + "\n")
+        atomik_yaz(path, "\n".join(lines) + "\n", 0o644)
         return True
-    except OSError:
+    except (OSError, ValueError):
         return False
 
 
@@ -1537,14 +1663,14 @@ def _set_accountsservice_language(locale):
             "org.freedesktop.Accounts", None)
         result = manager.call_sync(
             "FindUserByName", GLib.Variant("(s)", (GLib.get_user_name(),)),
-            Gio.DBusCallFlags.NONE, 5000, None)
+            Gio.DBusCallFlags.NONE, 3000, None)
         path = result.unpack()[0]
         user = Gio.DBusProxy.new_sync(
             bus, Gio.DBusProxyFlags.NONE, None,
             "org.freedesktop.Accounts", path,
             "org.freedesktop.Accounts.User", None)
         user.call_sync("SetLanguage", GLib.Variant("(s)", (locale,)),
-                       Gio.DBusCallFlags.NONE, 5000, None)
+                       Gio.DBusCallFlags.NONE, 3000, None)
         return True
     except Exception:
         return False
@@ -1660,7 +1786,7 @@ class WelcomeWindow(Gtk.Window):
         for kod, ad, taslak in dil.etkin_diller():       # yalniz cevirisi hazir diller
             self.lang_combo.append(kod, dil.secici_adi(kod, ad, taslak))
         self.lang_combo.set_active_id(self.lang)
-        self.lang_combo.connect("changed", self.on_lang_changed)
+        self._lang_combo_id = self.lang_combo.connect("changed", self.on_lang_changed)
         box.pack_end(self.lang_combo, False, False, 0)
 
         self.theme_btn = Gtk.Button()
@@ -2472,6 +2598,11 @@ class WelcomeWindow(Gtk.Window):
         else:
             self.skip_btn.hide()
 
+        if self.lang_combo.get_active_id() != self.lang:     # K-07: kartla secilen dil ust bantta da gorunsun
+            self.lang_combo.handler_block(self._lang_combo_id)
+            self.lang_combo.set_active_id(self.lang)
+            self.lang_combo.handler_unblock(self._lang_combo_id)
+
         self.check.set_label(UI["dont_show"][self.lang])
         self.theme_btn.set_label(
             UI["theme_light"][self.lang] if self.theme == "dark"
@@ -2536,8 +2667,12 @@ class WelcomeWindow(Gtk.Window):
     def on_next(self, _button):
         if self.gezinme.ileri() == "bitir":
             self._konulari_kaydet()
-            self.apply_choices()
-            self.close()
+            try:
+                self.apply_choices()
+            except Exception as exc:                  # K-04: tek hata sihirbazi acik birakmasin
+                print("carotos-welcome: secimler uygulanirken hata:", exc, file=sys.stderr)
+            finally:
+                self.close()
             return
         self.stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT)
         self._konulari_kaydet()
@@ -2550,12 +2685,37 @@ class WelcomeWindow(Gtk.Window):
             self.refresh()
 
     def apply_choices(self):
-        """Sihirbaz kapanirken secimleri sisteme uygular."""
-        apply_desktop_theme(self.theme)
-        apply_sibling_settings(self.lang, self.theme)
-        self.prepare_language()
-        apply_session_language(self.lang)
-        apply_wallpaper(self.wallpaper)
+        """Sihirbaz kapanirken secimleri sisteme uygular.
+
+        Iletisim kutulari (dil hazirligi) ana is parcacigindadir; xfconf/D-Bus gibi
+        bloklayabilen adimlar ayri is parcacigindadir ve bu sirada GTK dongusu
+        donmadan islenir (K-03). Her adim ayri korunur (K-04)."""
+        try:
+            hazir = self.prepare_language()
+        except Exception as exc:
+            print("carotos-welcome: dil hazirligi hatasi:", exc, file=sys.stderr)
+            hazir = False
+        self.set_sensitive(False)
+        t = threading.Thread(target=self._sistemi_uygula, args=(hazir,), daemon=True)
+        t.start()
+        while t.is_alive():
+            while Gtk.events_pending():
+                Gtk.main_iteration_do(False)
+            t.join(0.03)
+        self.set_sensitive(True)
+
+    def _sistemi_uygula(self, hazir):
+        adimlar = [lambda: apply_desktop_theme(self.theme),
+                   lambda: apply_sibling_settings(self.lang, self.theme)]
+        # K-02: oturum dili yalnizca hazirlik tamamsa (ya da gerekmiyorsa) yazilir
+        if hazir and not sd.hazirlik_gerekli_mi(self.lang):
+            adimlar.append(lambda: apply_session_language(self.lang))
+        adimlar.append(lambda: apply_wallpaper(self.wallpaper))
+        for adim in adimlar:
+            try:
+                adim()
+            except Exception as exc:
+                print("carotos-welcome: adim hatasi:", exc, file=sys.stderr)
 
     def prepare_language(self):
         """Secilen dilin locale'i/paketleri eksikse sorar ve hazirlar (ISO kucuk kalsin diye
@@ -2577,7 +2737,6 @@ class WelcomeWindow(Gtk.Window):
 
     def _run_language_setup(self, kod):
         """pkexec ile carotos-dil-hazirla'yi arka planda calistirir; pencere donmaz."""
-        import threading
         dlg = Gtk.Dialog(title=UI["dh_baslik"][self.lang], transient_for=self, modal=True)
         kutu = dlg.get_content_area()
         kutu.set_spacing(10)
@@ -2610,10 +2769,22 @@ class WelcomeWindow(Gtk.Window):
         threading.Thread(target=calis, daemon=True).start()
         yanit = dlg.run()
         surec = kayit["surec"]
-        if yanit == Gtk.ResponseType.CANCEL and surec is not None and surec.poll() is None:
-            surec.terminate()
-        dlg.destroy()
+        durduruldu = True
+        try:
+            if yanit == Gtk.ResponseType.CANCEL and surec is not None and surec.poll() is None:
+                try:
+                    surec.terminate()
+                except OSError:
+                    durduruldu = False      # pkexec ile root olmus surece sinyal gonderilemez (K-01/O-03)
+        finally:
+            dlg.destroy()
         if yanit != Gtk.ResponseType.OK:
+            if not durduruldu:
+                bilgi = Gtk.MessageDialog(transient_for=self, modal=True, message_type=Gtk.MessageType.INFO,
+                                          buttons=Gtk.ButtonsType.CLOSE, text=UI["dh_baslik"][self.lang])
+                bilgi.format_secondary_text(UI["dh_iptal_edilemedi"][self.lang])
+                bilgi.run()
+                bilgi.destroy()
             return False
         if kayit["kod"] != 0:
             hata = Gtk.MessageDialog(transient_for=self, modal=True, message_type=Gtk.MessageType.WARNING,
