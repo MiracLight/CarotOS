@@ -39,18 +39,32 @@ def load_settings():
     try:
         with open(CONFIG_PATH, "r", encoding="utf-8") as fh:
             data = json.load(fh)
-            return {**DEFAULT_SETTINGS, **data}
     except Exception:
         return dict(DEFAULT_SETTINGS)
+    if not isinstance(data, dict):
+        return dict(DEFAULT_SETTINGS)
+    ayar = {**DEFAULT_SETTINGS, **data}
+    # Elle bozulmus tek bir deger paneli acilamaz hale getirmesin (G-13)
+    for anahtar in ("language", "theme"):
+        if not isinstance(ayar.get(anahtar), str):
+            ayar[anahtar] = DEFAULT_SETTINGS[anahtar]
+    aglar = ayar.get("onayli_aglar", [])
+    if not isinstance(aglar, list) or not all(isinstance(a, str) for a in aglar):
+        ayar.pop("onayli_aglar", None)   # bozuk liste: aglar bir sonraki taramada yeniden sorulur
+    return ayar
 
 
 def save_settings(settings):
     try:
         os.makedirs(CONFIG_DIR, exist_ok=True)
-        with open(CONFIG_PATH, "w", encoding="utf-8") as fh:
+        # Gecici dosya + os.replace: yarida kesilen yazma ayar dosyasini bozmaz (G-13)
+        gecici = CONFIG_PATH + ".tmp"
+        fd = os.open(gecici, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
             json.dump(settings, fh, indent=2)
+        os.replace(gecici, CONFIG_PATH)
     except Exception:
-        pass
+        pass  # ayar kaydi araclarin calismasini engellemez; yalnizca tercih kaybolur
 
 
 STRINGS = {
@@ -62,7 +76,20 @@ STRINGS = {
         "tr": "Yönetici yetkisiyle çalıştırırken alanlarda '-' ile başlayan seçenek olamaz. Seçeneği kaldır ya da yetkisiz çalıştır.",
         "en": "With administrator rights, fields can't contain options that start with '-'. Remove the option or run without root.",
     },
+    "hedef_secenek_hata": {
+        "tr": "“Ek parametreler” alanında hedefi değiştiren seçenek olamaz ({secenek}). Hedefi “Hedef URL” alanına yaz; etik onay ona göre sorulur.",
+        "en": "The “Extra parameters” field can't contain an option that changes the target ({secenek}). Put the target in the “Target URL” field; the ethics check is based on it.",
+    },
+    "sayi_hata": {
+        "tr": "“{alan}” alanı 1 ile 100000 arasında bir sayı olmalı.",
+        "en": "The “{alan}” field must be a number between 1 and 100000.",
+    },
     "stop": {"tr": "Durdur", "en": "Stop"},
+    "durdurma_iptal": {
+        "tr": "Durdurulamadı: yönetici onayı alınamadı. Araç çalışmaya devam ediyor.",
+        "en": "Could not stop: administrator approval was not given. The tool is still running.",
+    },
+    "durdurma_hata": {"tr": "Durdurulamadı (çıkış kodu {code}).", "en": "Could not stop (exit code {code})."},
     "clear": {"tr": "Çıktıyı temizle", "en": "Clear output"},
     "explain": {"tr": "Açıkla", "en": "Explain"},
     "explain_tip": {"tr": "Komutu çalıştırmadan ne yapacağını, bayraklarını ve bıraktığı izi anlatır.",
@@ -137,6 +164,15 @@ STRINGS = {
               "Does this network belong to you, or do you have permission to test here? "
               "If you say yes, this network is remembered and you won't be asked again.",
     },
+    "etik_ozel_metin_ad": {
+        "tr": "Hedef özel bir ağda ({ag}). Okul, iş yeri ya da kafe gibi başkasına ait bir ağ olabilir.\n\n"
+              "Bu ağ sana mı ait, ya da burada test yapmak için izin aldın mı? "
+              "Tek sözcüklü bir makine adının hangi ağa ait olduğu bilinemediği için bu cevap hatırlanmaz; her seferinde sorulur.",
+        "en": "The target is on a private network ({ag}). It may belong to someone else, "
+              "like a school, workplace or café.\n\n"
+              "Does this network belong to you, or do you have permission to test here? "
+              "A one-word machine name doesn't tell which network it is on, so this answer isn't remembered; you'll be asked every time.",
+    },
     "etik_ozel_evet": {"tr": "Evet, bu benim ağım / iznim var", "en": "Yes, it's my network / I have permission"},
     "etik_iptal_mesaj": {
         "tr": "Etik onay verilmedi, araç çalıştırılmadı.",
@@ -162,11 +198,124 @@ def root_icin_guvenli_mi(values):
     """Yonetici yetkisiyle calisacak komutlarda kullanici metni arguman olarak
     '-' ile baslayan bir secenek gibi davranmamali. pkexec parola penceresi
     yalnizca programi gosterir, argumanlari gostermez; ornegin tcpdump filtresine
-    yapistirilmis '-z komut' root olarak calisirdi. Combo indeksleri (int) sayilmaz."""
+    yapistirilmis '-z komut' root olarak calisirdi. Combo indeksleri (int) sayilmaz.
+
+    Bu, kullaniciya erken ve anlasilir ret iletisi veren ilk elektir: tirnak ve ters
+    bolu bosluga cevrilir ki '"-z"', \\-z gibi yazimlar da yakalansin (G-01). Asil
+    guvence, araca giden argv'yi denetleyen root_argv_guvenli_mi'dir."""
     for deger in values.values():
-        if isinstance(deger, str) and any(p.startswith("-") for p in deger.split()):
+        if not isinstance(deger, str):
+            continue
+        temiz = deger.translate(str.maketrans("\"'\\", "   "))
+        if any(p.startswith("-") for p in temiz.split()):
             return False
     return True
+
+
+_SABLON_ON = "@@carotos-deger-"
+
+
+def root_argv_guvenli_mi(build, values):
+    """Root olarak calisacak komutun GERCEKTEN araca gidecek argv'sini denetler (G-01).
+
+    Komut iki kez kurulur: kullanicinin degerleriyle ve her dolu metin alaninin yerine
+    bir yer tutucuyla. Yer tutucuyla kurulan argv kodun sablonudur: yer tutucu icermeyen
+    elemanlar koddan gelen sabit seceneklerdir. Gercek argv sablonla eleman eleman
+    eslesmeli (uzunluk ayni, sabit elemanlar aynen); kullanicidan gelen hicbir eleman
+    '-' ile baslayamaz. Tek istisna: koddan gelen '--' elemanindan sonrasi arac icin
+    secenek degildir (tcpdump filtresi tek arguman olarak oraya konur). Boylece shlex'in
+    tirnak/ters bolu islemesi, sekme ya da satir sonu denetimi atlatamaz."""
+    try:
+        gercek = [c for c in build(values) if c != ""]
+        sablon_degerleri = {
+            k: (_SABLON_ON + k + "@@" if isinstance(d, str) and d.strip() else d)
+            for k, d in values.items()}
+        sablon = [c for c in build(sablon_degerleri) if c != ""]
+    except Exception:  # noqa: BLE001  (kurulamayan komut root olarak calistirilmaz)
+        return False
+    if not gercek or len(gercek) != len(sablon):
+        return False
+    secenek_sonu = False
+    for g, s in zip(gercek, sablon):
+        if not isinstance(g, str) or not isinstance(s, str):
+            return False
+        if _SABLON_ON in s:                    # kullanicidan gelen eleman
+            if g.startswith("-") and not secenek_sonu:
+                return False
+        elif g != s:                           # sabit eleman degismis: beklenmeyen bicim
+            return False
+        elif s == "--":
+            secenek_sonu = True
+    return True
+
+
+# sqlmap'te hedefi belirleyen secenekler (G-06): -u/--url, -d, -l, -m, -r, -g, -c, -x.
+# "Ek parametreler" alanina yazilirsa etik koruma "Hedef URL" alanina bakarken baska bir
+# hedefe saldirilirdi. Degerlendirmek yerine reddedilir: -m/-r/-l/-c dosyadan hedef okur,
+# dosyanin icerigini siniflamak mumkun degil; tek ve anlasilir kural "hedef, hedef alanina".
+_SQLMAP_HEDEF_KISA = frozenset("udlmrgcx")
+_SQLMAP_ARGSIZ_KISA = frozenset("abfho")     # arguman almayan kisa bayraklar (-a -b -f -h -o)
+_SQLMAP_HEDEF_UZUN = ("url", "sitemap-url", "direct", "logfile", "bulkfile",
+                      "requestfile", "googledork", "configfile")
+
+
+def hedef_degistiren_secenek(arac, values):
+    """sqlmap ek parametrelerinde hedefi degistiren ilk secenegi dondurur; yoksa None.
+    Uzun seceneklerin kisaltmalari (--ur) ve birlesik kisa bayraklar (-bu) da yakalanir."""
+    if arac != "sqlmap":
+        return None
+    metin = _v(values, "extra")
+    if not metin:
+        return None
+    try:
+        jetonlar = shlex.split(metin)
+    except ValueError:
+        return None                            # komut kurulurken build_error iletisi verilir
+    for j in jetonlar:
+        if j.startswith("--"):
+            ad = j[2:].split("=", 1)[0].lower()
+            if ad and any(h.startswith(ad) for h in _SQLMAP_HEDEF_UZUN):
+                return j.split("=", 1)[0]
+        elif j.startswith("-") and len(j) > 1:
+            for c in j[1:]:
+                if c in _SQLMAP_HEDEF_KISA:
+                    return j
+                if c not in _SQLMAP_ARGSIZ_KISA:
+                    break                      # gerisi bu secenegin degeri
+    return None
+
+
+def sayi_gecerli_mi(metin, en_az=1, en_cok=100000):
+    """Paket sayisi gibi alanlar: bos birakilirsa arac sonsuza dek yakalar (G-08)."""
+    metin = metin.strip() if isinstance(metin, str) else ""
+    return (metin.isascii() and metin.isdigit() and len(metin) <= 6
+            and en_az <= int(metin) <= en_cok)
+
+
+UFW_AYAR = "/etc/ufw/ufw.conf"
+
+
+def guvenlik_duvari_durumu(yol):
+    """ufw'nin acik olup olmadigini parola istemeden okur (G-10): True/False, okunamazsa None.
+
+    /etc/ufw/ufw.conf herkesce okunabilir; 'ufw enable/disable' buradaki ENABLED degerini
+    degistirir. 'pkexec ufw status' her acilista parola isterdi ve cevrilmis ciktida
+    'Status: active' eslesmezdi."""
+    try:
+        with open(yol, encoding="utf-8", errors="replace") as fh:
+            satirlar = fh.read(65536).splitlines()
+    except OSError:
+        return None
+    durum = None
+    for satir in satirlar:                     # kabuk dosyasi gibi okunur: son atama gecerli
+        satir = satir.strip()
+        if satir.startswith("ENABLED="):
+            deger = satir.split("=", 1)[1].strip().strip("'\"").lower()
+            durum = True if deger == "yes" else False if deger == "no" else None
+    return durum
+
+
+CIKTI_SATIR_SINIRI = 5000                      # cikti alaninda tutulan en cok satir (G-08)
 
 
 def _v(values, key, default=""):
@@ -245,9 +394,14 @@ TOOLS = [
             ("filter", {"tr": "Filtre (opsiyonel)", "en": "Filter (optional)"}, "text", "",
              {"tr": "örn. port 80", "en": "e.g. port 80"}),
         ],
+        # Filtre bir yakalama ifadesidir, secenek degil: shlex ile ayrilip (eski tirnakli
+        # yazimlar calismaya devam etsin) TEK arguman olarak '--' ardindan verilir; tcpdump
+        # ifadeyi kendisi ayristirir. Boylece filtreye yazilan '-z', '-w' hicbir zaman
+        # secenek olarak okunmaz (G-01).
         "build": lambda v: ["tcpdump", "-i", _v(v, "iface", "eth0"), "-c", _v(v, "count", "50")]
-        + (shlex.split(_v(v, "filter")) if _v(v, "filter") else []),
+        + (["--", " ".join(shlex.split(_v(v, "filter")))] if _v(v, "filter") else []),
         "requires": ["iface"],
+        "sayi_alanlari": ["count"],
     },
     {
         "name": "tshark",
@@ -269,6 +423,7 @@ TOOLS = [
         ],
         "build": lambda v: ["tshark", "-i", _v(v, "iface", "eth0"), "-c", _v(v, "count", "50")],
         "requires": ["iface"],
+        "sayi_alanlari": ["count"],
     },
     {
         "name": "aircrack-ng",
@@ -447,6 +602,7 @@ for _y in (ORTAK, BASE_DIR):
 
 import etik_koruma  # noqa: E402
 import tema  # noqa: E402
+import yetkili  # noqa: E402  (root programlari yalniz sistem dizinlerinde aranir: G-12)
 
 _ACIKLA = os.path.join(os.path.dirname(BASE_DIR), "acikla")
 if _ACIKLA not in sys.path:
@@ -514,6 +670,9 @@ class ToolPage(Gtk.Box):
         btn_row = Gtk.Box(spacing=8)
         self.run_btn = tema.dugme("", "ana", lambda: self.run(False))
         self.root_btn = tema.dugme("", None, lambda: self.run(True))
+        # Kabuk.icerik her sayfa seciminde show_all() cagirir; bayrak olmadan dugme
+        # root gerekmeyen araclarda da gorunurdu (G-02). Gorunurlugu retranslate belirler.
+        self.root_btn.set_no_show_all(True)
         self.stop_btn = tema.dugme("", "tehlike", self.stop)
         self.stop_btn.set_sensitive(False)
         self.clear_btn = tema.dugme("", "duz", lambda: self.output_buffer.set_text(""))
@@ -539,6 +698,11 @@ class ToolPage(Gtk.Box):
         self.output_view.set_right_margin(10)
         self.output_view.set_top_margin(8)
         self.output_buffer = self.output_view.get_buffer()
+        # Tek kaydirma isareti yeniden kullanilir: her satirda yeni isaret acilmaz (G-08)
+        self._son_isaret = self.output_buffer.create_mark(None, self.output_buffer.get_end_iter(), False)
+        self._kuyruk = []
+        self._kuyruk_kilit = threading.Lock()
+        self._bosaltma_bekliyor = False
         scroller.add(self.output_view)
         cic.pack_start(scroller, True, True, 0)
         self.pack_start(cdis, True, True, 0)
@@ -617,13 +781,25 @@ class ToolPage(Gtk.Box):
 
     def run(self, as_root):
         lang = self.app.lang
+        # Root yalnizca root isteyen ya da root'u istege bagli araclarda (G-02)
+        if as_root and not (self.tool.get("needs_root") or self.tool.get("root_optional")):
+            return
         values = self._collect()
         for req in self.tool.get("requires", []):
             if not _v(values, req):
                 self.append(f"[!] {T('needs_target', lang)}\n")
                 return
-        if as_root and not root_icin_guvenli_mi(values):
+        for alan in self.tool.get("sayi_alanlari", []):
+            if not sayi_gecerli_mi(_v(values, alan)):
+                self.append(f"[!] {T('sayi_hata', lang, alan=self.widgets[alan]['label'][lang])}\n")
+                return
+        if as_root and not (root_icin_guvenli_mi(values)
+                            and root_argv_guvenli_mi(self.tool["build"], values)):
             self.append(f"[!] {T('root_arg_hata', lang)}\n")
+            return
+        secenek = hedef_degistiren_secenek(self.tool["name"], values)
+        if secenek:
+            self.append(f"[!] {T('hedef_secenek_hata', lang, secenek=secenek)}\n")
             return
         if not self._etik_onay(values):
             return
@@ -635,14 +811,22 @@ class ToolPage(Gtk.Box):
         cmd = [c for c in cmd if c != ""]
         if not cmd:
             return
-        resolved = resolve_binary(cmd[0])
-        if resolved is None:
-            self.append(f"[!] {T('not_found', lang, cmd=cmd[0])}\n")
-            return
-        cmd[0] = resolved
-        self.run_as_root = as_root
         if as_root:
-            cmd = ["pkexec"] + cmd
+            # Root olarak calisacak program ve pkexec'in kendisi kullanicinin PATH'inden
+            # degil, yalnizca sistem dizinlerinden bulunur (G-12; ortak/yetkili.py).
+            resolved = yetkili.sistem_yolu(cmd[0])
+            pkexec = yetkili.sistem_yolu("pkexec")
+            if resolved is None or pkexec is None:
+                self.append(f"[!] {T('not_found', lang, cmd=cmd[0] if resolved is None else 'pkexec')}\n")
+                return
+            cmd = [pkexec, resolved] + cmd[1:]
+        else:
+            resolved = resolve_binary(cmd[0])
+            if resolved is None:
+                self.append(f"[!] {T('not_found', lang, cmd=cmd[0])}\n")
+                return
+            cmd[0] = resolved
+        self.run_as_root = as_root
         self.preview.set_text("$ " + " ".join(shlex.quote(c) for c in cmd))
         self.output_buffer.set_text("")
         self.run_btn.set_sensitive(False)
@@ -681,10 +865,14 @@ class ToolPage(Gtk.Box):
             if karar["sinif"] == etik_koruma.OZEL:   # daha once onaylanmis ag
                 etik_koruma.gunluge_yaz(ETIK_GUNLUGU, arac, metin, karar["sinif"], "hatirlanan")
             return True
+        hatirla = karar.get("hatirla", [])
         if karar["tur"] == "ozel":
+            # Tek sozcuklu adlar hatirlanmaz (G-05): metin de "bir daha sorulmaz" demesin
+            metin_anahtari = ("etik_ozel_metin" if set(karar["aglar"]) <= set(hatirla)
+                              else "etik_ozel_metin_ad")
             onay = self._etik_pencere(
                 T("etik_ozel_baslik", lang),
-                T("etik_ozel_metin", lang, ag=", ".join(karar["aglar"])),
+                T(metin_anahtari, lang, ag=", ".join(karar["aglar"])),
                 None, T("etik_ozel_evet", lang), lang)
         else:
             onay = self._etik_pencere(
@@ -695,9 +883,9 @@ class ToolPage(Gtk.Box):
         if not onay:
             self.append(f"[!] {T('etik_iptal_mesaj', lang)}\n")
             return False
-        if karar["tur"] == "ozel":
+        if karar["tur"] == "ozel" and hatirla:
             liste = list(onayli)
-            liste.extend(a for a in karar["aglar"] if a not in liste)
+            liste.extend(a for a in hatirla if a not in liste)
             self.app.settings["onayli_aglar"] = liste
             save_settings(self.app.settings)
         return True
@@ -736,18 +924,68 @@ class ToolPage(Gtk.Box):
 
     def _worker(self, cmd):
         lang = self.app.lang
+        surec = None
         try:
-            self.process = subprocess.Popen(
-                cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                text=True, bufsize=1, start_new_session=True)
-            for line in self.process.stdout:
-                GLib.idle_add(self.append, line)
-            self.process.wait()
-            GLib.idle_add(self.append, f"\n[{T('finished', lang, code=self.process.returncode)}]\n")
+            # errors="replace": arac ciktisindaki gecersiz UTF-8 (SSID, sunucu afisi) okumayi
+            # durdurmaz (G-07); stdin kapali: arac panelden girdi beklemesin.
+            surec = self.process = subprocess.Popen(
+                cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, errors="replace", bufsize=1, start_new_session=True)
+            for line in surec.stdout:
+                self._kuyruga_ekle(line)
+            surec.wait()
+            self._kuyruga_ekle(f"\n[{T('finished', lang, code=surec.returncode)}]\n")
         except Exception as exc:  # noqa: BLE001
-            GLib.idle_add(self.append, f"[!] {exc}\n")
+            self._kuyruga_ekle(f"[!] {exc}\n")
+            # Okuma yarida kaldiysa arac arka planda, durdurulamaz halde kalmasin (G-07)
+            if surec is not None and surec.poll() is None:
+                self._grubu_sonlandir(surec)
         finally:
-            GLib.idle_add(self._done)
+            if surec is not None:
+                try:
+                    surec.stdout.close()
+                except Exception:  # noqa: BLE001
+                    pass
+                try:
+                    surec.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    pass   # root sureci: yetkisiz sinyal gonderilemez, beklemeden birakilir
+            GLib.idle_add(self._bitti)
+
+    @staticmethod
+    def _grubu_sonlandir(surec):
+        """Yetkisiz calisan surecin grubuna SIGTERM; root surecinde PermissionError yutulur."""
+        try:
+            os.killpg(os.getpgid(surec.pid), signal.SIGTERM)
+        except OSError:
+            try:
+                surec.terminate()
+            except OSError:
+                pass
+
+    def _kuyruga_ekle(self, metin):
+        """Is parcacigindan cagrilir: satirlari biriktirir, arayuze saniyede ~12 kez toplu
+        yazar. Her satira ayri idle_add saniyede binlerce satirda arayuzu kilitlerdi (G-08)."""
+        with self._kuyruk_kilit:
+            self._kuyruk.append(metin)
+            if len(self._kuyruk) > CIKTI_SATIR_SINIRI:
+                del self._kuyruk[:len(self._kuyruk) - CIKTI_SATIR_SINIRI]
+            if self._bosaltma_bekliyor:
+                return
+            self._bosaltma_bekliyor = True
+        GLib.timeout_add(80, self._kuyrugu_bosalt)
+
+    def _kuyrugu_bosalt(self):
+        with self._kuyruk_kilit:
+            parcalar, self._kuyruk = self._kuyruk, []
+            self._bosaltma_bekliyor = False
+        if parcalar:
+            self.append("".join(parcalar))
+        return False
+
+    def _bitti(self):
+        self._kuyrugu_bosalt()      # son satirlar ve "Bitti" iletisi dugmeler acilmadan yazilir
+        return self._done()
 
     def _done(self):
         self.run_btn.set_sensitive(True)
@@ -765,26 +1003,58 @@ class ToolPage(Gtk.Box):
         except OSError:
             pgid = None
         if self.run_as_root:
+            # Root sureci yalniz root durdurabilir: ikinci bir parola istenir. kill ve pkexec
+            # sistem dizinlerinden (G-12); cagri arka planda, sonuc donus koduna gore (G-09).
             target = f"-{pgid}" if pgid else str(self.process.pid)
-            try:
-                subprocess.run(["pkexec", "kill", "-TERM", target], timeout=30)
-            except Exception as exc:  # noqa: BLE001
-                self.append(f"[!] {exc}\n")
-        else:
-            try:
-                if pgid:
-                    os.killpg(pgid, signal.SIGTERM)
-                else:
-                    self.process.terminate()
-            except OSError:
+            pkexec = yetkili.sistem_yolu("pkexec")
+            kill = yetkili.sistem_yolu("kill")
+            if pkexec is None or kill is None:
+                self.append(f"[!] {T('not_found', lang, cmd='pkexec' if pkexec is None else 'kill')}\n")
+                return
+            self.stop_btn.set_sensitive(False)
+            threading.Thread(target=self._root_durdur, args=([pkexec, kill, "-TERM", target],),
+                             daemon=True).start()
+            return
+        try:
+            if pgid:
+                os.killpg(pgid, signal.SIGTERM)
+            else:
                 self.process.terminate()
+        except OSError:
+            self.process.terminate()
         self.append(f"\n[{T('stopped', lang)}]\n")
 
+    def _root_durdur(self, komut):
+        try:
+            kod = subprocess.run(komut, stdin=subprocess.DEVNULL, capture_output=True,
+                                 timeout=120).returncode
+        except Exception as exc:  # noqa: BLE001
+            GLib.idle_add(self._root_durdu, None, str(exc))
+            return
+        GLib.idle_add(self._root_durdu, kod, None)
+
+    def _root_durdu(self, kod, hata):
+        lang = self.app.lang
+        if kod == 0:
+            self.append(f"\n[{T('stopped', lang)}]\n")
+        elif hata is not None:
+            self.append(f"[!] {hata}\n")
+        elif kod in (126, 127):     # pkexec: parola penceresi kapatildi / yetki alinamadi
+            self.append(f"[!] {T('durdurma_iptal', lang)}\n")
+        else:
+            self.append(f"[!] {T('durdurma_hata', lang, code=kod)}\n")
+        if kod != 0 and self.process is not None and self.process.poll() is None:
+            self.stop_btn.set_sensitive(True)      # arac hala calisiyor: yeniden denenebilir
+        return False
+
     def append(self, text):
-        end = self.output_buffer.get_end_iter()
-        self.output_buffer.insert(end, text)
-        mark = self.output_buffer.create_mark(None, self.output_buffer.get_end_iter(), False)
-        self.output_view.scroll_to_mark(mark, 0, False, 0, 0)
+        buf = self.output_buffer
+        buf.insert(buf.get_end_iter(), text)
+        fazla = buf.get_line_count() - CIKTI_SATIR_SINIRI
+        if fazla > 0:                       # en eski satirlar duser; bellek sinirli kalir (G-08)
+            buf.delete(buf.get_start_iter(), buf.get_iter_at_line(fazla))
+        buf.move_mark(self._son_isaret, buf.get_end_iter())
+        self.output_view.scroll_to_mark(self._son_isaret, 0, False, 0, 0)
         return False
 
 
@@ -857,14 +1127,9 @@ class SettingsPage(Gtk.Box):
         return False
 
     def _check_firewall_worker(self):
-        ufw_path = resolve_binary("ufw") or "/usr/sbin/ufw"
-        try:
-            result = subprocess.run(["pkexec", ufw_path, "status"],
-                                    capture_output=True, text=True, timeout=30)
-            active = "Status: active" in result.stdout
-            GLib.idle_add(self._apply_firewall_state, active, True)
-        except Exception:  # noqa: BLE001
-            GLib.idle_add(self._apply_firewall_state, None, False)
+        # Parola istemeden okunur (G-10); okunamazsa "Kapali" degil "bilinmiyor" gosterilir.
+        durum = guvenlik_duvari_durumu(UFW_AYAR)
+        GLib.idle_add(self._apply_firewall_state, durum, durum is not None)
 
     def _apply_firewall_state(self, active, known):
         self._fw_state = active if known else None
@@ -887,12 +1152,17 @@ class SettingsPage(Gtk.Box):
         return True
 
     def _set_firewall_worker(self, enable):
-        ufw_path = resolve_binary("ufw") or "/usr/sbin/ufw"
-        try:
-            subprocess.run(["pkexec", ufw_path, "enable" if enable else "disable"],
-                           capture_output=True, text=True, timeout=30)
-        except Exception:  # noqa: BLE001
-            pass
+        # Yetki yalnizca kullanici durumu degistirmek isteyince istenir; ufw ve pkexec
+        # sistem dizinlerinden (G-12). Donus kodu yerine gercek durum ufw.conf'tan yeniden
+        # okunur: iptal ya da hata, anahtarin eski konumuna donmesiyle gorunur.
+        ufw_path = yetkili.sistem_yolu("ufw")
+        pkexec = yetkili.sistem_yolu("pkexec")
+        if ufw_path and pkexec:
+            try:
+                subprocess.run([pkexec, ufw_path, "enable" if enable else "disable"],
+                               capture_output=True, text=True, errors="replace", timeout=120)
+            except Exception:  # noqa: BLE001
+                pass  # sonuc asagida durum yeniden okunarak gosterilir
         GLib.idle_add(self.refresh_firewall)
 
     def retranslate(self):
@@ -952,7 +1222,7 @@ class PanelApp(Gtk.Window):
                 self.set_icon_from_file(logo)
             except GLib.Error:
                 pass
-        self.connect("destroy", Gtk.main_quit)
+        self.connect("destroy", self._kapaniyor)
 
         bolumler = [
             ("araclar", [(t["name"], TOOL_IKON.get(t["name"], "liste")) for t in TOOLS]),
@@ -998,14 +1268,26 @@ class PanelApp(Gtk.Window):
             self.kabuk.baslik_ayarla(sayfa.tool["name"], sayfa.tool["tagline"][self.lang])
         self.kabuk.icerik(sayfa)
 
+    def _kapaniyor(self, *_):
+        # Pencere kapaninca yetkisiz calisan araclar da durur (G-11); ayri oturumda
+        # basladiklari icin aksi halde tarama trafigi arka planda surerdi. Root
+        # sureclerine yetkisiz sinyal gonderilemez; onlar icin bkz. G-09 notu.
+        for sayfa in getattr(self, "pages", {}).values():
+            surec = getattr(sayfa, "process", None)
+            if surec is not None and surec.poll() is None and not sayfa.run_as_root:
+                sayfa._grubu_sonlandir(surec)
+        Gtk.main_quit()
+
     def calisiyor(self, aktif, metin):
+        # Calisan arac sayaci: ilk biten arac, digeri surerken "Hazir" demesin (G-14)
+        self._calisan = max(0, getattr(self, "_calisan", 0) + (1 if aktif else -1))
         if aktif:
             self.bar.show()
             if not getattr(self, "_bar_id", 0):
                 self._bar_step = 0
                 self._bar_id = GLib.timeout_add(45, self._bar_adim)
             self.hap.ayarla(metin, "uyari")
-        else:
+        elif self._calisan == 0:
             self.bar.hide()
             if getattr(self, "_bar_id", 0):
                 GLib.source_remove(self._bar_id)

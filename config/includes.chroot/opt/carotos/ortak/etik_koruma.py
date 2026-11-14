@@ -5,9 +5,11 @@ Guvenlik Paneli'nde baska bir sisteme dokunabilecek araclar (nmap, nikto,
 sqlmap, hydra) calistirilmadan once hedefin kime ait olabilecegini siniflar:
 
   yerel   127.0.0.0/8, ::1, localhost, bu makinenin kendi adi -> surtunme yok
+          (ag/aralik yazimi ancak TAMAMI geri dongudeyse)
   ozel    ozel/yerel ag adresleri (RFC1918, link-local, CGNAT, ULA) ve
-          tek etiketli/.local/.lan adlari -> "Bu ag sana mi ait?" bir kez
-          sorulur, evet denirse ag hatirlanir
+          tek etiketli/.local/.lan adlari -> "Bu ag sana mi ait?" sorulur, evet
+          denirse ag hatirlanir; tek etiketli (noktasiz) adlar hatirlanmaz, her
+          seferinde sorulur (hangi aga ait olduklari bilinemez)
   disari  diger her sey (acik IP'ler, alan adlari, genis ozel bloklar, cozumlenemeyen
           girdi) -> etik islem metni gosterilir, hedef ELLE yazilarak onaylanir
 
@@ -35,29 +37,51 @@ _OZEL_AGLAR = [ipaddress.ip_network(a) for a in (
 )]
 _OZEL_SONEKLER = (".local", ".lan", ".home.arpa", ".internal", ".intranet")
 _ARALIK = re.compile(r"^(\d{1,3}|\*|\d{1,3}-\d{1,3})(\.(\d{1,3}|\*|\d{1,3}-\d{1,3})){3}$")
+_GERI_DONGU4 = ipaddress.ip_network("127.0.0.0/8")
+_HICBIRI4 = ipaddress.ip_network("0.0.0.0/32")
+_SAYISAL = re.compile(r"(0x[0-9a-f]*|\d+)(\.(0x[0-9a-f]*|\d+)){0,3}\Z")
 _GUNLUK_SINIR = 200_000
 
 
-def _aralik_uclari(belirtec):
-    """nmap'in '192.168.1.1-50', '10.0.*.1' gibi sekillerinin alt ve ust uc
-    adresleri (yalnizca bu sekil icin); degilse None."""
+def _aralik_agi(belirtec):
+    """nmap'in '192.168.1.1-50', '10.0.*.1' gibi sekilleri icin araligin TAMAMINI
+    kapsayan en kucuk ag; bu sekil degilse None.
+
+    Yalniz iki ucu siniflamak yetmez (G-04): '10-127.0.0.1'in uclari ozel/yerel ama
+    arasi acik internettir. Kapsayan ag araligin her adresini icerir; boylece adres
+    sayisi (256'dan fazla adres -> /24'ten genis ag) ve tek blokta kalma denetimi,
+    CIDR yazimiyla ayni kurallardan (sinifla) gecer: '10.*.*.*' de '10.0.0.0/8' de
+    disari; '192.168.1.1-50' ozel kalir."""
     if not _ARALIK.match(belirtec):
         return None
     alt, ust = [], []
     for parca in belirtec.split("."):
         if parca == "*":
-            alt.append("0")
-            ust.append("255")
-        elif "-" in parca:
-            a, b = parca.split("-")
-            alt.append(a)
-            ust.append(b)
+            a, b = 0, 255
         else:
-            alt.append(parca)
-            ust.append(parca)
+            uclar = parca.split("-")
+            if any(len(u) > 1 and u.startswith("0") for u in uclar):
+                return None            # bastaki sifir (sekizlik?) belirsiz: ad gibi, en katiya duser
+            a, b = sorted(int(u) for u in uclar) if len(uclar) == 2 else (int(parca), int(parca))
+        if b > 255:
+            return None
+        alt.append(a)
+        ust.append(b)
+    lo = int(ipaddress.IPv4Address(".".join(map(str, alt))))
+    hi = int(ipaddress.IPv4Address(".".join(map(str, ust))))
+    return ipaddress.ip_network((lo, 32 - (lo ^ hi).bit_length()), strict=False)
+
+
+def _cozumleyici_ip(ad):
+    """Adres cozumleyicinin (glibc inet_aton) IP adresi saydigi kisa/sayisal yazimlar:
+    '0x08080808', '134744072', '127.1', '8.8.2056', '010.0.0.1' (sekizlik). Bunlar ad
+    degil IP adresidir (G-05); ad sanilirsa 'ozel ag' sorusuyla gecip hatirlanirdi.
+    Standart dort sekizli yazim ipaddress ile zaten taninir. DNS'e sorulmaz."""
+    if not ad or not _SAYISAL.match(ad):
+        return None
     try:
-        return (ipaddress.ip_address(".".join(alt)), ipaddress.ip_address(".".join(ust)))
-    except ValueError:
+        return socket.inet_ntoa(socket.inet_aton(ad))
+    except (OSError, ValueError):
         return None
 
 
@@ -69,7 +93,10 @@ def _tek_hedef(jeton):
             host = urllib.parse.urlparse(jeton).hostname
         except ValueError:
             return []
-        return [(host.lower(), None)] if host else []
+        if not host:
+            return []
+        host = host.lower()
+        return [(_cozumleyici_ip(host) or host, None)]
     # IP, CIDR (IPv4/IPv6)
     try:
         ag = ipaddress.ip_network(jeton, strict=False)
@@ -77,9 +104,12 @@ def _tek_hedef(jeton):
         return [(str(ipaddress.ip_interface(jeton).ip), onek)]
     except ValueError:
         pass
-    uclar = _aralik_uclari(jeton)
-    if uclar:
-        return [(str(uclar[0]), None), (str(uclar[1]), None)]
+    sayisal = _cozumleyici_ip(jeton.lower())
+    if sayisal:
+        return [(sayisal, None)]
+    aralik = _aralik_agi(jeton)
+    if aralik is not None:
+        return [(str(aralik.network_address), aralik.prefixlen)]
     # host, host:port, host/yol
     govde = jeton.lstrip("/").split("/")[0]
     if govde.count(":") == 1:
@@ -87,16 +117,21 @@ def _tek_hedef(jeton):
     if govde.startswith("[") and "]" in govde:        # [::1]:80
         govde = govde[1:govde.index("]")]
     govde = govde.strip(".").lower()
-    return [(govde, None)] if re.fullmatch(r"[a-z0-9_.\-]+|[0-9a-f:]+", govde or "") else []
+    if not re.fullmatch(r"[a-z0-9_.\-]+|[0-9a-f:]+", govde or ""):
+        return []
+    return [(_cozumleyici_ip(govde) or govde, None)]          # '0x08080808:80'
 
 
 def hedefleri_ayikla(metin):
     """Hedef alanindaki metinden [(host, onek|None)] cikarir. '-' ile baslayan
-    jetonlar secenek sayilir ve atlanir."""
+    jetonlar secenek, 65535'e kadar yalniz rakamli jetonlar port sayilip atlanir.
+    Daha buyuk sayi ('134744072' = 8.8.8.8) cozumleyici icin IP adresidir (G-05)."""
     sonuc = []
     for jeton in (metin or "").split():
-        if jeton.startswith("-") or jeton.isdigit():   # secenek / port numarasi
+        if jeton.startswith("-"):                       # secenek
             continue
+        if jeton.isascii() and jeton.isdigit() and len(jeton) <= 5 and int(jeton) <= 65535:
+            continue                                    # port numarasi
         sonuc.extend(_tek_hedef(jeton))
     return sonuc
 
@@ -114,12 +149,22 @@ def sinifla(host, onek=None, kendi_ad=None):
         ip = ipaddress.ip_address(ad)
     except ValueError:
         ip = None
+    if ip is not None and onek is not None:
+        # Ag yazimi: tek adrese degil agin TAMAMINA bakilir (G-03). '127.0.0.1/0',
+        # '0.0.0.0/1', '::1/0' geri donguden tasar; bunlar butun adres uzayidir.
+        ag = ipaddress.ip_network(f"{ip}/{onek}", strict=False)
+        if ag.version == 4 and (ag.subnet_of(_GERI_DONGU4) or ag == _HICBIRI4):
+            return YEREL
+        if ag.version == 6 and ag.num_addresses == 1 and ip.is_loopback:
+            return YEREL
+        if onek < (24 if ip.version == 4 else 64):
+            return DISARI
+        if any(a.version == ag.version and ag.subnet_of(a) for a in _OZEL_AGLAR):
+            return OZEL
+        return DISARI
     if ip is not None:
-        genis = onek is not None and onek < (24 if ip.version == 4 else 64)
         if ip.is_loopback or (ip.version == 4 and ip == ipaddress.ip_address("0.0.0.0")):
             return YEREL
-        if genis:
-            return DISARI
         if any(ip in a for a in _OZEL_AGLAR):
             return OZEL
         return DISARI
@@ -144,13 +189,14 @@ def degerlendir(metin, onayli_aglar=(), kendi_ad=None):
 
     Donus: {"gerek": bool, "tur": None|"ozel"|"yaz", "sinif": str,
             "hedefler": [host...], "aglar": [yeni/onaysiz ag anahtarlari],
+            "hatirla": [onaylanirsa hatirlanabilecek ag anahtarlari],
             "onay_metni": yazilmasi gereken metin (yalniz tur=="yaz")}
     """
     hedefler = hedefleri_ayikla(metin)
     if not hedefler:
         # Hicbir hedef cikarilamadi: en temkinli yol, girdinin aynen yazilmasi.
         return {"gerek": True, "tur": "yaz", "sinif": DISARI, "hedefler": [],
-                "aglar": [], "onay_metni": (metin or "").strip()}
+                "aglar": [], "hatirla": [], "onay_metni": (metin or "").strip()}
     siniflar = [(h, sinifla(h, o, kendi_ad)) for h, o in hedefler]
     disari = [h for h, s in siniflar if s == DISARI]
     ozel = [h for h, s in siniflar if s == OZEL]
@@ -161,14 +207,18 @@ def degerlendir(metin, onayli_aglar=(), kendi_ad=None):
         tek = len(farkli) == 1 and len(adlar) == 1 and all(o is None for _, o in hedefler)
         yaz = farkli[0] if tek else (metin or "").strip()
         return {"gerek": True, "tur": "yaz", "sinif": DISARI, "hedefler": adlar,
-                "aglar": [], "onay_metni": yaz}
+                "aglar": [], "hatirla": [], "onay_metni": yaz}
     if ozel:
         aglar = sorted({ag_anahtari(h) for h in ozel})
-        yeni = [a for a in aglar if a not in set(onayli_aglar)]
+        # Tek sozcuklu (noktasiz) makine adi hangi agda oldugunu soylemez: ayni ad baska
+        # bir agda baska bir makine olabilir. Onayi hatirlanmaz, her seferinde sorulur (G-05).
+        tek_sozcuk = {a for a in aglar if a.startswith("ad:") and "." not in a[3:]}
+        yeni = [a for a in aglar if a in tek_sozcuk or a not in set(onayli_aglar)]
         return {"gerek": bool(yeni), "tur": "ozel" if yeni else None, "sinif": OZEL,
-                "hedefler": adlar, "aglar": yeni, "onay_metni": None}
+                "hedefler": adlar, "aglar": yeni,
+                "hatirla": [a for a in yeni if a not in tek_sozcuk], "onay_metni": None}
     return {"gerek": False, "tur": None, "sinif": YEREL, "hedefler": adlar,
-            "aglar": [], "onay_metni": None}
+            "aglar": [], "hatirla": [], "onay_metni": None}
 
 
 def onay_dogru(beklenen, yazilan):
