@@ -132,8 +132,9 @@ class YeniSayfaTesti(unittest.TestCase):
             self.assertIn(cok, metin)
             self.assertIn(tek, metin)
             self.assertIn("BitLocker", metin)
+        # saat kayması notu kaldırıldı (kullanıcı kararı): sayfada komut bloğu olmamalı
         kodlar = [y for t, y in self.s["windows"]["body"] if t == "code"]
-        self.assertEqual(kodlar, ["sudo timedatectl set-local-rtc 1 --adjust-system-clock"])
+        self.assertEqual(kodlar, [])
 
     def test_dogrula_iddialari(self):
         kodlar = [y for t, y in self.s["dogrula"]["body"] if t == "code"]

@@ -1043,21 +1043,6 @@ PAGES = [
                       "menu waits 30 seconds, or 5 seconds if only CarotOS is installed. You do not need to turn off "
                       "Secure Boot.",
             }),
-            ("p", {
-                "tr": "Saat kayıyorsa: Windows bilgisayarın donanım saatini yerel saat olarak, Linux ise UTC olarak "
-                      "tutar. Türkiye'de bu, sistemler arasında geçince 3 saatlik fark demektir. CarotOS'u Windows "
-                      "gibi yerel saati kullanacak şekilde ayarlamak için:",
-                "en": "If the clock drifts: Windows keeps the computer's hardware clock in local time, Linux keeps it "
-                      "in UTC. Switching between them then shows a difference equal to your time zone offset. To make "
-                      "CarotOS use local time like Windows:",
-            }),
-            ("code", "sudo timedatectl set-local-rtc 1 --adjust-system-clock"),
-            ("note", {
-                "tr": "Bilgisayarında yalnızca CarotOS varsa bu ayara gerek yoktur; saat yanlışsa önce saat dilimini "
-                      "kontrol et: timedatectl",
-                "en": "If CarotOS is the only system on your computer, you do not need this setting; if the time is "
-                      "wrong, check the time zone first: timedatectl",
-            }),
         ],
     },
     {
