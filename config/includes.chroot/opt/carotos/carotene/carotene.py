@@ -119,6 +119,33 @@ METIN = {
     "res_cancel_title": {"tr": "Tarama durduruldu", "en": "Scan stopped"},
     "res_error_title": {"tr": "Tarama tamamlanamadı",
                         "en": "The scan could not be completed"},
+    "res_partial_title": {"tr": "Tarama kısmen tamamlandı",
+                          "en": "The scan was only partly completed"},
+    "res_partial_body": {
+        "tr": "Bazı dosyalar okunamadığı ya da taranamadığı için sonuç "
+              "eksiktir. Taranan dosyalarda bilinen bir tehdide rastlanmadı; "
+              "ayrıntılar aşağıdaki uyarılardadır.",
+        "en": "The result is incomplete because some files could not be read "
+              "or scanned. No known threat was found in the files that were "
+              "scanned; see the warnings below for details."},
+    "res_aborted_title": {"tr": "Tarama yarıda kesildi",
+                          "en": "The scan was interrupted"},
+    "res_aborted_body": {
+        "tr": "ClamAV beklenmedik biçimde sonlandı; bellek yetmemiş olabilir. "
+              "Sonuç eksiktir ve temiz sayılmamalıdır. Açık uygulamaları "
+              "kapatıp yeniden deneyin.",
+        "en": "ClamAV stopped unexpectedly; there may not have been enough "
+              "memory. The result is incomplete and must not be treated as "
+              "clean. Close open applications and try again."},
+    "res_newline_warn": {
+        "tr": "Taranan konumda adında satır sonu bulunan bir dosya ya da "
+              "klasör var. Böyle adlar bulgunun hangi dosyaya ait olduğunu "
+              "karıştırabileceği için bulgular üzerinde işlem yapılamaz; "
+              "dosyaları dosya yöneticisinden denetleyin.",
+        "en": "The scanned location contains a file or folder whose name "
+              "includes a line break. Such names can confuse which file a "
+              "finding belongs to, so no action can be taken on the findings; "
+              "check the files in the file manager."},
     "res_summary": {"tr": "{n} dosya tarandı, {s} sn sürdü.",
                     "en": "{n} files scanned in {s} s."},
     "res_skipped": {"tr": "{k} öge atlandı (boş dosya, bağlantı ya da "
@@ -225,6 +252,12 @@ METIN = {
               "threat is not a false positive, the file may harm the "
               "system.\n\n{yol}"},
     "restored_to": {"tr": "Geri yüklendi: {yol}", "en": "Restored: {yol}"},
+    "q_orphan_title": {"tr": "Kaydı olmayan dosya", "en": "File without a record"},
+    "q_orphan_meta": {
+        "tr": "Bu dosyanın özgün konumu bilinmiyor; geri yüklenemez, yalnızca "
+              "silinebilir.",
+        "en": "The original location of this file is unknown; it cannot be "
+              "restored, only deleted."},
 
     "d_title": {"tr": "Virüs tanımları", "en": "Virus definitions"},
     "d_intro": {
@@ -304,6 +337,27 @@ METIN = {
                                 "bırakıldı.",
                           "en": "The original folder no longer exists; the "
                                 "file was kept in quarantine."},
+    "e_" + M.DOSYA_DEGISTI: {"tr": "Dosya taramadan sonra değişmiş; işlem "
+                                   "yapılmadı. Yeniden tarayın.",
+                             "en": "The file has changed since the scan; "
+                                   "nothing was done. Scan again."},
+    "e_" + M.DOGRULANAMADI: {"tr": "Bu bulgunun hangi dosyaya ait olduğu "
+                                   "doğrulanamadı; işlem yapılmadı.",
+                             "en": "It could not be verified which file this "
+                                   "finding belongs to; nothing was done."},
+    "e_" + M.KAYNAK_SILINEMEDI: {"tr": "Dosya özgün yerinden silinemedi (salt "
+                                       "okunur ortam olabilir); karantinaya "
+                                       "alınmadı.",
+                                 "en": "The file could not be removed from its "
+                                       "original location (the medium may be "
+                                       "read-only); it was not quarantined."},
+    "e_" + M.YER_YOK: {"tr": "Diskte yeterli yer yok; işlem yapılmadı.",
+                       "en": "There is not enough disk space; nothing was "
+                             "done."},
+    "e_" + M.KAYIT_HATASI: {"tr": "Karantina kaydı yazılamadı; işlem "
+                                  "yapılmadı.",
+                            "en": "The quarantine record could not be "
+                                  "written; nothing was done."},
 }
 
 METIN = dil.zenginlestir(METIN)      # tr/en sozlukleri her dil icin yedekli (ortak/dil.py)
@@ -509,7 +563,7 @@ class CaroteneWindow(Gtk.Window):
         for key in ("scan", "quarantine", "defs", "history"):
             self.kabuk.menu_metni(key, self.t("nav_" + key))
         self.kabuk.rozet("scan", "…" if self.tarama else None, sakin=True)
-        n = len(M.karantina_listesi())
+        n = len(M.karantina_listesi()) + len(M.kayitsiz_karantina_dosyalari())
         self.kabuk.rozet("quarantine", str(n) if n else None, sakin=True)
         if self.guncelleniyor:
             self.kabuk.rozet("defs", "…", sakin=True)
@@ -573,7 +627,8 @@ class CaroteneWindow(Gtk.Window):
             ozet.set_homogeneous(True)
             for ad, deger in (
                     ("k_last", tarih_metni(son) if son else "—"),
-                    ("k_quar", str(len(M.karantina_listesi()))),
+                    ("k_quar", str(len(M.karantina_listesi())
+                                   + len(M.kayitsiz_karantina_dosyalari()))),
                     ("k_defs", "—" if bilgi["durum"] == M.TANIM_YOK
                      else self.yas_metni(bilgi["yas_gun"]))):
                 kpi = tema.KpiKutusu(self.t(ad))
@@ -642,6 +697,10 @@ class CaroteneWindow(Gtk.Window):
             renk, isaret, title = "yesil", "✓", self.t("res_clean_title")
         elif durum == M.IPTAL:
             renk, isaret, title = "gri", "–", self.t("res_cancel_title")
+        elif durum == M.KISMI:
+            renk, isaret, title = "sari", "!", self.t("res_partial_title")
+        elif durum == M.YARIDA:
+            renk, isaret, title = "sari", "!", self.t("res_aborted_title")
         else:
             renk, isaret, title = "sari", "!", self.t("res_error_title")
         dis, ic = tema.kart(18, 9, "tehlikeli" if durum == M.BULGU else "")
@@ -661,7 +720,17 @@ class CaroteneWindow(Gtk.Window):
         if s.get("izinli"):
             ic.pack_start(tema.etiket(self.t("res_allowed", k=len(s["izinli"])), "soluk",
                                       sar=True), False, False, 0)
-        if durum == M.TARAMA_HATASI:
+        if durum == M.KISMI:
+            ic.pack_start(tema.etiket(self.t("res_partial_body"), None, sar=True),
+                          False, False, 0)
+        elif durum == M.YARIDA:
+            ic.pack_start(tema.etiket(self.t("res_aborted_body"), None, sar=True),
+                          False, False, 0)
+        if s.get("satir_sonlu_ad"):
+            ic.pack_start(tema.etiket(self.t("res_newline_warn"), None, sar=True),
+                          False, False, 0)
+        # Basarisiz ya da eksik taramada uyarilar her zaman gosterilir (T-02)
+        if durum in (M.TARAMA_HATASI, M.KISMI, M.YARIDA) or s.get("eksik"):
             for uyari in s.get("uyarilar", [])[:5]:
                 ic.pack_start(tema.etiket(uyari, "mono", sar=True, sec=True),
                               False, False, 0)
@@ -760,7 +829,13 @@ class CaroteneWindow(Gtk.Window):
             GLib.timeout_add(150, self.refresh_counts)
 
     def _tarama_isi(self, tarama):
-        sonuc = tarama.calistir()
+        try:
+            sonuc = tarama.calistir()
+        except Exception:  # noqa: BLE001 -- arayuz "tarama suruyor"da donup kalmasin (U-05)
+            tarama.iptal()
+            sonuc = {"taranan": 0, "atlanan": 0, "bulgular": [], "uyarilar": [],
+                     "izinli": [], "kod": None, "durum": M.TARAMA_HATASI,
+                     "sure": 0.0, "yollar": list(tarama.yollar)}
         GLib.idle_add(self.scan_done, tarama, sonuc)
 
     def stop_scan(self):
@@ -775,7 +850,9 @@ class CaroteneWindow(Gtk.Window):
         M.gecmise_ekle(self.tarama_turu, sonuc)
         anahtar, tur = {M.TEMIZ: ("res_clean_title", "acik"),
                         M.IPTAL: ("res_cancel_title", "kapali"),
-                        M.BULGU: ("res_found_title", "hata")
+                        M.BULGU: ("res_found_title", "hata"),
+                        M.KISMI: ("res_partial_title", "uyari"),
+                        M.YARIDA: ("res_aborted_title", "uyari"),
                         }.get(sonuc["durum"], ("res_error_title", "uyari"))
         self.set_hap(anahtar, tur, b=len(sonuc["bulgular"]))
         if self.page == "scan":
@@ -795,7 +872,8 @@ class CaroteneWindow(Gtk.Window):
         self.show_page("scan")
 
     def on_quarantine(self, bulgu):
-        kod, _kayit = M.karantinaya_al(bulgu["yol"], bulgu["imza"])
+        kod, _kayit = M.karantinaya_al(bulgu["yol"], bulgu["imza"],
+                                       bulgu.get("kimlik"))
         self._islendi(bulgu, self.t("done_quarantined") if kod == M.TAMAM
                       else self.t("e_" + kod), "basari" if kod == M.TAMAM else "hata")
 
@@ -804,7 +882,7 @@ class CaroteneWindow(Gtk.Window):
                             self.t("confirm_delete", yol=bulgu["yol"]),
                             self.t("act_delete"), destructive=True):
             return
-        kod = M.dosyayi_sil(bulgu["yol"])
+        kod = M.dosyayi_sil(bulgu["yol"], bulgu.get("kimlik"))
         self._islendi(bulgu, self.t("done_deleted") if kod == M.TAMAM
                       else self.t("e_" + kod), "basari" if kod == M.TAMAM else "hata")
 
@@ -840,7 +918,8 @@ class CaroteneWindow(Gtk.Window):
         if yanit == 1:
             self._islendi(bulgu, self.t("done_ignored"), "bilgi")
         elif yanit == 2:
-            kod = M.izin_listesine_ekle(bulgu["yol"], bulgu["imza"])
+            kod = M.izin_listesine_ekle(bulgu["yol"], bulgu["imza"],
+                                        bulgu.get("kimlik"))
             self._islendi(bulgu, self.t("done_allowed") if kod == M.TAMAM
                           else self.t("e_" + kod), "basari" if kod == M.TAMAM else "hata")
 
@@ -849,7 +928,8 @@ class CaroteneWindow(Gtk.Window):
     def build_quarantine_page(self, holder):
         self.giris(holder, "q_title", "q_intro")
         kayitlar = sorted(M.karantina_listesi(), key=lambda k: -k.get("tarih", 0))
-        if not kayitlar:
+        yetimler = M.kayitsiz_karantina_dosyalari()
+        if not kayitlar and not yetimler:
             dis, ic = tema.kart(10, 0)
             ic.pack_start(tema.bos_durum("kilit", self.t("q_empty")), False, False, 0)
             holder.pack_start(dis, False, False, 0)
@@ -861,6 +941,15 @@ class CaroteneWindow(Gtk.Window):
                 "kilit", "sari", os.path.basename(kayit["asil_yol"]), alt,
                 [tema.dugme(self.t("q_delete"), "tehlike kucuk", self.on_q_delete, kayit),
                  tema.dugme(self.t("q_restore"), "kucuk", self.on_q_restore, kayit)])
+            holder.pack_start(dis, False, False, 0)
+        # Kaydi kaybolmus karantina dosyalari gizli kalmasin (T-04)
+        for kimlik in yetimler:
+            yol = os.path.join(M.karantina_dizini(), kimlik + ".karantina")
+            dis, _ic = self.satir_karti(
+                "kilit", "sari", self.t("q_orphan_title"),
+                yol + "\n" + self.t("q_orphan_meta"),
+                [tema.dugme(self.t("q_delete"), "tehlike kucuk", self.on_q_delete,
+                            {"id": kimlik, "asil_yol": yol})])
             holder.pack_start(dis, False, False, 0)
 
         izinler = sorted(M.izin_listesi(), key=lambda k: -k.get("tarih", 0))
@@ -928,7 +1017,7 @@ class CaroteneWindow(Gtk.Window):
         baslik.pack_start(r, False, False, 0)
         top.pack_start(baslik, True, True, 0)
         btn = tema.dugme(self.t("d_update"), "ana", self.start_update)
-        btn.set_sensitive(not self.guncelleniyor and bool(M.freshclam_yolu()))
+        btn.set_sensitive(not self.guncelleniyor and bool(M.guncelleme_komutu()))
         top.pack_end(btn, False, False, 0)
         ic.pack_start(top, False, False, 0)
         ic.pack_start(Gtk.Separator(), False, False, 4)
@@ -962,7 +1051,8 @@ class CaroteneWindow(Gtk.Window):
         holder.pack_start(dis, False, False, 0)
 
     def start_update(self):
-        if self.guncelleniyor:
+        komut = M.guncelleme_komutu()
+        if self.guncelleniyor or not komut:
             return
         self.guncelleniyor = True
         self.guncelleme_mesaji = None
@@ -970,7 +1060,7 @@ class CaroteneWindow(Gtk.Window):
 
         def isci():
             try:
-                proc = subprocess.run(M.guncelleme_komutu(), stdout=subprocess.PIPE,
+                proc = subprocess.run(komut, stdout=subprocess.PIPE,
                                       stderr=subprocess.STDOUT, text=True,
                                       errors="replace", timeout=1800)
                 kod, cikti = proc.returncode, proc.stdout
@@ -1031,7 +1121,9 @@ class CaroteneWindow(Gtk.Window):
                 ic.pack_start(Gtk.Separator(), False, False, 2)
             row = Gtk.Box(spacing=12)
             durum = kayit.get("durum")
-            renk = {M.TEMIZ: "yesil", M.BULGU: "kirmizi", M.IPTAL: "gri"}.get(durum, "sari")
+            # KISMI, YARIDA ve TARAMA_HATASI sari: eksik tarama temiz gorunmez (T-02)
+            renk = {M.TEMIZ: "yesil", M.BULGU: "kirmizi", M.IPTAL: "gri",
+                    M.KISMI: "sari", M.YARIDA: "sari"}.get(durum, "sari")
             isaret = {"yesil": "✓", "kirmizi": "!", "gri": "–"}.get(renk, "!")
             row.pack_start(tema.rozet(isaret, renk), False, False, 0)
             metin = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)

@@ -25,6 +25,7 @@ import subprocess
 import sys
 import threading
 import time
+import unicodedata
 
 # Ortak dil katmani (ortak/dil.py, yalniz standart kutuphane): kurulu sistemde
 # /opt/carotos/ortak, depoda kardes klasor. Izleme modu da kullanir (Gtk gerekmez).
@@ -155,32 +156,86 @@ def mount_entries():
         if len(parts) < 3:
             continue
         entries.append({
-            "device": parts[0],
-            "mount": parts[1].replace("\\040", " "),
+            "device": _octal_decode(parts[0]),
+            # Cekirdek bosluk, sekme, satir sonu ve ters boluyu sekizlik yazar (U-08)
+            "mount": _octal_decode(parts[1]),
             "fstype": parts[2],
         })
     return entries
 
 
-def is_live_medium(mount_point):
-    """CarotOS canli moddayken kendi kurulum ortamini taramasin."""
-    for marker in ("live/filesystem.squashfs", "live/vmlinuz", ".disk/info"):
-        if os.path.exists(os.path.join(mount_point, marker)):
-            return True
-    return False
+def _octal_decode(value):
+    return re.sub(r"\\([0-7]{3})", lambda m: chr(int(m.group(1), 8)), value)
+
+
+# live-boot'un sistemin acildigi ortami bagladigi yerler
+LIVE_MEDIUM_MOUNTS = ("/run/live/medium", "/usr/lib/live/mount/medium",
+                      "/lib/live/mount/medium")
+
+
+def kernel_cmdline():
+    return read_file("/proc/cmdline")
+
+
+def live_medium_devices(entries=None, cmdline=None):
+    """Sistemin GERCEKTEN acildigi canli ortamin aygitlari (gercek yollar).
+
+    Karar yalnizca sistem tarafindaki kanita dayanir: /proc/cmdline'da
+    boot=live, live-boot'un baglama noktasi ve live-media= degeri. Takilan
+    bellegin icindeki dosyalara (.disk/info, live/vmlinuz) BAKILMAZ; aksi
+    halde bir bellek kendini "canli ortam" gosterip taramadan kacabilirdi
+    (U-01)."""
+    if cmdline is None:
+        cmdline = kernel_cmdline()
+    tokens = cmdline.split()
+    if "boot=live" not in tokens:
+        return set()
+    if entries is None:
+        entries = mount_entries()
+    devices = set()
+    for entry in entries:
+        if entry["mount"] in LIVE_MEDIUM_MOUNTS and entry["device"].startswith("/dev/"):
+            devices.add(os.path.realpath(entry["device"]))
+    for token in tokens:
+        if token.startswith("live-media="):
+            value = token.split("=", 1)[1]
+            if value.startswith("/dev/"):
+                devices.add(os.path.realpath(value))
+    return devices
+
+
+def is_live_medium(entry, live_devices):
+    """CarotOS canli moddayken kendi acilis ortamini taramasin."""
+    device = entry.get("device") or ""
+    return device.startswith("/dev/") and os.path.realpath(device) in live_devices
+
+
+def is_optical_drive(device):
+    """Aygit bir CD/DVD surucusu mu? (USB bellege yazilmis ISO/UDF degil)"""
+    if not device or not device.startswith("/dev/"):
+        return False
+    name = os.path.basename(os.path.realpath(device))
+    if name.startswith("sr"):
+        return True
+    return read_file(f"/sys/class/block/{name}/device/type").strip() == "5"
 
 
 def removable_mounts():
     """Taranmasi anlamli, bagli cikarilabilir aygitlar."""
     found = []
-    for entry in mount_entries():
-        if entry["fstype"] in SKIP_FS or entry["fstype"] in OPTICAL_FS:
+    entries = mount_entries()
+    live_devices = live_medium_devices(entries)
+    for entry in entries:
+        if entry["fstype"] in SKIP_FS:
+            continue
+        # ISO/UDF bicimli USB bellek de taranir; yalniz optik surucu atlanir (U-02)
+        if entry["fstype"] in OPTICAL_FS and is_optical_drive(entry["device"]):
             continue
         if not entry["mount"].startswith(MOUNT_PREFIXES):
             continue
         if not is_removable(entry["device"]):
             continue
-        if is_live_medium(entry["mount"]):
+        if is_live_medium(entry, live_devices):
             continue
         found.append(entry)
     return found
@@ -251,12 +306,46 @@ def split_extensions(name):
 # Denetim
 # ---------------------------------------------------------------------------
 
+def guvenli_metin(deger):
+    """Dosya adindan gelen metni ekrana, rapora ve JSON'a guvenle verilecek
+    bicime cevirir (U-04, U-06): UTF-8 olmayan baytlar \\xff, denetim ve
+    gorunmez bicim karakterleri (satir sonu, yon isaretleri) \\uXXXX olarak
+    yazilir. Dosyanin gercek yolu bulguda degismeden kalir."""
+    if not isinstance(deger, str):
+        return deger
+    try:
+        deger.encode("utf-8")
+    except UnicodeEncodeError:
+        try:
+            deger = deger.encode("utf-8", "surrogateescape").decode(
+                "utf-8", "backslashreplace")
+        except UnicodeEncodeError:
+            deger = deger.encode("utf-8", "backslashreplace").decode("utf-8")
+    if any(unicodedata.category(ch) in ("Cc", "Cf", "Cs") for ch in deger):
+        deger = "".join(
+            ("\\x%02x" % ord(ch) if ord(ch) < 0x100 else "\\u%04x" % ord(ch))
+            if unicodedata.category(ch) in ("Cc", "Cf", "Cs") else ch
+            for ch in deger)
+    return deger
+
+
+def guvenli_veri(veri):
+    """Ic ice yapidaki butun metinleri guvenli_metin'den gecirir (JSON icin)."""
+    if isinstance(veri, str):
+        return guvenli_metin(veri)
+    if isinstance(veri, dict):
+        return {guvenli_metin(k): guvenli_veri(v) for k, v in veri.items()}
+    if isinstance(veri, (list, tuple)):
+        return [guvenli_veri(v) for v in veri]
+    return veri
+
+
 def metin(deger, lang):
     """Bulgu metni iki dilli sozluk ya da (eski kayitlarda) duz metindir.
     Eksik dilde en, sonra tr'ye duser (ortak/dil.py)."""
     if isinstance(deger, dict):
-        return dil.metin(deger, lang)
-    return deger or ""
+        return guvenli_metin(dil.metin(deger, lang))
+    return guvenli_metin(deger or "")
 
 
 def scan_path(root, cancel=None):
@@ -271,9 +360,11 @@ def scan_path(root, cancel=None):
     dir_count = 0
     total_size = 0
     truncated = False
+    depth_limited = False
     cancelled = False
 
     exec_in_root = []
+    system_execs = []
     lnk_files = []
     hidden_dirs = []
     visible_dirs = set()
@@ -298,13 +389,20 @@ def scan_path(root, cancel=None):
         depth = current[len(root):].count(os.sep)
         at_root = os.path.abspath(current) == os.path.abspath(root)
         if depth >= MAX_DEPTH:
+            if dirs:
+                # Derinlik siniri: atlanan klasorler sonucu eksik yapar (U-02)
+                depth_limited = True
             dirs[:] = []
+        # Cop kutusu, "System Volume Information" gibi sistem klasorleri
+        # zararlilarin klasik saklanma yeridir: icleri de taranir (U-02)
+        in_system_dir = any(
+            part.lower() in BENIGN_NAMES
+            for part in os.path.relpath(current, root).split(os.sep))
 
         for name in list(dirs):
             dir_count += 1
             lowered = name.lower()
             if lowered in BENIGN_NAMES:
-                dirs.remove(name)
                 continue
             full_dir = os.path.join(current, name)
             if at_root:
@@ -376,6 +474,11 @@ def scan_path(root, cancel=None):
                     full)
                 continue
 
+            if in_system_dir and (lowered == "autorun.inf" or last_ext in EXEC_EXT
+                                  or last_ext == ".lnk"):
+                system_execs.append((name, full))
+                continue
+
             if last_ext == ".lnk":
                 lnk_files.append((name, full))
                 continue
@@ -441,6 +544,21 @@ def scan_path(root, cancel=None):
                    f"not run programs whose source you do not know."},
             exec_in_root[0][1])
 
+    if system_execs:
+        names = ", ".join(n for n, _ in system_execs[:5])
+        add(LOW, "system_exec",
+            {"tr": f"Sistem klasöründe {len(system_execs)} çalıştırılabilir dosya",
+             "en": f"{len(system_execs)} executable files in system folders"},
+            {"tr": f"{names}. Çöp kutusu ya da \"System Volume Information\" gibi "
+                   f"sistem klasörlerinde çalıştırılabilir dosya ya da kısayol "
+                   f"bulundu. Silinmiş dosyalar olabilir, ancak zararlılar da bu "
+                   f"klasörlere saklanır.",
+             "en": f"{names}. Executable files or shortcuts were found in system "
+                   f"folders such as the recycle bin or \"System Volume "
+                   f"Information\". They may be deleted files, but malware also "
+                   f"hides in these folders."},
+            system_execs[0][1])
+
     if hidden_dirs and not disguised:
         add(LOW, "hidden_dirs",
             {"tr": f"{len(hidden_dirs)} gizli klasör",
@@ -470,7 +588,7 @@ def scan_path(root, cancel=None):
             "dirs": dir_count,
             "size": total_size,
             "seconds": round(time.time() - started, 2),
-            "truncated": truncated,
+            "truncated": truncated or depth_limited,
             "cancelled": cancelled,
             "empty": file_count == 0 and dir_count == 0,
             "unreadable": len(unreadable),
@@ -498,11 +616,14 @@ def enrich(result, mount_point):
 if __name__ == "__main__" and "--audit-json" in sys.argv:
     index = sys.argv.index("--audit-json")
     target = sys.argv[index + 1] if index + 1 < len(sys.argv) else None
+    # UTF-8 olmayan dosya adlari JSON'u bozmasin (U-04)
     if target:
-        print(json.dumps(enrich(scan_path(target), target), ensure_ascii=False))
+        print(json.dumps(guvenli_veri(enrich(scan_path(target), target)),
+                         ensure_ascii=False))
     else:
-        print(json.dumps([enrich(scan_path(e["mount"]), e["mount"])
-                          for e in removable_mounts()], ensure_ascii=False))
+        print(json.dumps(guvenli_veri([enrich(scan_path(e["mount"]), e["mount"])
+                                       for e in removable_mounts()]),
+                         ensure_ascii=False))
     sys.exit(0)
 
 
@@ -752,6 +873,24 @@ UI = {
                            "was stopped. The result is incomplete."},
     "deep_error": {"tr": "Tarama tamamlanamadı.",
                    "en": "The scan could not be completed."},
+    "deep_partial": {"tr": "Tarama kısmen tamamlandı: {n} dosya tarandı, bazı "
+                           "dosyalar okunamadı ya da taranamadı. Taranan "
+                           "dosyalarda bilinen bir tehdide rastlanmadı; sonuç "
+                           "eksiktir.",
+                     "en": "The scan was only partly completed: {n} files were "
+                           "scanned, some files could not be read or scanned. "
+                           "No known threat was found in the scanned files; the "
+                           "result is incomplete."},
+    "deep_aborted": {"tr": "Tarama yarıda kesildi; bellek yetmemiş olabilir. "
+                           "Sonuç eksiktir ve temiz sayılmamalıdır.",
+                     "en": "The scan was interrupted; there may not have been "
+                           "enough memory. The result is incomplete and must "
+                           "not be treated as clean."},
+    "status_partial": {"tr": "Eksik", "en": "Incomplete"},
+    "partial_body": {"tr": "{label}: şüpheli bir şey bulunmadı, ancak aygıtın "
+                           "tamamı denetlenemedi.",
+                     "en": "{label}: nothing suspicious found, but the whole "
+                           "device could not be checked."},
     "deep_no_clamav": {"tr": "ClamAV kurulu değildir; ayrıntılı tarama "
                              "yapılamaz.",
                        "en": "ClamAV is not installed; the detailed scan "
@@ -830,13 +969,15 @@ def build_report(result, lang):
     ]
     if not result["findings"]:
         lines.append(UI["summary_clean"][lang])
+    if stats.get("truncated"):
+        lines.append(UI["truncated"][lang])
     for finding in result["findings"]:
         tag = {HIGH: UI["level_high"], MEDIUM: UI["level_medium"],
                LOW: UI["level_low"]}[finding["level"]][lang]
         lines.append(f"[{tag}] {metin(finding['title'], lang)}")
         lines.append(f"    {metin(finding['detail'], lang)}")
         if finding.get("path"):
-            lines.append(f"    {finding['path']}")
+            lines.append(f"    {guvenli_metin(finding['path'])}")
         lines.append("")
     return "\n".join(lines)
 
@@ -944,7 +1085,10 @@ def _tanimla_result_window(Gtk, Gdk, tema, SweepBar):
                 self.hap.ayarla(UI["scanning"][self.lang], "acik")
                 return
             worst = worst_level(findings)
-            if worst is None:
+            if worst is None and self.result["stats"].get("truncated"):
+                # Eksik denetim "Temiz" gorunmesin (U-02)
+                self.hap.ayarla(UI["status_partial"][self.lang], "uyari")
+            elif worst is None:
                 self.hap.ayarla(UI["status_clean"][self.lang], "acik")
             else:
                 self.hap.ayarla(UI["status_found"][self.lang],
@@ -1080,8 +1224,8 @@ def _tanimla_result_window(Gtk, Gdk, tema, SweepBar):
             ic.pack_start(tema.etiket(metin(finding["detail"], self.lang), "soluk",
                                       sar=True, genislik=90), False, False, 0)
             if finding.get("path"):
-                ic.pack_start(tema.etiket(finding["path"], "mono", sar=True, sec=True),
-                              False, False, 0)
+                ic.pack_start(tema.etiket(guvenli_metin(finding["path"]), "mono",
+                                          sar=True, sec=True), False, False, 0)
             return dis
 
         # -- ayrintili tarama (ClamAV) ----------------------------------------
@@ -1147,7 +1291,7 @@ def _tanimla_result_window(Gtk, Gdk, tema, SweepBar):
                 self.deep_count.set_text(f"{self.deep_sayac['n']:,}".replace(
                     ",", "." if self.lang == "tr" else ","))
                 self.deep_found.set_text(str(self.deep_sayac["b"]))
-                self.deep_path.set_text(self.deep_sayac["son"]
+                self.deep_path.set_text(guvenli_metin(self.deep_sayac["son"])
                                         or UI["deep_loading"][self.lang])
             except Exception:  # noqa: BLE001
                 pass
@@ -1228,7 +1372,11 @@ def _tanimla_result_window(Gtk, Gdk, tema, SweepBar):
                 GLib.timeout_add(150, self._deep_sayac_yaz)
 
         def _deep_isi(self, tarama):
-            sonuc = tarama.calistir()
+            try:
+                sonuc = tarama.calistir()
+            except Exception:  # noqa: BLE001 -- pencere "taraniyor"da donup kalmasin (U-05)
+                tarama.iptal()
+                sonuc = {"durum": None, "taranan": 0, "sure": 0.0, "bulgular": []}
             GLib.idle_add(self._deep_done, tarama, sonuc)
 
         def _aygit_izle(self):
@@ -1265,6 +1413,11 @@ def _tanimla_result_window(Gtk, Gdk, tema, SweepBar):
             elif durum == motor.TEMIZ:
                 self.deep.update(durum="temiz", anahtar="deep_clean",
                                  kw={"n": n, "s": sure})
+            elif durum == motor.KISMI:
+                # Eksik tarama temiz gorunmez (T-02, U-03)
+                self.deep.update(durum="kismi", anahtar="deep_partial", kw={"n": n})
+            elif durum == motor.YARIDA:
+                self.deep.update(durum="yarida", anahtar="deep_aborted", kw={})
             else:
                 self.deep.update(durum="hata", anahtar="deep_error", kw={})
             # Yeni ClamAV bulgulari mevcut listeye eklenir (eskileri yenilenir)
@@ -1359,10 +1512,12 @@ def _tanimla_result_window(Gtk, Gdk, tema, SweepBar):
                 GLib.get_home_dir(),
                 time.strftime("carotos-usb-%Y%m%d-%H%M.txt"))
             try:
+                # Metin dosya acilmadan kurulur: hata olursa bos rapor kalmaz (U-04)
+                rapor = build_report(self.result, self.lang)
                 with open(path, "w", encoding="utf-8") as fh:
-                    fh.write(build_report(self.result, self.lang))
+                    fh.write(rapor)
                 self.bildir(UI["saved"][self.lang].format(path=path), "basari")
-            except OSError:
+            except (OSError, UnicodeError):
                 self.bildir(UI["save_failed"][self.lang], "hata")
 
         def on_lang_changed(self, combo):
@@ -1419,7 +1574,10 @@ def send_notification(result, settings, on_details=None):
 
     if count == 0:
         summary = UI["clean_title"][lang]
-        body = UI["clean_body"][lang].format(label=label)
+        # Sinira takilan denetim "temiz" diye bildirilmez (U-02)
+        anahtar = ("partial_body" if result.get("stats", {}).get("truncated")
+                   else "clean_body")
+        body = UI[anahtar][lang].format(label=label)
         icon = "drive-removable-media"
         # DUSUK oncelik: kisa surede kendiliginden kaybolur
         urgency = 0
@@ -1435,6 +1593,12 @@ def send_notification(result, settings, on_details=None):
         # kullanici kapatana kadar ekranda kalir — istenmiyor.
         urgency = 1
         timeout = 12000
+
+    # Bildirim sunucusu govdedeki isaretlemeyi yorumlar; birim etiketi ve dosya
+    # adlari aygittan gelir (U-06)
+    summary = guvenli_metin(summary)
+    body = (guvenli_metin(body).replace("&", "&amp;").replace("<", "&lt;")
+            .replace(">", "&gt;"))
 
     if _notify_araclari():
         try:
@@ -1460,7 +1624,7 @@ def send_notification(result, settings, on_details=None):
 
     try:
         subprocess.Popen(["notify-send", "-i", icon,
-                          "-t", str(timeout), summary, body])
+                          "-t", str(timeout), "--", summary, body])
     except OSError:
         print(f"{summary}: {body}")
     return None, False

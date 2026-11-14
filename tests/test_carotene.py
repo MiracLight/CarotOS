@@ -124,11 +124,14 @@ ERROR: Update failed."""
         self.assertEqual(M.guncelleme_sonucu(5, "tuhaf"), M.GUNCELLEME_HATASI)
 
     def test_komut_sabit(self):
+        # T-03: kabuk yok, programlar mutlak sistem yollariyla verilir
+        asil = M.sistem_yolu
+        self.addCleanup(setattr, M, "sistem_yolu", asil)
+        M.sistem_yolu = lambda ad: "/usr/bin/" + ad
         komut = M.guncelleme_komutu()
-        self.assertEqual(komut[:3], ["pkexec", "/bin/sh", "-c"])
-        self.assertEqual(len(komut), 4)
-        self.assertIn("LC_ALL=C", komut[3])
-        self.assertTrue(komut[3].rstrip().endswith("freshclam"))
+        self.assertEqual(komut, ["/usr/bin/pkexec", "/usr/bin/env", "LC_ALL=C",
+                                 "LANG=C", "/usr/bin/freshclam"])
+        self.assertNotIn("/bin/sh", komut)
 
 
 class BellekTesti(unittest.TestCase):
