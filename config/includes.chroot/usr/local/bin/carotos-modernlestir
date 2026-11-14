@@ -65,7 +65,7 @@ YAN_DOCK = "dock2"                             # sol yan dock: plank -n dock2
 DOCK_VARSAYILAN = (
     ("xfce4-terminal-emulator.desktop", "xfce4-terminal.desktop"),
     ("xfce4-file-manager.desktop", "thunar.desktop"),
-    ("xfce4-web-browser.desktop", "firefox-esr.desktop", "firefox.desktop"),
+    ("carotos-tarayici.desktop", "xfce4-web-browser.desktop", "firefox-esr.desktop", "firefox.desktop"),
     ("xfce4-appfinder.desktop",),
     ("xfce4-settings-manager.desktop",),
 )
@@ -760,8 +760,9 @@ def plan_olustur(o):
             plan["dosyalar"][os.path.join(baslatici_dizini, ad)] = (
                 "[PlankDockItemPreferences]\nLauncher=file://%s\n" % urllib.parse.quote(yol))
         _, mevcut = o.calistir([o.prog("gsettings"), "get", PLANK_SEMA_SABLON % dock, "dock-items"])
-        ogeler = _gvariant_dizi(mevcut)
-        ogeler += [a for a in adlar if a not in ogeler]
+        # bizim ogeler ONCE ve belirlenen sirada; alt dock'ta kullanicinin mevcut diger ogeleri sonda kalir,
+        # yan dock yalniz CarotOS uygulamalaridir
+        ogeler = adlar + ([a for a in _gvariant_dizi(mevcut) if a not in adlar] if dock == "dock1" else [])
         on = "" if dock == "dock1" else dock + "/"
         plan["gsettings"] += [(on + k, v) for k, v in ayarlar]
         plan["gsettings"].append((on + "dock-items", "[" + ", ".join("'%s'" % a for a in ogeler) + "]"))

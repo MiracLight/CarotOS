@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Web Browser
+Name[tr]=İnternet Tarayıcısı
+Comment=Browse the internet
+Comment[tr]=İnternette gezin
+Exec=exo-open --launch WebBrowser %u
+Icon=carotos-tarayici
+Terminal=false
+Categories=Network;WebBrowser;
+StartupWMClass=firefox-esr
+NoDisplay=true
