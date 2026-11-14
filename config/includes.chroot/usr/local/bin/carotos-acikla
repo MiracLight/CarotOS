@@ -10,9 +10,15 @@ Kullanım:
 Komutu hiçbir zaman çalıştırmaz; yalnızca ayrıştırır. Hiçbir şey ağa gönderilmez.
 """
 import os
+import shlex
 import sys
 
 sys.dont_write_bytecode = True
+try:
+    # Komut satırında geçersiz UTF-8 baytı olsa da (surrogateescape) yazarken çökmesin (A-09)
+    sys.stdout.reconfigure(errors="backslashreplace")
+except (AttributeError, ValueError):
+    pass
 _BURASI = os.path.dirname(os.path.abspath(__file__))
 for _yol in ("/opt/carotos/acikla", os.path.join(_BURASI, "..", "..", "..", "opt", "carotos", "acikla")):
     if os.path.isdir(_yol):
@@ -32,10 +38,17 @@ def main(argv):
         return 0
     if kalan and kalan[0] == "--satir":
         satir = " ".join(kalan[1:])
+    elif len(kalan) == 1:
+        satir = kalan[0]                    # tek argüman: bütün satır (carotos-acikla "ls | grep x")
     elif kalan:
-        satir = " ".join(kalan)
+        # Kabuk tırnakları zaten açtı; yeniden tırnaklayarak birleştir ki `echo 'a; b'` iki parça görünmesin (A-10)
+        satir = shlex.join(kalan)
     elif not sys.stdin.isatty():
-        satir = sys.stdin.read().strip()
+        try:
+            sys.stdin.reconfigure(errors="replace")     # geçersiz UTF-8 çökertmesin (A-09)
+        except (AttributeError, ValueError):
+            pass
+        satir = sys.stdin.read(acikla_motor.SINIR_KARAKTER + 1).strip()
     else:
         print(__doc__.strip())
         return 0

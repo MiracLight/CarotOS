@@ -282,6 +282,9 @@ class BashBaglantisiTesti(unittest.TestCase):
         dosya = os.path.join(INC, "usr", "share", "carotos", "acikla.bash")
         s = subprocess.run(["bash", "--norc", "-i", "-c", f"source '{dosya}'; bind -X | grep -c carotos_acikla_satir"],
                            capture_output=True, text=True, timeout=30,
+                           # Ayri oturum: 'bash -i' denetleyen terminal varken is denetimine
+                           # (SIGTTOU) takilip testi asili birakmasin
+                           start_new_session=True, stdin=subprocess.DEVNULL,
                            env=dict(os.environ, PATH=bin_ + ":" + os.environ["PATH"]))
         self.assertEqual(s.stdout.strip().splitlines()[-1], "1", s.stdout + s.stderr)
 
