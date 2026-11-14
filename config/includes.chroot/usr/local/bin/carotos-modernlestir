@@ -65,7 +65,7 @@ YAN_DOCK = "dock2"                             # sol yan dock: plank -n dock2
 DOCK_VARSAYILAN = (
     ("xfce4-terminal-emulator.desktop", "xfce4-terminal.desktop"),
     ("xfce4-file-manager.desktop", "thunar.desktop"),
-    ("carotos-tarayici.desktop", "xfce4-web-browser.desktop", "firefox-esr.desktop", "firefox.desktop"),
+    ("xfce4-web-browser.desktop", "firefox-esr.desktop", "firefox.desktop"),
     ("xfce4-appfinder.desktop",),
     ("xfce4-settings-manager.desktop",),
 )
