@@ -1,0 +1,172 @@
+#!/usr/bin/python3 -I
+# -*- coding: utf-8 -*-
+"""CarotOS: "Carot Sleek" gorunumunun paketlerini kurar (root olarak; pkexec ya da sudo ile).
+
+Kullanim:  carotos-tema-kur [kur | durum]
+
+  kur    (varsayilan) asagidaki SABIT paket listesini Debian'in imzali depolarindan apt-get ile kurar.
+         Once yalnizca indirir (@@CAROTOS-FAZ indirme), sonra kurar (@@CAROTOS-FAZ kurulum).
+         Paketlerin hepsi zaten kuruluysa apt calistirilmaz.
+  durum  her paket icin "<paket> kurulu|eksik" yazar; root gerekmez.
+
+Hicbir arguman apt-get'e aktarilmaz; paket listesi kodun icindedir. apt-get ve dpkg-query yalnizca tam
+yoluyla, sabit ortamla (PATH sistem dizinleri, LC_ALL=C, DEBIAN_FRONTEND=noninteractive), kabuksuz ve
+stdin kapali calistirilir. "apt-get update" BILEREK yapilmaz (depolar ISO'da ayarli gelir).
+Tek dosya, yalnizca standart kutuphane (root olarak calisir; kullanicinin yazabildigi modullere dayanmaz).
+
+Cikis kodlari:
+  0 tamam (ya da zaten kurulu)   2 yanlis kullanim       3 root degil
+  4 paket bulunamadi (depo listesi yok/eski ya da internet yok)
+  5 ag yok (indirilemedi)        6 paket yoneticisi mesgul (kilit)
+  7 apt-get baska bir nedenle basarisiz   127 apt-get bulunamadi
+"""
+import os
+import subprocess
+import sys
+
+sys.dont_write_bytecode = True
+
+APT_GET = "/usr/bin/apt-get"
+DPKG_QUERY = "/usr/bin/dpkg-query"
+PAKETLER = (
+    "orchis-gtk-theme",
+    "papirus-icon-theme",
+    "bibata-cursor-theme",
+    "fonts-inter",
+    "fonts-jetbrains-mono",
+    "picom",
+    "plank",
+    "rofi",
+)
+KOMUTLAR = ("kur", "durum")
+ORTAM = {
+    "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+    "DEBIAN_FRONTEND": "noninteractive",
+    "LC_ALL": "C",
+    "LANGUAGE": "C",
+}
+FAZ = "@@CAROTOS-FAZ "
+KILIT = ["-o", "DPkg::Lock::Timeout=60"]
+CONF = ["-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold"]
+EN_FAZLA_SATIR = 5000            # apt ciktisindan aktarilan en fazla satir
+SATIR_UZUNLUGU = 400             # aktarilan satir bu uzunlukta kesilir
+
+KOD_KULLANIM, KOD_ROOT, KOD_BULUNAMADI, KOD_AG, KOD_KILIT, KOD_APT = 2, 3, 4, 5, 6, 7
+KOD_APT_YOK = 127
+
+ILETILER = {
+    KOD_BULUNAMADI: "paket bulunamadi: depo listesi yok ya da eski, veya internet yok "
+                    "(internet baglantisini denetleyip 'sudo apt update' ile yeniden deneyin)",
+    KOD_AG: "internet yok: paketler indirilemedi (baglantiyi denetleyin)",
+    KOD_KILIT: "paket yoneticisi baska bir islemle mesgul (Magaza ya da guncelleme bitince yeniden deneyin)",
+    KOD_APT: "apt-get basarisiz oldu (ayrinti yukaridaki ciktida)",
+}
+
+_BULUNAMADI = ("unable to locate package", "has no installation candidate", "no installation candidate")
+_AG = ("temporary failure resolving", "could not resolve", "failed to fetch", "unable to fetch some archives",
+       "network is unreachable", "connection timed out", "could not connect")
+_KILIT = ("could not get lock", "unable to acquire the dpkg frontend lock", "unable to lock")
+
+
+def kurulu_mu(paket, dpkg_query=DPKG_QUERY, ortam=None):
+    try:
+        sonuc = subprocess.run([dpkg_query, "-W", "-f", "${Status}", "--", paket], env=ortam or ORTAM,
+                               stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                               timeout=30, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return sonuc.returncode == 0 and sonuc.stdout.decode("utf-8", "replace").strip() == "install ok installed"
+
+
+def eksikler(dpkg_query=DPKG_QUERY, ortam=None):
+    return [p for p in PAKETLER if not kurulu_mu(p, dpkg_query, ortam)]
+
+
+def komutlar(apt_get=APT_GET):
+    """(indirme komutu, kurulum komutu) -- ikisi de sabit liste."""
+    ortak = [apt_get, "-y", *KILIT, "--no-install-recommends"]
+    return ([*ortak, "--download-only", "install", "--", *PAKETLER],
+            [*ortak, *CONF, "install", "--", *PAKETLER])
+
+
+def hata_turu(satirlar):
+    """apt ciktisindan cikis kodu tahmini (once kilit, sonra bulunamadi, sonra ag)."""
+    metin = "\n".join(satirlar).lower()
+    if any(k in metin for k in _KILIT):
+        return KOD_KILIT
+    if any(k in metin for k in _BULUNAMADI):
+        return KOD_BULUNAMADI
+    if any(k in metin for k in _AG):
+        return KOD_AG
+    return KOD_APT
+
+
+def yaz(satir, akis=None):
+    akis = akis or sys.stdout
+    akis.write(satir + "\n")
+    akis.flush()
+
+
+def calistir(komut, ortam, akis=None):
+    """Komutu calistirir, ciktisini satir satir (sinirli) aktarir. Donus: (kod, son satirlar)."""
+    son = []
+    aktarilan = 0
+    try:
+        surec = subprocess.Popen(komut, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                 stderr=subprocess.STDOUT, env=ortam, close_fds=True)
+    except OSError as exc:
+        return KOD_APT_YOK, [str(exc)]
+    with surec.stdout:
+        for ham in surec.stdout:
+            satir = ham.decode("utf-8", "replace").rstrip("\r\n")[:SATIR_UZUNLUGU]
+            son.append(satir)
+            if len(son) > 200:
+                del son[0]
+            if aktarilan < EN_FAZLA_SATIR:
+                yaz(satir, akis)
+                aktarilan += 1
+    return surec.wait(), son
+
+
+def main(argv=None, apt_get=APT_GET, dpkg_query=DPKG_QUERY, ortam=None, root_mu=None, akis=None):
+    argv = sys.argv[1:] if argv is None else list(argv)
+    ortam = dict(ORTAM) if ortam is None else ortam
+    if len(argv) > 1 or (argv and argv[0] not in KOMUTLAR):
+        sys.stderr.write("kullanim: carotos-tema-kur [kur|durum]\n")
+        return KOD_KULLANIM
+    komut = argv[0] if argv else "kur"
+
+    if komut == "durum":
+        for p in PAKETLER:
+            yaz("%s %s" % (p, "kurulu" if kurulu_mu(p, dpkg_query, ortam) else "eksik"), akis)
+        return 0
+
+    root = (os.geteuid() == 0) if root_mu is None else root_mu
+    if not root:
+        sys.stderr.write("carotos-tema-kur: root gerekli (pkexec ya da sudo ile calistirin)\n")
+        return KOD_ROOT
+    if not os.path.isabs(apt_get) or not os.access(apt_get, os.X_OK):
+        sys.stderr.write("carotos-tema-kur: apt-get bulunamadi\n")
+        return KOD_APT_YOK
+    if not eksikler(dpkg_query, ortam):
+        yaz("@@CAROTOS-TAMAM zaten kurulu", akis)
+        return 0
+
+    indirme, kurulum = komutlar(apt_get)
+    for faz, komut_listesi in (("indirme", indirme), ("kurulum", kurulum)):
+        yaz(FAZ + faz, akis)
+        kod, son = calistir(komut_listesi, ortam, akis)
+        if kod == KOD_APT_YOK:
+            sys.stderr.write("carotos-tema-kur: apt-get calistirilamadi\n")
+            return KOD_APT_YOK
+        if kod != 0:
+            tur = hata_turu(son)
+            sys.stderr.write("carotos-tema-kur: %s\n" % ILETILER[tur])
+            yaz("@@CAROTOS-HATA %d" % tur, akis)
+            return tur
+    yaz("@@CAROTOS-TAMAM kuruldu", akis)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,1020 @@
+#!/usr/bin/python3 -I
+# -*- coding: utf-8 -*-
+"""CarotOS: "Carot Sleek" gorunumunu uygular ya da geri alir (KULLANICI olarak; root DEGIL).
+
+Kullanim:  carotos-modernlestir uygula | geri-al | durum
+
+Paketler (Orchis, Papirus, Bibata, Inter, JetBrains Mono, picom, plank, rofi) once
+/usr/local/sbin/carotos-tema-kur ile kurulmus olmalidir; bu betik paket kurmaz.
+
+uygula   Degisecek her xfconf degerinin, dosyanin ve gsettings anahtarinin ESKI halini
+         ~/.local/state/carotos/sleek-yedek.json dosyasina (0600, atomik) yazar, sonra:
+           - GTK/xfwm4 temasi, simgeler, imlec (24), Inter 10, ortali baslik
+           - picom (yuvarlak kose, golge; gercek makinede bulanıklik+solma; sanal makinede
+             xrender, bulanıklik/solma kapali) + xfwm4'un kendi birlestiricisi kapatilir
+           - ust panel ince (30) ve yari saydam (gtk.css blogu), saat bicimi; eklenti yerlesimine
+             dokunulmaz. Yalniz baslaticidan olusan ikinci panel (alt dock) plank ile cakismasin diye
+             panel listesinden cikarilir (ayarlari silinmez; geri al ile doner)
+           - plank (alt orta, akilli gizleme, buyutme), rofi (Super+Space), terminal (JetBrains Mono,
+             saydam, marka renkleri), autostart dosyalari
+         Ikinci kez calistirilinca ILK yedek korunur (yalniz yeni anahtarlar eklenir).
+         Bir adim basarisiz olursa yedekten her sey eski haline getirilir.
+geri-al  Yedegi geri yukler: xfconf eski degerler (yoksa silinir), bizim dosyalar silinir ya da eski
+         icerige doner, gtk.css'ten yalniz bizim blok kalkar, terminalrc'de yalniz bizim anahtarlar
+         eski degerine doner, picom/plank kapatilir. Paketler kaldirilmaz.
+durum    Uygulanmis mi, sanal makine mi, eksik program var mi.
+
+Disaridan girdi almaz. Programlar yalniz /usr/bin altindaki tam yollariyla, kabuksuz, temiz ortamla
+calistirilir. Tek dosya, yalnizca standart kutuphane.
+
+Cikis kodlari: 0 tamam, 2 yanlis kullanim, 3 root olarak calistirildi, 4 eksik program/paket,
+5 uygulama/geri alma hatasi (uygulamada her sey geri alindi), 6 yedek yok, 7 yedek bozuk (kenara alindi).
+"""
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.parse
+
+sys.dont_write_bytecode = True
+
+KOD_KULLANIM, KOD_ROOT, KOD_EKSIK, KOD_HATA, KOD_YEDEK_YOK, KOD_YEDEK_BOZUK = 2, 3, 4, 5, 6, 7
+
+YEDEK_SURUM = 1
+CSS_BAS = "/* CAROTOS-SLEEK-BAŞLANGIÇ */"
+CSS_SON = "/* CAROTOS-SLEEK-SON */"
+DESKTOP_ISARETI = "X-CarotOS-Sleek=true"
+
+TEMA_ADAYLARI = ("Orchis-Dark-Compact", "Orchis-Dark")
+SIMGE_ADAYLARI = ("Papirus-Dark",)
+IMLEC_ADAYLARI = ("Bibata-Modern-Ice", "Bibata-Modern-Classic")
+IMLEC_BOYU = 24
+UI_YAZI = "Inter"
+MONO_YAZI = "JetBrains Mono"
+PANEL_BOYU = 30
+SAAT_BICIMI = "%a %d %b  %H:%M"
+KISAYOL = "<Super>space"
+DOCK_PANEL_TURLERI = {"launcher", "separator", "showdesktop", "directorymenu"}
+PLANK_SEMA = "net.launchpad.plank.dock.settings:/net/launchpad/plank/docks/dock1/"
+# Karsilama "Varsayilan dock simgeleri": her grup icin ilk VAR olan .desktop alinir
+DOCK_VARSAYILAN = (
+    ("carotos-magaza.desktop",),
+    ("carotos-security-panel.desktop",),
+    ("carotos-carotene.desktop",),
+    ("xfce4-file-manager.desktop", "thunar.desktop"),
+    ("xfce4-terminal-emulator.desktop", "xfce4-terminal.desktop"),
+    ("carotos-welcome.desktop",),
+)
+GEREKLI_PROGRAMLAR = ("xfconf-query", "picom", "plank", "rofi", "gsettings")
+
+# Marka renkleri (logo mavisi #5196d6, koyu #2568a9, zemin #001239 / #000b24)
+RENK_ZEMIN = "#000b24"
+RENK_YAZI = "#d6e4f5"
+RENK_VURGU = "#5196d6"
+PALET = ("#001239;#e06c75;#7ec699;#e5c07b;#5196d6;#b48ead;#56b6c2;#c8d3e0;"
+         "#3a4d6e;#ff7b86;#98d8a9;#f0d08c;#7ab3ea;#c9a6d4;#7fd0da;#ffffff")
+TERMINALRC_ANAHTARLARI = (
+    ("FontName", MONO_YAZI + " 11"),
+    ("FontUseSystem", "FALSE"),
+    ("BackgroundMode", "TERMINAL_BACKGROUND_TRANSPARENT"),
+    ("BackgroundDarkness", "0.880000"),
+    ("ColorForeground", RENK_YAZI),
+    ("ColorBackground", RENK_ZEMIN),
+    ("ColorCursor", RENK_VURGU),
+    ("ColorCursorUseDefault", "FALSE"),
+    ("ColorPalette", PALET),
+)
+# xfce4-terminal 1.1+ ayarlari xfconf'ta tutar (kanal bossa terminalrc'yi ilk acilista tasir)
+TERMINAL_XFCONF = (
+    ("/font-name", "string", MONO_YAZI + " 11"),
+    ("/font-use-system", "bool", False),
+    ("/background-mode", "string", "TERMINAL_BACKGROUND_TRANSPARENT"),
+    ("/background-darkness", "double", "0.880000"),
+    ("/color-foreground", "string", RENK_YAZI),
+    ("/color-background", "string", RENK_ZEMIN),
+    ("/color-cursor", "string", RENK_VURGU),
+    ("/color-cursor-use-default", "bool", False),
+    ("/color-palette", "string", PALET),
+)
+ORTAM_ANAHTARLARI = ("HOME", "USER", "LOGNAME", "DISPLAY", "XAUTHORITY", "DBUS_SESSION_BUS_ADDRESS",
+                     "XDG_RUNTIME_DIR", "XDG_SESSION_TYPE", "XDG_CURRENT_DESKTOP", "XDG_DATA_DIRS",
+                     "XDG_CONFIG_DIRS", "XDG_SESSION_ID", "LANG")
+
+
+class UygulamaHatasi(Exception):
+    pass
+
+
+# ---------------------------------------------------------------------------
+# Ortam: dis dunyaya dokunan her sey burada (testte yerine sahtesi konur)
+# ---------------------------------------------------------------------------
+
+def temiz_ortam(c_dili=True, kaynak=None):
+    kaynak = os.environ if kaynak is None else kaynak
+    ortam = {k: kaynak[k] for k in ORTAM_ANAHTARLARI if k in kaynak}
+    ortam["PATH"] = "/usr/bin:/bin"
+    if c_dili:
+        ortam["LC_ALL"] = "C"
+        ortam["LANGUAGE"] = "C"
+    return ortam
+
+
+class Ortam:
+    def __init__(self, ev, bin_dizini="/usr/bin", uygulamalar="/usr/share/applications",
+                 temalar="/usr/share/themes", simgeler="/usr/share/icons", calistir=None, baslat=None,
+                 program_var=None, bekle=None, dil=None, config=None):
+        self.ev = ev
+        self.config = config if config and os.path.isabs(config) else os.path.join(ev, ".config")
+        self.durum_dizini = os.path.join(ev, ".local", "state", "carotos")
+        self.yedek_yolu = os.path.join(self.durum_dizini, "sleek-yedek.json")
+        self.bin_dizini = bin_dizini
+        self.uygulamalar = uygulamalar
+        self.temalar = temalar
+        self.simgeler = simgeler
+        self._calistir = calistir
+        self._baslat = baslat
+        self._program_var = program_var
+        self.bekle = bekle or time.sleep
+        lang = os.environ.get("LANG", "") if dil is None else dil
+        self.dil = "tr" if lang.startswith("tr") else "en"
+        self.uid = os.getuid()
+
+    def prog(self, ad):
+        return os.path.join(self.bin_dizini, ad)
+
+    def program_var(self, ad):
+        if self._program_var is not None:
+            return self._program_var(ad)
+        yol = self.prog(ad)
+        return os.path.isfile(yol) and os.access(yol, os.X_OK)
+
+    def calistir(self, argv, zaman=30):
+        """(cikis kodu, stdout metni). Program yoksa ya da zaman asimi: (127, "")."""
+        if self._calistir is not None:
+            return self._calistir(list(argv))
+        try:
+            s = subprocess.run(argv, env=temiz_ortam(), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                               stderr=subprocess.DEVNULL, timeout=zaman, check=False)
+        except (OSError, subprocess.SubprocessError):
+            return 127, ""
+        return s.returncode, s.stdout.decode("utf-8", "replace")
+
+    def baslat(self, argv):
+        """Arka planda, oturumdan bagimsiz baslatir (picom, plank, xfce4-panel).
+
+        Bunlar oturumun kalici parcalaridir (panelden acilan uygulamalar panelin ortamini devralir);
+        bu yuzden oturum ortami korunur, yalniz kitaplik/yorumlayici enjeksiyonu degiskenleri atilir.
+        Program yine tam yoluyla cagrilir; ayristirilan komutlar icin temiz_ortam() kullanilir."""
+        if self._baslat is not None:
+            return self._baslat(list(argv))
+        ortam = {k: v for k, v in os.environ.items() if not k.startswith(("LD_", "PYTHON"))}
+        try:
+            subprocess.Popen(argv, env=ortam, stdin=subprocess.DEVNULL,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, close_fds=True,
+                             start_new_session=True)
+            return True
+        except OSError:
+            return False
+
+    def yol(self, *parcalar):
+        return os.path.join(self.config, *parcalar)
+
+
+# ---------------------------------------------------------------------------
+# xfconf
+# ---------------------------------------------------------------------------
+
+def xq_oku(o, kanal, ozellik):
+    """(var_mi, deger). Dizi ise deger str listesi, degilse tek satir str."""
+    kod, cikti = o.calistir([o.prog("xfconf-query"), "-c", kanal, "-p", ozellik])
+    if kod != 0:
+        return False, None
+    if cikti.startswith("Value is an array"):
+        govde = cikti.split("\n\n", 1)[1] if "\n\n" in cikti else ""
+        return True, [s for s in govde.splitlines() if s.strip()]
+    return True, cikti.rstrip("\n")
+
+
+def _deger_metni(tur, deger):
+    if tur == "bool":
+        if isinstance(deger, bool):
+            return "true" if deger else "false"
+        return "true" if str(deger).strip().lower() in ("true", "1", "yes") else "false"
+    return str(deger)
+
+
+def xq_yaz(o, kanal, ozellik, tur, deger):
+    argv = [o.prog("xfconf-query"), "-c", kanal, "-p", ozellik, "-n"]
+    if tur.startswith("dizi:"):
+        ogetur = tur.split(":", 1)[1]
+        argv.append("-a")
+        for d in deger:
+            argv += ["-t", ogetur, "-s", _deger_metni(ogetur, d)]
+    else:
+        argv += ["-t", tur, "-s", _deger_metni(tur, deger)]
+    kod, _ = o.calistir(argv)
+    if kod != 0:
+        raise UygulamaHatasi("xfconf yazilamadi: %s %s" % (kanal, ozellik))
+
+
+def xq_sil(o, kanal, ozellik):
+    o.calistir([o.prog("xfconf-query"), "-c", kanal, "-p", ozellik, "-r"])
+
+
+def xq_kanal_dolu(o, kanal):
+    kod, cikti = o.calistir([o.prog("xfconf-query"), "-c", kanal, "-l"])
+    return kod == 0 and bool(cikti.strip())
+
+
+# ---------------------------------------------------------------------------
+# Dosya yardimcilari
+# ---------------------------------------------------------------------------
+
+def atomik_yaz(yol, metin, izin=0o600):
+    dizin = os.path.dirname(yol)
+    os.makedirs(dizin, mode=0o700, exist_ok=True)
+    fd, gecici = tempfile.mkstemp(prefix=".carotos-tmp-", dir=dizin)
+    try:
+        os.fchmod(fd, izin)
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(metin)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(gecici, yol)
+    except BaseException:
+        try:
+            os.unlink(gecici)
+        except OSError:
+            pass
+        raise
+
+
+def oku(yol, sinir=1 << 20):
+    """Dosya metni; yoksa None. Cok buyukse ya da okunamazsa UygulamaHatasi."""
+    if not os.path.lexists(yol):
+        return None
+    if os.path.islink(yol) or not os.path.isfile(yol):
+        raise UygulamaHatasi("duzenli dosya degil (sembolik bag?): %s" % yol)
+    if os.path.getsize(yol) > sinir:
+        raise UygulamaHatasi("dosya cok buyuk: %s" % yol)
+    with open(yol, encoding="utf-8", errors="surrogateescape") as fh:
+        return fh.read()
+
+
+def desktop_exec_alintila(arg):
+    if re.fullmatch(r"[A-Za-z0-9_@%+=:,./-]+", arg):
+        return arg
+    return '"' + re.sub(r'(["`$\\])', r"\\\1", arg) + '"'
+
+
+def autostart_metni(ad, argv):
+    exec_satiri = " ".join(desktop_exec_alintila(a) for a in argv)
+    return ("[Desktop Entry]\nType=Application\nName=%s\nComment=CarotOS Sleek (carotos-modernlestir)\n"
+            "Exec=%s\nOnlyShowIn=XFCE;\nNoDisplay=true\nX-GNOME-Autostart-enabled=true\n%s\n"
+            % (ad, exec_satiri, DESKTOP_ISARETI))
+
+
+# ---------------------------------------------------------------------------
+# Uretilen metinler
+# ---------------------------------------------------------------------------
+
+def picom_conf(sanal):
+    """picom 10..12.5 ile uyumlu eski tip anahtarlar ("rules" kullanilmaz, karistirilmaz)."""
+    tam_ekran = "\"_NET_WM_STATE@:32a *= '_NET_WM_STATE_FULLSCREEN'\""
+    s = [
+        "# CarotOS \"Carot Sleek\" picom ayarlari (carotos-modernlestir uretti).",
+        "# Geri almak icin: carotos-modernlestir geri-al",
+        "# Mod: %s" % ("sanal makine (xrender, bulaniklik ve solma kapali)" if sanal
+                       else "gercek makine (glx, bulaniklik ve solma acik)"),
+        "",
+        'backend = "%s";' % ("xrender" if sanal else "glx"),
+        "vsync = %s;" % ("false" if sanal else "true"),
+        "use-damage = true;",
+        "detect-rounded-corners = true;",
+        "detect-client-opacity = true;",
+        "detect-transient = true;",
+        "mark-wmwin-focused = true;",
+        "mark-ovredir-focused = true;",
+        "",
+        "corner-radius = 12;",
+        "rounded-corners-exclude = [",
+        "  \"window_type = 'dock'\",",
+        "  \"window_type = 'desktop'\",",
+        "  \"class_g = 'Plank'\",",
+        "  \"class_g = 'Xfdesktop'\",",
+        "  " + tam_ekran,
+        "];",
+        "",
+        "shadow = true;",
+        "shadow-radius = 24;",
+        "shadow-opacity = 0.35;",
+        "shadow-offset-x = -24;",
+        "shadow-offset-y = -16;",
+        "shadow-exclude = [",
+        "  \"window_type = 'dock'\",",
+        "  \"window_type = 'desktop'\",",
+        "  \"window_type = 'dnd'\",",
+        "  \"class_g = 'Plank'\",",
+        "  \"class_g = 'Xfdesktop'\",",
+        "  \"_GTK_FRAME_EXTENTS@:c\",",
+        "  " + tam_ekran,
+        "];",
+        "",
+    ]
+    if sanal:
+        s += ["fading = false;", "blur-background = false;", ""]
+    else:
+        s += [
+            "fading = true;",
+            "fade-in-step = 0.03;",
+            "fade-out-step = 0.03;",
+            "fade-delta = 5;",
+            "",
+            "# Bulaniklik yalniz yari saydam panel, dock, menu, bildirim, terminal ve rofi icin",
+            'blur-method = "dual_kawase";',
+            "blur-strength = 6;",
+            "blur-background = true;",
+            "blur-background-frame = false;",
+            "blur-background-fixed = false;",
+            "blur-background-exclude = [",
+            "  \"window_type = 'desktop'\",",
+            "  \"window_type = 'dnd'\",",
+            "  \"window_type = 'tooltip'\",",
+            "  \"window_type = 'splash'\",",
+            "  \"window_type = 'utility'\",",
+            "  \"window_type = 'dialog'\",",
+            "  \"window_type = 'normal' && class_g != 'Xfce4-terminal' && class_g != 'Rofi'\",",
+            "  \"_GTK_FRAME_EXTENTS@:c\"",
+            "];",
+            "",
+        ]
+    s += [
+        "wintypes:",
+        "{",
+        "  tooltip = { fade = true; shadow = false; };",
+        "  dock = { shadow = false; };",
+        "  dnd = { shadow = false; };",
+        "};",
+        "",
+    ]
+    return "\n".join(s)
+
+
+def css_blogu():
+    return "\n".join([
+        CSS_BAS,
+        "/* carotos-modernlestir ekledi; geri al yalniz bu blogu siler. */",
+        ".xfce4-panel.panel,",
+        "#XfcePanelWindow {",
+        "  background-color: rgba(0, 18, 57, 0.75);",
+        "  border: none;",
+        "}",
+        ".xfce4-panel button { border-radius: 8px; }",
+        ".xfce4-panel #tasklist-button:checked,",
+        ".xfce4-panel button:checked { border-bottom: 2px solid %s; }" % RENK_VURGU,
+        "menu, .menu, .context-menu { border-radius: 12px; padding: 6px; }",
+        "menu menuitem, .menu menuitem { border-radius: 8px; padding: 6px 10px; }",
+        "#whiskermenu-window { border-radius: 14px; }",
+        "#whiskermenu-window entry { border-radius: 10px; padding: 6px 10px; }",
+        "#whiskermenu-window button { border-radius: 8px; }",
+        CSS_SON,
+    ]) + "\n"
+
+
+_BLOK = re.compile(r"\n?" + re.escape(CSS_BAS) + r".*?" + re.escape(CSS_SON) + r"[ \t]*\n?", re.S)
+
+
+def css_blok_ekle(metin, blok):
+    """Mevcut icerik korunur; bizim blok varsa yerine konur, yoksa sona eklenir."""
+    metin = metin or ""
+    if CSS_BAS in metin and CSS_SON not in metin:
+        raise UygulamaHatasi("gtk.css icinde yarim CarotOS blogu var; elle duzeltin")
+    temiz = css_blok_kaldir(metin)
+    if temiz and not temiz.endswith("\n"):
+        temiz += "\n"
+    return temiz + ("\n" if temiz else "") + blok
+
+
+def css_blok_kaldir(metin):
+    if not metin:
+        return metin
+    if CSS_BAS in metin and CSS_SON not in metin:
+        return metin                       # yarim blok: dokunma
+    # css_blok_ekle blogun onune bir bos satir koyar: o satir da blokla birlikte kalkar
+    return _BLOK.sub("", metin, count=1)
+
+
+def rofi_temasi(dil):
+    yer = "Uygulama ara…" if dil == "tr" else "Search apps…"
+    return "\n".join([
+        "/* CarotOS \"Carot Sleek\" rofi temasi (carotos-modernlestir). */",
+        "configuration {",
+        '  modi: "drun,run";',
+        "  show-icons: true;",
+        '  icon-theme: "Papirus-Dark";',
+        '  font: "%s 11";' % UI_YAZI,
+        '  drun-display-format: "{name}";',
+        '  display-drun: "";',
+        '  display-run: "$";',
+        "}",
+        "* {",
+        "  bg: #000b24e6;",
+        "  bg-alt: #0b2350;",
+        "  fg: #e6eef8;",
+        "  fg-dim: #8aa3c4;",
+        "  accent: #5196d6;",
+        "  background-color: transparent;",
+        "  text-color: @fg;",
+        "}",
+        "window {",
+        "  width: 640px;",
+        "  location: center;",
+        "  anchor: center;",
+        "  border: 1px;",
+        "  border-color: #5196d659;",
+        "  border-radius: 16px;",
+        "  background-color: @bg;",
+        "  padding: 18px;",
+        "}",
+        "mainbox { spacing: 12px; children: [ inputbar, listview ]; }",
+        "inputbar {",
+        "  children: [ prompt, entry ];",
+        "  spacing: 10px;",
+        "  padding: 10px 14px;",
+        "  border-radius: 12px;",
+        "  background-color: @bg-alt;",
+        "}",
+        "prompt { text-color: @accent; }",
+        'entry { placeholder: "%s"; placeholder-color: @fg-dim; }' % yer,
+        "listview { lines: 8; columns: 1; fixed-height: false; scrollbar: false; spacing: 4px; }",
+        "element { padding: 8px 12px; border-radius: 10px; spacing: 12px; }",
+        "element selected.normal { background-color: @accent; text-color: #ffffff; }",
+        "element-icon { size: 28px; background-color: inherit; text-color: inherit; }",
+        "element-text { vertical-align: 0.5; background-color: inherit; text-color: inherit; }",
+        "",
+    ])
+
+
+def terminalrc_ayarla(metin, anahtarlar):
+    """[Configuration] bolumunde yalniz verilen anahtarlari degistirir. (yeni_metin, eski{anahtar: deger|None})."""
+    satirlar = (metin or "").splitlines()
+    if not any(s.strip() == "[Configuration]" for s in satirlar):
+        satirlar = ["[Configuration]"] + satirlar
+    eski = {k: None for k, _ in anahtarlar}
+    istenen = dict(anahtarlar)
+    yeni, bolum, yazilan = [], None, set()
+    for s in satirlar:
+        cizgi = s.strip()
+        if cizgi.startswith("[") and cizgi.endswith("]"):
+            if bolum == "[Configuration]":
+                yeni += ["%s=%s" % (k, v) for k, v in anahtarlar if k not in yazilan]
+                yazilan.update(istenen)
+            bolum = cizgi
+            yeni.append(s)
+            continue
+        if bolum == "[Configuration]" and "=" in s:
+            k = s.split("=", 1)[0].strip()
+            if k in istenen:
+                if k not in yazilan:
+                    eski[k] = s.split("=", 1)[1]
+                    yeni.append("%s=%s" % (k, istenen[k]))
+                    yazilan.add(k)
+                continue                    # yinelenen anahtar satiri atilir
+        yeni.append(s)
+    if bolum == "[Configuration]":
+        yeni += ["%s=%s" % (k, v) for k, v in anahtarlar if k not in yazilan]
+    return "\n".join(yeni) + "\n", eski
+
+
+def terminalrc_geri(metin, eski):
+    """Yalniz bizim anahtarlar: eski degeri olan geri yazilir, olmayan satir silinir."""
+    if metin is None:
+        return None
+    satirlar, yeni, bolum, yazilan = metin.splitlines(), [], None, set()
+    for s in satirlar:
+        cizgi = s.strip()
+        if cizgi.startswith("[") and cizgi.endswith("]"):
+            bolum = cizgi
+            yeni.append(s)
+            continue
+        if bolum == "[Configuration]" and "=" in s:
+            k = s.split("=", 1)[0].strip()
+            if k in eski:
+                if eski[k] is not None and k not in yazilan:
+                    yeni.append("%s=%s" % (k, eski[k]))
+                    yazilan.add(k)
+                continue
+        yeni.append(s)
+    return "\n".join(yeni) + "\n"
+
+
+# ---------------------------------------------------------------------------
+# Plan: neyin degisecegi (hicbir sey yazmadan hesaplanir)
+# ---------------------------------------------------------------------------
+
+def sanal_makine_mi(o):
+    kod, _ = o.calistir([o.prog("systemd-detect-virt"), "--vm", "--quiet"])
+    return kod == 0
+
+
+def yazi_tipi_var(o, aile):
+    kod, cikti = o.calistir([o.prog("fc-list"), ":family=" + aile, "family"])
+    return kod == 0 and bool(cikti.strip())
+
+
+def _ilk_var(adaylar, kok, alt):
+    for a in adaylar:
+        if os.path.exists(os.path.join(kok, a, alt)):
+            return a
+    return None
+
+
+def _uygulama_yolu(o, ad):
+    yol = os.path.join(o.uygulamalar, ad)
+    return yol if os.path.isfile(yol) else None
+
+
+def _baslatici_kaynagi(o, dosya):
+    """Panel baslaticisinin sistemdeki asil .desktop dosyasi (X-XFCE-Source), yoksa dosyanin kendisi."""
+    try:
+        metin = oku(dosya, 65536) or ""
+    except UygulamaHatasi:
+        return None
+    m = re.search(r"^X-XFCE-Source=file://(\S+)$", metin, re.M)
+    if m:
+        kaynak = urllib.parse.unquote(m.group(1))
+        if (os.path.dirname(kaynak) == o.uygulamalar.rstrip("/") and kaynak.endswith(".desktop")
+                and os.path.isfile(kaynak)):
+            return kaynak
+    return dosya
+
+
+def _int_listesi(deger):
+    if not isinstance(deger, list):
+        return []
+    return [d.strip() for d in deger if d.strip().isdigit()]
+
+
+def panel_plani(o, plan):
+    var, paneller = xq_oku(o, "xfce4-panel", "/panels")
+    paneller = _int_listesi(paneller) if var else []
+    if not paneller:
+        plan["uyarilar"].append("panel listesi okunamadi; panel ayarlari atlandi")
+        return []
+    ana = paneller[0]
+    plan["xfconf"] += [
+        ("xfce4-panel", "/panels/panel-%s/size" % ana, "uint", PANEL_BOYU),
+        ("xfce4-panel", "/panels/panel-%s/background-style" % ana, "uint", 0),
+    ]
+    _, ana_eklentiler = xq_oku(o, "xfce4-panel", "/panels/panel-%s/plugin-ids" % ana)
+    for eid in _int_listesi(ana_eklentiler):
+        _, tur = xq_oku(o, "xfce4-panel", "/plugins/plugin-%s" % eid)
+        if tur == "clock":
+            plan["xfconf"].append(("xfce4-panel", "/plugins/plugin-%s/digital-time-format" % eid,
+                                   "string", SAAT_BICIMI))
+    baslaticilar, gizlenen = [], []
+    for pid in paneller[1:]:
+        _, eklentiler = xq_oku(o, "xfce4-panel", "/panels/panel-%s/plugin-ids" % pid)
+        eklentiler = _int_listesi(eklentiler)
+        turler = {}
+        for eid in eklentiler:
+            _, tur = xq_oku(o, "xfce4-panel", "/plugins/plugin-%s" % eid)
+            turler[eid] = tur
+        if not eklentiler or not set(turler.values()) <= DOCK_PANEL_TURLERI \
+                or "launcher" not in turler.values():
+            continue
+        gizlenen.append(pid)
+        for eid in eklentiler:
+            if turler[eid] != "launcher":
+                continue
+            _, ogeler = xq_oku(o, "xfce4-panel", "/plugins/plugin-%s/items" % eid)
+            for oge in ogeler if isinstance(ogeler, list) else []:
+                oge = oge.strip()
+                if "/" in oge or not oge.endswith(".desktop"):
+                    continue
+                dosya = o.yol("xfce4", "panel", "launcher-%s" % eid, oge)
+                if os.path.isfile(dosya):
+                    kaynak = _baslatici_kaynagi(o, dosya)
+                    if kaynak:
+                        baslaticilar.append(kaynak)
+    if gizlenen:
+        plan["paneller"] = [p for p in paneller if p not in gizlenen]
+        plan["uyarilar"].append("alt dock paneli (panel-%s) plank ile cakismasin diye gizlendi; "
+                                "geri al ile doner" % ", panel-".join(gizlenen))
+    return baslaticilar
+
+
+def _dockitem_adi(desktop_yolu):
+    taban = os.path.basename(desktop_yolu)[:-len(".desktop")]
+    return "carotos-" + re.sub(r"[^A-Za-z0-9._-]", "_", taban) + ".dockitem"
+
+
+def _gvariant_dizi(metin):
+    return re.findall(r"'((?:[^'\\]|\\.)*)'", metin or "")
+
+
+def plan_olustur(o):
+    plan = {"xfconf": [], "dosyalar": {}, "terminalrc": list(TERMINALRC_ANAHTARLARI),
+            "terminal_xfconf": False, "gsettings": [], "paneller": None, "uyarilar": []}
+    sanal = sanal_makine_mi(o)
+    plan["sanal"] = sanal
+
+    # 1) GTK / xfwm4
+    tema = _ilk_var(TEMA_ADAYLARI, o.temalar, "gtk-3.0")
+    if tema:
+        plan["xfconf"].append(("xsettings", "/Net/ThemeName", "string", tema))
+        xfwm = _ilk_var((tema,) + TEMA_ADAYLARI, o.temalar, os.path.join("xfwm4", "themerc"))
+        if xfwm:
+            plan["xfconf"].append(("xfwm4", "/general/theme", "string", xfwm))
+        else:
+            plan["uyarilar"].append("Orchis'in xfwm4 temasi bulunamadi; pencere kenarligi temasi degismedi")
+    else:
+        plan["uyarilar"].append("Orchis temasi bulunamadi; GTK temasi degismedi")
+    plan["tema"] = tema
+    simge = _ilk_var(SIMGE_ADAYLARI, o.simgeler, "index.theme")
+    if simge:
+        plan["xfconf"].append(("xsettings", "/Net/IconThemeName", "string", simge))
+    imlec = _ilk_var(IMLEC_ADAYLARI, o.simgeler, "cursors")
+    if imlec:
+        plan["xfconf"] += [("xsettings", "/Gtk/CursorThemeName", "string", imlec),
+                           ("xsettings", "/Gtk/CursorThemeSize", "int", IMLEC_BOYU)]
+    else:
+        plan["uyarilar"].append("Bibata imleci bulunamadi; imlec degismedi")
+    inter = yazi_tipi_var(o, UI_YAZI)
+    mono = yazi_tipi_var(o, MONO_YAZI)
+    if inter:
+        plan["xfconf"] += [("xsettings", "/Gtk/FontName", "string", UI_YAZI + " 10"),
+                           ("xfwm4", "/general/title_font", "string", UI_YAZI + " Bold 10")]
+    else:
+        plan["uyarilar"].append("Inter yazi tipi bulunamadi; arayuz yazi tipi degismedi")
+    if mono:
+        plan["xfconf"].append(("xsettings", "/Gtk/MonospaceFontName", "string", MONO_YAZI + " 10"))
+    plan["xfconf"].append(("xfwm4", "/general/title_alignment", "string", "center"))
+
+    # 3) Panel (konum/boyut/saydamlik; eklenti yerlesimine dokunulmaz)
+    panel_baslaticilari = panel_plani(o, plan)
+
+    # 5) Rofi kisayolu: Super+Space baska ise atanmissa eklenmez
+    rasi = o.yol("rofi", "carotos.rasi")
+    plan["dosyalar"][rasi] = rofi_temasi(o.dil)
+    rofi_komutu = "%s -show drun -theme %s" % (o.prog("rofi"), desktop_exec_alintila(rasi))
+    dolu = False
+    for yol in ("/commands/custom/" + KISAYOL, "/xfwm4/custom/" + KISAYOL):
+        var, deger = xq_oku(o, "xfce4-keyboard-shortcuts", yol)
+        if var and not (isinstance(deger, str) and "carotos.rasi" in deger):
+            dolu = True
+    if dolu:
+        plan["uyarilar"].append("Super+Space baska bir ise atanmis; rofi kisayolu EKLENMEDI")
+    else:
+        plan["xfconf"].append(("xfce4-keyboard-shortcuts", "/commands/custom/" + KISAYOL, "string",
+                               rofi_komutu))
+
+    # 6) Terminal
+    if not mono:
+        plan["terminalrc"] = [(k, v) for k, v in plan["terminalrc"] if k not in ("FontName", "FontUseSystem")]
+    if xq_kanal_dolu(o, "xfce4-terminal"):
+        plan["terminal_xfconf"] = True
+        for ozellik, tur, deger in TERMINAL_XFCONF:
+            if not mono and ozellik in ("/font-name", "/font-use-system"):
+                continue
+            plan["xfconf"].append(("xfce4-terminal", ozellik, tur, deger))
+
+    # 1) picom + xfwm4 birlestiricisi (EN SON: picom hemen ardindan baslar)
+    picom = o.yol("picom", "picom.conf")
+    plan["dosyalar"][picom] = picom_conf(sanal)
+    plan["dosyalar"][o.yol("autostart", "carotos-picom.desktop")] = autostart_metni(
+        "CarotOS picom", [o.prog("picom"), "--config", picom])
+    plan["dosyalar"][o.yol("autostart", "carotos-plank.desktop")] = autostart_metni(
+        "CarotOS plank", [o.prog("plank")])
+
+    # 4) Dock: varsayilanlar + gizlenen paneldeki baslaticilar
+    secilen = []
+    for grup in DOCK_VARSAYILAN:
+        for ad in grup:
+            yol = _uygulama_yolu(o, ad)
+            if yol:
+                secilen.append(yol)
+                break
+    for yol in panel_baslaticilari:
+        if yol not in secilen:
+            secilen.append(yol)
+    baslatici_dizini = o.yol("plank", "dock1", "launchers")
+    adlar = []
+    for yol in secilen:
+        ad = _dockitem_adi(yol)
+        if ad in adlar:
+            continue
+        adlar.append(ad)
+        plan["dosyalar"][os.path.join(baslatici_dizini, ad)] = (
+            "[PlankDockItemPreferences]\nLauncher=file://%s\n" % urllib.parse.quote(yol))
+    _, mevcut = o.calistir([o.prog("gsettings"), "get", PLANK_SEMA, "dock-items"])
+    ogeler = _gvariant_dizi(mevcut)
+    ogeler += [a for a in adlar if a not in ogeler]
+    plan["gsettings"] = [
+        ("position", "'bottom'"), ("alignment", "'center'"), ("hide-mode", "'intelligent'"),
+        ("zoom-enabled", "true"), ("zoom-percent", "150"), ("icon-size", "44"),
+        ("dock-items", "[" + ", ".join("'%s'" % a for a in ogeler) + "]"),
+    ]
+
+    plan["xfconf"].append(("xfwm4", "/general/use_compositing", "bool", False))
+    return plan
+
+
+# ---------------------------------------------------------------------------
+# Yedek
+# ---------------------------------------------------------------------------
+
+def _anahtar(kanal, ozellik):
+    return kanal + "|" + ozellik
+
+
+def yedek_oku(o):
+    """dict, yoksa None; bozuksa kenara alinir ve UygulamaHatasi('bozuk')."""
+    try:
+        metin = oku(o.yedek_yolu)
+    except UygulamaHatasi:
+        metin = "<okunamadi>"
+    if metin is None:
+        return None
+    try:
+        veri = json.loads(metin)
+        if not isinstance(veri, dict) or veri.get("surum") != YEDEK_SURUM:
+            raise ValueError("surum")
+        for alan, tur in (("xfconf", list), ("dosyalar", dict), ("terminalrc", dict), ("gsettings", dict)):
+            if not isinstance(veri.get(alan), tur):
+                raise ValueError(alan)
+        return veri
+    except ValueError:
+        hedef = o.yedek_yolu + ".bozuk"
+        try:
+            os.replace(o.yedek_yolu, hedef)
+        except OSError:
+            pass
+        raise UygulamaHatasi("bozuk")
+
+
+def yedek_yaz(o, yedek):
+    os.makedirs(o.durum_dizini, mode=0o700, exist_ok=True)
+    atomik_yaz(o.yedek_yolu, json.dumps(yedek, ensure_ascii=False, indent=1, sort_keys=True) + "\n", 0o600)
+
+
+def yedegi_genislet(o, plan, yedek):
+    """Planin dokunacagi ve yedekte HENUZ olmayan her seyin simdiki halini ekler (ilk yedek ezilmez)."""
+    if yedek is None:
+        yedek = {"surum": YEDEK_SURUM, "olusturma": time.strftime("%Y-%m-%d %H:%M:%S"),
+                 "xfconf": [], "dosyalar": {}, "terminalrc": {}, "gsettings": {}, "css": False}
+    bilinen = {_anahtar(x["kanal"], x["ozellik"]) for x in yedek["xfconf"]}
+    for kanal, ozellik, tur, _ in plan["xfconf"]:
+        if _anahtar(kanal, ozellik) in bilinen:
+            continue
+        var, deger = xq_oku(o, kanal, ozellik)
+        yedek["xfconf"].append({"kanal": kanal, "ozellik": ozellik, "tur": tur, "var": var, "deger": deger})
+        bilinen.add(_anahtar(kanal, ozellik))
+    if plan["paneller"] is not None and _anahtar("xfce4-panel", "/panels") not in bilinen:
+        var, deger = xq_oku(o, "xfce4-panel", "/panels")
+        yedek["xfconf"].append({"kanal": "xfce4-panel", "ozellik": "/panels", "tur": "dizi:int",
+                                "var": var, "deger": deger})
+    for yol in plan["dosyalar"]:
+        if yol not in yedek["dosyalar"]:
+            icerik = oku(yol)
+            yedek["dosyalar"][yol] = {"vardi": icerik is not None, "icerik": icerik}
+    trc = o.yol("xfce4", "terminal", "terminalrc")
+    if "anahtarlar" not in yedek["terminalrc"]:
+        yedek["terminalrc"] = {"vardi": os.path.exists(trc), "anahtarlar": {}}
+    _, eski = terminalrc_ayarla(oku(trc), plan["terminalrc"])
+    for k, v in eski.items():
+        yedek["terminalrc"]["anahtarlar"].setdefault(k, v)
+    for anahtar, _ in plan["gsettings"]:
+        if anahtar not in yedek["gsettings"]:
+            kod, cikti = o.calistir([o.prog("gsettings"), "get", PLANK_SEMA, anahtar])
+            yedek["gsettings"][anahtar] = cikti.strip() if kod == 0 and cikti.strip() else None
+    yedek["css"] = True
+    return yedek
+
+
+# ---------------------------------------------------------------------------
+# Surecler
+# ---------------------------------------------------------------------------
+
+def surec_calisiyor(o, ad):
+    kod, _ = o.calistir([o.prog("pgrep"), "-u", str(o.uid), "-x", ad])
+    return kod == 0
+
+
+def surec_durdur(o, ad):
+    o.calistir([o.prog("pkill"), "-u", str(o.uid), "-x", ad])
+
+
+def paneli_yeniden_kur(o, ayarla):
+    """/panels degisikligi calisan panele ancak yeniden baslatinca yansir: kapat, ayarla, baslat."""
+    calisiyor = surec_calisiyor(o, "xfce4-panel")
+    if calisiyor:
+        o.calistir([o.prog("xfce4-panel"), "--quit"])
+        for _ in range(25):
+            if not surec_calisiyor(o, "xfce4-panel"):
+                break
+            o.bekle(0.2)
+    try:
+        ayarla()
+    finally:
+        if calisiyor and not surec_calisiyor(o, "xfce4-panel"):
+            o.baslat([o.prog("xfce4-panel")])
+
+
+def _guvenli_yol(o, yol):
+    if not isinstance(yol, str) or not os.path.isabs(yol):
+        return False
+    gercek = os.path.realpath(os.path.dirname(yol))
+    for kok in {os.path.realpath(o.ev), os.path.realpath(o.config)}:
+        if gercek == kok or gercek.startswith(kok + os.sep):
+            return True
+    return False
+
+
+# ---------------------------------------------------------------------------
+# Uygula / geri al
+# ---------------------------------------------------------------------------
+
+def _uygula_plan(o, plan):
+    for kanal, ozellik, tur, deger in plan["xfconf"]:
+        if (kanal, ozellik) == ("xfwm4", "/general/use_compositing"):
+            continue
+        xq_yaz(o, kanal, ozellik, tur, deger)
+    for yol, metin in plan["dosyalar"].items():
+        atomik_yaz(yol, metin, 0o644 if yol.endswith(".desktop") else 0o600)
+    css = o.yol("gtk-3.0", "gtk.css")
+    eski_css = oku(css)
+    atomik_yaz(css, css_blok_ekle(eski_css, css_blogu()), 0o644)
+    trc = o.yol("xfce4", "terminal", "terminalrc")
+    yeni_trc, _ = terminalrc_ayarla(oku(trc), plan["terminalrc"])
+    atomik_yaz(trc, yeni_trc, 0o644)
+    for anahtar, deger in plan["gsettings"]:
+        kod, _ = o.calistir([o.prog("gsettings"), "set", PLANK_SEMA, anahtar, deger])
+        if kod != 0:
+            raise UygulamaHatasi("plank ayari yazilamadi: %s" % anahtar)
+    # birlestirici devri: xfwm4 kapanir, picom baslar
+    surec_durdur(o, "picom")
+    xq_yaz(o, "xfwm4", "/general/use_compositing", "bool", False)
+    o.bekle(1.0)
+    if not o.baslat([o.prog("picom"), "--config", o.yol("picom", "picom.conf")]):
+        raise UygulamaHatasi("picom baslatilamadi")
+    if not surec_calisiyor(o, "plank"):
+        o.baslat([o.prog("plank")])
+    if plan["paneller"] is not None:
+        paneli_yeniden_kur(o, lambda: xq_yaz(o, "xfce4-panel", "/panels", "dizi:int", plan["paneller"]))
+
+
+def geri_yukle(o, yedek):
+    """En iyi caba: her adimi dener, hatalari listeler."""
+    hatalar = []
+    surec_durdur(o, "plank")
+    surec_durdur(o, "picom")
+    panel_kaydi = None
+    for x in reversed(yedek.get("xfconf", [])):
+        try:
+            if x["ozellik"] == "/panels":
+                panel_kaydi = x
+                continue
+            if x["var"]:
+                xq_yaz(o, x["kanal"], x["ozellik"], x["tur"], x["deger"])
+            else:
+                xq_sil(o, x["kanal"], x["ozellik"])
+        except (UygulamaHatasi, KeyError, TypeError) as exc:
+            hatalar.append(str(exc))
+    for yol, kayit in yedek.get("dosyalar", {}).items():
+        try:
+            if not _guvenli_yol(o, yol):
+                hatalar.append("ev dizini disinda yol atlandi: %s" % yol)
+                continue
+            if kayit.get("vardi"):
+                atomik_yaz(yol, kayit.get("icerik") or "", 0o644 if yol.endswith(".desktop") else 0o600)
+            elif os.path.lexists(yol):
+                os.unlink(yol)
+        except (OSError, UygulamaHatasi, AttributeError) as exc:
+            hatalar.append(str(exc))
+    try:
+        css = o.yol("gtk-3.0", "gtk.css")
+        metin = oku(css)
+        if metin is not None and CSS_BAS in metin:
+            atomik_yaz(css, css_blok_kaldir(metin), 0o644)
+    except (OSError, UygulamaHatasi) as exc:
+        hatalar.append(str(exc))
+    try:
+        trc_kayit = yedek.get("terminalrc", {})
+        trc = o.yol("xfce4", "terminal", "terminalrc")
+        metin = oku(trc)
+        if metin is not None and trc_kayit.get("anahtarlar") is not None:
+            yeni = terminalrc_geri(metin, trc_kayit["anahtarlar"])
+            if not trc_kayit.get("vardi") and yeni.strip() in ("", "[Configuration]"):
+                os.unlink(trc)
+            else:
+                atomik_yaz(trc, yeni, 0o644)
+    except (OSError, UygulamaHatasi) as exc:
+        hatalar.append(str(exc))
+    for anahtar, eski in yedek.get("gsettings", {}).items():
+        argv = ([o.prog("gsettings"), "set", PLANK_SEMA, anahtar, eski] if eski is not None
+                else [o.prog("gsettings"), "reset", PLANK_SEMA, anahtar])
+        if o.calistir(argv)[0] != 0:
+            hatalar.append("plank ayari geri yuklenemedi: %s" % anahtar)
+    if panel_kaydi is not None:
+        try:
+            if panel_kaydi["var"]:
+                paneli_yeniden_kur(o, lambda: xq_yaz(o, "xfce4-panel", "/panels", "dizi:int",
+                                                     panel_kaydi["deger"]))
+        except UygulamaHatasi as exc:
+            hatalar.append(str(exc))
+    return hatalar
+
+
+def eksik_programlar(o):
+    return [p for p in GEREKLI_PROGRAMLAR if not o.program_var(p)]
+
+
+def uygula(o, cikti=print):
+    eksik = eksik_programlar(o)
+    if eksik:
+        cikti("eksik: %s (once paketleri kurun: pkexec /usr/local/sbin/carotos-tema-kur)" % " ".join(eksik))
+        return KOD_EKSIK
+    try:
+        onceki = yedek_oku(o)
+    except UygulamaHatasi:
+        cikti("yedek bozuktu, kenara alindi: %s.bozuk (yeniden calistirirsaniz yeni yedek alinir)" % o.yedek_yolu)
+        return KOD_YEDEK_BOZUK
+    try:
+        plan = plan_olustur(o)
+        yedek = yedegi_genislet(o, plan, onceki)
+        yedek_yaz(o, yedek)
+    except (UygulamaHatasi, OSError) as exc:
+        cikti("hata (hicbir sey degismedi): %s" % exc)
+        return KOD_HATA
+    try:
+        _uygula_plan(o, plan)
+    except (UygulamaHatasi, OSError) as exc:
+        hatalar = geri_yukle(o, yedek)
+        if not hatalar:
+            try:
+                os.unlink(o.yedek_yolu)
+            except OSError:
+                pass
+        cikti("hata: %s; ayarlar eski haline getirildi%s" % (
+            exc, "" if not hatalar else " (bazi adimlar geri alinamadi: %s)" % "; ".join(hatalar)))
+        return KOD_HATA
+    for u in plan["uyarilar"]:
+        cikti("uyari: " + u)
+    cikti("uygulandi (%s)" % ("sanal makine: bulaniklik ve solma kapali" if plan["sanal"] else "gercek makine"))
+    return 0
+
+
+def geri_al(o, cikti=print):
+    try:
+        yedek = yedek_oku(o)
+    except UygulamaHatasi:
+        cikti("yedek bozuktu, kenara alindi: %s.bozuk" % o.yedek_yolu)
+        return KOD_YEDEK_BOZUK
+    if yedek is None:
+        cikti("yedek yok: Carot Sleek uygulanmamis")
+        return KOD_YEDEK_YOK
+    hatalar = geri_yukle(o, yedek)
+    if hatalar:
+        cikti("bazi adimlar geri alinamadi (yedek korunuyor): " + "; ".join(hatalar))
+        return KOD_HATA
+    try:
+        os.unlink(o.yedek_yolu)
+    except OSError:
+        pass
+    cikti("geri alindi")
+    return 0
+
+
+def durum(o, cikti=print):
+    try:
+        yedek = yedek_oku(o)
+    except UygulamaHatasi:
+        yedek = None
+    cikti("sleek %s" % ("uygulandi" if yedek else "uygulanmadi"))
+    cikti("sanal_makine %s" % ("evet" if sanal_makine_mi(o) else "hayir"))
+    eksik = eksik_programlar(o)
+    cikti("eksik_program %s" % (" ".join(eksik) if eksik else "yok"))
+    return 0
+
+
+def main(argv=None, o=None, cikti=print):
+    argv = sys.argv[1:] if argv is None else list(argv)
+    if len(argv) != 1 or argv[0] not in ("uygula", "geri-al", "durum"):
+        sys.stderr.write("kullanim: carotos-modernlestir uygula|geri-al|durum\n")
+        return KOD_KULLANIM
+    if o is None:
+        if os.geteuid() == 0:
+            sys.stderr.write("carotos-modernlestir: root olarak calistirmayin (kendi kullanicinizla calistirin)\n")
+            return KOD_ROOT
+        import pwd
+        ev = pwd.getpwuid(os.getuid()).pw_dir
+        o = Ortam(ev, config=os.environ.get("XDG_CONFIG_HOME"))
+    return {"uygula": uygula, "geri-al": geri_al, "durum": durum}[argv[0]](o, cikti)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

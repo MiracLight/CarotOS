@@ -43,6 +43,8 @@ chmod 755 /usr/local/sbin/carotos-dil-hazirla
 chmod 755 /usr/local/sbin/carotos-mac-ayar
 chmod 755 /usr/local/sbin/carotos-ufw-ayar
 chmod 755 /usr/local/sbin/carotos-magaza-apt
+chmod 755 /usr/local/sbin/carotos-tema-kur
+chmod 755 /usr/local/bin/carotos-modernlestir
 chmod 755 /usr/local/bin/carotos-saat-eslestir
 chmod 755 /usr/local/bin/carotos-acikla
 chmod 644 /usr/share/carotos/acikla.bash
