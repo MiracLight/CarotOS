@@ -238,7 +238,10 @@ class RkhunterTesti(unittest.TestCase):
         self.assertEqual(r3["status"], H.WARN)
 
     def test_derin_komut_dil_ayari(self):
-        komut = H.deep_command("rkhunter", ["--check"])
+        # (H-03) yollar yalnizca sistem dizinlerinden cozulur; test makinesine bagli olmasin
+        from unittest import mock
+        with mock.patch.object(H, "sistem_yolu", lambda ad: "/usr/bin/" + ad):
+            komut = H.deep_command("rkhunter", ["--check"])
         self.assertEqual(komut[0], "pkexec")
         self.assertIn("LC_ALL=C", komut)
         self.assertEqual(komut[-1], "--check")

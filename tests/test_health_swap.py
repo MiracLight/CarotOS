@@ -85,8 +85,9 @@ class SwapKayitTesti(unittest.TestCase):
         self.assertTrue(a["confirm"])
         self.assertEqual(set(a["label"]), {"tr", "en"})
         # yalniz zram olmayan swap kapatilir; fstab yedeklenir
-        self.assertIn("!~ /zram/", a["cmd"])
-        self.assertIn("sed -i.carotos-yedek", a["cmd"])
+        # (H-07/H-11) yalniz /dev/zram* ayrilir; fstab her seferinde zaman damgali yedeklenir
+        self.assertIn("!~ /^\\/dev\\/zram/", a["cmd"])
+        self.assertIn("fstab.carotos-yedek-$(date", a["cmd"])
         self.assertNotIn("swapoff -a", a["cmd"])
 
     def test_gercek_sistemde_cokmez(self):

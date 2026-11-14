@@ -10,6 +10,7 @@ Kullanım:
     carotos-health --audit-json   Denetimi çalıştırır, JSON basar (pkexec için)
 """
 
+import ipaddress
 import json
 import os
 import re
@@ -17,6 +18,18 @@ import shutil
 import subprocess
 import sys
 import time
+
+# H-01: ortak katman (dil, yetkili) GTK'den bagimsizdir ve --audit-json yolu
+# (pkexec ile root olarak calisir) da buna ihtiyac duyar; bu yuzden en basta yuklenir.
+sys.dont_write_bytecode = True      # root olarak calisinca /opt altina __pycache__ yazilmasin
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ORTAK = os.path.join(os.path.dirname(BASE_DIR), "ortak")
+for _y in (ORTAK, BASE_DIR):
+    if _y not in sys.path:
+        sys.path.insert(0, _y)
+
+import dil  # noqa: E402  (ortak dil katmani: ortak/dil.py)
+from yetkili import sistem_yolu, temiz_ortam  # noqa: E402
 
 APP_VERSION = "1.1"
 
@@ -32,12 +45,15 @@ NEEDROOT = "root"  # root olmadan bakilamaz
 # Yardimcilar
 # ---------------------------------------------------------------------------
 
-def run(cmd, timeout=12):
-    """Komutu calistirir, (donus_kodu, cikti) dondurur."""
+def run(cmd, timeout=12, env=None):
+    """Komutu calistirir, (donus_kodu, cikti) dondurur. Ortam varsayilan olarak
+    temiz_ortam(): sabit sistem PATH'i ve LC_ALL=C (cikti ayristirmasi Turkce
+    yerelde bozulmasin)."""
     try:
         proc = subprocess.run(
             cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            timeout=timeout, text=True, errors="replace")
+            timeout=timeout, text=True, errors="replace",
+            env=env if env is not None else temiz_ortam())
         return proc.returncode, proc.stdout.strip()
     except FileNotFoundError:
         return 127, ""
@@ -60,19 +76,13 @@ def is_root():
 
 
 def have(binary):
-    return shutil.which(binary) is not None or os.path.exists("/usr/sbin/" + binary)
+    """H-03: yalnizca sistem dizinlerine bakilir (kullanicinin PATH'ine degil)."""
+    return sistem_yolu(binary) is not None
 
 
 def bin_path(binary):
-    """Aracin tam yolunu bulur; /usr/sbin normal PATH'te olmayabilir."""
-    found = shutil.which(binary)
-    if found:
-        return found
-    for prefix in ("/usr/sbin/", "/sbin/", "/usr/bin/", "/bin/"):
-        candidate = prefix + binary
-        if os.path.exists(candidate):
-            return candidate
-    return binary
+    """Aracin tam yolu; yalnizca sistem dizinleri (ortak/yetkili.py). Yoksa None."""
+    return sistem_yolu(binary)
 
 
 # ---------------------------------------------------------------------------
@@ -135,7 +145,7 @@ def check_reboot_required():
 def check_failed_units():
     code, out = run(["systemctl", "--failed", "--no-legend", "--plain"])
     if code != 0:
-        return {"status": INFO,
+        return {"status": INFO, "unknown": True,
                 "detail": {"tr": "Servis durumu okunamadı.",
                            "en": "Could not read service status."}}
     lines = [l for l in out.splitlines() if l.strip()]
@@ -151,9 +161,23 @@ def check_failed_units():
     }
 
 
+def kept_back_packages(out):
+    """apt-get -s ciktisindaki 'kept back' paket adlari (LC_ALL=C ciktisi)."""
+    adlar, icinde = [], False
+    for satir in (out or "").splitlines():
+        if satir.startswith("The following packages have been kept back"):
+            icinde = True
+        elif icinde and satir.startswith("  "):
+            adlar.extend(satir.split())
+        else:
+            icinde = False
+    return adlar
+
+
 def check_pending_updates():
     if not have("apt-get"):
-        return {"status": INFO, "detail": {"tr": "apt bulunamadı.",
+        return {"status": INFO, "unknown": True,
+                "detail": {"tr": "apt bulunamadı.",
                                            "en": "apt not found."}}
     code, out = run(["apt-get", "-s", "-o", "Debug::NoLocking=1", "upgrade"],
                     timeout=40)
@@ -163,18 +187,27 @@ def check_pending_updates():
                                  "yapılandırmasını kontrol edin.",
                            "en": "Could not read the update list. Check the "
                                  "repository configuration."}}
-    count = len(re.findall(r"^Inst ", out, re.M))
+    inst = len(re.findall(r"^Inst ", out, re.M))
     security = len(re.findall(r"^Inst .*(?:security|Security)", out, re.M))
+    kept = kept_back_packages(out)
+    count = inst + len(kept)
+    # H-02: "upgrade" yeni paket kurmayi gerektiren guncellemeleri (ornegin yeni cekirdek)
+    # uygulamaz, "kept back" diye ayirir; bunlar da bekleyen guncellemedir.
+    held_tr = (f" {len(kept)} tanesi yeni paket kurulumu gerektirdiği için ayrı "
+               f"tutuluyor (ör. çekirdek)." if kept else "")
+    held_en = (f" {len(kept)} of them are held back because they need new "
+               f"packages installed (e.g. the kernel)." if kept else "")
     if security:
         return {"status": FAIL,
                 "detail": {"tr": f"{count} güncelleme bekliyor, bunların "
-                                 f"{security} tanesi güvenlik güncellemesi.",
+                                 f"{security} tanesi güvenlik güncellemesi."
+                                 + held_tr,
                            "en": f"{count} updates pending, {security} of them "
-                                 f"security updates."}}
+                                 f"security updates." + held_en}}
     if count:
         return {"status": WARN,
-                "detail": {"tr": f"{count} güncelleme bekliyor.",
-                           "en": f"{count} updates pending."}}
+                "detail": {"tr": f"{count} güncelleme bekliyor." + held_tr,
+                           "en": f"{count} updates pending." + held_en}}
     return {"status": OK,
             "detail": {"tr": "Sistem güncel.", "en": "System is up to date."}}
 
@@ -261,8 +294,17 @@ def check_repositories():
 
 
 def check_unattended():
-    code, _ = run(["dpkg-query", "-W", "-f=${Status}", "unattended-upgrades"])
-    if code != 0:
+    code, out = run(["dpkg-query", "-W", "-f=${Status}", "unattended-upgrades"])
+    if code in (124, 127) or (code not in (0, 1)):
+        # komut yok / zaman asimi / beklenmeyen hata: sonuc uretilemedi
+        return {"status": INFO, "unknown": True,
+                "detail": {"tr": "Otomatik güvenlik güncellemelerinin durumu "
+                                 "okunamadı.",
+                           "en": "Could not read the state of automatic "
+                                 "security updates."}}
+    # H-04: cikis kodu 0 yetmez; kaldirilmis ama ayari kalmis paket
+    # ("deinstall ok config-files") da 0 doner.
+    if code != 0 or out.strip() != "install ok installed":
         return {"status": WARN,
                 "detail": {"tr": "Otomatik güvenlik güncellemeleri kurulu değil. "
                                  "Güncellemeler elle yapılmalıdır.",
@@ -302,14 +344,21 @@ def check_firewall_policy():
         return {"status": NEEDROOT,
                 "detail": {"tr": "Varsayılan kurallar root yetkisiyle okunabilir.",
                            "en": "Default policies can only be read as root."}}
-    code, out = run([bin_path("ufw"), "status", "verbose"])
+    ufw = bin_path("ufw")
+    if ufw is None:
+        return {"status": INFO, "unknown": True,
+                "detail": {"tr": "ufw kurulu değil; varsayılan kural "
+                                 "okunamadı.",
+                           "en": "ufw is not installed; the default policy "
+                                 "could not be read."}}
+    code, out = run([ufw, "status", "verbose"])
     if code != 0:
-        return {"status": INFO,
+        return {"status": INFO, "unknown": True,
                 "detail": {"tr": "ufw durumu okunamadı.",
                            "en": "Could not read ufw status."}}
     match = re.search(r"Default:\s*(.+)", out)
     if not match:
-        return {"status": INFO,
+        return {"status": INFO, "unknown": True,
                 "detail": {"tr": "Varsayılan kural bulunamadı.",
                            "en": "Default policy not found."}}
     policy = match.group(1).strip()
@@ -326,14 +375,24 @@ def check_firewall_policy():
                              f"restrictive. ({policy})"}}
 
 
+def _loopback_mi(addr):
+    if addr == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(addr).is_loopback
+    except ValueError:
+        return False
+
+
 def check_listening_ports():
     code, out = run(["ss", "-tulnH"])
     if code != 0:
-        return {"status": INFO,
+        return {"status": INFO, "unknown": True,
                 "detail": {"tr": "Dinlenen portlar okunamadı.",
                            "en": "Could not read listening ports."}}
     external = []
     local_only = 0
+    parsed = 0
     for line in out.splitlines():
         parts = line.split()
         if len(parts) < 5:
@@ -341,11 +400,20 @@ def check_listening_ports():
         proto = parts[0]
         local = parts[4]
         addr, _, port = local.rpartition(":")
-        addr = addr.strip("[]")
-        if addr in ("127.0.0.1", "::1", "localhost"):
+        addr = addr.strip("[]").split("%")[0]
+        if not port.isdigit() and port != "*":
+            continue
+        parsed += 1
+        if _loopback_mi(addr):
             local_only += 1
         else:
             external.append(f"{proto}/{port}")
+    if out.strip() and not parsed:
+        # H-10: cikti dolu ama hicbir satir ayristirilamadi: "sorun yok" denemez
+        return {"status": INFO, "unknown": True,
+                "detail": {"tr": "Dinlenen portların çıktısı yorumlanamadı.",
+                           "en": "The listening-ports output could not be "
+                                 "interpreted."}}
     if not external:
         return {"status": OK,
                 "detail": {"tr": f"Dışarıya açık dinleyen servis yok. "
@@ -454,7 +522,7 @@ def check_apparmor_profiles():
                            "en": "AppArmor is not installed."}}
     metin = read_file("/sys/kernel/security/apparmor/profiles")
     if metin is None:
-        return {"status": INFO,
+        return {"status": INFO, "unknown": True,
                 "detail": {"tr": "Profil listesi okunamadı (AppArmor devre dışı "
                                  "olabilir).",
                            "en": "The profile list could not be read (AppArmor "
@@ -757,8 +825,12 @@ def deep_command(binary, args):
     """Ayrintili tarama komutu. Araclar Turkce dil ayariyla bazi desenleri
     yanlis yorumladigindan (ornegin [a-z] araligi) ve ciktilari Ingilizce
     metinlere gore yorumlandigindan LC_ALL=C ile calistirilir."""
-    return (["pkexec", bin_path("env"), "LC_ALL=C", bin_path(binary)]
-            + list(args))
+    # H-03: root'a giden program yollari yalnizca sistem dizinlerinden cozulur;
+    # bulunamazsa None doner (cagiran "kurulu degil" der).
+    env_yolu, arac_yolu = sistem_yolu("env"), sistem_yolu(binary)
+    if env_yolu is None or arac_yolu is None:
+        return None
+    return ["pkexec", env_yolu, "LC_ALL=C", arac_yolu] + list(args)
 
 
 # Sabit komutlar: kullanici metni argumana hic girmez. rkhunter'a
@@ -816,13 +888,18 @@ def check_root_locked():
                 "detail": {"tr": "Root hesabının durumu root yetkisiyle "
                                  "görülebilir.",
                            "en": "The root account state requires root to inspect."}}
-    code, out = run([bin_path("passwd"), "-S", "root"])
+    passwd = bin_path("passwd")
+    code, out = run([passwd, "-S", "root"]) if passwd else (127, "")
     if code != 0 or not out:
-        return {"status": INFO,
+        return {"status": INFO, "unknown": True,
                 "detail": {"tr": "Root hesabının durumu okunamadı.",
                            "en": "Could not read the root account state."}}
     parts = out.split()
     state = parts[1] if len(parts) > 1 else "?"
+    if state not in ("L", "NP", "P"):
+        return {"status": INFO, "unknown": True,
+                "detail": {"tr": "Root hesabının durumu yorumlanamadı.",
+                           "en": "Could not interpret the root account state."}}
     if state == "L":
         return {"status": OK,
                 "detail": {"tr": "Root hesabı kilitli. Yönetici işlemleri sudo "
@@ -849,7 +926,7 @@ def check_empty_passwords():
                            "en": "Password fields can only be read as root."}}
     shadow = read_file("/etc/shadow")
     if shadow is None:
-        return {"status": INFO,
+        return {"status": INFO, "unknown": True,
                 "detail": {"tr": "/etc/shadow okunamadı.",
                            "en": "Could not read /etc/shadow."}}
     empty = []
@@ -922,8 +999,12 @@ def check_auth_failures():
                            "en": "The authentication log requires root to read."}}
     code, out = run(["journalctl", "-b", "--no-pager", "-g",
                      "authentication failure|Failed password", "-q"], timeout=20)
+    # H-12: systemd 257'de eslesme yoksa journalctl -g cikis kodu 1 verir; bos cikti
+    # "0 deneme" demektir. Bos olmayan cikti ile kod 1 ya da diger kodlar hatadir.
+    if code == 1 and not out.strip():
+        code = 0
     if code != 0:
-        return {"status": INFO,
+        return {"status": INFO, "unknown": True,
                 "detail": {"tr": "Günlük okunamadı.",
                            "en": "Could not read the log."}}
     count = len([l for l in out.splitlines() if l.strip()])
@@ -941,19 +1022,19 @@ def check_auth_failures():
 def check_disk_usage():
     code, out = run(["df", "-P", "/"])
     if code != 0:
-        return {"status": INFO,
+        return {"status": INFO, "unknown": True,
                 "detail": {"tr": "Disk kullanımı okunamadı.",
                            "en": "Could not read disk usage."}}
     lines = out.splitlines()
     if len(lines) < 2:
-        return {"status": INFO,
+        return {"status": INFO, "unknown": True,
                 "detail": {"tr": "Disk kullanımı okunamadı.",
                            "en": "Could not read disk usage."}}
     parts = lines[1].split()
     try:
         percent = int(parts[4].rstrip("%"))
     except (IndexError, ValueError):
-        return {"status": INFO,
+        return {"status": INFO, "unknown": True,
                 "detail": {"tr": "Disk kullanımı çözümlenemedi.",
                            "en": "Could not parse disk usage."}}
     free_kb = int(parts[3]) if parts[3].isdigit() else 0
@@ -992,7 +1073,8 @@ def swap_cihazlari(swaps_metni):
     for satir in (swaps_metni or "").splitlines()[1:]:
         parca = satir.split()
         if len(parca) >= 2:
-            sonuc.append((parca[0], parca[1]))
+            yol = re.sub(r"\\([0-7]{3})", lambda m: chr(int(m.group(1), 8)), parca[0])
+            sonuc.append((yol, parca[1]))
     return sonuc
 
 
@@ -1018,7 +1100,9 @@ def check_swap_encryption(swaps_metni=None, sifreli_mi=None):
         swaps_metni = read_file("/proc/swaps") or ""
     sifreli_mi = sifreli_mi or _swap_sifreli_mi
     cihazlar = swap_cihazlari(swaps_metni)
-    diskte = [(y, t) for y, t in cihazlar if "/zram" not in y]
+    # H-11: yalnizca /dev/zram* RAM ici sayilir (yolun herhangi bir yerinde "zram" gecen
+    # diskteki swap dosyasi degil)
+    diskte = [(y, t) for y, t in cihazlar if not y.startswith("/dev/zram")]
     if not cihazlar:
         return {"status": OK, "detail": {"tr": "Swap kullanılmıyor.", "en": "No swap is in use."}}
     if not diskte:
@@ -1053,10 +1137,22 @@ def check_world_writable():
     code, out = run(["find", "/etc", "-xdev", "-type", "f", "-perm", "-0002",
                      "-not", "-path", "*/shadow*"], timeout=25)
     if code not in (0, 1):
-        return {"status": INFO,
+        return {"status": INFO, "unknown": True,
                 "detail": {"tr": "Dosya izinleri taranamadı.",
                            "en": "Could not scan file permissions."}}
     files = [l for l in out.splitlines() if l.strip() and l.startswith("/etc")]
+    hata = [l for l in out.splitlines() if l.strip() and not l.startswith("/etc")]
+    if not files and (hata or code == 1):
+        # H-08: find okunamayan dizinlerde hata verdi; tam taranmadi, "yok" denemez
+        return {"status": INFO, "unknown": True,
+                "detail": {"tr": "/etc altı yalnızca kısmen taranabildi (bazı "
+                                 "dizinler okunamadı); herkesin yazabildiği "
+                                 "dosya bulunamadı. Root ile tam denetimi "
+                                 "deneyin.",
+                           "en": "/etc could only be scanned partially (some "
+                                 "directories were unreadable); no world-"
+                                 "writable file was found. Try the full audit "
+                                 "as root."}}
     if files:
         return {"status": FAIL,
                 "detail": {"tr": f"/etc altında herkesin yazabildiği "
@@ -1129,10 +1225,20 @@ CHECKS = [
                       "sistemi korumaz. Saldırganlar bilinen açıkları hedefler.",
                 "en": "A published security patch protects nothing until it is "
                       "installed. Attackers target known holes."},
-        "fix": "sudo apt update && sudo apt upgrade",
-        "action": {"cmd": 'apt-get update && DEBIAN_FRONTEND=noninteractive apt-get -y upgrade',
+        "fix": "sudo apt update && sudo apt upgrade && sudo apt-get --no-remove dist-upgrade",
+        "action": {"cmd": 'apt-get update && DEBIAN_FRONTEND=noninteractive apt-get -y upgrade && '
+                          'DEBIAN_FRONTEND=noninteractive apt-get -y --no-remove dist-upgrade',
                    "label": {'tr': 'Güncelle', 'en': 'Update'},
-                   "confirm": True},
+                   "confirm": True,
+                   # H-02/H-07: onay iletisi eylemin gercek kapsamini soyler
+                   "note": {"tr": "Paket listesi yenilenecek, ardından bekleyen tüm "
+                                  "güncellemeler kurulacaktır. Yeni paket kurulumu "
+                                  "gerektiren güncellemeler (ör. yeni çekirdek) de "
+                                  "kurulur; hiçbir paket kaldırılmaz.",
+                            "en": "The package list will be refreshed, then all "
+                                  "pending updates will be installed. Updates that "
+                                  "need new packages (e.g. a new kernel) are "
+                                  "installed too; no package is removed."}},
     },
     {
         "id": "apt_age", "category": "updates", "func": check_last_apt_update,
@@ -1167,9 +1273,27 @@ CHECKS = [
                 "en": "Without a repository the system can neither install "
                       "software nor receive security updates. It fails silently."},
         "fix": "cat /etc/apt/sources.list.d/debian.sources",
-        "action": {"cmd": "printf '%s\\n' 'Types: deb' 'URIs: http://deb.debian.org/debian' 'Suites: trixie trixie-updates' 'Components: main contrib non-free non-free-firmware' 'Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg' '' 'Types: deb' 'URIs: http://security.debian.org/debian-security' 'Suites: trixie-security' 'Components: main contrib non-free non-free-firmware' 'Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg' > /etc/apt/sources.list.d/debian.sources && sed -i 's|^deb cdrom:|#deb cdrom:|' /etc/apt/sources.list; apt-get update",
+        "action": {"cmd": "F=/etc/apt/sources.list.d/debian.sources; "
+                          "{ [ ! -f \"$F\" ] || cp -a \"$F\" \"$F.carotos-yedek-$(date +%Y%m%d-%H%M%S)\"; } && "
+                          "printf '%s\\n' 'Types: deb' 'URIs: http://deb.debian.org/debian' 'Suites: trixie trixie-updates' 'Components: main contrib non-free non-free-firmware' 'Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg' '' 'Types: deb' 'URIs: http://security.debian.org/debian-security' 'Suites: trixie-security' 'Components: main contrib non-free non-free-firmware' 'Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg' > \"$F\" && sed -i 's|^deb cdrom:|#deb cdrom:|' /etc/apt/sources.list; apt-get update",
                    "label": {'tr': 'Depoları yapılandır', 'en': 'Configure repositories'},
-                   "confirm": True},
+                   "confirm": True,
+                   "note": {"tr": "/etc/apt/sources.list.d/debian.sources dosyası "
+                                  "Debian trixie için standart depolarla "
+                                  "değiştirilecek (özel yansı, backports ve üçüncü "
+                                  "taraf satırları dahil önceki içerik, aynı "
+                                  "klasörde zaman damgalı bir yedeğe kopyalanır), "
+                                  "/etc/apt/sources.list içindeki kurulum CD'si "
+                                  "satırları yoruma alınacak ve paket listesi "
+                                  "güncellenecektir.",
+                            "en": "/etc/apt/sources.list.d/debian.sources will be "
+                                  "replaced with the standard Debian trixie "
+                                  "repositories (the previous content, including "
+                                  "any custom mirror, backports and third-party "
+                                  "lines, is copied to a timestamped backup in the "
+                                  "same folder), the installation CD lines in "
+                                  "/etc/apt/sources.list will be commented out and "
+                                  "the package list will be refreshed."}},
     },
     {
         "id": "fw_enabled", "category": "network", "func": check_firewall_enabled,
@@ -1369,10 +1493,21 @@ CHECKS = [
                 "en": "When the disk fills up, logging stops, updates fail and "
                       "some services will not start."},
         "fix": "sudo apt clean && du -sh /var/log/*",
-        "action": {"cmd": 'apt-get clean; journalctl --vacuum-size=100M; '
-                          'DEBIAN_FRONTEND=noninteractive apt-get -y autoremove --purge',
+        # H-07: eylem onay iletisinde soylenenle sinirlandi: kimlik dogrulama gunlukleri
+        # kisaltilmaz, ayar dosyalari silinmez (--purge yok).
+        "action": {"cmd": 'apt-get clean; '
+                          'DEBIAN_FRONTEND=noninteractive apt-get -y autoremove',
                    "label": {'tr': 'Yer aç', 'en': 'Free up space'},
-                   "confirm": True},
+                   "confirm": True,
+                   "note": {"tr": "Paket önbelleği temizlenecek ve artık hiçbir "
+                                  "paketin gerek duymadığı otomatik kurulmuş "
+                                  "paketler kaldırılacaktır (ayar dosyaları "
+                                  "silinmez). Sistem günlüklerine dokunulmaz.",
+                            "en": "The package cache will be cleaned and "
+                                  "automatically installed packages that no "
+                                  "other package needs any more will be removed "
+                                  "(configuration files are kept). System logs "
+                                  "are not touched."}},
     },
     {
         "id": "memory", "category": "storage", "func": check_memory,
@@ -1390,10 +1525,22 @@ CHECKS = [
                 "en": "When memory fills up the system writes its contents to disk; unencrypted swap "
                       "can leave passwords and keys on disk."},
         "fix": "swapon --show; lsblk -s -o NAME,TYPE",
-        "action": {"cmd": "awk 'NR>1 && $1 !~ /zram/ {print $1}' /proc/swaps | xargs -r swapoff; "
-                          "sed -i.carotos-yedek -E '/^[^#].*[[:space:]]swap[[:space:]]/ s/^/#/' /etc/fstab",
+        # H-07: fstab her seferinde zaman damgali yeni bir yedege alinir (ilk yedek ezilmez).
+        "action": {"cmd": "awk 'NR>1 && $1 !~ /^\\/dev\\/zram/ {print $1}' /proc/swaps | xargs -r -d '\\n' swapoff; "
+                          "cp -a /etc/fstab /etc/fstab.carotos-yedek-$(date +%Y%m%d-%H%M%S) && "
+                          "sed -i -E '/^[^#].*[[:space:]]swap[[:space:]]/ s/^/#/' /etc/fstab",
                    "label": {'tr': 'Disk swap\'ını kapat', 'en': 'Disable disk swap'},
-                   "confirm": True},
+                   "confirm": True,
+                   "note": {"tr": "Diskteki tüm swap alanları (şifreli olanlar dahil) "
+                                  "hemen kapatılacak ve /etc/fstab içindeki swap "
+                                  "satırları yoruma alınacaktır; fstab'ın zaman "
+                                  "damgalı bir yedeği alınır. RAM içindeki zram "
+                                  "etkilenmez.",
+                            "en": "All swap areas on disk (including encrypted "
+                                  "ones) will be turned off immediately and the "
+                                  "swap lines in /etc/fstab will be commented out; "
+                                  "a timestamped backup of fstab is made. zram in "
+                                  "RAM is not affected."}},
     },
 ]
 
@@ -1405,16 +1552,27 @@ def run_all_checks():
         try:
             outcome = check["func"]()
         except Exception as exc:  # denetim cokerse uygulama durmasin
-            outcome = {"status": INFO,
+            outcome = {"status": INFO, "unknown": True,
                        "detail": {"tr": f"Denetim çalıştırılamadı: {exc}",
                                   "en": f"Check could not run: {exc}"}}
-        results.append({
+        sonuc = {
             "id": check["id"],
             "category": check["category"],
             "status": outcome["status"],
             "detail": outcome["detail"],
-        })
+        }
+        if outcome.get("unknown"):
+            sonuc["unknown"] = True
+        results.append(sonuc)
     return dil.zenginlestir(results)    # calisma aninda uretilen tr/en sozlukleri de yedekli
+
+
+def not_run(results):
+    """H-06: sonuc uretemeyen denetimler (root gerektirenler dahil). Dogasi geregi bilgi
+    veren denetimler (sistem bilgisi, calisma suresi...) ve "kurulu degil" gibi gecerli
+    bilgiler sayilmaz."""
+    return sum(1 for r in results
+               if r["status"] == NEEDROOT or (r["status"] == INFO and r.get("unknown")))
 
 
 def score(results):
@@ -1429,6 +1587,27 @@ def score(results):
     warn = sum(1 for r in counted if r["status"] == WARN)
     fail = sum(1 for r in counted if r["status"] == FAIL)
     return percent, ok, warn, fail
+
+
+def audit_json_coz(code, out):
+    """pkexec --audit-json ciktisini sonuc listesine cevirir; gecersizse None.
+    stderr de ciktiya karistigindan JSON yoksa son satira bakilir."""
+    if code != 0:
+        return None
+    adaylar = [out or ""]
+    satirlar = [s for s in (out or "").splitlines() if s.strip()]
+    if satirlar:
+        adaylar.append(satirlar[-1])
+    for aday in adaylar:
+        try:
+            veri = json.loads(aday)
+        except ValueError:
+            continue
+        if isinstance(veri, list) and veri and all(
+                isinstance(r, dict) and "id" in r and "status" in r
+                and "detail" in r for r in veri):
+            return dil.zenginlestir(veri)
+    return None
 
 
 if __name__ == "__main__" and "--audit-json" in sys.argv:
@@ -1447,13 +1626,6 @@ from gi.repository import Gtk, GLib  # noqa: E402
 
 import threading  # noqa: E402
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-ORTAK = os.path.join(os.path.dirname(BASE_DIR), "ortak")
-for _y in (ORTAK, BASE_DIR):
-    if _y not in sys.path:
-        sys.path.insert(0, _y)
-
-import dil  # noqa: E402  (ortak dil katmani: ortak/dil.py)
 import tema  # noqa: E402
 from bekleme_cubugu import SweepBar  # noqa: E402
 
@@ -1499,6 +1671,23 @@ UI = {
     "audit_failed": {
         "tr": "Tam denetim çalıştırılamadı (iptal edildi veya yetki verilmedi).",
         "en": "The full audit could not run (cancelled or not authorised).",
+    },
+    "audit_error": {
+        "tr": "Tam denetim çalışırken hata verdi (çıkış kodu {code}).",
+        "en": "The full audit failed while running (exit code {code}).",
+    },
+    "not_run": {
+        "tr": "{ran}/{total} denetim sonuç üretti. {n} denetim çalıştırılamadı "
+              "ya da root yetkisi gerektiriyor; sonuç eksiktir.",
+        "en": "{ran}/{total} checks produced a result. {n} check(s) could not "
+              "run or need root; the result is incomplete.",
+    },
+    "stale": {
+        "tr": "Bu sonuç saat {time} root denetiminden kalmadır ve güncel "
+              "olmayabilir. Güncel sonuç için “Root ile tam denetim” düğmesini "
+              "kullanın.",
+        "en": "This result is from the root audit at {time} and may be out of "
+              "date. Use “Full audit as root” for a current result.",
     },
     "as_root": {"tr": "root ile denetlendi", "en": "audited as root"},
     "confirm_body": {
@@ -1631,6 +1820,15 @@ def check_meta(check_id):
     return None
 
 
+def pkexec_iptal_mi(code, out):
+    """H-07: 126 pkexec'in iptal/yetkisiz cikisidir. 127 yalnizca cikti bossa iptal
+    sayilir; sh -c icindeki bir komutun bulunamamasi (cikti dolu) gercek hatadir ve
+    kullanici hata ciktisini gormelidir."""
+    if code == 126:
+        return True
+    return code == 127 and not (out or "").strip()
+
+
 def kod_kutusu(komut):
     """Monospace komutu çerçeveli, seçilebilir bir kutuda gösterir."""
     dis, ic = tema.kart(12, 0, "serit")
@@ -1655,6 +1853,8 @@ class HealthWindow(Gtk.Window):
         self.rescan_pending = False
         self.current_category = "summary"
         self.deep = {}
+        self.fixed_ids = set()      # H-05: duzeltilen denetimler (eski root sonucu tasinmaz)
+        self.root_stamp = None      # H-05: son root denetiminin saati
 
         tema.uygula(self.ui_theme, VURGU)
         self.set_default_size(1120, 740)
@@ -1807,7 +2007,15 @@ class HealthWindow(Gtk.Window):
 
         problems = [r for r in self.results if r["status"] in (FAIL, WARN)]
         problems.sort(key=lambda r: 0 if r["status"] == FAIL else 1)
-        if self.results and not problems:
+        eksik = not_run(self.results)
+        if eksik:
+            # H-06: calisamayan denetim varken "her sey yolunda" denmez
+            kutu, _ = tema.not_kutusu(
+                UI["not_run"][self.lang].format(ran=len(self.results) - eksik,
+                                                total=len(self.results), n=eksik),
+                "uyari")
+            box.pack_start(kutu, False, False, 0)
+        if self.results and not problems and not eksik:
             box.pack_start(tema.bos_durum("onay", UI["all_clear_baslik"][self.lang],
                                           UI["all_clear"][self.lang]), False, False, 10)
         for result in problems:
@@ -1846,6 +2054,9 @@ class HealthWindow(Gtk.Window):
 
         ic.pack_start(tema.etiket(result["detail"][self.lang], None, sar=True, genislik=96),
                       False, False, 0)
+        if result.get("stale"):
+            ic.pack_start(tema.etiket(UI["stale"][self.lang].format(time=result["stale"]),
+                                      "silik", sar=True, genislik=96), False, False, 0)
         if meta and status in (WARN, FAIL, NEEDROOT):
             ic.pack_start(tema.etiket(f"{UI['why'][self.lang]}: {meta['why'][self.lang]}",
                                       "kart-alt", sar=True, genislik=96), False, False, 0)
@@ -1864,6 +2075,8 @@ class HealthWindow(Gtk.Window):
             metin = UI["confirm_body"][self.lang].format(action=action["label"][self.lang])
             if action.get("warning"):
                 metin += "\n\n" + action["warning"][self.lang]
+            elif action.get("note"):
+                metin += "\n\n" + action["note"][self.lang]
             if not tema.onay_sor(self, meta["title"][self.lang], metin,
                                  UI["uygula"][self.lang], UI["iptal"][self.lang],
                                  tehlike=bool(action.get("warning"))):
@@ -1881,8 +2094,9 @@ class HealthWindow(Gtk.Window):
         if code == 0:
             self.kabuk.bildir(UI["fix_ok"][self.lang].format(title=meta["title"][self.lang]),
                               "basari")
+            self.fixed_ids.add(meta["id"])      # H-05: eski root sonucu tasinmasin
             self.start_scan(False)
-        elif code in (126, 127):
+        elif pkexec_iptal_mi(code, out):
             self.kabuk.bildir(UI["fix_cancelled"][self.lang])
         else:
             self.kabuk.bildir(UI["fix_failed"][self.lang].format(
@@ -1958,20 +2172,24 @@ class HealthWindow(Gtk.Window):
             args = scan["propupd_args"]
         else:
             args = scan["args"]
+        komut = deep_command(scan["binary"], args)
+        if komut is None:       # H-03: arac sistem dizinlerinde yok
+            self.kabuk.bildir(UI["deep_missing"][self.lang], "hata")
+            return
         self.job_begin(key)
         if self.current_category == "deep":
             self.show_category("deep")
         self.kabuk.bildir(UI["deep_running"][self.lang].format(title=scan["title"][self.lang]))
 
         def worker():
-            code, out = run(deep_command(scan["binary"], args), timeout=scan["timeout"])
+            code, out = run(komut, timeout=scan["timeout"])
             GLib.idle_add(self.deep_done, scan, mode, code, out)
         threading.Thread(target=worker, daemon=True).start()
 
     def deep_done(self, scan, mode, code, out):
         self.job_end(("deep", scan["id"]))
         title = scan["title"][self.lang]
-        if code in (126, 127) and not out:
+        if pkexec_iptal_mi(code, out):
             self.kabuk.bildir(UI["fix_cancelled"][self.lang])
         elif mode == "propupd":
             anahtar = "deep_propupd_ok" if code == 0 else "deep_propupd_failed"
@@ -2082,25 +2300,26 @@ class HealthWindow(Gtk.Window):
                 script = os.path.abspath(__file__)
                 code, out = run(["pkexec", sys.executable, script, "--audit-json"],
                                 timeout=180)
-                try:
-                    data = json.loads(out) if code == 0 else None
-                except ValueError:
-                    data = None
-                GLib.idle_add(self.scan_done, data, True)
+                GLib.idle_add(self.scan_done, audit_json_coz(code, out), True, code)
             else:
-                GLib.idle_add(self.scan_done, run_all_checks(), False)
+                GLib.idle_add(self.scan_done, run_all_checks(), False, 0)
         threading.Thread(target=worker, daemon=True).start()
 
-    def scan_done(self, data, was_root):
+    def scan_done(self, data, was_root, code=0):
         self.job_end(("scan",))
         if data is None:
             self.hap.ayarla(UI["ready"][self.lang], "kapali")
-            self.kabuk.bildir(UI["audit_failed"][self.lang], "hata")
+            if code in (126, 127):      # H-01: iptal/yetki ile gercek cokme ayri iletilir
+                self.kabuk.bildir(UI["audit_failed"][self.lang], "hata")
+            else:
+                self.kabuk.bildir(UI["audit_error"][self.lang].format(code=code), "hata")
             self.flush_rescan()
             return False
         if was_root:
             self.results = data
             self.audited_as_root = True
+            self.root_stamp = time.strftime("%H:%M")
+            self.fixed_ids.clear()
         else:
             self.results = self.merge_results(data)
         stamp = time.strftime("%H:%M")
@@ -2119,7 +2338,13 @@ class HealthWindow(Gtk.Window):
         for result in fresh:
             old = previous.get(result["id"])
             if result["status"] == NEEDROOT and old and old["status"] != NEEDROOT:
-                merged.append(old)
+                if result["id"] in self.fixed_ids:
+                    merged.append(result)       # duzeltildi: eski sonuc artik gecersiz
+                else:
+                    # H-05: eski root sonucu tasinir ama yasi gosterilir
+                    kopya = dict(old)
+                    kopya.setdefault("stale", self.root_stamp or "?")
+                    merged.append(kopya)
             else:
                 merged.append(result)
         return merged
@@ -2145,8 +2370,12 @@ class HealthWindow(Gtk.Window):
             f"({ok} {UI['count_ok'][self.lang]}, "
             f"{warn} {UI['count_warn'][self.lang]}, "
             f"{fail} {UI['count_fail'][self.lang]})",
-            "",
         ]
+        eksik = not_run(self.results)
+        if eksik:
+            lines.append(UI["not_run"][self.lang].format(
+                ran=len(self.results) - eksik, total=len(self.results), n=eksik))
+        lines.append("")
         for cat_key, cat_label in CATEGORIES:
             rows = [r for r in self.results if r["category"] == cat_key]
             if not rows:
