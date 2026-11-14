@@ -667,5 +667,24 @@ class GercekAltSurecTesti(unittest.TestCase):
         self.assertEqual(satirlar[2], "-c xfwm4 -p /general/use_compositing -n -t bool -s false")
 
 
+class VarsayilanTerminalTesti(unittest.TestCase):
+    """ISO'nun varsayilan terminali Carot Sleek terminaliyle ayni (ayni yazi tipi ve renkler)."""
+    KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    def test_skel_terminalrc_betikteki_degerlerle_ayni(self):
+        yol = os.path.join(self.KOK, "config", "includes.chroot", "etc", "skel", ".config", "xfce4",
+                           "terminal", "terminalrc")
+        with open(yol, encoding="utf-8") as f:
+            satirlar = dict(l.split("=", 1) for l in f.read().splitlines() if "=" in l)
+        self.assertEqual(satirlar["MiscDefaultGeometry"], "100x30")           # eski ayar korunur
+        for anahtar, deger in md.TERMINALRC_ANAHTARLARI:
+            self.assertEqual(satirlar.get(anahtar), deger, anahtar)
+
+    def test_yazi_tipi_paketi_iso_listesinde(self):
+        yol = os.path.join(self.KOK, "config", "package-lists", "carotos.list.chroot")
+        with open(yol, encoding="utf-8") as f:
+            self.assertIn("fonts-jetbrains-mono", f.read().split())
+
+
 if __name__ == "__main__":
     unittest.main()

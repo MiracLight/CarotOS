@@ -36,6 +36,7 @@ htop
 alsa-utils
 locales
 fonts-noto-cjk
+fonts-jetbrains-mono
 gir1.2-notify-0.7
 libnotify-bin
 systemd-zram-generator

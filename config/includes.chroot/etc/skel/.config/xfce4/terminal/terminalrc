@@ -1,2 +1,11 @@
 [Configuration]
 MiscDefaultGeometry=100x30
+FontName=JetBrains Mono 11
+FontUseSystem=FALSE
+BackgroundMode=TERMINAL_BACKGROUND_TRANSPARENT
+BackgroundDarkness=0.880000
+ColorForeground=#d6e4f5
+ColorBackground=#000b24
+ColorCursor=#5196d6
+ColorCursorUseDefault=FALSE
+ColorPalette=#001239;#e06c75;#7ec699;#e5c07b;#5196d6;#b48ead;#56b6c2;#c8d3e0;#3a4d6e;#ff7b86;#98d8a9;#f0d08c;#7ab3ea;#c9a6d4;#7fd0da;#ffffff
