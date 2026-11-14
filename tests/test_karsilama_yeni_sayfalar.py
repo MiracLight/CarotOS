@@ -155,7 +155,9 @@ class KonuKartiTesti(unittest.TestCase):
         konular = {k["id"]: k["sayfalar"] for k in gezinme.KONULAR}
         self.assertEqual(konular["arac"], ["panel", "tools", "terminal", "acikla"])
         self.assertEqual(konular["etik"], ["etik"])
-        self.assertEqual(konular["gizlilik"], ["network", "disk"])
+        self.assertEqual(konular["ag"], ["network"])
+        self.assertEqual(konular["disk"], ["disk"])
+        self.assertEqual(konular["guvenlik_duvari"], ["guvenlik_duvari"])
         self.assertEqual(konular["sistem"][-1], "windows")
         self.assertEqual(konular["koruma"][-1], "dogrula")
 

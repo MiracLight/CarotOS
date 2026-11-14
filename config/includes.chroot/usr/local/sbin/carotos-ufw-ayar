@@ -1,0 +1,82 @@
+#!/usr/bin/python3 -I
+# -*- coding: utf-8 -*-
+"""CarotOS: guvenlik duvari (ufw) anahtari (root olarak, pkexec ile cagrilir).
+
+Kullanim:  carotos-ufw-ayar ac | kapat | durum
+
+  ac     /usr/sbin/ufw --force enable  (varsayilan gelen politikasina DOKUNULMAZ; Debian'da DROP kalir)
+  kapat  /usr/sbin/ufw disable
+  durum  "ac", "kapali" ya da "bilinmiyor" yazar (/etc/ufw/ufw.conf icindeki ENABLED satirindan)
+
+Baska arguman kabul edilmez; hicbir arguman ufw'ye aktarilmaz. ufw yalnizca tam yoluyla, sabit ortamla
+(PATH sistem dizinleri, LC_ALL=C), kabuksuz ve stdin kapali calistirilir. Karsilama > Guvenlik duvari
+anahtari bu betigi kullanir.
+
+Cikis kodlari: 0 tamam, 2 yanlis kullanim, 3 root degil, 4 ufw kurulu degil, 5 ufw basarisiz.
+"""
+import os
+import subprocess
+import sys
+
+sys.dont_write_bytecode = True
+
+UFW = "/usr/sbin/ufw"
+UFW_CONF = "/etc/ufw/ufw.conf"
+ORTAM = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL": "C"}
+KOMUTLAR = ("ac", "kapat", "durum")
+UFW_ARGUMANLARI = {"ac": ["--force", "enable"], "kapat": ["disable"]}
+
+
+def durum(kok=""):
+    """ufw.conf'taki son ENABLED atamasi: "ac" | "kapali" | "bilinmiyor"."""
+    try:
+        with open(kok + UFW_CONF, encoding="utf-8", errors="replace") as fh:
+            satirlar = fh.read(65536).splitlines()
+    except OSError:
+        return "bilinmiyor"
+    sonuc = "bilinmiyor"
+    for satir in satirlar:                         # kabuk dosyasi gibi: son atama gecerli
+        satir = satir.strip()
+        if satir.startswith("ENABLED="):
+            deger = satir.split("=", 1)[1].strip().strip("'\"").lower()
+            sonuc = "ac" if deger == "yes" else "kapali" if deger == "no" else "bilinmiyor"
+    return sonuc
+
+
+def ufw_kurulu(ufw=UFW):
+    return os.path.isfile(ufw) and os.access(ufw, os.X_OK)
+
+
+def ufw_calistir(komut, ufw=UFW):
+    try:
+        return subprocess.run([ufw] + UFW_ARGUMANLARI[komut], env=ORTAM, stdin=subprocess.DEVNULL,
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                              timeout=60, check=False).returncode
+    except (OSError, subprocess.SubprocessError):
+        return 1
+
+
+def main(argv, kok="", ufw=UFW):
+    if len(argv) != 2 or argv[1] not in KOMUTLAR:
+        print("kullanim: carotos-ufw-ayar ac|kapat|durum", file=sys.stderr)
+        return 2
+    komut = argv[1]
+    if komut == "durum":
+        print(durum(kok))
+        return 0
+    if not kok and os.geteuid() != 0:
+        print("root gerekli (pkexec ile calistirin)", file=sys.stderr)
+        return 3
+    if not ufw_kurulu(ufw):
+        print("ufw kurulu degil (%s bulunamadi)" % ufw, file=sys.stderr)
+        return 4
+    if ufw_calistir(komut, ufw) != 0:
+        print("ufw basarisiz oldu", file=sys.stderr)
+        print(durum(kok))
+        return 5
+    print(durum(kok))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

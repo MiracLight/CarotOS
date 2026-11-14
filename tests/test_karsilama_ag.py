@@ -61,7 +61,7 @@ class AgSayfasiTesti(unittest.TestCase):
         sys.path.insert(0, os.path.dirname(WELCOME))
         import gezinme
         konu = next(k for k in gezinme.KONULAR if "network" in k["sayfalar"])
-        self.assertEqual(konu["id"], "gizlilik")
+        self.assertEqual(konu["id"], "ag")                     # "Ag ve sahte MAC" konusu (eski "gizlilik" bolundu)
 
     def test_her_metin_iki_dilde_dolu(self):
         for m in metinler(self.sayfa):

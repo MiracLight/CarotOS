@@ -102,11 +102,11 @@ class ModelTesti(unittest.TestCase):
     def test_istenen_sirayla_birden_cok_konu(self):
         for _ in range(3):
             self.g.ileri()
-        for kimlik in ("gizlilik", "sistem"):
+        for kimlik in ("ag", "sistem"):
             self.g.konuyu_ac(kimlik)
             while self.g.durum == G.Gezinme.KONU_DURUMU:
                 self.g.ileri()
-        self.assertEqual(self.g.biten_konular(), ["gizlilik", "sistem"])
+        self.assertEqual(self.g.biten_konular(), ["ag", "sistem"])
 
     def test_bilinmeyen_konu(self):
         self.assertFalse(self.g.konuyu_ac("yok"))

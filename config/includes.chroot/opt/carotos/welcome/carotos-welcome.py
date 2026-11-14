@@ -56,6 +56,23 @@ LOGO_CANDIDATES = [
 ]
 
 
+def ufw_durumu(yol):
+    """ufw acik mi: /etc/ufw/ufw.conf'taki ENABLED satirindan, parola istemeden (Guvenlik Paneli ile ayni desen).
+    True/False; dosya okunamaz ya da deger tanimsizsa None."""
+    try:
+        with open(yol, encoding="utf-8", errors="replace") as fh:
+            satirlar = fh.read(65536).splitlines()
+    except OSError:
+        return None
+    durum = None
+    for satir in satirlar:                     # kabuk dosyasi gibi okunur: son atama gecerli
+        satir = satir.strip()
+        if satir.startswith("ENABLED="):
+            deger = satir.split("=", 1)[1].strip().strip("'\"").lower()
+            durum = True if deger == "yes" else False if deger == "no" else None
+    return durum
+
+
 # ---------------------------------------------------------------------------
 # Metinler
 # ---------------------------------------------------------------------------
@@ -92,6 +109,8 @@ UI = {
 #   ("grid",    [ (baslik, {tr, en}), ... ])   iki sutunlu kutu izgarasi
 #   ("mac_anahtar", {baslik, alt, acik, kapali, hata: {tr, en}})
 #                                               sahte MAC anahtari (pkexec carotos-mac-ayar)
+#   ("ufw_anahtar", {baslik, alt, acik, kapali, bilinmiyor, hata: {tr, en}})
+#                                               guvenlik duvari anahtari (pkexec carotos-ufw-ayar)
 #   ("action",  ({tr, en} baslik, {tr, en} alt, [komut, ...]))
 #                                               tiklandiginda bir uygulama acan buyuk kutu
 
@@ -672,6 +691,22 @@ PAGES = [
                 "en": "In CarotOS the firewall comes turned off on purpose, so you can try network tools "
                       "such as nmap, CarotPot and Poligon comfortably from day one. At home and on your "
                       "own network this is a calm starting point.",
+            }),
+            ("ufw_anahtar", {
+                "baslik": {"tr": "Güvenlik duvarı (ufw)", "en": "Firewall (ufw)"},
+                "alt": {"tr": "Açıkken dışarıdan gelen bağlantılar engellenir. CarotPot başlarken kendi portlarına "
+                              "izin verir; Poligon sınıf modu için izin vermen gerekebilir.",
+                        "en": "While it is on, incoming connections from outside are blocked. CarotPot allows its "
+                              "own ports when it starts; Poligon class mode may need to be allowed."},
+                "acik": {"tr": "Açık: dışarıdan gelen bağlantılar engelleniyor.",
+                         "en": "On: incoming connections from outside are blocked."},
+                "kapali": {"tr": "Kapalı: gelen bağlantılar süzülmüyor.",
+                           "en": "Off: incoming connections are not filtered."},
+                "bilinmiyor": {"tr": "Durum bilinmiyor (ufw ayarı okunamadı).",
+                               "en": "State unknown (the ufw setting could not be read)."},
+                "hata": {"tr": "Ayar değiştirilemedi (yetki verilmedi, ufw kurulu değil ya da bir hata oldu).",
+                         "en": "The setting could not be changed (permission was not granted, ufw is not "
+                               "installed or an error occurred)."},
             }),
             ("bullets", [
                 {"tr": "Ne zaman açmalı: kafe, okul, yurt ya da herhangi bir ortak ağdayken; "
@@ -2461,6 +2496,9 @@ class WelcomeWindow(Gtk.Window):
         if kind == "mac_anahtar":
             return self.build_mac_anahtar(payload)
 
+        if kind == "ufw_anahtar":
+            return self.build_ufw_anahtar(payload)
+
         if kind == "action":
             baslik, alt_metin, komut = payload
             inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
@@ -2499,8 +2537,43 @@ class WelcomeWindow(Gtk.Window):
         except (OSError, subprocess.SubprocessError):
             return 1
 
+    UFW_AYAR = "/usr/local/sbin/carotos-ufw-ayar"
+    UFW_CONF = "/etc/ufw/ufw.conf"
+
+    def ufw_acik_mi(self):
+        """True/False; okunamazsa None ("durum bilinmiyor"). Root gerekmez."""
+        return ufw_durumu(self.UFW_CONF)
+
+    def ufw_komutu(self, acik):
+        """Yetkili betigin komutu (pkexec ile); testte yerine kopya konur."""
+        return ["pkexec", self.UFW_AYAR, "ac" if acik else "kapat"]
+
+    def ufw_yetkili_calistir(self, komut):
+        try:
+            return subprocess.run(komut, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                  stderr=subprocess.DEVNULL, timeout=120).returncode
+        except (OSError, subprocess.SubprocessError):
+            return 1
+
     def build_mac_anahtar(self, p):
         """Sahte MAC anahtari: yetkili betigi pkexec ile calistirir; pencere donmaz, basarisizsa anahtar eski haline doner."""
+        kart, anahtar = self._yetkili_anahtar(
+            p, self.mac_acik_mi(),
+            lambda istenen: self.mac_yetkili_calistir(self.mac_komutu(istenen)))
+        self.mac_anahtari = anahtar                        # testler icin
+        return kart
+
+    def build_ufw_anahtar(self, p):
+        """Guvenlik duvari anahtari: MAC anahtariyla ayni mantik (pkexec carotos-ufw-ayar)."""
+        kart, anahtar = self._yetkili_anahtar(
+            p, self.ufw_acik_mi(),
+            lambda istenen: self.ufw_yetkili_calistir(self.ufw_komutu(istenen)))
+        self.ufw_anahtari = anahtar                        # testler icin
+        return kart
+
+    def _yetkili_anahtar(self, p, baslangic, calistir):
+        """Ortak anahtar karti. baslangic True/False/None (None: durum bilinmiyor, anahtar kapali gorunur).
+        calistir(istenen) arka planda cagrilir ve cikis kodunu dondurur; basarisizsa anahtar eski haline doner."""
         import threading
         satir = Gtk.Box(spacing=14)
         metin = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
@@ -2527,15 +2600,17 @@ class WelcomeWindow(Gtk.Window):
         def yaz(acik):
             durum.set_text((p["acik"] if acik else p["kapali"])[self.lang])
 
-        acik = self.mac_acik_mi()
-        anahtar.set_active(acik)
-        yaz(acik)
+        anahtar.set_active(bool(baslangic))
+        if baslangic is None and "bilinmiyor" in p:
+            durum.set_text(p["bilinmiyor"][self.lang])
+        else:
+            yaz(bool(baslangic))
 
         def degisti(sw, istenen):
             sw.set_sensitive(False)
 
             def calis():
-                tamam = self.mac_yetkili_calistir(self.mac_komutu(istenen)) == 0
+                tamam = calistir(istenen) == 0
                 GLib.idle_add(bitti, tamam, istenen)
             threading.Thread(target=calis, daemon=True).start()
             return True                                    # durumu biz ayarliyoruz (basarisizsa eski haline doner)
@@ -2555,8 +2630,7 @@ class WelcomeWindow(Gtk.Window):
             return False
 
         kimlik = anahtar.connect("state-set", degisti)
-        self.mac_anahtari = anahtar                        # testler icin
-        return self.card(satir)                            # diger bloklarla ayni kutu
+        return self.card(satir), anahtar                   # diger bloklarla ayni kutu
 
     def on_action_clicked(self, _button, komut):
         """'action' turundeki bir kutuya tiklandiginda ilgili uygulamayi acar."""

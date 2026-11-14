@@ -243,7 +243,8 @@ class KarsilamaDenetimTesti(UygulamaDilTabani):
     def test_guvenlik_duvari_sayfasi(self):
         s = self._sayfa("guvenlik_duvari")
         konular = {k["id"]: k["sayfalar"] for k in self.m.gezinme.KONULAR}
-        self.assertIn("guvenlik_duvari", konular["koruma"])
+        self.assertEqual(konular["guvenlik_duvari"], ["guvenlik_duvari"])   # artik kendi konusu
+        self.assertNotIn("guvenlik_duvari", konular["koruma"])
         tr = " ".join(d["tr"] for d in _metin(s))
         en = self._tum_en(s)
         for parca in ("Güvenlik Paneli", "Etkinleştir", "sudo ufw enable", "kapalı"):
