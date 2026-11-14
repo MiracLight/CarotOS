@@ -44,11 +44,17 @@ def metin_sozlugu():
 
 
 class AptKomutuTesti(unittest.TestCase):
+    # Root programlari artik shutil.which (kullanici PATH'i) ile degil, ortak/yetkili.py
+    # sistem_yolu ile bulunur (M-04); test sistem_yolu'nu sahteler.
     def setUp(self):
-        self.ad_alani = islevleri_yukle("_yetki", "apt_komutu")
-        yama = mock.patch.object(shutil, "which", lambda ad: "/usr/bin/" + ad)
-        yama.start()
-        self.addCleanup(yama.stop)
+        import re
+        agac = kaynak_agaci()
+        secilen = [n for n in agac.body
+                   if (isinstance(n, ast.FunctionDef) and n.name in ("apt_komutu", "paket_adi_gecerli"))
+                   or (isinstance(n, ast.Assign)
+                       and any(getattr(t, "id", "") in ("PAKET_ADI", "APT_EYLEMLERI") for t in n.targets))]
+        self.ad_alani = {"re": re, "sistem_yolu": lambda ad: "/usr/bin/" + ad}
+        exec(compile(ast.Module(body=secilen, type_ignores=[]), KOD, "exec"), self.ad_alani)
 
     def test_yerel_ayar_c_olur(self):
         # Turkce yerelde rkhunter gibi paketlerin kurulum betigi dusuyordu
@@ -61,17 +67,17 @@ class AptKomutuTesti(unittest.TestCase):
     def test_komut_pkexec_ile_baslar_ve_apt_get_cagirir(self):
         komut = self.ad_alani["apt_komutu"]("install", "nmap")
         self.assertEqual(komut[0], "/usr/bin/pkexec")
-        self.assertIn("apt-get", komut)
-        self.assertEqual(komut[komut.index("install") + 1:], ["-y", "nmap"])
+        self.assertIn("/usr/bin/apt-get", komut)
+        self.assertEqual(komut[komut.index("install") + 1:], ["-y", "--", "nmap"])
 
     def test_birden_cok_paket_tek_komutta(self):
         komut = self.ad_alani["apt_komutu"]("install", "nmap", "rkhunter", "htop")
         self.assertEqual(komut[-3:], ["nmap", "rkhunter", "htop"])
-        self.assertEqual(komut.count("apt-get"), 1)
+        self.assertEqual(komut.count("/usr/bin/apt-get"), 1)
 
     def test_pkexec_yoksa_none(self):
-        with mock.patch.object(shutil, "which", lambda ad: None):
-            self.assertIsNone(self.ad_alani["apt_komutu"]("install", "nmap"))
+        self.ad_alani["sistem_yolu"] = lambda ad: None
+        self.assertIsNone(self.ad_alani["apt_komutu"]("install", "nmap"))
 
 
 class SepetTesti(unittest.TestCase):

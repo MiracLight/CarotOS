@@ -21,7 +21,7 @@ import base64
 import json
 import locale
 import os
-import shutil
+import re
 import subprocess
 import sys
 import threading
@@ -40,6 +40,7 @@ for _y in (ORTAK, BASE_DIR):
 
 import dil  # noqa: E402  (ortak dil katmani: ortak/dil.py)
 import tema  # noqa: E402
+from yetkili import sistem_yolu, temiz_ortam  # noqa: E402
 
 APP_VERSION = "2.0"
 KATALOG_YOLU = os.path.join(BASE_DIR, "katalog.json")
@@ -155,6 +156,36 @@ METIN = {
     "iptal": {"tr": "İptal", "en": "Cancel"},
     "tamamlandi": {"tr": "Tamamlandı.", "en": "Done."},
     "hata_olustu": {"tr": "İşlem başarısız oldu.", "en": "The operation failed."},
+    "iptal_edilemez": {
+        "tr": "Yetki verildi; işlem artık güvenle durdurulamaz. Pencereyi kapatabilirsiniz, "
+              "işlem arka planda sürer ve bitince sonuç Mağaza'da görünür.",
+        "en": "Permission was granted; the operation can no longer be stopped safely. You can "
+              "close this window: it keeps running in the background and the Store shows the "
+              "result when it finishes."},
+    "kilit_mesgul": {
+        "tr": "Başka bir paket işlemi sürüyor (başka bir Mağaza penceresi ya da sistem "
+              "güncellemesi). O bitince yeniden deneyin.",
+        "en": "Another package operation is running (another Store window or a system "
+              "update). Try again when it finishes."},
+    "dpkg_yarim": {
+        "tr": "Önceki bir paket işlemi yarıda kalmış. Terminalde "
+              "'sudo dpkg --configure -a' komutunu çalıştırıp yeniden deneyin.",
+        "en": "A previous package operation was interrupted. Run "
+              "'sudo dpkg --configure -a' in a terminal, then try again."},
+    "kaldir_onay_baslik": {"tr": "{ad} kaldırılsın mı?", "en": "Remove {ad}?"},
+    "kaldir_liste": {"tr": "Şu paketler kaldırılacak:", "en": "These packages will be removed:"},
+    "kaldir_hesaplanamadi": {
+        "tr": "Birlikte kaldırılacak paketler hesaplanamadı; apt, bu pakete bağlı başka "
+              "paketleri de kaldırabilir.",
+        "en": "Could not work out which other packages would be removed; apt may also "
+              "remove packages that depend on this one."},
+    "kaldir_korunan": {
+        "tr": "CarotOS bu paketleri kullanıyor:",
+        "en": "CarotOS uses these packages:"},
+    "kaldir_anladim": {"tr": "Anladım, yine de kaldır", "en": "I understand, remove anyway"},
+    "kaldir_temel": {
+        "tr": "Bu işlem sistemin temel paketlerini de kaldırırdı; apt buna izin vermez.",
+        "en": "This would also remove essential system packages; apt does not allow it."},
     "sepete_ekle": {"tr": "Sepete ekle", "en": "Add to basket"},
     "sepette": {"tr": "Sepette ✓", "en": "In basket ✓"},
     "sepeti_kur": {"tr": "Sepeti kur ({n})", "en": "Install basket ({n})"},
@@ -394,9 +425,13 @@ def logo_pixbuf(px):
 
 # --- apt / dpkg -------------------------------------------------------------
 def kurulu_paketler():
+    dpkg_query = sistem_yolu("dpkg-query")
+    if not dpkg_query:
+        return set()
     try:
-        r = subprocess.run(["dpkg-query", "-W", "-f=${Package} ${Status}\n"],
-                           capture_output=True, text=True, timeout=20)
+        r = subprocess.run([dpkg_query, "-W", "-f=${Package} ${Status}\n"],
+                           capture_output=True, text=True, errors="replace", timeout=20,
+                           stdin=subprocess.DEVNULL, env=temiz_ortam())
     except Exception:  # noqa: BLE001
         return set()
     return {s.split(" ", 1)[0] for s in r.stdout.splitlines()
@@ -405,10 +440,13 @@ def kurulu_paketler():
 
 def guncellenebilir_paketler():
     """`apt list --upgradable` çıktısından güncellenebilir paket adları."""
+    apt = sistem_yolu("apt")
+    if not apt:
+        return set()
     try:
-        r = subprocess.run(["apt", "list", "--upgradable"],
-                           capture_output=True, text=True, timeout=30,
-                           env=dict(os.environ, LC_ALL="C"))
+        r = subprocess.run([apt, "list", "--upgradable"],
+                           capture_output=True, text=True, errors="replace", timeout=30,
+                           stdin=subprocess.DEVNULL, env=temiz_ortam())
     except Exception:  # noqa: BLE001
         return set()
     adlar = set()
@@ -418,25 +456,167 @@ def guncellenebilir_paketler():
     return adlar
 
 
-def _yetki():
-    return shutil.which("pkexec")
+# Debian paket adi bicimi (Policy 5.6.1). Root'a giden her ad bu bicime uymali (M-05):
+# '-o', './x.deb', 'paket=surum', 'paket/depo' gibi apt'in baska anlam verdigi yazimlar reddedilir.
+PAKET_ADI = re.compile(r"[a-z0-9][a-z0-9+.-]+\Z")
+APT_EYLEMLERI = ("install", "remove", "upgrade", "update")
 
 
-def apt_komutu(eylem, *paketler):
-    """eylem: install | remove | upgrade | update."""
-    yetki = _yetki()
-    if not yetki:
+def paket_adi_gecerli(ad):
+    return isinstance(ad, str) and bool(PAKET_ADI.match(ad))
+
+
+def apt_komutu(eylem, *paketler, izinli=None):
+    """pkexec ile root olarak calisacak apt-get komutu (liste; kabuk yok).
+
+    eylem: install | remove | upgrade | update. Programlar yalnizca sistem dizinlerinden
+    (M-04: kullanicinin PATH'indeki sahte pkexec/env/apt-get root olarak calismasin).
+    Paket adlari bicim denetiminden gecer, verilirse `izinli` (katalog) icinde olmalidir;
+    adlar '--' ardindan verilir. Gecersiz eylem ya da adda ValueError. Gerekli
+    programlardan biri yoksa None (arayuz elle calistirilacak komutu gosterir)."""
+    if eylem not in APT_EYLEMLERI:
+        raise ValueError("gecersiz apt eylemi: %r" % (eylem,))
+    if eylem in ("install", "remove"):
+        if not paketler:
+            raise ValueError("paket adi verilmedi")
+        for ad in paketler:
+            if not paket_adi_gecerli(ad):
+                raise ValueError("gecersiz paket adi: %r" % (ad,))
+            if izinli is not None and ad not in izinli:
+                raise ValueError("katalogda olmayan paket: %r" % (ad,))
+    # upgrade/update paket adi almaz: verilse de root komutuna hic eklenmez
+    pkexec, env, apt_get = sistem_yolu("pkexec"), sistem_yolu("env"), sistem_yolu("apt-get")
+    if not (pkexec and env and apt_get):
         return None
-    if eylem == "update":
-        return [yetki, "apt-get", "update"]
     # LC_ALL=C: pkexec yerel ayari korur; Turkce'de bazi paketlerin kurulum
     # betikleri bozulur (rkhunter: tr '[:upper:]' '[:lower:]' "I" harfini
     # kucultmez, betik 10 koduyla duser, paket yari kurulu kalir). Bu yuzden
-    # apt dil ayarindan bagimsiz calistirilir (cikti Ingilizce olur).
-    ortam = ["env", "DEBIAN_FRONTEND=noninteractive", "LC_ALL=C"]
+    # apt dil ayarindan bagimsiz calistirilir (cikti Ingilizce olur; kilit iletisi
+    # de bu sayede sabit metinle taninir).
+    ortam = [env, "DEBIAN_FRONTEND=noninteractive", "LC_ALL=C", "LANGUAGE=C"]
+    # Baska bir apt/dpkg kilidi tutuyorsa hemen dusme, bir sure bekle (M-06)
+    kilit = ["-o", "DPkg::Lock::Timeout=60"]
+    if eylem == "update":
+        return [pkexec, *ortam, apt_get, *kilit, "update"]
+    # stdin yok: dpkg degismis bir yapilandirma dosyasi icin soru sorarsa EOF alip paketi
+    # yari yapilandirilmis birakmasin; yerel (CarotOS'un degistirdigi) dosya korunur.
+    conf = ["-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold"]
     if eylem == "upgrade":
-        return [yetki, *ortam, "apt-get", "upgrade", "-y"]
-    return [yetki, *ortam, "apt-get", eylem, "-y", *paketler]
+        return [pkexec, *ortam, apt_get, *kilit, *conf, "upgrade", "-y"]
+    return [pkexec, *ortam, apt_get, *kilit, *conf, eylem, "-y", "--", *paketler]
+
+
+def kilit_iletisi(cikti):
+    """Basarisiz apt ciktisinda kilit/yarim dpkg nedenini tanir: metin anahtari ya da None.
+    apt LC_ALL=C ile calistigi icin iletiler Ingilizcedir."""
+    if not cikti:
+        return None
+    if "dpkg was interrupted" in cikti:
+        return "dpkg_yarim"
+    if re.search(r"Could not get lock|Unable to acquire the dpkg frontend lock|"
+                 r"Unable to lock (the )?(administration |download |list )?directory", cikti):
+        return "kilit_mesgul"
+    return None
+
+
+# --- Kaldirma onayi (M-03) ---------------------------------------------------
+# CarotOS'un kendi uygulamalarinin dayandigi paketler. Kaldirma yasak DEGIL (karar: DENETIM.md
+# 2.5); onay penceresi hangi CarotOS uygulamasinin bozulacagini adiyla soyler ve ek onay ister.
+_ARAC_ETKI = {
+    # paket: (Guvenlik Paneli araci mi, Poligon gorevi var mi)
+    "nmap": (True, True), "tcpdump": (True, False), "tshark": (True, True),
+    "john": (True, True), "hydra": (True, True), "sqlmap": (True, True),
+    "aircrack-ng": (True, False), "nikto": (True, False),
+}
+
+
+def _arac_etkisi(paket, panel, poligon):
+    tr = ["CarotOS Güvenlik Paneli'ndeki %s aracı" % paket] if panel else []
+    en = ["the %s tool in CarotOS Security Panel" % paket] if panel else []
+    if poligon:
+        tr.append("CarotOS Poligon'daki %s görevleri" % paket)
+        en.append("the CarotOS Poligon %s tasks" % paket)
+    return {
+        "tr": "%s kaldırılırsa %s çalışmaz; CarotOS Former'daki %s dersinin alıştırmaları "
+              "yapılamaz." % (paket, " ve ".join(tr), paket),
+        "en": "Without %s, %s stop working and the CarotOS Former %s lesson exercises "
+              "cannot be done." % (paket, " and ".join(en), paket),
+    }
+
+
+KORUNAN = {
+    "clamav": {
+        "tr": "clamav kaldırılırsa Carotene ve CarotOS USB Denetimi virüs taraması yapamaz; "
+              "CarotOS Sistem Sağlığı'nın virüs denetimi çalışmaz.",
+        "en": "Without clamav, Carotene and CarotOS USB Check cannot scan for viruses and "
+              "the CarotOS System Health virus check does not run."},
+    "clamav-freshclam": {
+        "tr": "clamav-freshclam kaldırılırsa Carotene virüs tanımlarını güncelleyemez.",
+        "en": "Without clamav-freshclam, Carotene cannot update its virus definitions."},
+    "rkhunter": {
+        "tr": "rkhunter kaldırılırsa CarotOS Sistem Sağlığı'nın rootkit denetimi çalışmaz.",
+        "en": "Without rkhunter, the CarotOS System Health rootkit check does not run."},
+    "ufw": {
+        "tr": "ufw kaldırılırsa güvenlik duvarı kalmaz; CarotPot'un güvenlik duvarı kuralları "
+              "ve CarotOS Sistem Sağlığı'nın güvenlik duvarı denetimi çalışmaz.",
+        "en": "Without ufw there is no firewall; CarotPot's firewall rules and the CarotOS "
+              "System Health firewall check do not work."},
+    "firefox-esr": {
+        "tr": "firefox-esr sistemdeki tek internet tarayıcısıdır; kaldırılırsa CarotOS "
+              "uygulamalarındaki internet bağlantıları açılmaz.",
+        "en": "firefox-esr is the only web browser on the system; without it, web links in "
+              "CarotOS apps do not open."},
+    "python3-gi": {
+        "tr": "python3-gi kaldırılırsa CarotOS uygulamalarının hiçbiri açılmaz.",
+        "en": "Without python3-gi, none of the CarotOS apps open."},
+    "gir1.2-gtk-3.0": {
+        "tr": "gir1.2-gtk-3.0 kaldırılırsa CarotOS uygulamalarının hiçbiri açılmaz.",
+        "en": "Without gir1.2-gtk-3.0, none of the CarotOS apps open."},
+    "pkexec": {
+        "tr": "pkexec kaldırılırsa CarotOS Mağaza ve yönetici yetkisi isteyen CarotOS "
+              "işlemleri çalışmaz.",
+        "en": "Without pkexec, CarotOS Store and CarotOS actions that need administrator "
+              "rights do not work."},
+    "polkitd": {
+        "tr": "polkitd kaldırılırsa CarotOS Mağaza ve yönetici yetkisi isteyen CarotOS "
+              "işlemleri çalışmaz.",
+        "en": "Without polkitd, CarotOS Store and CarotOS actions that need administrator "
+              "rights do not work."},
+}
+KORUNAN.update({p: _arac_etkisi(p, *e) for p, e in _ARAC_ETKI.items()})
+
+
+def kaldirma_simulasyonu_coz(kod, cikti):
+    """`apt-get -s remove` ciktisi -> {"paketler": [...], "temel": bool}; basarisizsa None."""
+    if kod != 0:
+        return None
+    paketler = []
+    for satir in (cikti or "").splitlines():
+        if satir.startswith("Remv "):
+            ad = satir.split()[1].split(":", 1)[0] if len(satir.split()) > 1 else ""
+            if paket_adi_gecerli(ad) and ad not in paketler:
+                paketler.append(ad)
+    temel = "essential packages will be removed" in (cikti or "")
+    return {"paketler": paketler, "temel": temel}
+
+
+def kaldirma_simulasyonu(paket):
+    """Kullanici yetkisiyle (root gerekmez) `apt-get -s remove`; None: hesaplanamadi."""
+    apt_get = sistem_yolu("apt-get")
+    if not apt_get or not paket_adi_gecerli(paket):
+        return None
+    try:
+        r = subprocess.run([apt_get, "-s", "remove", "--", paket],
+                           capture_output=True, text=True, errors="replace", timeout=60,
+                           stdin=subprocess.DEVNULL, env=temiz_ortam())
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return kaldirma_simulasyonu_coz(r.returncode, r.stdout + "\n" + r.stderr)
+
+
+def korunan_etkiler(paketler, dil_kodu):
+    """Kaldirilacak paketlerden CarotOS'un dayandiklari icin, secili dilde etki cumleleri."""
+    return [dil.metin(KORUNAN[p], dil_kodu) for p in paketler if p in KORUNAN]
 
 
 # --- İşlem penceresi (apt çıktısı) ------------------------------------------
@@ -453,10 +633,16 @@ class IslemPenceresi(Gtk.Window):
         self.otomatik_kapan = otomatik_kapan
         self.surec = None
         self.iptal_edildi = False
+        self.durdurulamaz = False    # pkexec yetkiyi aldi: root surece sinyal gonderilemez (M-02)
+        self.bitti_mi = False
+        self._yok_edildi = False
         self._bekleyen = []          # okuyucu is parcaciginin biriktirdigi satirlar
+        self._cikti_sonu = ""        # kilit iletisini tanimak icin ciktinin son kismi (M-06)
         self._kilit = threading.Lock()
         self._bosaltma_sayisi = 0    # test icin: arayuze kac kez yazildi
         self._zamanlayici = None
+        self.connect("delete-event", self._kapatiliyor)
+        self.connect("destroy", self._yok_ediliyor)
 
         dis = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         tema.sinif(dis, "arka")
@@ -497,56 +683,144 @@ class IslemPenceresi(Gtk.Window):
         self._zamanlayici = GLib.timeout_add(150, self._bosalt)
         threading.Thread(target=self._calis, daemon=True).start()
 
+    SATIR_SINIRI = 10000         # tamponda tutulan en fazla satir (M-07)
+    _OKUMA_PARCASI = 65536       # satir sonu gelmeyen dev ciktida tek okumanin siniri
+
+    def _ekle(self, metin):
+        with self._kilit:
+            self._bekleyen.append(metin)
+            self._cikti_sonu = (self._cikti_sonu + metin)[-8192:]
+
     def _calis(self):
+        """apt'i calistirir ve ciktisini sonuna kadar okur (M-01).
+
+        Cikti bayt olarak okunup 'replace' ile cozulur: UTF-8 olmayan bir bayt okuyucuyu
+        olduremez. Okuyucu ne olursa olsun boruyu bosaltmayi surdurur ve wait() cagirir;
+        boylece root apt boru dolunca takilip dpkg kilidini tutmaz, _bitti yalnizca surec
+        gercekten bittiginde gelir."""
         try:
             self.surec = subprocess.Popen(
-                self.komut, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                text=True, bufsize=1)
-            for satir in self.surec.stdout:
-                with self._kilit:
-                    self._bekleyen.append(satir)
-            kod = self.surec.wait()
+                self.komut, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT)
         except Exception as exc:  # noqa: BLE001
-            with self._kilit:
-                self._bekleyen.append(f"\n[hata] {exc}\n")
+            self._ekle(f"\n[hata] {exc}\n")
+            GLib.idle_add(self._bitti, 1)
+            return
+        if self.iptal_edildi:        # Iptal, surec baslamadan once basildi
+            try:
+                self.surec.terminate()
+            except OSError:
+                pass
+        akis = self.surec.stdout
+        try:
+            for satir in iter(lambda: akis.readline(self._OKUMA_PARCASI), b""):
+                self._ekle(satir.decode("utf-8", "replace"))
+        except Exception as exc:  # noqa: BLE001
+            self._ekle(f"\n[hata] {exc}\n")
+            try:                     # okumayi birak ama boruyu bosaltmayi surdur
+                while akis.read(self._OKUMA_PARCASI):
+                    pass
+            except Exception:  # noqa: BLE001
+                pass
+        try:
+            kod = self.surec.wait()
+        except Exception:  # noqa: BLE001
             kod = 1
+        try:
+            akis.close()
+        except OSError:
+            pass
         GLib.idle_add(self._bitti, kod)
 
     def _bosalt(self):
         """Biriken satirlari tek seferde tampona yazar ve bir kez kaydirir."""
         with self._kilit:
             parca, self._bekleyen = "".join(self._bekleyen), []
-        if parca:
+        if parca and not self._yok_edildi:
             self._bosaltma_sayisi += 1
             self.tampon.insert(self.tampon.get_end_iter(), parca)
+            fazla = self.tampon.get_line_count() - self.SATIR_SINIRI
+            if fazla > 0:            # en eski satirlar atilir
+                self.tampon.delete(self.tampon.get_start_iter(),
+                                   self.tampon.get_iter_at_line(fazla))
             self.tampon.move_mark(self._son_isaret, self.tampon.get_end_iter())
             self.gorunum.scroll_mark_onscreen(self._son_isaret)
         return self._zamanlayici is not None
 
     def _bitti(self, kod):
+        self.bitti_mi = True
         if self._zamanlayici is not None:
             GLib.source_remove(self._zamanlayici)
             self._zamanlayici = None
-        self._bosalt()
-        self.spinner.stop()
         basarili = (kod == 0 and not self.iptal_edildi)
-        self.durum.get_style_context().add_class("basari-yazi" if basarili else "hata-yazi")
-        self.durum.set_text(M("tamamlandi") if basarili else M("hata_olustu"))
-        self.kapat_dugme.set_label(M("kapat"))
+        if not self._yok_edildi:
+            self._bosalt()
+            self.spinner.stop()
+            self.durum.get_style_context().add_class("basari-yazi" if basarili else "hata-yazi")
+            neden = None if basarili else kilit_iletisi(self._cikti_sonu)
+            self.durum.set_text(M(neden) if neden else
+                                M("tamamlandi") if basarili else M("hata_olustu"))
+            if neden:
+                self.durum.set_ellipsize(Pango.EllipsizeMode.NONE)
+                self.durum.set_line_wrap(True)
+            self.kapat_dugme.set_label(M("kapat"))
+            if not basarili and not self.iptal_edildi and not self.get_visible():
+                self.present()       # gizlenmis islem basarisiz bitti: kullanici gorsun
         if self.bitince:
             self.bitince(basarili)
         if basarili and self.otomatik_kapan:
-            GLib.timeout_add_seconds(2, lambda: self.get_realized() and self.destroy())
+            GLib.timeout_add_seconds(2, lambda: (not self._yok_edildi) and self.destroy())
         return False
 
+    def calisiyor(self):
+        return not self.bitti_mi and not self._yok_edildi
+
     def _kapat(self):
-        if self.surec and self.surec.poll() is None:
-            self.iptal_edildi = True
-            try:
-                self.surec.terminate()
-            except Exception:  # noqa: BLE001
-                pass
+        """Iptal / Kapat dugmesi.
+
+        pkexec yetki beklerken surec hala kullanicinindir: sinyal ulasir, islem gercekten
+        iptal edilir. Yetki verildikten sonra apt root olarak calisir; kullanici sureci ona
+        sinyal gonderemez (PermissionError) ve dpkg'yi yarida kesmek de guvenli olmazdi.
+        O durumda islem 'iptal edildi' sayilmaz, pencere yok edilmez: durum dürüstce
+        yazilir, sonraki tiklama pencereyi yalnizca gizler (M-02)."""
+        if self.calisiyor():
+            if self.durdurulamaz:
+                self.hide()
+                return
+            if self.surec is None:
+                self.iptal_edildi = True     # _calis surec acilir acilmaz sonlandirir
+            elif self.surec.poll() is None:
+                try:
+                    self.surec.terminate()
+                except PermissionError:
+                    self._durdurulamaz_goster()
+                    return
+                except OSError:
+                    pass
+                else:
+                    self.iptal_edildi = True
         self.destroy()
+
+    def _durdurulamaz_goster(self):
+        self.durdurulamaz = True
+        self.durum.set_ellipsize(Pango.EllipsizeMode.NONE)
+        self.durum.set_line_wrap(True)
+        self.durum.set_text(M("iptal_edilemez"))
+        self.kapat_dugme.set_label(M("kapat"))
+
+    def _kapatiliyor(self, *_):
+        """Pencere yoneticisinin x dugmesi: islem suruyorsa pencere yok edilmez, gizlenir;
+        cikti kaybolmaz ve Magaza onu yeniden one getirebilir (M-02)."""
+        if self.calisiyor():
+            self.hide()
+            return True
+        return False
+
+    def _yok_ediliyor(self, *_):
+        self._yok_edildi = True
+        if self._zamanlayici is not None:
+            GLib.source_remove(self._zamanlayici)
+            self._zamanlayici = None
 
 
 # --- Tıklanır sarıcı --------------------------------------------------------
@@ -651,6 +925,10 @@ class MagazaPenceresi(Gtk.Window):
         self.katalog = katalog
         self.kategoriler = katalog.get("kategoriler", [])
         self.uygulamalar = katalog.get("uygulamalar", [])
+        # root'a gidecek paket adlari yalnizca bu kumeden olabilir (M-05)
+        self.katalog_adlari = frozenset(u.get("paket") for u in self.uygulamalar
+                                        if paket_adi_gecerli(u.get("paket")))
+        self._onay_bekliyor = False
         self.kat_ad = {k["id"]: k["ad"] for k in self.kategoriler}
         self.kurulu = kurulu_paketler()
         self.as_harita = {}
@@ -1048,8 +1326,15 @@ class MagazaPenceresi(Gtk.Window):
             return
         if not self.sepet:
             return
-        paketler = sorted(self.sepet)
-        komut = apt_komutu("install", *paketler)
+        # yalnizca katalogdaki adlar root'a gider (M-05); bicimi apt_komutu ayrica denetler
+        paketler = sorted(p for p in self.sepet if p in self.katalog_adlari)
+        if not paketler:
+            return
+        try:
+            komut = apt_komutu("install", *paketler)
+        except ValueError as exc:
+            print(f"[magaza] {exc}", file=sys.stderr)
+            return
         if komut is None:
             self._pkexec_yok("install", " ".join(paketler))
             return
@@ -1087,8 +1372,9 @@ class MagazaPenceresi(Gtk.Window):
 
     def _mesgul_uyar(self):
         """Is suruyorken yeni bir islem istenirse calisan islemin penceresini one getirir."""
+        # Gizlenmis (x ya da Kapat ile) ama suren islemin penceresi de one getirilir (M-02)
         p = getattr(self, "islem_penceresi", None)
-        if p is not None and p.get_realized():
+        if p is not None and not p._yok_edildi:
             p.present()
 
     def _kurulu_oku(self, sonra):
@@ -1101,29 +1387,125 @@ class MagazaPenceresi(Gtk.Window):
         if self.mesgul:
             self._mesgul_uyar()
             return
-        komut = apt_komutu(islem, u["paket"])
+        if self._onay_bekliyor:
+            return
+        try:
+            komut = apt_komutu(islem, u.get("paket"), izinli=self.katalog_adlari)
+        except ValueError as exc:
+            print(f"[magaza] {exc}", file=sys.stderr)
+            return
         if komut is None:
             self._pkexec_yok(islem, u["paket"])
             return
+        if islem == "remove":
+            self._kaldirma_onayi(u, komut)
+            return
+        self._eylem_baslat(u, islem, komut)
+
+    def _kaldirma_onayi(self, u, komut):
+        """Kaldirmadan once neyin kaldirilacagini gosterir (M-03).
+
+        `apt-get -s remove` kullanici yetkisiyle arka planda calisir; onay penceresi
+        birlikte kaldirilacak butun paketleri listeler. CarotOS'un dayandigi bir paket
+        varsa hangi uygulamanin bozulacagi adiyla yazilir ve ek onay (onay kutusu) istenir."""
+        self._onay_bekliyor = True
+
+        def is_():
+            sonuc = kaldirma_simulasyonu(u["paket"])
+            GLib.idle_add(goster, sonuc)
+
+        def goster(sonuc):
+            self._onay_bekliyor = False
+            if not self.mesgul and self._kaldirma_sor(u, sonuc):
+                self._eylem_baslat(u, "remove", komut)
+            return False
+        threading.Thread(target=is_, daemon=True).start()
+
+    def _kaldirma_sor(self, u, sonuc):
+        """Onay penceresi; True: kaldir. sonuc: kaldirma_simulasyonu ciktisi ya da None."""
+        paketler = sonuc["paketler"] if sonuc and sonuc["paketler"] else [u["paket"]]
+        etkiler = korunan_etkiler(paketler, DIL)
+        temel = bool(sonuc and sonuc["temel"])
+
+        d = Gtk.Dialog(transient_for=self, modal=True)
+        d.set_title(M("kaldir_onay_baslik", ad=metin(u["ad"])))
+        d.set_resizable(False)
+        alan = d.get_content_area()
+        alan.set_spacing(10)
+        for k in ("top", "bottom", "start", "end"):
+            getattr(alan, f"set_margin_{k}")(18)
+        alan.pack_start(tema.etiket(M("kaldir_onay_baslik", ad=metin(u["ad"])), "buyuk-baslik",
+                                    sar=True, genislik=50), False, False, 0)
+        alan.pack_start(tema.etiket(M("kaldir_liste"), "soluk", sar=True, genislik=56),
+                        False, False, 0)
+        liste = tema.etiket("\n".join(paketler), None, sar=True, sec=True, genislik=56)
+        if len(paketler) > 8:
+            kaydir = Gtk.ScrolledWindow()
+            kaydir.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+            kaydir.set_size_request(-1, 160)
+            kaydir.add(liste)
+            alan.pack_start(kaydir, False, False, 0)
+        else:
+            alan.pack_start(liste, False, False, 0)
+        if sonuc is None:
+            k, e = tema.not_kutusu(M("kaldir_hesaplanamadi"), "uyari")
+            e.set_max_width_chars(56)
+            alan.pack_start(k, False, False, 0)
+        anladim = None
+        if temel:
+            k, e = tema.not_kutusu(M("kaldir_temel"), "hata")
+            e.set_max_width_chars(56)
+            alan.pack_start(k, False, False, 0)
+        elif etkiler:
+            k, e = tema.not_kutusu(M("kaldir_korunan") + "\n\n" + "\n".join(etkiler), "uyari")
+            e.set_max_width_chars(56)
+            alan.pack_start(k, False, False, 0)
+            anladim = Gtk.CheckButton(label=M("kaldir_anladim"))
+            alan.pack_start(anladim, False, False, 0)
+
+        satir = Gtk.Box(spacing=8)
+        satir.set_margin_top(8)
+        if temel:
+            satir.pack_end(tema.dugme(M("kapat"), None, d.response, Gtk.ResponseType.CANCEL),
+                           False, False, 0)
+        else:
+            evet = tema.dugme(M("kaldir"), "tehlike", d.response, Gtk.ResponseType.OK)
+            hayir = tema.dugme(M("iptal"), None, d.response, Gtk.ResponseType.CANCEL)
+            satir.pack_end(evet, False, False, 0)
+            satir.pack_end(hayir, False, False, 0)
+            if anladim is not None:          # ek onay: kutu isaretlenmeden Kaldir basilmaz
+                evet.set_sensitive(False)
+                anladim.connect("toggled", lambda c: evet.set_sensitive(c.get_active()))
+        alan.pack_start(satir, False, False, 0)
+        d.show_all()
+        cevap = d.run()
+        onay = (cevap == Gtk.ResponseType.OK and not temel
+                and (anladim is None or anladim.get_active()))
+        d.destroy()
+        return onay
+
+    def _eylem_baslat(self, u, islem, komut):
         self._mesgul_ayarla(islem + ":" + u["paket"])
         baslik = "%s — %s" % (metin(u["ad"]),
                               M("kaldiriliyor") if islem == "remove" else M("kuruluyor"))
 
-        def bitince(basarili):
-            if basarili:
-                if islem == "install":
-                    self.kurulu.add(u["paket"])
-                    self.sepet.discard(u["paket"])
-                else:
-                    self.kurulu.discard(u["paket"])
+        def bitince(_basarili):
+            # Sonuc her zaman dpkg'den okunur (M-02): islem penceresi gizlenmis olabilir, kod
+            # basarisiz olsa da paket kurulmus/kaldirilmis olabilir.
+            def oku_bitti(kurulu):
+                self.kurulu = kurulu
+                self.sepet -= kurulu
+                if u["paket"] not in kurulu:
                     self.guncellenebilir.discard(u["paket"])
-            self._mesgul_ayarla(None)
-            self._sepet_guncelle()
-            self._guncelleme_rozeti()
-            if self.detay_app is u:
-                self.detay_goster(u)
-            else:
-                self.sayfa_secildi(self.aktif)
+                self._mesgul_ayarla(None)
+                self._sepet_guncelle()
+                self._guncelleme_rozeti()
+                if self.detay_app is u:
+                    self.detay_goster(u)
+                else:
+                    self.sayfa_secildi(self.aktif)
+                return False
+            self._kurulu_oku(oku_bitti)
         self._islem_baslat(baslik, komut, bitince)
 
     def depoyu_yenile(self):
@@ -1153,8 +1535,7 @@ class MagazaPenceresi(Gtk.Window):
 
         def bitince(basarili):
             def oku_bitti(kurulu):
-                if basarili:
-                    self.kurulu = kurulu
+                self.kurulu = kurulu     # basarisiz bitse de bazi paketler guncellenmis olabilir
                 self._mesgul_ayarla(None)
                 self._guncelleme_denetle()
                 return False
@@ -1164,7 +1545,7 @@ class MagazaPenceresi(Gtk.Window):
     def _pkexec_yok(self, islem, paket):
         komut = {"update": "sudo apt-get update",
                  "upgrade": "sudo apt-get upgrade -y"}.get(
-            islem, "sudo apt-get %s -y %s" % (islem, paket))
+            islem, "sudo apt-get %s -y -- %s" % (islem, paket))
         d = Gtk.MessageDialog(transient_for=self, modal=True,
                               message_type=Gtk.MessageType.WARNING,
                               buttons=Gtk.ButtonsType.CLOSE, text=M("pkexec_yok_baslik"))
