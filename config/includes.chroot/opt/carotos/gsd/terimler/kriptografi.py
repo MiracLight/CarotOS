@@ -220,7 +220,7 @@ TERIMLER = [
                   "and SHA-1, no practical collision attack (two different inputs producing the same "
                   "hash) has been found against it to date.",
         },
-        "ornek": "sha256sum carotos-1.3-amd64.iso",
+        "ornek": "sha256sum carotos-1.4-amd64.iso",
         "ilgili": ["hash_fonksiyonu", "md5"],
     },
     {

@@ -21,9 +21,9 @@ lb config \
   --architectures amd64 \
   --debian-installer live \
   --archive-areas "main contrib non-free non-free-firmware" \
-  --image-name "carotos-1.3" \
+  --image-name "carotos-1.4" \
   --iso-application "CarotOS" \
-  --iso-volume "CarotOS 1.3" \
+  --iso-volume "CarotOS 1.4" \
   --iso-publisher "CarotOS; https://carotos.org" \
   --uefi-secure-boot enable \
   --firmware-chroot true
@@ -84,7 +84,7 @@ Gerekçesi için "Secure Boot" bölümüne bakın.
 ISO'nun yazıldığı dizin yapılandırmaya göre değişir:
 
 ```
-sudo find / -iname "carotos-1.3*" 2>/dev/null
+sudo find / -iname "carotos-1.4*" 2>/dev/null
 ```
 
 ## Dizin yapısı

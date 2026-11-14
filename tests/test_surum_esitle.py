@@ -90,7 +90,7 @@ class SurumGecisiTesti(unittest.TestCase):
         yol = os.path.join(gecici, "surum.json")
         with open(yol, encoding="utf-8") as f:
             veri = json.load(f)
-        veri["dagitim"]["surum"] = "1.4"
+        veri["dagitim"]["surum"] = "1.5"
         with open(yol, "w", encoding="utf-8") as f:
             json.dump(veri, f, indent=2)
         mod = yukle()
@@ -106,11 +106,11 @@ class SurumGecisiTesti(unittest.TestCase):
         def oku(d):
             return ham_oku(d).decode("utf-8")
         ayrac = "\r\n" if crlf else "\n"
-        self.assertIn('LB_IMAGE_NAME="carotos-1.4"' + ayrac, oku("config/common"))
+        self.assertIn('LB_IMAGE_NAME="carotos-1.5"' + ayrac, oku("config/common"))
         build = oku("BUILD.md")
-        self.assertIn('  --image-name "carotos-1.4" \\' + ayrac, build)
-        self.assertIn('  --iso-volume "CarotOS 1.4" \\' + ayrac, build)
-        self.assertIn('VERSION_ID="1.4"', oku("config/includes.chroot/etc/os-release"))
+        self.assertIn('  --image-name "carotos-1.5" \\' + ayrac, build)
+        self.assertIn('  --iso-volume "CarotOS 1.5" \\' + ayrac, build)
+        self.assertIn('VERSION_ID="1.5"', oku("config/includes.chroot/etc/os-release"))
         # satir sonlari bozulmadi (karisik LF/CRLF olusmadi)
         for d in ("config/common", "BUILD.md"):
             ham = ham_oku(d)

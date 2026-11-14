@@ -38,7 +38,7 @@ import yetkili  # noqa: E402  (pkexec yalnizca sistem dizinlerinde aranir)
 
 VURGU = "karsilama"                 # ortak/tema.py: marka mavisi
 
-APP_VERSION = "1.3"
+APP_VERSION = "1.4"
 APP_CODENAME = "Eggshell"
 
 CONFIG_DIR = os.path.join(GLib.get_user_config_dir(), "carotos-welcome")

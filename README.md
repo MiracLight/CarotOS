@@ -171,11 +171,11 @@ Genel Sistem Sözlüğü. Linux, ağ, siber güvenlik, kriptografi ve bilgisayar
 
 1. ISO dosyasını indirin ve sağlamasını doğrulayın:
    ```
-   sha256sum -c carotos-1.3-amd64.iso.sha256
+   sha256sum -c carotos-1.4-amd64.iso.sha256
    ```
 2. USB belleğe yazın (Linux'ta):
    ```
-   sudo dd if=carotos-1.3-amd64.iso of=/dev/sdX bs=4M status=progress oflag=sync
+   sudo dd if=carotos-1.4-amd64.iso of=/dev/sdX bs=4M status=progress oflag=sync
    ```
    Windows'ta [Rufus](https://rufus.ie) veya
    [balenaEtcher](https://etcher.balena.io) kullanabilirsiniz.
@@ -255,7 +255,7 @@ cd CarotOS
 sudo lb clean --purge
 lb config --distribution trixie --architectures amd64 --debian-installer live \
   --archive-areas "main contrib non-free non-free-firmware" \
-  --image-name "carotos-1.3" --uefi-secure-boot enable --firmware-chroot true
+  --image-name "carotos-1.4" --uefi-secure-boot enable --firmware-chroot true
 sudo lb build 2>&1 | tee build.log
 ```
 
@@ -291,6 +291,6 @@ dahil edilmiştir ve kendi lisans koşullarına tabidir.
 
 <div align="center">
 
-**CarotOS 1.3 "Eggshell"**
+**CarotOS 1.4 "Eggshell"**
 
 </div>

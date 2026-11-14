@@ -245,7 +245,7 @@ class GsdTesti(unittest.TestCase):
         self.assertNotIn("/var/log/auth.log", genel)
         self.assertIn("journalctl -u ssh | grep -E", genel)
         self.assertIn("SHA256:", krip)
-        self.assertIn("sha256sum carotos-1.3-amd64.iso", krip)
+        self.assertIn("sha256sum carotos-1.4-amd64.iso", krip)
         self.assertNotIn("1947'de gerçek bir güve kelebeğinin bir bilgisayar \"\n", "")  # yer tutucu
         self.assertIn("popülerleşti", genel)
         self.assertIn("popularised in 1947", genel)
