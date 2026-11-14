@@ -12,9 +12,6 @@ chmod 644 /usr/share/icons/carotos/security-panel-icon.png
 chmod 644 /usr/share/carotos/carotos_ascii.txt
 chmod 644 /usr/share/applications/carotos-security-panel.desktop
 
-# GRUB'ı güncelle (CarotOS adının menüde görünmesi için)
-
-
 # Firefox'u varsayılan tarayıcı yap
 # www-browser metin tarayicilarina ayrilmistir, firefox-esr onu saglamaz;
 # yalnizca x-www-browser ayarlanir. Hata olursa derleme dursun.
@@ -23,12 +20,8 @@ update-alternatives --set x-www-browser /usr/bin/firefox-esr
 # fail2ban'ı açılışta otomatik başlat
 systemctl enable fail2ban
 
-# İlk kullanıcıyı otomatik sudo yetkili yap
-if [ -n "$(getent group sudo)" ]; then
-    for u in $(awk -F: '$3 >= 1000 && $3 < 65534 {print $1}' /etc/passwd); do
-        usermod -aG sudo "$u" || true
-    done
-fi
+# Not: derleme aninda UID >= 1000 kullanici yoktur; ilk kullanicinin yetkisi
+# kurucu (preseed, passwd/root-login false) ve carotos-firstboot ile verilir.
 
 # Sistem kimligi: hardinfo2 (ve benzer araclar) once /usr/lib/os-release'i okur, /etc/os-release'i yalniz CachyOS icin kullanir.
 # Debian'in dosyasi orada kaldigi icin "Debian" gorunuyordu. Dosya CarotOS'unkiyle degistirilir; dpkg-divert ile
@@ -62,30 +55,31 @@ systemctl enable carotos-firstboot.service
 echo "CarotOS: firstboot servisi etkinlestirildi."
 
 # Karşılama sihirbazı
-chmod 755 /opt/carotos/welcome/carotos-welcome.py || true
-chmod 644 /usr/share/applications/carotos-welcome.desktop || true
-chmod 644 /etc/skel/.config/autostart/carotos-welcome-autostart.desktop || true
+chmod 755 /opt/carotos/welcome/carotos-welcome.py
+chmod 644 /usr/share/applications/carotos-welcome.desktop
+chmod 644 /etc/skel/.config/autostart/carotos-welcome-autostart.desktop
 echo "CarotOS: karsilama sihirbazi yerlestirildi."
 
 # Sistem Sağlığı uygulaması
-chmod 755 /opt/carotos/health/carotos-health.py || true
-chmod 644 /usr/share/applications/carotos-health.desktop || true
+chmod 755 /opt/carotos/health/carotos-health.py
+chmod 644 /usr/share/applications/carotos-health.desktop
 echo "CarotOS: sistem sagligi yerlestirildi."
 
-# Yerel ayarlar (Türkçe varsayılan, İngilizce de mevcut)
-if [ -x /usr/sbin/locale-gen ]; then
-    /usr/sbin/locale-gen || true
-    echo "CarotOS: yerel ayarlar uretildi."
-fi
+# Yerel ayarlar (Türkçe varsayılan, İngilizce de mevcut). Üretilemezse ISO
+# bozuk dil ayarıyla çıkardı: derleme durur.
+[ -x /usr/sbin/locale-gen ] || { echo "CarotOS HATA: locale-gen yok (paket listesinde 'locales' olmali)." >&2; exit 1; }
+/usr/sbin/locale-gen
+locale -a | grep -qi '^tr_TR\.utf-\{0,1\}8$' || { echo "CarotOS HATA: tr_TR.UTF-8 yerel ayari uretilmedi." >&2; exit 1; }
+echo "CarotOS: yerel ayarlar uretildi."
 
-# Simge önbelleğini tazele
+# Simge önbelleğini tazele (isteğe bağlı: başarısızlık yalnızca bellek kullanımını artırır)
 gtk-update-icon-cache -f /usr/share/icons/hicolor 2>/dev/null || true
 echo "CarotOS: simge onbellegi tazelendi."
 
-# USB Denetimi
-chmod 755 /opt/carotos/usb/carotos-usb-check.py || true
-chmod 644 /usr/share/applications/carotos-usb-check.desktop || true
-chmod 644 /etc/skel/.config/autostart/carotos-usb-monitor.desktop || true
+# USB Denetimi (otomatik başlatıcısı /etc/xdg/autostart/carotos-usb-check.desktop)
+chmod 755 /opt/carotos/usb/carotos-usb-check.py
+chmod 644 /usr/share/applications/carotos-usb-check.desktop
+chmod 644 /etc/xdg/autostart/carotos-usb-check.desktop
 echo "CarotOS: usb denetimi yerlestirildi."
 
 # CarotOS paket deposu (apt.carotos.org): imza anahtari ve depo tanimi config/packages.chroot'taki
@@ -95,3 +89,20 @@ dpkg -s carotos-archive-keyring 2>/dev/null | grep -q '^Status: install ok insta
 [ -s /usr/share/keyrings/carotos-archive-keyring.gpg ] && [ -s /etc/apt/sources.list.d/carotos.sources ] \
     || { echo "CarotOS HATA: depo anahtari ya da carotos.sources eksik." >&2; exit 1; }
 echo "CarotOS: paket deposu tanimi yerlestirildi (apt.carotos.org)."
+
+# Sahiplik ve izinler: includes.chroot dosyalarinin kipi derleme klonundan gelir
+# (umask 002 ile alinmis klonda grup-yazilabilir). Root'un calistirdigi ya da
+# okudugu CarotOS dosyalari root'a ait ve yalnizca root'ca yazilabilir olmali
+# (carotos-dil-hazirla, pkexec betikleri, systemd birimleri, oturum betikleri).
+for yol in /opt/carotos /usr/local/bin /usr/local/sbin /usr/share/carotos \
+           /etc/systemd/system /etc/grub.d /etc/default/grub.d /etc/X11/Xsession.d \
+           /etc/xdg/autostart /etc/skel /etc/carotpot /etc/live/config.conf.d; do
+    [ -e "$yol" ] || continue
+    chown -R -h root:root "$yol"
+    chmod -R go-w "$yol"
+done
+KOTU="$(find /opt/carotos /usr/local/bin /usr/local/sbin /usr/share/carotos /etc/systemd/system \
+        /etc/grub.d /etc/default/grub.d /etc/X11/Xsession.d -xdev ! -type l \
+        \( -perm /022 -o ! -user root \) -print 2>/dev/null | head -n 5)"
+[ -z "$KOTU" ] || { echo "CarotOS HATA: root disinda yazilabilir dosya kaldi: $KOTU" >&2; exit 1; }
+echo "CarotOS: sahiplik ve izinler denetlendi (root, go-w)."

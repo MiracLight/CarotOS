@@ -1,6 +1,9 @@
 [Unit]
 Description=CarotOS ilk acilis ayarlari
-After=multi-user.target
+# Grup uyelikleri ilk oturum acilmadan once verilmeli (yoksa tshark ilk
+# oturumda "Couldn't run dumpcap" verir): oturum aciliminden once siralanir.
+After=local-fs.target
+Before=display-manager.service systemd-user-sessions.service
 ConditionPathExists=!/var/lib/carotos/firstboot.done
 
 [Service]

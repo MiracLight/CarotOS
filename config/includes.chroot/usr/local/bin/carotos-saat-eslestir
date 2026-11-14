@@ -81,9 +81,24 @@ esitle
 
 [ "${1:-}" = "--izle" ] || exit 0
 
+# Oturum bitince izleme de biter: autostart surecleri oturum kapaninca
+# oldurulmez (logind KillUserProcesses=no), yetim dongu birikmesin. Baslangicta
+# bu kullanicinin en yeni oturum yoneticisi sureci bulunur; o surec yok olunca
+# (ya da PID baska bir programa gecince) cikilir. Oturum yoneticisi bulunamazsa
+# eski davranis surer.
+OTURUM_ADI="${CAROTOS_SAAT_OTURUM:-xfce4-session}"
+OTURUM=$(pgrep -n -u "$(id -u)" -x "$OTURUM_ADI" 2>/dev/null)
+case "$OTURUM" in '' | *[!0-9]*) OTURUM="" ;; esac
+
+oturum_canli() {
+    [ -z "$OTURUM" ] && return 0
+    [ "$(cat "/proc/$OTURUM/comm" 2>/dev/null)" = "$OTURUM_ADI" ]
+}
+
 onceki=$(imza)
 while :; do
     sleep "$ARALIK"
+    oturum_canli || exit 0
     simdiki=$(imza)
     if [ "$simdiki" != "$onceki" ]; then
         onceki=$simdiki

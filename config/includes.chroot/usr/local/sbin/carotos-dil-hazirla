@@ -24,22 +24,84 @@ ORTAM = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL": "C", "DEBIAN_FRONTEN
 
 
 def bildir(metin):
-    print("[carotos-dil] " + metin, flush=True)
+    # Okuyucu (Karsilama penceresi) gittiyse yazim hatasi islemi yarida birakmasin
+    try:
+        print("[carotos-dil] " + metin, flush=True)
+    except (BrokenPipeError, OSError):
+        try:
+            sys.stdout = open(os.devnull, "w")
+        except OSError:
+            pass
+
+
+# Guven denetimi: modul dosyasi ve kok dizine kadar butun ust dizinler bu
+# kullaniciya (root) ait olmali ve grup/herkes tarafindan yazilamamali.
+# Testler GUVENILIR_UID ve ZINCIR_KOKU'nu degistirir.
+GUVENILIR_UID = 0
+ZINCIR_KOKU = "/"
+
+
+def _guvensiz(neden, yol):
+    bildir("guvensiz modul (" + neden + "; root'a ait olmali, baskalarinca yazilamamali): " + yol)
+    sys.exit(3)
+
+
+def _guvenli_mi(st):
+    return st.st_uid == GUVENILIR_UID and not (st.st_mode & 0o022)
 
 
 def modulu_yukle():
-    yol = os.path.join(MODUL_DIZINI, "sistem_dili.py")
-    st = os.stat(yol)
-    if st.st_uid != 0 or (st.st_mode & 0o022):
-        bildir("guvensiz modul (root'a ait olmali, baskalarinca yazilamamali): " + yol)
-        sys.exit(3)
-    sys.path.insert(0, MODUL_DIZINI)
-    import sistem_dili
-    return sistem_dili
+    """sistem_dili.py'yi denetlenmis dosya tanitecisinden kaynak olarak yukler.
+
+    `import` kullanilmaz: import, __pycache__ altindaki bayt kodunu kaynaktan
+    once calistirabilir ve denetlenen dosya ile calisan kod ayni olmayabilir.
+    Burada dosya O_NOFOLLOW ile acilir, fstat ile denetlenir ve ayni
+    tanitecten okunan metin compile()+exec() ile yeni bir modul nesnesine
+    yuklenir. Ust dizin zinciri de denetlenir (dizini yazabilen dosyayi
+    degistirebilir)."""
+    import stat as _stat
+    import types
+    dizin = os.path.realpath(MODUL_DIZINI)
+    kok = os.path.realpath(ZINCIR_KOKU)
+    d = dizin
+    while True:
+        try:
+            st = os.stat(d)
+        except OSError:
+            _guvensiz("dizin okunamadi", d)
+        if not _stat.S_ISDIR(st.st_mode) or not _guvenli_mi(st):
+            _guvensiz("guvensiz dizin", d)
+        if d == kok:
+            break
+        ust = os.path.dirname(d)
+        if ust == d:                    # kok dizine ulasildi ama ZINCIR_KOKU yolda degil
+            _guvensiz("dizin zinciri beklenen kokte bitmiyor", dizin)
+        d = ust
+    yol = os.path.join(dizin, "sistem_dili.py")
+    try:
+        fd = os.open(yol, os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0))
+    except OSError:
+        _guvensiz("dosya acilamadi ya da sembolik bag", yol)
+    try:
+        st = os.fstat(fd)
+        if not _stat.S_ISREG(st.st_mode) or not _guvenli_mi(st):
+            _guvensiz("guvensiz dosya", yol)
+        with os.fdopen(fd, "rb") as f:
+            fd = -1
+            kaynak = f.read()
+    finally:
+        if fd >= 0:
+            os.close(fd)
+    modul = types.ModuleType("sistem_dili")
+    modul.__file__ = yol
+    exec(compile(kaynak, yol, "exec"), modul.__dict__)
+    return modul
 
 
 def calistir(komut):
-    return subprocess.run(komut, env=ORTAM).returncode
+    # restore_signals=False: Python SIGPIPE'i yok sayar; apt/dpkg bunu miras alir ve
+    # okuyucu gidince olmek yerine yazim hatasi (EPIPE) alip isini bitirir.
+    return subprocess.run(komut, env=ORTAM, restore_signals=False).returncode
 
 
 def locale_etkinlestir(SD, kod):
@@ -105,4 +167,7 @@ def main(argv):
 
 
 if __name__ == "__main__":
+    # Modulun kendi alt surecleri (dpkg-query, locale) de sabit PATH ve LC_ALL=C ile calissin
+    os.environ.update(ORTAM)
+    sys.dont_write_bytecode = True
     sys.exit(main(sys.argv))

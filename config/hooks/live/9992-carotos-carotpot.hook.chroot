@@ -21,6 +21,13 @@ chmod 644 /etc/systemd/system/carotpot.service /etc/systemd/system/carotpot-enge
 # Yalniz acilista suresi dolmus engelleri temizleyen birim etkinlestirilir;
 # tuzak hizmetinin kendisi (carotpot.service) etkinlestirilmez.
 systemctl enable carotpot-engel-temizle.service
+systemctl is-enabled --quiet carotpot-engel-temizle.service \
+    || { echo "CarotOS HATA: carotpot-engel-temizle.service etkinlestirilemedi." >&2; exit 1; }
+if systemctl is-enabled --quiet carotpot.service 2>/dev/null; then
+    echo "CarotOS HATA: carotpot.service etkin (acilista baslamamali)." >&2
+    exit 1
+fi
+getent passwd carotpot >/dev/null || { echo "CarotOS HATA: carotpot kullanicisi yok." >&2; exit 1; }
 chmod 644 /etc/carotpot/ayarlar.json
 chmod 644 /etc/fail2ban/filter.d/carotos-carotpot.conf /etc/fail2ban/jail.d/carotos-carotpot.local
 chmod 644 /etc/xdg/autostart/carotpot-bildirim.desktop

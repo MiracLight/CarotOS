@@ -12,6 +12,11 @@ set -e
 LC_ALL=C DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends clamav clamav-freshclam
 
 systemctl disable clamav-freshclam.service 2>/dev/null || true
+# Karar sessizce bozulmasin: birim hala etkinse derleme durur.
+if systemctl is-enabled --quiet clamav-freshclam.service 2>/dev/null; then
+    echo "CarotOS HATA: clamav-freshclam.service hala etkin." >&2
+    exit 1
+fi
 
 if LC_ALL=C freshclam --stdout; then
     echo "CarotOS: ClamAV tanimlari ISO'ya eklendi."

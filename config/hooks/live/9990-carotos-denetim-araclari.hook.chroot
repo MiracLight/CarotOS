@@ -10,3 +10,7 @@ set -e
 # "tr '[:upper:]' '[:lower:]'" ile uretir; Turkce dil ayarinda "I" harfi
 # kuculmez (cron_daIly_run) ve betik 10 koduyla dusup paketi yarim birakir.
 LC_ALL=C DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends rkhunter debsums
+for arac in rkhunter debsums; do
+    command -v "$arac" >/dev/null || { echo "CarotOS HATA: $arac kurulmadi." >&2; exit 1; }
+done
+echo "CarotOS: rkhunter ve debsums kuruldu."

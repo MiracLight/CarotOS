@@ -1,5 +1,10 @@
 #!/bin/sh
 # CarotOS: simge onbellegi dogrulama servisini etkinlestir.
-systemctl enable carotos-ikon-onbellek.service || true
+set -e
+chmod 755 /usr/local/sbin/carotos-ikon-onbellek
+chmod 644 /etc/systemd/system/carotos-ikon-onbellek.service
+systemctl enable carotos-ikon-onbellek.service
+systemctl is-enabled --quiet carotos-ikon-onbellek.service \
+    || { echo "CarotOS HATA: carotos-ikon-onbellek.service etkinlestirilemedi." >&2; exit 1; }
 echo "CarotOS: ikon onbellek servisi etkinlestirildi"
 exit 0

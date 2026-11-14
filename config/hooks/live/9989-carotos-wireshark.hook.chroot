@@ -20,5 +20,14 @@ dpkg-reconfigure -f noninteractive wireshark-common
 
 getent group wireshark >/dev/null || { echo "CarotOS HATA: wireshark grubu olusmadi." >&2; exit 1; }
 ls -l /usr/bin/dumpcap
-getcap /usr/bin/dumpcap
+# getcap yetki yokken de 0 doner: ciktinin kendisi denetlenir. setcap basarisiz
+# olursa paket dumpcap'i setuid-root yapar; bu da derlemeyi durdurur.
+YETKI="$(getcap /usr/bin/dumpcap)"
+echo "${YETKI}"
+case "${YETKI}" in
+    *cap_net_raw*) ;;
+    *) echo "CarotOS HATA: dumpcap'te cap_net_raw yetkisi yok." >&2; exit 1 ;;
+esac
+[ ! -u /usr/bin/dumpcap ] || { echo "CarotOS HATA: dumpcap setuid-root kalmis." >&2; exit 1; }
+[ "$(stat -c %G /usr/bin/dumpcap)" = wireshark ] || { echo "CarotOS HATA: dumpcap wireshark grubuna ait degil." >&2; exit 1; }
 echo "CarotOS: wireshark grubu ve dumpcap yetkileri ayarlandi."

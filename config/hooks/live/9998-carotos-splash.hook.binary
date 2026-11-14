@@ -27,12 +27,21 @@ fi
 echo "CarotOS: kaynak bulundu -> ${SRC}"
 
 # Overwrite every splash the bootloaders might use.
+_SAYI=0
 for _DIR in isolinux boot/grub ../binary/isolinux ../binary/boot/grub; do
     if [ -d "${_DIR}" ]; then
         cp "${SRC}" "${_DIR}/splash.png"
         rm -f "${_DIR}/splash.svg"
+        cmp -s "${SRC}" "${_DIR}/splash.png" || { echo "CarotOS: HATA - ${_DIR}/splash.png kopyalanamadi." >&2; exit 1; }
         echo "CarotOS: ${_DIR}/splash.png guncellendi."
+        _SAYI=$((_SAYI + 1))
     fi
 done
 
-echo "CarotOS: splash islemi tamam."
+# Hicbir hedef dizin bulunamadiysa ISO'da Debian gorseli kalir: sessizce gecme.
+if [ "${_SAYI}" -eq 0 ]; then
+    echo "CarotOS: HATA - splash hedef dizini (isolinux, boot/grub) bulunamadi." >&2
+    exit 1
+fi
+
+echo "CarotOS: splash islemi tamam (${_SAYI} dizin)."

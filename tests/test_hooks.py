@@ -172,6 +172,37 @@ class HookTesti(unittest.TestCase):
                 self.assertNotIn("|| true", satir)
         self.assertIn("EKLENEMEDI", veri.decode("utf-8"))
 
+    # S-02: hook'lar sessizce basarisiz olmasin
+    OR_TRUE_IZINLI = ("gtk-update-icon-cache", "update-desktop-database",
+                      "systemctl disable clamav-freshclam.service")   # ardindan is-enabled ile dogrulanir
+
+    def test_her_hook_set_e_ile_calisir(self):
+        for ad, veri in hook_listesi():
+            with self.subTest(hook=ad):
+                satirlar = [s.strip() for s in veri.decode("utf-8").split("\n")]
+                self.assertIn("set -e", satirlar, f"{ad}: 'set -e' satiri yok")
+
+    def test_or_true_yalniz_izinli_komutlarda(self):
+        for ad, veri in hook_listesi():
+            for satir in veri.decode("utf-8").split("\n"):
+                kod = satir.strip()
+                if kod.startswith("#") or "|| true" not in kod:
+                    continue
+                with self.subTest(hook=ad, satir=kod):
+                    self.assertTrue(any(kod.startswith(k) for k in self.OR_TRUE_IZINLI),
+                                    f"{ad}: izinsiz '|| true': {kod}")
+
+    def test_her_hook_carotos_basari_iletisi_yazar(self):
+        for ad, veri in hook_listesi():
+            with self.subTest(hook=ad):
+                self.assertIn('echo "CarotOS', veri.decode("utf-8"))
+
+    def test_derleme_aninda_sudo_dongusu_yok(self):
+        # derleme aninda UID >= 1000 kullanici yoktur; dongu olu koddu (S-03)
+        veri = dict(hook_listesi())["9999-carotos-setup.hook.chroot"].decode("utf-8")
+        self.assertNotIn("usermod -aG sudo", veri)
+        self.assertNotIn("carotos-usb-monitor.desktop", veri)       # diskte olmayan dosya
+
     @unittest.skipIf(SHELLCHECK is None, "shellcheck kurulu degil")
     def test_shellcheck_hata_duzeyi(self):
         for ad, veri in hook_listesi():

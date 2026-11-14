@@ -5,7 +5,9 @@
 set -e
 for tema in Papirus Papirus-Dark Papirus-Light ePapirus ePapirus-Dark; do
     if [ -d "/usr/share/icons/$tema" ]; then
+        # Istege bagli: onbellek uretilemezse yalnizca bellek kullanimi artar
         gtk-update-icon-cache -f -t "/usr/share/icons/$tema" || true
     fi
 done
+echo "CarotOS: Papirus simge onbellekleri uretildi."
 exit 0

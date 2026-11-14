@@ -13,37 +13,66 @@
 # Erisim engellendi" hatasi verir ve Guvenlik Paneli'ndeki tshark girisi
 # de calismaz.
 
-STAMP=/var/lib/carotos/firstboot.done
+#
+# sudo: kurucu (preseed, passwd/root-login false) ilk kullaniciyi zaten sudo'ya
+# koyar. Bu betik yalnizca yedektir: sistemde TEK normal kullanici varsa ve sudo
+# grubunda hic kimse yoksa o kullaniciyi ekler. Ilk acilistan once acilmis ikinci
+# bir hesap (klonlanan sinif makinesi gibi) sessizce yonetici yapilmaz.
+# Damga yalnizca butun adimlar basariliysa yazilir; hata olursa sonraki
+# acilista yeniden denenir.
+#
+# CAROTOS_PASSWD / CAROTOS_DAMGA_DIZINI / CAROTOS_SOURCES yalnizca testler
+# icindir (systemd birimi temiz ortamla calistirir).
+
+PASSWD="${CAROTOS_PASSWD:-/etc/passwd}"
+DAMGA_DIZINI="${CAROTOS_DAMGA_DIZINI:-/var/lib/carotos}"
+SOURCES="${CAROTOS_SOURCES:-/etc/apt/sources.list}"
+STAMP="$DAMGA_DIZINI/firstboot.done"
+HATA=0
 
 # Zaten calistiysa cik
 [ -f "$STAMP" ] && exit 0
 
-if getent group sudo >/dev/null 2>&1; then
-    for u in $(awk -F: '$3 >= 1000 && $3 < 65534 {print $1}' /etc/passwd); do
-        if usermod -aG sudo "$u"; then
-            logger -t carotos-firstboot "sudo grubuna eklendi: $u"
+KULLANICILAR=$(awk -F: '$3 >= 1000 && $3 < 65534 {print $1}' "$PASSWD")
+SAYI=$(printf '%s\n' "$KULLANICILAR" | grep -c .)
+
+if SUDO_SATIRI=$(getent group sudo 2>/dev/null); then
+    SUDO_UYELER=$(printf '%s\n' "$SUDO_SATIRI" | cut -d: -f4)
+    if [ -n "$SUDO_UYELER" ]; then
+        logger -t carotos-firstboot "sudo grubunda zaten uye var ($SUDO_UYELER); dokunulmadi"
+    elif [ "$SAYI" -eq 1 ]; then
+        if usermod -aG sudo "$KULLANICILAR"; then
+            logger -t carotos-firstboot "sudo grubuna eklendi: $KULLANICILAR"
         else
-            logger -t carotos-firstboot -p user.err "sudo grubuna EKLENEMEDI: $u"
+            logger -t carotos-firstboot -p user.err "sudo grubuna EKLENEMEDI: $KULLANICILAR"
+            HATA=1
         fi
-    done
+    elif [ "$SAYI" -gt 1 ]; then
+        logger -t carotos-firstboot -p user.warning "sudo grubu bos ve $SAYI normal kullanici var; kimse yonetici yapilmadi"
+    fi
 fi
 
 if getent group wireshark >/dev/null 2>&1; then
-    for u in $(awk -F: '$3 >= 1000 && $3 < 65534 {print $1}' /etc/passwd); do
+    for u in $KULLANICILAR; do
         if usermod -aG wireshark "$u"; then
             logger -t carotos-firstboot "wireshark grubuna eklendi: $u"
         else
             logger -t carotos-firstboot -p user.err "wireshark grubuna EKLENEMEDI: $u"
+            HATA=1
         fi
     done
 fi
 
-mkdir -p /var/lib/carotos
-date > "$STAMP"
-
 # Kurulum CD'sini APT kaynak listesinden cikar
-if [ -f /etc/apt/sources.list ]; then
-    sed -i "s|^deb cdrom:|#deb cdrom:|" /etc/apt/sources.list
+if [ -f "$SOURCES" ]; then
+    sed -i "s|^deb cdrom:|#deb cdrom:|" "$SOURCES" || HATA=1
 fi
 
+if [ "$HATA" -ne 0 ]; then
+    logger -t carotos-firstboot -p user.err "ilk acilis adimlari tamamlanamadi; sonraki acilista yeniden denenecek"
+    exit 1
+fi
+
+mkdir -p "$DAMGA_DIZINI"
+date > "$STAMP"
 exit 0
