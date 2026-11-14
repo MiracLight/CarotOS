@@ -6,6 +6,10 @@ Wants=network-online.target
 # Acilistaki izin temizligi (carotpot-engel-temizle) tuzak izinlerini eklemeden
 # once bitmeli; yoksa yeni eklenen izinleri silebilir.
 After=carotpot-engel-temizle.service
+# S-04: bozuk ayar ya da portu kapilmis tuzak sonsuz yeniden baslatma dongusune
+# girmesin (2 dakikada en fazla 3 deneme)
+StartLimitIntervalSec=120
+StartLimitBurst=3
 
 # Acilista kendiliginden BASLAMAZ (karar D5): hook bu birimi etkinlestirmez.
 # Kullanici CarotPot uygulamasindan tek tikla acar ve kapatir.
