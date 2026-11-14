@@ -428,31 +428,41 @@ class ModernlestirUygulaTesti(ModernlestirTabani):
     def test_dock_ogeleri(self):
         self.assertEqual(self.calistir("uygula"), 0, self.ciktilar)
         alt = os.path.join(self.config, "plank", "dock1", "launchers")
-        yan = os.path.join(self.config, "plank", "dock2", "launchers")
         # ALT dock: yalnizca sistem (dosyalar, terminal, tarayici); CarotOS uygulamalari yok
         self.assertEqual(sorted(os.listdir(alt)), sorted([
             "carotos-thunar.dockitem", "carotos-xfce4-terminal.dockitem",
             "carotos-xfce4-web-browser.dockitem"]))
-        # SOL yan dock: butun CarotOS uygulamalari (welcome bu sahte sistemde yok: konmadi)
-        self.assertEqual(sorted(os.listdir(yan)), sorted([
-            "carotos-carotos-magaza.dockitem", "carotos-carotos-security-panel.dockitem",
-            "carotos-carotos-carotene.dockitem"]))
-        self.assertEqual(self.masa.gsettings["dock2/position"], "'left'")
         self.assertEqual(self.masa.gsettings["position"], "'bottom'")
-        self.assertEqual(self.masa.gsettings["dock2/hide-mode"], "'intelligent'")   # tam ekranda iceri girer
-        self.assertEqual(self.masa.gsettings["dock2/auto-pinning"], "false")        # acilan uygulama listeye eklenmez
-        self.assertEqual(self.masa.gsettings["auto-pinning"], "false")
-        self.assertEqual(self.masa.gsettings["dock2/pinned-only"], "true")          # yalniz CarotOS uygulamalari
-        icerik = self.oku(os.path.join(yan, "carotos-carotos-magaza.dockitem"))
+        self.assertEqual(self.masa.gsettings["hide-mode"], "'intelligent'")
+        self.assertEqual(self.masa.gsettings["auto-pinning"], "false")          # acilan uygulama listeye eklenmez
+        icerik = self.oku(os.path.join(alt, "carotos-thunar.dockitem"))
         self.assertTrue(icerik.startswith("[PlankDockItemPreferences]\nLauncher=file://"))
-        self.assertIn(os.path.join(self.uyg, "carotos-magaza.desktop").replace(os.sep, "/").split(":")[-1],
-                      icerik.replace("%3A", ":"))
-        self.assertIn("carotos-carotos-magaza.dockitem", self.masa.gsettings["dock2/dock-items"])
         self.assertIn("carotos-thunar.dockitem", self.masa.gsettings["dock-items"])
-        self.assertIn(("autostart", "carotos-plank-yan.desktop"),
-                      [tuple(os.path.relpath(p, self.config).split(os.sep)) for p in
-                       (os.path.join(self.config, "autostart", "carotos-plank-yan.desktop"),)
-                       if os.path.exists(p)])
+        # SOL yan dock artik plank DEGIL: ikinci dock ayari ve plank ogeleri yok
+        self.assertFalse(os.path.exists(os.path.join(self.config, "plank", "dock2")))
+        self.assertFalse([k for k in self.masa.gsettings if k.startswith("dock2/")])
+
+    def test_yan_panel_autostart_ve_baslatma(self):
+        yanpanel = os.path.join(self.kok, "yanpanel.py")
+        self.yaz(yanpanel, "# sahte\n")
+        eski = md.YANPANEL
+        md.YANPANEL = yanpanel
+        self.addCleanup(setattr, md, "YANPANEL", eski)
+        self.assertEqual(self.calistir("uygula"), 0, self.ciktilar)
+        oto = self.oku(os.path.join(self.config, "autostart", "carotos-yanpanel.desktop"))
+        self.assertIn("Exec=", oto)
+        self.assertIn("-I", oto)
+        self.assertIn(yanpanel, oto)
+        self.assertTrue([k for k in self.masa.baslatilan if yanpanel in " ".join(k)], self.masa.baslatilan)
+        self.assertEqual(self.calistir("geri-al"), 0, self.ciktilar)
+        self.assertFalse(os.path.exists(os.path.join(self.config, "autostart", "carotos-yanpanel.desktop")))
+
+    def test_eski_ikinci_plank_temizlenir(self):
+        # onceki denemeden kalan autostart dosyasi ve calisan 'plank -n dock2'
+        eski = os.path.join(self.config, "autostart", "carotos-plank-yan.desktop")
+        self.yaz(eski, "[Desktop Entry]\nExec=plank -n dock2\n")
+        self.assertEqual(self.calistir("uygula"), 0, self.ciktilar)
+        self.assertFalse(os.path.exists(eski))
 
     def test_geri_al_tam_eski_duruma(self):
         once_dosya = self.ev_dosyalari()

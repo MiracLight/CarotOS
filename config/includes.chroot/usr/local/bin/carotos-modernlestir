@@ -15,8 +15,9 @@ uygula   Degisecek her xfconf degerinin, dosyanin ve gsettings anahtarinin ESKI 
            - ust panel ince (30) ve yari saydam (gtk.css blogu), saat bicimi; eklenti yerlesimine
              dokunulmaz. Yalniz baslaticidan olusan ikinci panel (alt dock) plank ile cakismasin diye
              panel listesinden cikarilir (ayarlari silinmez; geri al ile doner)
-           - plank: ALT dock (sistem: terminal, dosyalar, tarayici, uygulama arama, ayarlar) ve SOL yan
-             dock (butun CarotOS uygulamalari); rofi (Super+Space), terminal (JetBrains Mono,
+           - plank: ALT dock (sistem: terminal, dosyalar, tarayici, uygulama arama, ayarlar); SOL yan
+             PANEL (kendi uygulamamiz /opt/carotos/yanpanel: 5 simge gorunur, kaydirmali, sol kenarda
+             gizli); rofi (Super+Space), terminal (JetBrains Mono,
              saydam, marka renkleri), autostart dosyalari
          Ikinci kez calistirilinca ILK yedek korunur (yalniz yeni anahtarlar eklenir).
          Bir adim basarisiz olursa yedekten her sey eski haline getirilir.
@@ -59,7 +60,7 @@ KISAYOL = "<Super>space"
 DOCK_PANEL_TURLERI = {"launcher", "separator", "showdesktop", "directorymenu"}
 PLANK_SEMA_SABLON = "net.launchpad.plank.dock.settings:/net/launchpad/plank/docks/%s/"
 PLANK_SEMA = PLANK_SEMA_SABLON % "dock1"      # alt dock (geriye uyum)
-YAN_DOCK = "dock2"                             # sol yan dock: plank -n dock2
+YAN_DOCK = "dock2"                             # ESKI deneme: plank -n dock2 (artik temizlenir)
 # Karsilama "Varsayilan dock simgeleri": her grup icin ilk VAR olan .desktop alinir
 # ALT dock: sistemle ilgili seyler
 DOCK_VARSAYILAN = (
@@ -69,15 +70,8 @@ DOCK_VARSAYILAN = (
     ("xfce4-appfinder.desktop",),
     ("xfce4-settings-manager.desktop",),
 )
-# SOL yan dock: YALNIZ CarotOS uygulamalari (sabitlenmis; acik baska pencereler gosterilmez) (once bu sira, sonra kalan carotos-*.desktop dosyalari)
-# mantik: baslangic/yonetim -> koruma ve denetim -> ogrenme -> yardimci araclar
-YAN_DOCK_SIRA = (
-    "carotos-welcome.desktop", "carotos-magaza.desktop",
-    "carotos-security-panel.desktop", "carotos-health.desktop", "carotos-usb-check.desktop",
-    "carotos-carotene.desktop", "carotos-carotpot.desktop",
-    "carotos-poligon-ogrenci.desktop", "carotos-poligon-ogretmen.desktop",
-    "carotos-former.desktop", "carotos-gsd.desktop", "carotos-filenor.desktop",
-)
+# SOL yan panel: kendi yazdigimiz kaydirmali panel (5 simge gorunur); plank degil
+YANPANEL = "/opt/carotos/yanpanel/carotos-yanpanel.py"
 GEREKLI_PROGRAMLAR = ("xfconf-query", "picom", "plank", "rofi", "gsettings")
 
 # Marka renkleri (logo mavisi #5196d6, koyu #2568a9, zemin #001239 / #000b24)
@@ -705,8 +699,10 @@ def plan_olustur(o):
         "CarotOS picom", [o.prog("picom"), "--config", picom])
     plan["dosyalar"][o.yol("autostart", "carotos-plank.desktop")] = autostart_metni(
         "CarotOS plank", [o.prog("plank")])
-    plan["dosyalar"][o.yol("autostart", "carotos-plank-yan.desktop")] = autostart_metni(
-        "CarotOS plank yan", [o.prog("plank"), "-n", YAN_DOCK])
+    plan["dosyalar"][o.yol("autostart", "carotos-yanpanel.desktop")] = autostart_metni(
+        "CarotOS yan panel", [o.prog("python3"), "-I", YANPANEL])
+    if not os.path.isfile(YANPANEL):
+        plan["uyarilar"].append("yan panel kurulu degil (%s); once /opt/carotos kopyasini guncelleyin" % YANPANEL)
 
     # 4) Dock: varsayilanlar + gizlenen paneldeki baslaticilar
     secilen = []
@@ -719,37 +715,12 @@ def plan_olustur(o):
     for yol in panel_baslaticilari:
         if yol not in secilen:
             secilen.append(yol)
-    # SOL yan dock: butun CarotOS uygulamalari
-    yan = []
-    for ad in YAN_DOCK_SIRA:
-        yol = _uygulama_yolu(o, ad)
-        if yol:
-            yan.append(yol)
-    try:
-        kalan = sorted(a for a in os.listdir(o.uygulamalar) if a.startswith("carotos-") and a.endswith(".desktop"))
-    except OSError:
-        kalan = []
-    for ad in kalan:
-        yol = os.path.join(o.uygulamalar, ad)
-        if yol in yan:
-            continue
-        try:
-            if re.search(r"^NoDisplay=true", oku(yol, 65536) or "", re.M):
-                continue
-        except UygulamaHatasi:
-            continue
-        yan.append(yol)
     plan["gsettings"] = []
     for dock, yollar, ayarlar in (
             ("dock1", secilen, (("position", "'bottom'"), ("alignment", "'center'"),
                                 ("hide-mode", "'intelligent'"), ("zoom-enabled", "true"),
                                 ("zoom-percent", "150"), ("icon-size", "44"),
-                                ("auto-pinning", "false"))),
-            (YAN_DOCK, yan, (("position", "'left'"), ("alignment", "'center'"),
-                             ("hide-mode", "'intelligent'"), ("pinned-only", "true"),
-                             ("auto-pinning", "false"),
-                             ("zoom-enabled", "true"),
-                             ("zoom-percent", "130"), ("icon-size", "44")))):
+                                ("auto-pinning", "false"))),):
         baslatici_dizini = o.yol("plank", dock, "launchers")
         adlar = []
         for yol in yollar:
@@ -887,7 +858,19 @@ def _guvenli_yol(o, yol):
 # Uygula / geri al
 # ---------------------------------------------------------------------------
 
+def eski_yan_dock_temizle(o):
+    """Onceki denemedeki ikinci plank (plank -n dock2) ve autostart dosyasi: yan panel artik kendi uygulamamiz."""
+    o.calistir([o.prog("pkill"), "-u", str(o.uid), "-f", "plank -n " + YAN_DOCK])
+    eski = o.yol("autostart", "carotos-plank-yan.desktop")
+    try:
+        if os.path.lexists(eski):
+            os.unlink(eski)
+    except OSError:
+        pass
+
+
 def _uygula_plan(o, plan):
+    eski_yan_dock_temizle(o)
     for kanal, ozellik, tur, deger in plan["xfconf"]:
         if (kanal, ozellik) == ("xfwm4", "/general/use_compositing"):
             continue
@@ -913,9 +896,10 @@ def _uygula_plan(o, plan):
         raise UygulamaHatasi("picom baslatilamadi")
     if not surec_calisiyor(o, "plank"):
         o.baslat([o.prog("plank")])
-    kod, _ = o.calistir([o.prog("pgrep"), "-u", str(o.uid), "-f", "plank -n " + YAN_DOCK])
-    if kod != 0:
-        o.baslat([o.prog("plank"), "-n", YAN_DOCK])
+    if os.path.isfile(YANPANEL):
+        kod, _ = o.calistir([o.prog("pgrep"), "-u", str(o.uid), "-f", "carotos-yanpanel.py"])
+        if kod != 0:
+            o.baslat([o.prog("python3"), "-I", YANPANEL])
     if plan["paneller"] is not None:
         paneli_yeniden_kur(o, lambda: xq_yaz(o, "xfce4-panel", "/panels", "dizi:int", plan["paneller"]))
 
@@ -925,6 +909,7 @@ def geri_yukle(o, yedek):
     hatalar = []
     surec_durdur(o, "plank")
     surec_durdur(o, "picom")
+    o.calistir([o.prog("pkill"), "-u", str(o.uid), "-f", "carotos-yanpanel.py"])
     panel_kaydi = None
     for x in reversed(yedek.get("xfconf", [])):
         try:
