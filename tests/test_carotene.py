@@ -270,8 +270,10 @@ class GercekTaramaTesti(GeciciEv):
                          olay=lambda t, v: satirlar.append(t)).calistir()
         self.assertEqual(sonuc["durum"], M.BULGU, sonuc)
         self.assertEqual(sonuc["taranan"], 3)
-        self.assertEqual(sonuc["bulgular"], [{"yol": bulasik,
-                                              "imza": "Eicar-Test-Signature.UNOFFICIAL"}])
+        self.assertEqual([{k: b[k] for k in ("yol", "imza")} for b in sonuc["bulgular"]],
+                         [{"yol": bulasik, "imza": "Eicar-Test-Signature.UNOFFICIAL"}])
+        # T-01: bulgu tarama anindaki dosya kimligini tasir
+        self.assertEqual(len(sonuc["bulgular"][0]["kimlik"]), 4)
         self.assertIn("bulgu", satirlar)
 
         kod, kayit = M.karantinaya_al(bulasik, sonuc["bulgular"][0]["imza"])

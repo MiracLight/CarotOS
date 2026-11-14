@@ -201,6 +201,8 @@ class KurulumBetigiTesti(unittest.TestCase):
         self.assertFalse(os.path.exists(self.grubcfg + ".yeni"))
 
     def test_os_prober_yoksa_apt_ipucu_verip_durur(self):
+        if any(os.path.exists(os.path.join(d, "os-prober")) for d in ("/usr/bin", "/usr/sbin", "/bin", "/sbin")):
+            self.skipTest("sistemde gercek os-prober kurulu; betik onu bulur")
         os.remove(os.path.join(self.bin, "os-prober"))
         r = self._calistir("kur", yol=self.bin)
         self.assertNotEqual(r.returncode, 0)

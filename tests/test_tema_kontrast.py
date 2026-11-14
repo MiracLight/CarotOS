@@ -10,6 +10,8 @@ import re
 import sys
 import unittest
 
+sys.dont_write_bytecode = True      # ortak/__pycache__ birakmasin (diger testler bunu denetler)
+
 KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(KOK, "config", "includes.chroot", "opt", "carotos", "ortak"))
 

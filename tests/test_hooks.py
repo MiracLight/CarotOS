@@ -194,6 +194,8 @@ class HookTesti(unittest.TestCase):
 
     def test_her_hook_carotos_basari_iletisi_yazar(self):
         for ad, veri in hook_listesi():
+            if "carotos" not in ad:
+                continue        # 0010/0050: live-build'in kendi hook'lari (Linux'ta sembolik bag)
             with self.subTest(hook=ad):
                 self.assertIn('echo "CarotOS', veri.decode("utf-8"))
 

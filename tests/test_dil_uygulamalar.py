@@ -61,6 +61,10 @@ class UygulamaDilTabani(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.ev = _sahte_ev()           # GTK/GLib iceri aktarilmadan ONCE (klasorleri onbellege alir)
+        # Bozuk ayarda sistem diline dusulur; testler sistemin Turkce olmasina bagli kalmasin
+        cls.eski_yerel = {k: os.environ.get(k) for k in ("LANG", "LANGUAGE", "LC_ALL", "LC_MESSAGES")}
+        os.environ.update({"LANG": "en_US.UTF-8", "LANGUAGE": "en", "LC_ALL": "en_US.UTF-8",
+                           "LC_MESSAGES": "en_US.UTF-8"})
         try:
             import gi
             gi.require_version("Gtk", "3.0")
@@ -78,6 +82,11 @@ class UygulamaDilTabani(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        for k, v in cls.eski_yerel.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
         cls.dil.DIZIN = cls.eski_dizin
         cls.dil.onbellegi_temizle()
         shutil.rmtree(cls.diller, True)
