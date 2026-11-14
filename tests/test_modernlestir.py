@@ -440,6 +440,8 @@ class ModernlestirUygulaTesti(ModernlestirTabani):
         self.assertEqual(self.masa.gsettings["dock2/position"], "'left'")
         self.assertEqual(self.masa.gsettings["position"], "'bottom'")
         self.assertEqual(self.masa.gsettings["dock2/hide-mode"], "'intelligent'")   # tam ekranda iceri girer
+        self.assertEqual(self.masa.gsettings["dock2/auto-pinning"], "false")        # acilan uygulama listeye eklenmez
+        self.assertEqual(self.masa.gsettings["auto-pinning"], "false")
         self.assertEqual(self.masa.gsettings["dock2/pinned-only"], "true")          # yalniz CarotOS uygulamalari
         icerik = self.oku(os.path.join(yan, "carotos-carotos-magaza.dockitem"))
         self.assertTrue(icerik.startswith("[PlankDockItemPreferences]\nLauncher=file://"))
