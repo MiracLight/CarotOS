@@ -1267,12 +1267,34 @@ class Uygulama(Gtk.Window):
         hata = None
         try:
             K.kur(pl, lambda satir: GLib.idle_add(self._kur_satir, satir),
-                  ilerleme_cb=lambda o, a, d: GLib.idle_add(self._kur_ilerle, o, a, d))
+                  ilerleme_cb=lambda o, a, d: GLib.idle_add(self._kur_ilerle, o, a, d),
+                  pypi_izin=self._pypi_sor)
         except FilenorHata as h:
             hata = h
         except Exception as e:          # beklenmeyen: arayüz asılı kalmasın
             hata = FilenorHata("bilinmeyen", ayrinti=str(e))
         GLib.idle_add(self._kur_bitti, pl, hata)
+
+    def _pypi_sor(self, paketler):
+        """F-10: PyPI'dan (denetlenmeyen, internetten) indirmeden ONCE onay penceresi.
+        Kurulum iş parçacığından çağrılır; pencere ana iş parçacığında açılır, yanıt beklenir."""
+        olay = threading.Event()
+        sonuc = [False]
+        liste = ", ".join(paketler)
+
+        def sor():
+            try:
+                sonuc[0] = bool(tema.onay_sor(
+                    self, self.t("kur_pypi_baslik", liste=liste), self.t("kur_pypi_metin", liste=liste),
+                    self.t("kur_onay_evet"), self.t("kur_onay_hayir")))
+            except Exception:
+                sonuc[0] = False
+            finally:
+                olay.set()
+            return False
+        GLib.idle_add(sor)
+        olay.wait()
+        return sonuc[0]
 
     def _kur_satir(self, satir):
         self.a_kur_durum.set_tooltip_text(satir[:300])      # ham çıktı: üzerine gelince

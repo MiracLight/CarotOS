@@ -166,6 +166,12 @@ M = {
     "kur_onay_metin": {
         "tr": "Bu büyük bir indirmedir (yaklaşık {boyut}) ve birkaç dakika sürebilir. Yönetici parolanız istenecek.",
         "en": "This is a large download (about {boyut}) and may take a few minutes. You will be asked for your password."},
+    "kur_pypi_baslik": {"tr": "{liste} internetten indirilsin mi?", "en": "Download {liste} from the internet?"},
+    "kur_pypi_metin": {
+        "tr": "{liste} Debian deposunda yok; Python paket deposundan (PyPI) internetten indirilecek. "
+              "PyPI paketleri Debian'daki gibi denetlenmez. Kurulsun mu?",
+        "en": "{liste} is not in the Debian repositories; it will be downloaded from the internet from the "
+              "Python package index (PyPI). PyPI packages are not reviewed the way Debian's are. Install it?"},
     "kur_onay_evet": {"tr": "Kur", "en": "Install"},
     "kur_onay_hayir": {"tr": "Vazgeç", "en": "Cancel"},
     "kur_yok_ipucu": {

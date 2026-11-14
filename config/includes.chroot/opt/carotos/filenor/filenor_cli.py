@@ -3,7 +3,8 @@
 Filenor komut satiri -- arayuzle ayni motoru kullanir.
 
   filenor-cli durum                         kurulu araclar
-  filenor-cli kur [ARAC...]                 eksik araclari kur (yonetici parolasi ister; --deneme yalniz plani gosterir)
+  filenor-cli kur [ARAC...]                 eksik araclari kur (yonetici parolasi ister; --deneme yalniz plani gosterir;
+                                            PyPI gerekiyorsa terminalde sorar ya da --pypi-izin ister, yoksa kurmaz)
   filenor-cli formatlar [uzanti]            hangi bicimden hangisine
   filenor-cli araclar                       PDF/OCR/gorsel araclari
   filenor-cli donustur -t HEDEF DOSYA...    bicim donustur
@@ -142,6 +143,27 @@ def komut_durum(args):
     return 0
 
 
+def _pypi_izni(args):
+    """F-10: PyPI kurulumu icin izin. --pypi-izin bayragi, yoksa terminalde acik soru; ikisi de
+    yoksa None (kur() kurmadan aciklayici hata verir)."""
+    if getattr(args, "pypi_izin", False):
+        return lambda paketler: True
+    if sys.stdin is not None and sys.stdin.isatty():
+        def sor(paketler):
+            liste = ", ".join(paketler)
+            if DIL == "tr":
+                yaz(f"{liste} Debian deposunda yok; Python paket deposundan (PyPI) internetten indirilecek. "
+                    "PyPI paketleri Debian'daki gibi denetlenmez.")
+                cevap = input("Kurulsun mu? [e/H] ")
+            else:
+                yaz(f"{liste} is not in the Debian repositories; it will be downloaded from the internet "
+                    "from the Python package index (PyPI). PyPI packages are not reviewed like Debian's.")
+                cevap = input("Install it? [y/N] ")
+            return cevap.strip().lower() in ("e", "evet", "y", "yes")
+        return sor
+    return None
+
+
 def komut_kur(args):
     d = M.araclar_durumu()
     istek = args.araclar or K.temel_eksikler(d)
@@ -158,7 +180,7 @@ def komut_kur(args):
     yaz(("kurulacak: " if DIL == "tr" else "to install: ") + " ".join(pl.paketler))
     if args.deneme:
         return 0
-    yok = K.kur(pl, lambda s: yaz(s))
+    yok = K.kur(pl, lambda s: yaz(s), pypi_izin=_pypi_izni(args))
     K.ortami_yenile()
     kalan = [k for k in pl.anahtarlar if k not in pl.elle and not M.araclar_durumu().get(k)]
     if yok or kalan:
@@ -227,6 +249,8 @@ def main(argv=None):
     p = alt.add_parser("kur", help="eksik araclari kur")
     p.add_argument("araclar", nargs="*", help="arac anahtari (bos: LibreOffice/Ghostscript disindaki eksikler)")
     p.add_argument("--deneme", action="store_true", help="yalniz ne kurulacagini goster")
+    p.add_argument("--pypi-izin", dest="pypi_izin", action="store_true",
+                   help="Debian'da olmayan Python paketlerinin PyPI'dan (denetlenmeyen, internetten) kurulmasina izin ver")
     p.set_defaults(f=komut_kur)
     p = alt.add_parser("formatlar", help="bicim donusum tablosu")
     p.add_argument("uzanti", nargs="?")

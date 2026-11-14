@@ -52,14 +52,18 @@ class PlanTesti(unittest.TestCase):
         self.assertEqual(p.elle, ["avif", "webp"])
 
     def test_rawpy_pip_ve_pip_paketi(self):
-        yedek = K.pip_var
+        yedek, yedek_v = K.pip_var, K.venv_var
         K.pip_var = lambda: False
+        K.venv_var = lambda: True
         try:
             p = K.plan(["rawpy"], HEPSI_YOK, apt_kullan=True)
+            K.venv_var = lambda: False
+            p2 = K.plan(["rawpy"], HEPSI_YOK, apt_kullan=True)
         finally:
-            K.pip_var = yedek
+            K.pip_var, K.venv_var = yedek, yedek_v
         self.assertEqual(p.pip, ["rawpy"])
         self.assertEqual(p.apt, ["python3-pip"])             # pip yoksa once o kurulur
+        self.assertEqual(p2.apt, ["python3-pip", "python3-venv"])   # PEP 668 yolu icin venv de
 
     def test_apt_yok_pip_var(self):
         p = K.plan(["pillow", "ffmpeg"], HEPSI_YOK, apt_kullan=False, pip_kullan=True)
@@ -179,32 +183,102 @@ exit 0
         self.assertEqual(self.kur(K.Plan()), [])
         self.assertEqual(self.gunluk_satirlari(), [])
 
-    def test_pip_externally_managed_ise_bayrakla_yeniden_dener(self):
+    def test_pip_externally_managed_ise_sanal_ortam_kullanilir(self):
+        # F-10: --break-system-packages HIC kullanilmaz; kullanici klasorunde venv kurulur
         cagrilar = []
+        venv_py = os.path.join(K.S.sanal_ortam_dizini(), "bin", "python")
 
         def sahte(komut, cb, env=None, islem=None):
             cagrilar.append(list(komut))
-            if "--break-system-packages" not in komut:
+            if "--user" in komut:
                 return 1, "error: externally-managed-environment", []
+            if "venv" in komut:
+                os.makedirs(os.path.dirname(venv_py), exist_ok=True)
+                open(venv_py, "w").close()
             return 0, "Successfully installed rawpy", []
 
         yedek = K._calistir
         K._calistir = sahte
         try:
-            self.assertEqual(K.kur(K.Plan(pip=["rawpy"])), [])
+            self.assertEqual(K.kur(K.Plan(pip=["rawpy"]), pypi_izin=lambda p: True), [])
         finally:
             K._calistir = yedek
-        self.assertEqual(len(cagrilar), 2)
+        self.assertTrue(all("--break-system-packages" not in c for c in cagrilar))
         self.assertIn("--user", cagrilar[0])
-        self.assertIn("--break-system-packages", cagrilar[1])
+        self.assertEqual(cagrilar[1][1:4], ["-m", "venv", "--system-site-packages"])
+        self.assertEqual(cagrilar[1][-1], K.S.sanal_ortam_dizini())
+        self.assertEqual(cagrilar[2][0], venv_py)
+        self.assertNotIn("--user", cagrilar[2])
+        self.assertTrue(K.S.sanal_ortam_dizini().startswith(_EV))      # yalniz kullanici klasoru
+
+    def test_pip_venv_kurulamazsa_basarisiz_listelenir(self):
+        import shutil
+        shutil.rmtree(os.path.join(_EV, ".local"), ignore_errors=True)
+        yedek = K._calistir
+        K._calistir = lambda komut, cb, env=None, islem=None: (
+            (1, "error: externally-managed-environment", []) if "--user" in komut else (1, "ensurepip yok", []))
+        try:
+            self.assertEqual(K.kur(K.Plan(pip=["rawpy"]), pypi_izin=lambda p: True), ["rawpy"])
+        finally:
+            K._calistir = yedek
 
     def test_pip_basarisiz_listelenir(self):
         yedek = K._calistir
         K._calistir = lambda komut, cb, env=None, islem=None: (1, "ERROR: no matching distribution", [])
         try:
-            self.assertEqual(K.kur(K.Plan(pip=["rawpy"])), ["rawpy"])
+            self.assertEqual(K.kur(K.Plan(pip=["rawpy"]), pypi_izin=lambda p: True), ["rawpy"])
         finally:
             K._calistir = yedek
+
+    def test_pypi_izin_yoksa_hicbir_sey_kurulmaz(self):
+        # F-10: izin callback'i yoksa ya da Hayir derse pip HIC calismaz, acik hata atilir
+        cagrilar = []
+        yedek = K._calistir
+        K._calistir = lambda komut, cb, env=None, islem=None: cagrilar.append(list(komut)) or (0, "", [])
+        try:
+            with self.assertRaises(FilenorHata) as h:
+                K.kur(K.Plan(pip=["rawpy"]))
+            self.assertEqual(h.exception.kod, "kurulum_pypi_izin_yok")
+            self.assertIn("rawpy", str(h.exception))
+            sorulan = []
+            with self.assertRaises(FilenorHata) as h2:
+                K.kur(K.Plan(pip=["rawpy"]), pypi_izin=lambda p: sorulan.append(p) or False)
+            self.assertEqual(h2.exception.kod, "kurulum_pypi_reddedildi")
+            self.assertEqual(sorulan, [["rawpy"]])
+        finally:
+            K._calistir = yedek
+        self.assertEqual(cagrilar, [])
+
+    def test_apt_pip_yedegi_once_sorar_hayirda_pypiye_dusmez(self):
+        gercek = K._calistir
+        pip_cagrilari = []
+
+        def ara(komut, cb, env=None, islem=None):
+            if komut and komut[0] == sys.executable:
+                pip_cagrilari.append(list(komut))
+                return 0, "ok", []
+            return gercek(komut, cb, env, islem)
+        K._calistir = ara
+        yedek = dict(K.APT_PIP_YEDEK)
+        sorulan = []
+        try:
+            K.APT_PIP_YEDEK["FAKE_YOK-heif"] = "pillow-heif"
+            with self.assertRaises(FilenorHata) as h:
+                K.kur(K.Plan(apt=["ffmpeg", "FAKE_YOK-heif"]), self.satirlar.append, yetki=[], env=self.env,
+                      pypi_izin=lambda p: sorulan.append(list(p)) or False)
+        finally:
+            K._calistir = gercek
+            K.APT_PIP_YEDEK.clear()
+            K.APT_PIP_YEDEK.update(yedek)
+        self.assertEqual(h.exception.kod, "kurulum_pypi_reddedildi")
+        self.assertEqual(sorulan, [["pillow-heif"]])
+        self.assertEqual(pip_cagrilari, [])
+        self.assertTrue(any("ffmpeg" in g for g in self.gunluk_satirlari()))   # apt kismi yapildi
+
+    def test_break_system_packages_kodda_yok(self):
+        src = open(K.__file__, encoding="utf-8").read()
+        self.assertNotIn('["--break-system-packages"]', src)       # komuta eklenmez
+        self.assertNotIn("+ ek + [\"--break", src)
 
     def test_ilerleme_gercek_apt_satirlarindan_gelir(self):
         olaylar = []
@@ -241,7 +315,8 @@ exit 0
             yedek = dict(K.APT_PIP_YEDEK)
             K.APT_PIP_YEDEK["FAKE_YOK-heif"] = "pillow-heif"
             k = K.kur(K.Plan(apt=["FAKE_YOK-heif"]), self.satirlar.append, yetki=[], env=self.env,
-                      ilerleme_cb=lambda o, a, d: olaylar.append((o, a, d)))
+                      ilerleme_cb=lambda o, a, d: olaylar.append((o, a, d)),
+                      pypi_izin=lambda p: True)       # F-10: PyPI'ya dusmeden once onay gerekir
         finally:
             K._calistir = gercek
             K.APT_PIP_YEDEK.clear()
@@ -257,7 +332,8 @@ exit 0
             (1, "ERROR", []) if komut and komut[0] == sys.executable else gercek(komut, cb, env, islem))
         try:
             K.APT_PIP_YEDEK["FAKE_YOK-x"] = "yok-boyle-paket"
-            k = K.kur(K.Plan(apt=["FAKE_YOK-x"]), self.satirlar.append, yetki=[], env=self.env)
+            k = K.kur(K.Plan(apt=["FAKE_YOK-x"]), self.satirlar.append, yetki=[], env=self.env,
+                      pypi_izin=lambda p: True)
         finally:
             K._calistir = gercek
             del K.APT_PIP_YEDEK["FAKE_YOK-x"]
@@ -278,7 +354,8 @@ exit 0
             return 0, "", []
         K._calistir = ara
         try:
-            K.kur(K.Plan(pip=["rawpy"]), None, ilerleme_cb=lambda o, a, d: olaylar.append((o, a, d)))
+            K.kur(K.Plan(pip=["rawpy"]), None, ilerleme_cb=lambda o, a, d: olaylar.append((o, a, d)),
+                  pypi_izin=lambda p: True)
         finally:
             K._calistir = gercek
         oranlar = [o for o, a, _d in olaylar if o is not None]

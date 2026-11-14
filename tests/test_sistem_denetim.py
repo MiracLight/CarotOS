@@ -493,5 +493,53 @@ class DilHazirlaModulTesti(unittest.TestCase):
             sys.stdout = eski
 
 
+class S06GrubOsProberTekSeferTesti(unittest.TestCase):
+    """S-06: os-prober acik kalir ama update-grub basina yalniz BIR kez (30_os-prober) calisir."""
+
+    SURE = os.path.join(INC, "etc", "grub.d", "99_carotos_sure")
+
+    def test_sure_betigi_os_prober_komutunu_calistirmaz(self):
+        kod = [s for s in oku(self.SURE).splitlines() if not s.lstrip().startswith("#")]
+        for s in kod:
+            self.assertNotRegex(s, r"(^|[\s;|&(`$])os-prober(\s|$|[;|&)`])", s)
+        self.assertNotIn("timeout 90", "\n".join(kod))
+
+    def test_os_prober_acik_kalir_ve_hook_755_yapar(self):
+        cfg = oku(os.path.join(INC, "etc", "default", "grub.d", "carotos.cfg"))
+        self.assertIn("GRUB_DISABLE_OS_PROBER=false", [s.strip() for s in cfg.splitlines()])
+        self.assertIn("chmod 755 /etc/grub.d/99_carotos_sure", hook("9996-carotos-onyukleme.hook.chroot"))
+        # dosya adi degismedi: 30_os-prober'dan sonra siralanir
+        self.assertGreater("99_carotos_sure", "30_os-prober")
+
+    def test_arac_kopyasi_ayni(self):
+        self.assertEqual(oku(self.SURE), oku(os.path.join(KOK, "tools", "grub-test", "grub.d", "99_carotos_sure")))
+
+    @unittest.skipUnless(SH and POSIX, "sh/posix yok")
+    def test_mkconfig_taklidi_30_sonra_99_prober_tek_cagri(self):
+        """grub-mkconfig gibi: stdout bir dosya, betikler sirayla; os-prober yalniz 30'da (taklit) bir kez."""
+        with tempfile.TemporaryDirectory() as d:
+            gunluk = os.path.join(d, "g")
+            p = os.path.join(d, "os-prober")
+            with open(p, "w") as f:
+                f.write("#!/bin/sh\necho x >> '%s'\necho '/dev/sda1::Windows:efi'\n" % gunluk)
+            os.chmod(p, 0o755)
+            otuz = os.path.join(d, "30_os-prober")
+            with open(otuz, "w") as f:
+                f.write("#!/bin/sh\nos-prober >/dev/null\n"
+                        "echo \"menuentry 'Windows' --id 'osprober-chain-1' {\"\necho '}'\n")
+            os.chmod(otuz, 0o755)
+            yeni = os.path.join(d, "grub.cfg.new")
+            env = {"PATH": d + ":/usr/bin:/bin", "GRUB_DISABLE_OS_PROBER": "false"}
+            with open(yeni, "w") as f:
+                for betik in (otuz, self.SURE):
+                    r = subprocess.run([SH, betik], env=env, stdout=f, stderr=subprocess.PIPE, text=True)
+                    self.assertEqual(r.returncode, 0, r.stderr)
+            with open(yeni) as f:
+                cfg = f.read()
+            with open(gunluk) as f:
+                self.assertEqual(f.read().split(), ["x"])            # os-prober tam bir kez
+            self.assertIn("set timeout=30\n", cfg)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

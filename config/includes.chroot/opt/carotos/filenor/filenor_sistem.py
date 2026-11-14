@@ -108,7 +108,9 @@ def _win_arac_dizinleri() -> list[str]:
 
 def ortam_hazirla() -> None:
     """Kurulu ama PATH'te olmayan araclarin klasorlerini bu surecin PATH'ine ekler.
-    Yeni arac kurulduktan sonra yeniden cagrilir (calisan program PATH degisikligini gormez)."""
+    Yeni arac kurulduktan sonra yeniden cagrilir (calisan program PATH degisikligini gormez).
+    Ayrica PyPI sanal ortaminin (varsa) modullerini gorunur kilar."""
+    sanal_ortam_yolu_ekle()
     if not WINDOWS:
         ek = os.environ.get("FILENOR_ARAC_DIZINLERI")
         yeni = [d for d in (ek or "").split(os.pathsep) if d and os.path.isdir(d)]
@@ -120,6 +122,22 @@ def ortam_hazirla() -> None:
         os.environ["PATH"] = os.pathsep.join(mevcut + eklenecek)
     if WINDOWS:
         _win_yol_registry()
+
+
+def sanal_ortam_dizini() -> str:
+    """PyPI paketleri icin kullanici klasorundeki sanal ortam (PEP 668 yolu; sistem paketlerini gorur)."""
+    return os.path.join(os.path.expanduser("~"), ".local", "share", "filenor", "venv")
+
+
+def sanal_ortam_yolu_ekle() -> None:
+    """Sanal ortamin site-packages klasorunu sys.path'in SONUNA ekler: sistem (Debian) paketleri
+    her zaman onceliklidir, PyPI'dan gelen modul yalniz sistemde yoksa gorunur."""
+    if DONMUS or WINDOWS:
+        return
+    yol = os.path.join(sanal_ortam_dizini(), "lib",
+                       "python%d.%d" % sys.version_info[:2], "site-packages")
+    if os.path.isdir(yol) and yol not in sys.path:
+        sys.path.append(yol)
 
 
 def _win_yol_registry() -> None:

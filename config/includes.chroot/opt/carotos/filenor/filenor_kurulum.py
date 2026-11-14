@@ -13,7 +13,12 @@ Yontemler:
     penceresini acar). Python modulleri paketle birlikte gelir; kaynak koddan
     calisirken "pip --user" kullanilir.
   * apt yoksa (macOS, baska dagitimlar) ya da pakette bulunmayan bir Python
-    modulu ise (rawpy) "pip --user" kullanilir; yonetici yetkisi gerekmez.
+    modulu ise (rawpy) PyPI'dan "pip install --user" kullanilir; yonetici yetkisi
+    gerekmez. PyPI paketleri Debian'daki gibi denetlenmedigi icin HICBIR PyPI
+    kurulumu kullaniciya sorulmadan yapilmaz (kur(..., pypi_izin=...)); izin yoksa
+    kurulmaz ve acik hata atilir. "--break-system-packages" hic kullanilmaz: Debian
+    "externally-managed-environment" derse kullanici klasorunde bir sanal ortam
+    (~/.local/share/filenor/venv, --system-site-packages) kullanilir.
 
 Paket adlari sabit tablodadir; kullanici girdisi hicbir komuta karismaz.
 """
@@ -92,6 +97,7 @@ SIRA = ("ffmpeg", "libreoffice", "pdftoppm", "qpdf", "tesseract", "pillow", "rep
         "fonttools", "brotli", "svg", "avif", "rawpy", "heif", "gs")
 
 PIP_PAKETI = "python3-pip"
+VENV_PAKETI = "python3-venv"      # sanal ortam (PEP 668 yolu) icin gerekir
 
 # Debian surumunuzda bulunmayan bir python3-* paketi icin pip yedegi
 APT_PIP_YEDEK = {APT[k][0]: PIP[k] for k in PIP if k in APT and len(APT[k]) == 1 and k not in SADECE_PIP}
@@ -158,6 +164,18 @@ def pip_var() -> bool:
         return False
 
 
+def venv_var() -> bool:
+    """python3 -m venv calisabilir mi (Debian'da python3-venv / ensurepip)."""
+    if S.DONMUS:
+        return False
+    try:
+        importlib.import_module("venv")
+        importlib.import_module("ensurepip")
+        return True
+    except Exception:
+        return False
+
+
 def temel_eksikler(durum: dict) -> list:
     """'Eksikleri kur' dugmesinin kapsami: kurulabilen, buyuk olmayan eksikler."""
     return [k for k in SIRA
@@ -189,9 +207,16 @@ def plan(anahtarlar, durum: dict, apt_kullan: Optional[bool] = None,
                 p.pip.append(PIP[a])
         else:
             p.elle.append(a)
-    # apt'te hic pip yoksa, pip gerekiyorsa once onu kur
-    if p.pip and apt_ok and not pip_var() and PIP_PAKETI not in p.apt:
-        p.apt.insert(0, PIP_PAKETI)
+    # apt'te hic pip/venv yoksa, pip gerekiyorsa once onlari kur (Debian paketleri; PyPI degil)
+    if p.pip and apt_ok:
+        eksik = []
+        if not pip_var():
+            eksik.append(PIP_PAKETI)
+        if not venv_var():
+            eksik.append(VENV_PAKETI)
+        for pk in reversed(eksik):
+            if pk not in p.apt:
+                p.apt.insert(0, pk)
     return p
 
 
@@ -277,6 +302,21 @@ def _calistir(komut, satir_cb, env=None, satir_islem=None):
     return kod, "\n".join(cikti), yok
 
 
+def _venv_pip_kur(ad, ek, satir_cb, env, satir_islem) -> int:
+    """Sanal ortami (yoksa) kullanici klasorunde kurar ve paketi oraya yukler. Cikis kodu doner."""
+    dizin = S.sanal_ortam_dizini()
+    py = os.path.join(dizin, "bin", "python")
+    if not os.path.exists(py):
+        os.makedirs(os.path.dirname(dizin), exist_ok=True)
+        kod, _c, _ = _calistir([sys.executable, "-m", "venv", "--system-site-packages", dizin],
+                               satir_cb, env, None)
+        if kod != 0 or not os.path.exists(py):
+            return kod or 1
+    kod, _c, _ = _calistir([py, "-m", "pip", "install", "--disable-pip-version-check", ad] + list(ek),
+                           satir_cb, env, satir_islem)
+    return kod
+
+
 def _pip_kur(ad, satir_cb, env, ilerle, aralik):
     """Tek pip paketi (--user). aralik=(bas, son): pip'in 'Progress X of Y' satirlarindan
     ilerleme verilir; None ise boyut bilinmez (belirsiz ilerleme)."""
@@ -301,8 +341,9 @@ def _pip_kur(ad, satir_cb, env, ilerle, aralik):
         ek = []
         kod, cikti, _ = _calistir(taban, satir_cb, env, satir_islem)
     if kod != 0 and "externally-managed-environment" in cikti:
-        # Debian: --user kurulumu sistemi bozmaz, ama bayrak gerekir
-        kod, cikti, _ = _calistir(taban + ek + ["--break-system-packages"], satir_cb, env, satir_islem)
+        # Debian (PEP 668): --user da reddedilir. "--break-system-packages" KULLANILMAZ;
+        # kullanicinin kendi klasorunde sistem paketlerini goren bir sanal ortam kullanilir.
+        kod = _venv_pip_kur(ad, ek, satir_cb, env, satir_islem)
     if aralik:
         ilerle.ver(aralik[1], "pip", ad)
     return kod == 0
@@ -330,8 +371,14 @@ def _winget_kur(kimlik, satir_cb, env, ilerle, aralik) -> bool:
 
 def kur(plan_: Plan, satir_cb: Optional[Callable[[str], None]] = None,
         yetki: Optional[list] = None, env: Optional[dict] = None,
-        ilerleme_cb: Optional[Callable] = None) -> list:
+        ilerleme_cb: Optional[Callable] = None,
+        pypi_izin: Optional[Callable[[list], bool]] = None) -> list:
     """Plani uygular. Kurulamayan paket adlarinin listesini dondurur (bos = hepsi tamam).
+
+    pypi_izin(paketler) -> bool: PyPI'dan INTERNETTEN indirilecek paketler icin kullaniciya
+    sorar (arayuz: onay penceresi, CLI: soru ya da --pypi-izin). None ya da False donerse
+    o paketler kurulmaz; Debian/winget adimlari tamamlandiktan sonra
+    FilenorHata('kurulum_pypi_izin_yok' | 'kurulum_pypi_reddedildi', liste=...) atilir.
 
     ilerleme_cb(oran, asama, ayrinti): oran 0..1 (geri gitmez) ya da None (belirsiz);
     asama: guncelle | indir | kur | pip | winget; ayrinti: yuzde ya da paket adi.
@@ -342,6 +389,18 @@ def kur(plan_: Plan, satir_cb: Optional[Callable[[str], None]] = None,
     basarisiz: list = []
     planli_pip = list(plan_.pip)
     yedek_pip: list = []                    # apt'de bulunamayanlar icin pip yedegi
+    pypi_red: list = []                     # PyPI izni verilmeyen paketler
+
+    def pypi_sor(paketler) -> bool:
+        if not paketler:
+            return True
+        ok = bool(pypi_izin is not None and pypi_izin(list(paketler)))
+        if not ok:
+            pypi_red.extend(p for p in paketler if p not in pypi_red)
+        return ok
+
+    if not pypi_sor(planli_pip):            # herhangi bir PyPI kurulumundan ONCE
+        planli_pip = []
 
     # adimlar ve agirliklari: ilerleme araligi bunlara gore bolunur
     adimlar = []
@@ -382,10 +441,15 @@ def kur(plan_: Plan, satir_cb: Optional[Callable[[str], None]] = None,
         else:
             if not _pip_kur(ad, satir_cb, env, ilerle, aralik):
                 basarisiz.append(ad)
+    if yedek_pip and not pypi_sor(yedek_pip):   # apt basarisiz oldu: PyPI'a dusmeden once yine sor
+        yedek_pip = []
     for ad in yedek_pip:                     # boyut bilinmez: belirsiz ilerleme
         if not _pip_kur(ad, satir_cb, env, ilerle, None):
             basarisiz.append(ad)
     ilerle.ver(1.0, "kur")
+    if pypi_red:
+        raise FilenorHata("kurulum_pypi_izin_yok" if pypi_izin is None else "kurulum_pypi_reddedildi",
+                          liste=", ".join(pypi_red))
     return basarisiz
 
 
@@ -393,6 +457,7 @@ def ortami_yenile() -> None:
     """Calisan surecin yeni kurulan modulleri ve programlari gormesini saglar."""
     importlib.invalidate_caches()
     S.ortam_hazirla()
+    S.sanal_ortam_yolu_ekle()
     try:
         kullanici = site.getusersitepackages()
         if kullanici and os.path.isdir(kullanici):

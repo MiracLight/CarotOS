@@ -2672,6 +2672,14 @@ class WelcomeWindow(Gtk.Window):
             except Exception as exc:                  # K-04: tek hata sihirbazi acik birakmasin
                 print("carotos-welcome: secimler uygulanirken hata:", exc, file=sys.stderr)
             finally:
+                # K-06: sihirbaz sonuna kadar gezilip Bitir'e basildi -> bir daha kendiliginden
+                # acilmaz (yaridan kapatilirsa ayar degismez, sonraki oturumda yine gelir;
+                # menuden her zaman acilabilir).
+                try:
+                    self.settings["show_on_startup"] = False
+                    save_settings(self.settings)
+                except Exception as exc:
+                    print("carotos-welcome: ayar yazilamadi:", exc, file=sys.stderr)
                 self.close()
             return
         self.stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT)

@@ -192,6 +192,35 @@ class KarsilamaDenetimTesti(UygulamaDilTabani):
         for dl in ("tr", "en"):
             self.assertTrue(self.m.UI["dh_iptal_edilemedi"][dl])
 
+    # -- K-06 ------------------------------------------------------------------------
+    def test_k06_bitir_bir_daha_kendiliginden_acilmaz_yaridan_kapatinca_acilir(self):
+        p = self.m.WelcomeWindow(self.m.load_settings())
+        self.addCleanup(p.destroy)
+        self.assertTrue(self.m.load_settings()["show_on_startup"])
+        p.close = lambda: None
+        p.apply_choices = lambda: None
+        # yarida kapatma: Bitir'e basilmadi -> ayar degismez, sonraki acilista yine gelir
+        self.assertTrue(self.m.load_settings()["show_on_startup"])
+        p.gezinme.sayfaya_git("resources")
+        p.next_btn.emit("clicked")                  # son sayfadan Bitir
+        self.assertFalse(self.m.load_settings()["show_on_startup"])
+        # --autostart artik sessizce cikar; menuden (bayraksiz) acilis etkilenmez
+        eski = sys.argv
+        sys.argv = ["carotos-welcome", "--autostart"]
+        try:
+            self.assertEqual(self.m.main(), 0)      # pencere acilmadan doner
+        finally:
+            sys.argv = eski
+
+    def test_k06_autostart_aciklamasi_gercek_davranisi_soyler(self):
+        yol = os.path.join(INC, "..", "..", "etc", "skel", ".config", "autostart", "carotos-welcome-autostart.desktop")
+        with open(yol, encoding="utf-8") as f:
+            icerik = f.read()
+        self.assertNotIn("once after installation", icerik)
+        self.assertNotIn("bir kez gösterilir", icerik)
+        for anahtar in ("Comment=", "Comment[tr]="):
+            self.assertIn(anahtar, icerik)
+
     # -- K-07 ------------------------------------------------------------------------
     def test_k07_kartla_dil_secince_ust_secici_eslesir(self):
         self.dil_dosyasi("de", {"Next": "Weiter"})

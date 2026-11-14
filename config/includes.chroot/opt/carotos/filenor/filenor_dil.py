@@ -132,6 +132,12 @@ MESAJ = {
     "kurulum_yetki": {
         "tr": "Yönetici yetkisi alınamadı (parola penceresi kapatıldı ya da yetki aracı çalışmıyor)",
         "en": "Administrator rights were not granted (the password prompt was closed or the helper is not running)"},
+    "kurulum_pypi_reddedildi": {
+        "tr": "{liste} kurulmadı: Python paket deposundan (PyPI) indirmeye izin vermediniz. Bu özellik kullanılamaz",
+        "en": "{liste} was not installed: you did not allow downloading from the Python package index (PyPI). This feature is unavailable"},
+    "kurulum_pypi_izin_yok": {
+        "tr": "{liste} Debian deposunda yok; PyPI'dan indirilmesi için açık izin gerekir. Kurulmadı, bu özellik kullanılamaz. İzin vermek için --pypi-izin ekleyin",
+        "en": "{liste} is not in the Debian repositories; downloading it from PyPI needs explicit permission. Nothing was installed and the feature is unavailable. Add --pypi-izin to allow it"},
     "kurulum_basarisiz": {
         "tr": "Kurulum tamamlanamadı (çıkış kodu {cikis}). İnternet bağlantısını ve paket kilidini kontrol edin",
         "en": "The installation did not finish (exit code {cikis}). Check the network and that no other package manager is running"},
@@ -168,7 +174,8 @@ ARAC_IPUCU = {
     "fonttools": {"tr": "Kurulum: sudo apt install python3-fonttools", "en": "Install: sudo apt install python3-fonttools"},
     "brotli": {"tr": "Kurulum: sudo apt install python3-brotli", "en": "Install: sudo apt install python3-brotli"},
     "svg": {"tr": "Kurulum: sudo apt install python3-cairosvg", "en": "Install: sudo apt install python3-cairosvg"},
-    "rawpy": {"tr": "Kurulum: pip install --user rawpy", "en": "Install: pip install --user rawpy"},
+    "rawpy": {"tr": "Kurulum: Filenor Ayarlar'daki Kur düğmesi (onayınla PyPI'dan indirilir)",
+              "en": "Install: the Install button in Filenor Settings (downloaded from PyPI with your permission)"},
     "heif": {"tr": "Kurulum: sudo apt install python3-pillow-heif", "en": "Install: sudo apt install python3-pillow-heif"},
     "avif": {"tr": "Bu Pillow sürümü AVIF desteklemiyor", "en": "This Pillow build has no AVIF support"},
     "gs": {"tr": "Kurulum: sudo apt install ghostscript", "en": "Install: sudo apt install ghostscript"},

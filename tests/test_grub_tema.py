@@ -31,38 +31,63 @@ PNG_ADLARI = ("background.png", "select_c.png", "select_w.png", "select_e.png")
 
 @unittest.skipUnless(SH, "sh yok")
 class SureBetigiTesti(unittest.TestCase):
-    def _calistir(self, prober_satir, env_ek=None):
+    """S-06: 99_carotos_sure os-prober'i CALISTIRMAZ; grub-mkconfig'in grub.cfg.new'e yazdigi
+    (betigin standart ciktisi olan dosya) '30_os-prober' girislerine bakar."""
+
+    MENU_WIN = ("menuentry 'Windows Boot Manager (on /dev/sda1)' --class windows --class os "
+                "--id 'osprober-efi-ABCD-1234' {\n\tinsmod part_gpt\n}\n")
+
+    def _calistir(self, onceki_cfg, env_ek=None, boru=False, prober=True):
+        """onceki_cfg: betik calismadan once grub.cfg.new'de bulunan metin (None = hic dosya yok: boru)."""
         with tempfile.TemporaryDirectory() as d:
-            if prober_satir is not None:
+            gunluk = os.path.join(d, "prober-cagrildi")
+            if prober:
                 p = os.path.join(d, "os-prober")
-                with open(p, "w") as f:
-                    f.write("#!/bin/sh\n" + "".join("echo '%s'\n" % s for s in prober_satir))
+                with open(p, "w") as f:                  # cagrilirsa iz birakir: cagrilmamali
+                    f.write("#!/bin/sh\necho cagrildi >> '%s'\necho '/dev/sda1::Windows:efi'\n" % gunluk)
                 os.chmod(p, 0o755)
             env = {"PATH": d + ":/usr/bin:/bin", "GRUB_DISABLE_OS_PROBER": "false"}
             env.update(env_ek or {})
-            r = subprocess.run([SH, SURE], env=env, capture_output=True, text=True, timeout=30)
-        self.assertEqual(r.returncode, 0, r.stderr)
-        return r.stdout
+            yeni = os.path.join(d, "grub.cfg.new")
+            if boru:
+                r = subprocess.run([SH, SURE], env=env, capture_output=True, text=True, timeout=30)
+                out = r.stdout
+            else:
+                with open(yeni, "w", encoding="utf-8") as f:
+                    f.write("# 00_header\nset timeout=5\n" + (onceki_cfg or ""))
+                    f.flush()
+                    r = subprocess.run([SH, SURE], env=env, stdout=f, stderr=subprocess.PIPE, text=True, timeout=30)
+                with open(yeni, encoding="utf-8") as f:
+                    out = f.read().split("# 00_header\nset timeout=5\n", 1)[1][len(onceki_cfg or ""):]
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertFalse(os.path.exists(gunluk), "os-prober ikinci kez calistirildi")
+        return out
 
     def test_yalniz_carotos_5_sn(self):
-        self.assertIn("set timeout=5\n", self._calistir([]))
+        self.assertIn("set timeout=5\n", self._calistir(""))
 
     def test_baska_sistem_varsa_30_sn(self):
-        out = self._calistir(["/dev/sda1@/efi/Microsoft/Boot/bootmgfw.efi:Windows Boot Manager:Windows:efi"])
+        out = self._calistir(self.MENU_WIN)
         self.assertIn("set timeout=30\n", out)
-        self.assertIn("sayisi: 1", out)
+        self.assertIn("girisi: 1", out)
 
-    def test_birden_cok_sistem(self):
-        out = self._calistir(["/dev/sda1::Windows:efi", "/dev/sdb2:Ubuntu:Ubuntu:linux"])
-        self.assertIn("sayisi: 2", out)
+    def test_alt_menu_girisi_de_sayilir(self):
+        out = self._calistir("submenu 'Advanced options for Ubuntu' --id 'osprober-gnulinux-advanced-UUID' {\n}\n")
         self.assertIn("set timeout=30\n", out)
 
-    def test_os_prober_kapaliysa_aranmaz(self):
-        out = self._calistir(["/dev/sda1::Windows:efi"], {"GRUB_DISABLE_OS_PROBER": "true"})
+    def test_yorum_ve_baska_menuentry_baska_sistem_degil(self):
+        out = self._calistir("# osprober- yorumu\nmenuentry 'CarotOS' --id 'gnulinux-simple-UUID' {\n}\n")
         self.assertIn("set timeout=5\n", out)
 
+    def test_os_prober_kapaliysa_aranmaz(self):
+        out = self._calistir(self.MENU_WIN, {"GRUB_DISABLE_OS_PROBER": "true"})
+        self.assertIn("set timeout=5\n", out)
+
+    def test_cikti_dosya_degilse_cokmez_ve_5_sn(self):
+        self.assertIn("set timeout=5\n", self._calistir(None, boru=True))
+
     def test_os_prober_yoksa_cokmez(self):
-        self.assertIn("set timeout=5\n", self._calistir(None))
+        self.assertIn("set timeout=30\n", self._calistir(self.MENU_WIN, prober=False))   # prober gerekmez
 
 
 @unittest.skipUnless(SH, "sh yok")

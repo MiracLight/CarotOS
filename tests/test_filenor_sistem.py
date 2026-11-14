@@ -278,7 +278,8 @@ class WingetPlani(unittest.TestCase):
         gercek = K._calistir
         K._calistir = lambda komut, cb, env=None, islem=None: (0, "", [])
         try:
-            K.kur(K.Plan(winget=["A.B"], pip=["x"]), None, ilerleme_cb=lambda o, a, d: olaylar.append(o))
+            K.kur(K.Plan(winget=["A.B"], pip=["x"]), None, ilerleme_cb=lambda o, a, d: olaylar.append(o),
+                  pypi_izin=lambda paketler: True)      # F-10: PyPI kurulumu onay ister
         finally:
             K._calistir = gercek
         oranlar = [o for o in olaylar if o is not None]

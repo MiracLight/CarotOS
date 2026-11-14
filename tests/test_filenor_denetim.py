@@ -552,5 +552,60 @@ class F11(unittest.TestCase):
         self.assertEqual([os.path.basename(x) for x in self.F.klasor_dosyalari(kok)], ["a.png"])
 
 
+class F10(unittest.TestCase):
+    """PyPI kurulumu: onay, sanal ortam, --break-system-packages yok."""
+
+    def test_sanal_ortam_yolu_sona_eklenir_sistemi_golgelemez(self):
+        import filenor_sistem as S
+        if S.WINDOWS:
+            self.skipTest("posix")
+        site = os.path.join(S.sanal_ortam_dizini(), "lib",
+                            "python%d.%d" % sys.version_info[:2], "site-packages")
+        os.makedirs(site, exist_ok=True)
+        self.addCleanup(shutil.rmtree, os.path.join(_EV, ".local"), True)
+        self.addCleanup(lambda: site in sys.path and sys.path.remove(site))
+        S.sanal_ortam_yolu_ekle()
+        self.assertEqual(sys.path[-1], site)
+        S.sanal_ortam_yolu_ekle()                       # tekrar eklenmez
+        self.assertEqual(sys.path.count(site), 1)
+
+    def test_cli_izin_bayragi_ve_tty_yoksa_none(self):
+        import argparse
+        import filenor_cli as C
+        self.assertTrue(C._pypi_izni(argparse.Namespace(pypi_izin=True))(["x"]))
+        eski = C.sys.stdin
+        try:
+            C.sys.stdin = open(os.devnull)               # tty degil
+            self.assertIsNone(C._pypi_izni(argparse.Namespace(pypi_izin=False)))
+        finally:
+            C.sys.stdin.close()
+            C.sys.stdin = eski
+
+    def test_cli_izin_yoksa_kurmadan_hata_verir(self):
+        import argparse
+        import filenor_cli as C
+        import filenor_kurulum as K
+        gercek = K._calistir
+        cagrilar = []
+        K._calistir = lambda *a, **k: cagrilar.append(a) or (0, "", [])
+        try:
+            with self.assertRaises(FilenorHata) as h:
+                K.kur(K.Plan(pip=["rawpy"]), pypi_izin=C._pypi_izni(argparse.Namespace(pypi_izin=False))
+                      if C.sys.stdin is None or not C.sys.stdin.isatty() else None)
+        finally:
+            K._calistir = gercek
+        self.assertEqual(h.exception.kod, "kurulum_pypi_izin_yok")
+        self.assertIn("--pypi-izin", hata_metni(h.exception, "tr"))
+        self.assertEqual(cagrilar, [])
+
+    def test_metinler_tr_en(self):
+        from filenor_dil import MESAJ
+        from filenor_metin import METIN as T
+        for k in ("kurulum_pypi_reddedildi", "kurulum_pypi_izin_yok"):
+            self.assertTrue(MESAJ[k]["tr"] and MESAJ[k]["en"])
+        self.assertIn("PyPI", T["kur_pypi_metin"]["tr"])
+        self.assertIn("PyPI", T["kur_pypi_metin"]["en"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)
