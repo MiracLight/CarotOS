@@ -439,7 +439,8 @@ class ModernlestirUygulaTesti(ModernlestirTabani):
             "carotos-carotos-carotene.dockitem"]))
         self.assertEqual(self.masa.gsettings["dock2/position"], "'left'")
         self.assertEqual(self.masa.gsettings["position"], "'bottom'")
-        self.assertEqual(self.masa.gsettings["dock2/hide-mode"], "'none'")
+        self.assertEqual(self.masa.gsettings["dock2/hide-mode"], "'intelligent'")   # tam ekranda iceri girer
+        self.assertEqual(self.masa.gsettings["dock2/pinned-only"], "true")          # yalniz CarotOS uygulamalari
         icerik = self.oku(os.path.join(yan, "carotos-carotos-magaza.dockitem"))
         self.assertTrue(icerik.startswith("[PlankDockItemPreferences]\nLauncher=file://"))
         self.assertIn(os.path.join(self.uyg, "carotos-magaza.desktop").replace(os.sep, "/").split(":")[-1],

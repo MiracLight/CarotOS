@@ -69,7 +69,7 @@ DOCK_VARSAYILAN = (
     ("xfce4-appfinder.desktop",),
     ("xfce4-settings-manager.desktop",),
 )
-# SOL yan dock: butun CarotOS uygulamalari (once bu sira, sonra kalan carotos-*.desktop dosyalari)
+# SOL yan dock: YALNIZ CarotOS uygulamalari (sabitlenmis; acik baska pencereler gosterilmez) (once bu sira, sonra kalan carotos-*.desktop dosyalari)
 YAN_DOCK_SIRA = (
     "carotos-welcome.desktop", "carotos-magaza.desktop", "carotos-security-panel.desktop",
     "carotos-carotene.desktop", "carotos-carotpot.desktop", "carotos-health.desktop",
@@ -743,7 +743,8 @@ def plan_olustur(o):
                                 ("hide-mode", "'intelligent'"), ("zoom-enabled", "true"),
                                 ("zoom-percent", "150"), ("icon-size", "44"))),
             (YAN_DOCK, yan, (("position", "'left'"), ("alignment", "'center'"),
-                             ("hide-mode", "'none'"), ("zoom-enabled", "true"),
+                             ("hide-mode", "'intelligent'"), ("pinned-only", "true"),
+                             ("zoom-enabled", "true"),
                              ("zoom-percent", "130"), ("icon-size", "44")))):
         baslatici_dizini = o.yol("plank", dock, "launchers")
         adlar = []
