@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from former_zaman import T, balon, git, yaz
+from former_zaman import birlestir, T, balon, git, yaz
 from konular._panel import T_DENEME_UYARISI, arac_sec, calistir, konu as _konu
 
 ARAC = {
@@ -77,15 +77,18 @@ def konu():
                     "The Server line says which web server and version is running. The lines below are "
                     "findings: a missing header is a harmless hint, a directory listing means files are "
                     "directly visible and should usually be turned off.")),
-            ("not", T("nikto “burada bir şey var” der ama kesin karar vermez; bazı bulgular yanlış alarm "
-                      "(false positive) olabilir. " + T_DENEME_UYARISI["tr"],
-                      "nikto says “there might be something here” but does not decide for certain; some "
-                      "findings can be false positives. " + T_DENEME_UYARISI["en"])),
+            ("not", birlestir(T("nikto “burada bir şey var” der ama kesin karar vermez; bazı bulgular yanlış "
+                               "alarm (false positive) olabilir. ",
+                               "nikto says “there might be something here” but does not decide for certain; "
+                               "some findings can be false positives. "), T_DENEME_UYARISI)),
         ]),
         (T("Kendin dene", "Try it yourself"), [
             ("liste", [
-                T("Kendi makinende basit bir web sunucusu başlat (örn. python3 -m http.server) ve onu tara.",
-                  "Start a simple web server on your own machine (e.g. python3 -m http.server) and scan it."),
+                T("Kendi makinende basit bir web sunucusu başlat: python3 -m http.server --bind 127.0.0.1 "
+                  "(yalnızca bu bilgisayardan erişilir, port 8000). Sonra hedefe http://127.0.0.1:8000 yazıp onu tara.",
+                  "Start a simple web server on your own machine: python3 -m http.server --bind 127.0.0.1 "
+                  "(reachable only from this computer, port 8000). Then type http://127.0.0.1:8000 as the target "
+                  "and scan it."),
                 T("Çıktıdaki bir bulguyu seç, ne anlama geldiğini web'de ara.",
                   "Pick one finding from the output and search the web for what it means."),
             ]),

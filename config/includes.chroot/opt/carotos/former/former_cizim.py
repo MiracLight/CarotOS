@@ -310,7 +310,7 @@ def _balon(cr, p, W, H, sahne, durum, dil, t):
     if not b:
         return
     hedef = next((o for o in sahne["ogeler"] if o["id"] == b["hedef"]), None)
-    if hedef is None:
+    if hedef is None or not _gorunur(hedef, durum):
         return
     alfa = b["alfa"]
     # hedefi cevreleyen nabiz halkasi

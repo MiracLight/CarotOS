@@ -49,6 +49,28 @@ def metin_al(m, dil: str) -> str:
     return "" if m is None else str(m)
 
 
+def birlestir(*parcalar):
+    """Parcalari her dilde kendi cevirisiyle birlestirir (R-07): her parca iki dilli sozluk
+    ya da duz metin olabilir. Sonuc, tum dil kodlari icin hazir bir Metin'dir; boylece
+    birlesik cumle de cevrilmis dillerde cevrilmis gorunur."""
+    return _Birlesik(parcalar)
+
+
+class _Birlesik(dilkat.Metin):
+    """Yalniz tr/en anahtarli gorunur (iki dilli sozluk sozlesmesi); baska bir dil sorulunca
+    (metin() -> .get) parcalar o dilde kendi cevirileriyle birlestirilir."""
+
+    def __init__(self, parcalar):
+        super().__init__({"tr": "".join(metin_al(p, "tr") for p in parcalar),
+                          "en": "".join(metin_al(p, "en") for p in parcalar)})
+        self._parcalar = tuple(parcalar)
+
+    def get(self, kod, varsayilan=None):
+        if kod in ("tr", "en"):
+            return super().get(kod, varsayilan)
+        return "".join(metin_al(p, kod) for p in self._parcalar)
+
+
 # ---------------------------------------------------------------------------
 # Adim ureticileri
 # ---------------------------------------------------------------------------
@@ -412,4 +434,38 @@ def dogrula(sahne: dict, adimlar: list) -> list:
                 sorun.append(f"adim {i + 1}: '{alan}' iki dilde degil")
     if not any(a["tur"] == "balon" for a in adimlar):
         sorun.append("hic balon (aciklama) yok")
+    sorun += balon_hedefi_sorunlari(sahne, adimlar)
+    return sorun
+
+
+def _oge_gorunur(o: dict, durum: dict) -> bool:
+    sayfa = o.get("sayfa")
+    if sayfa is not None:
+        izin = sayfa if isinstance(sayfa, (list, tuple)) else [sayfa]
+        if durum["sayfa"] not in izin:
+            return False
+    bayrak = o.get("bayrak")
+    if bayrak is not None:
+        if bayrak.startswith("!"):
+            if durum["bayraklar"].get(bayrak[1:]):
+                return False
+        elif not durum["bayraklar"].get(bayrak):
+            return False
+    return True
+
+
+def balon_hedefi_sorunlari(sahne: dict, adimlar: list) -> list:
+    """Her balon acildigi anda hedef oge ekranda gorunuyor mu (R-02)?"""
+    sorun = []
+    try:
+        cz = Cizelge(sahne, adimlar, "tr")
+    except Exception:           # derleme hatasi baska denetimlerde yakalanir
+        return sorun
+    sozluk = {o["id"]: o for o in sahne["ogeler"]}
+    for o in cz.olaylar:
+        if o.tur != "balon":
+            continue
+        hedef = sozluk.get(o.veri["hedef"])
+        if hedef is not None and not _oge_gorunur(hedef, cz.durum(o.basla + 1)):
+            sorun.append("balon hedefi gorunmuyor: '%s' (t=%d ms)" % (hedef["id"], o.basla))
     return sorun

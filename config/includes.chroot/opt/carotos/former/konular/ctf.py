@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """CTF yarismasi: Poligon ogrenci uygulamasindaki "CTF yarismasi" penceresi (gorev, dosya, ipucu, bayrak, skor)."""
-from former_sahneler import PH, PW
+from former_sahneler import PH, PW, T_POLIGON_NOTU
 from former_zaman import T, ayarla, balon, bekle, git, tikla, yaz
 
 KOMUT = ["python3", "/opt/carotos/poligon/ogrenci_uygulama.py"]
@@ -83,11 +83,12 @@ def konu():
         yaz("c_bayrak", T("CAROT{kod_cozuldu}", "CAROT{kod_cozuldu}")),
         git("c_gonder"),
         tikla("c_gonder", ayarla={
-            "c_sonuc": {"metin": T("Doğru! +100 puan.", "Correct! +100 points.")},
-            "c_puan": {"metin": T("Puanın: 90 · Sıran: 3", "Your score: 90 · Rank: 3")},
+            "c_sonuc": {"metin": T("Doğru! +100 puan (ipucu −10 → toplam 90).",
+                                   "Correct! +100 points (hint −10 → total 90).")},
+            "c_puan": {"metin": T("Puanın: 90 · Sıran: 4", "Your score: 90 · Rank: 4")},
             "c_g1": {"renk": "yesil"},
-            "c_skor": {"metin": T("Skor tablosu: 1. Ayşe 350 · 2. Can 250 · 3. Sen 90 · 4. Deniz 100",
-                                  "Scoreboard: 1. Alex 350 · 2. Sam 250 · 3. You 90 · 4. Robin 100")}}),
+            "c_skor": {"metin": T("Skor tablosu: 1. Ayşe 350 · 2. Can 250 · 3. Deniz 100 · 4. Sen 90",
+                                  "Scoreboard: 1. Alex 350 · 2. Sam 250 · 3. Robin 100 · 4. You 90")}}),
         bekle(300),
         balon("c_sonuc", T("Bayrak gönderme", "Submitting a flag"),
               T("Bayrağı kutuya yaz ve Gönder'e bas. Sunucu bayrağı senin için doğrular. Art arda çok yanlış "
@@ -123,6 +124,9 @@ def konu():
                     "Her görevin kolay, orta ya da zor etiketi vardır.",
                     "Challenges fall into five groups: encoding, cryptography, hash, log analysis and forensics. "
                     "Each challenge is labelled easy, medium or hard.")),
+        ]),
+        (T("Hangi ağda kullanılır", "Which network to use it on"), [
+            ("not", T_POLIGON_NOTU),
         ]),
         (T("Adil oyun", "Fair play"), [
             ("not", T("Dosyalar herkese farklı üretilir ve doğrulama sunucuda yapılır. Bu yüzden bayrak "

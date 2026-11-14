@@ -33,9 +33,11 @@ def konu():
         yaz("d1_komut", KOMUT_1),
         balon("d1_komut", T("Önce imza", "Signature first"),
               T("gpgv, SHA256SUMS dosyasını gerçekten CarotOS'un imzaladığını denetler. Anahtar CarotOS'ta zaten "
-                "kurulu; başka bir sistemde önce anahtarı carotos.org'dan alırsın.",
+                "kurulu; başka bir sistemde anahtarı indirdikten sonra parmak izini ayrı bir kaynaktan (örn. GitHub'daki README) "
+                "karşılaştırırsın.",
                 "gpgv checks that CarotOS really signed the SHA256SUMS file. The key is already installed on "
-                "CarotOS; on another system you first get the key from carotos.org."), "ust"),
+                "CarotOS; on another system, after downloading the key, you compare its fingerprint with a separate source "
+                "(e.g. the README on GitHub)."), "ust"),
         tikla("d1_tus", ayarla={"d1_tus": {"renk": "yesil"}}),
         cikti("d1_pencere", CIKTI_1),
         balon("d1_pencere", T("İmza iyi", "Good signature"),

@@ -91,7 +91,7 @@ STRINGS = {
     "oynat": T("Oynat", "Play"),
     "duraklat": T("Duraklat", "Pause"),
     "bastan": T("Baştan", "Restart"),
-    "acik_uygulama": T("{ad}'ı aç", "Open {ad}"),
+    "acik_uygulama": T("Aç: {ad}", "Open {ad}"),
     "uygulama_yok": T("{ad} bu bilgisayarda kurulu değil.", "{ad} is not installed on this computer."),
     "animasyon_basligi": T("Canlı anlatım", "Live walkthrough"),
     "adimlar_basligi": T("Adımlar", "Steps"),
@@ -109,8 +109,13 @@ HIZLAR = [("0.75", "0.75×"), ("1", "1×"), ("1.5", "1.5×")]
 
 
 def ac(komut):
+    """Uygulamayi ayri oturumda baslatir. Betik yolu yoksa False doner (R-01): python3 var
+    oldugu icin Popen basarili gorunurdu ama 'dosya acilamadi' deyip cikardi."""
     try:
-        subprocess.Popen(komut)
+        for parca in komut[1:]:
+            if parca.startswith("/") and parca.endswith(".py") and not os.path.isfile(parca):
+                return False
+        subprocess.Popen(komut, start_new_session=True, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
         return True
     except Exception:
         return False
@@ -208,7 +213,7 @@ class Uygulama(Gtk.Window):
             ayar_yaz(self.ayar)
             self._metinleri_uygula()
             if self._aktif_id:
-                self._sayfayi_yeniden_kur(self._aktif_id)
+                self._sayfayi_yeniden_kur(self._aktif_id, koru=True)
             else:
                 self._bos_goster()
 
@@ -219,7 +224,7 @@ class Uygulama(Gtk.Window):
         tema.uygula(yeni, "former")
         self.tema_dugme.set_label("☀" if yeni == "dark" else "☾")
         if self._aktif_id:
-            self._sayfayi_yeniden_kur(self._aktif_id)
+            self._sayfayi_yeniden_kur(self._aktif_id, koru=True)
         else:
             self._bos_goster()
 
@@ -232,12 +237,21 @@ class Uygulama(Gtk.Window):
     def sayfa_secildi(self, anahtar):
         self._sayfayi_yeniden_kur(anahtar)
 
-    def _sayfayi_yeniden_kur(self, anahtar):
+    def _sayfayi_yeniden_kur(self, anahtar, koru=False):
+        """koru=True (dil/tema degisimi): ayni konuda anlatimin yeri ve oynatma durumu korunur (R-03)."""
+        onceki = None
+        if koru and self._aktif_id == anahtar and self._cz is not None:
+            onceki = (self._t, self._oynuyor)
         self._zamanlayiciyi_durdur()
         self._aktif_id = anahtar
         k = self.konular[anahtar]
         self.kabuk.baslik_ayarla(metin_al(k["ad"], self.lang), metin_al(k["alt"], self.lang))
         self.kabuk.icerik(self._konu_govdesi(k))
+        if onceki is not None and self._cz is not None:
+            self._t = min(onceki[0], float(self._cz.toplam))
+            self._oynuyor = bool(onceki[1]) and self._t < self._cz.toplam
+            self._oynat_dugme.set_label(self.t("duraklat") if self._oynuyor else self.t("oynat"))
+            self._zamanlayiciyi_baslat()
 
     def _bos_goster(self):
         self._zamanlayiciyi_durdur()
@@ -295,7 +309,7 @@ class Uygulama(Gtk.Window):
         self._oynat_dugme = tema.dugme(self.t("duraklat"), "kucuk", self._oynat_duraklat)
         denetim.pack_start(self._oynat_dugme, False, False, 0)
         denetim.pack_start(tema.dugme(self.t("bastan"), "kucuk duz", self._bastan), False, False, 0)
-        hiz_kutu, _ = tema.secim_grubu(HIZLAR, "1", self._hiz_degisti)
+        hiz_kutu, _ = tema.secim_grubu(HIZLAR, "%g" % self._hiz, self._hiz_degisti)
         denetim.pack_end(hiz_kutu, False, False, 0)
         ic.pack_start(denetim, False, False, 0)
 
@@ -324,7 +338,12 @@ class Uygulama(Gtk.Window):
 
     def _zamanlayiciyi_baslat(self):
         self._zamanlayiciyi_durdur()
+        self._son_ms = GLib.get_monotonic_time() / 1000.0
         self._zamanlayici_id = GLib.timeout_add(33, self._adim)
+
+    def _zamanlayici_calissin(self):
+        if self._zamanlayici_id is None:
+            self._zamanlayiciyi_baslat()
 
     def _zamanlayiciyi_durdur(self):
         if self._zamanlayici_id is not None:
@@ -332,16 +351,24 @@ class Uygulama(Gtk.Window):
             self._zamanlayici_id = None
 
     def _adim(self):
+        """Duvar saatine gore ilerler (R-04); anlatim bitince/duraklayinca zamanlayici birakilir."""
         if self._cz is None:
+            self._zamanlayici_id = None
             return False
+        simdi = GLib.get_monotonic_time() / 1000.0
+        gecen = min(max(simdi - getattr(self, "_son_ms", simdi - 33.0), 0.0), 250.0)
+        self._son_ms = simdi
         if self._oynuyor:
-            self._t += 33 * self._hiz
+            self._t += gecen * self._hiz
             if self._t >= self._cz.toplam:
                 self._t = float(self._cz.toplam)
                 self._oynuyor = False
                 self._oynat_dugme.set_label(self.t("oynat"))
         if self._canvas is not None:
             self._canvas.queue_draw()
+        if not self._oynuyor:
+            self._zamanlayici_id = None
+            return False
         return True
 
     def _oynat_duraklat(self, *_):
@@ -351,11 +378,14 @@ class Uygulama(Gtk.Window):
             self._t = 0.0
         self._oynuyor = not self._oynuyor
         self._oynat_dugme.set_label(self.t("duraklat") if self._oynuyor else self.t("oynat"))
+        if self._oynuyor:
+            self._zamanlayici_calissin()
 
     def _bastan(self, *_):
         self._t = 0.0
         self._oynuyor = True
         self._oynat_dugme.set_label(self.t("duraklat"))
+        self._zamanlayici_calissin()
         if self._canvas is not None:
             self._canvas.queue_draw()
 
@@ -369,6 +399,7 @@ class Uygulama(Gtk.Window):
         self._t = float(ms)
         self._oynuyor = True
         self._oynat_dugme.set_label(self.t("duraklat"))
+        self._zamanlayici_calissin()
         if self._canvas is not None:
             self._canvas.queue_draw()
 
@@ -399,7 +430,7 @@ class Uygulama(Gtk.Window):
         if tur == "kod":
             kutu = Gtk.Box()
             tema.sinif(kutu, "secili-satir")
-            e = tema.etiket(icerik, "mono", sar=True, genislik=100)
+            e = tema.etiket(icerik, "mono", sar=True, genislik=100, sec=True)
             e.set_margin_top(10)
             e.set_margin_bottom(10)
             e.set_margin_start(14)

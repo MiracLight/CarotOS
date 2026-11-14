@@ -17,16 +17,23 @@ ARAC = {
     ],
 }
 
+# Panelin "Genel durum" çıktısı: `fail2ban-client status` (yalnızca bu üç satır)
 CIKTI = [
     "Status",
     "|- Number of jail:      2",
-    "`- Jail list:   sshd, recidive",
-    "",
+    "`- Jail list:   recidive, sshd",
+]
+# Terminalde `sudo fail2ban-client status sshd` çıktısı (panelde yok)
+SSHD_CIKTI = [
     "Status for the jail: sshd",
-    "|- Currently failed:   1",
-    "|- Total failed:       9",
-    "`- Currently banned:   1",
-    "   `- Banned IP list:  192.168.1.23",
+    "|- Filter",
+    "|  |- Currently failed: 1",
+    "|  |- Total failed:     9",
+    "|  `- Journal matches:  _SYSTEMD_UNIT=ssh.service + _COMM=sshd",
+    "`- Actions",
+    "   |- Currently banned: 1",
+    "   |- Total banned:     1",
+    "   `- Banned IP list:   192.168.1.23",
 ]
 
 
@@ -43,11 +50,12 @@ def konu():
                 "fail2ban protects (called a “jail”) and how many addresses are blocked right now.")),
     ] + calistir("fail2ban-client status", CIKTI, kok=True) + [
         balon("cikti", T("Durumu oku", "Read the status"),
-              T("Jail list, hangi servislerin korunduğunu sayar — sshd, SSH girişini korur. Altındaki "
-                "bölüm o servise özeldir: kaç başarısız deneme oldu, şu an kaç adres engelli.",
-                "Jail list counts which services are protected — sshd protects SSH login. The section below "
-                "is specific to that service: how many failed attempts there were, how many addresses are "
-                "banned right now."), "ust"),
+              T("Jail list, hangi servislerin korunduğunu sayar — sshd, SSH girişini korur. Panel yalnızca bu "
+                "genel özeti gösterir; bir servisin ayrıntısını (kaç başarısız deneme, şu an kaç adres engelli) "
+                "terminalde “sudo fail2ban-client status sshd” ile görürsün.",
+                "Jail list counts which services are protected — sshd protects SSH login. The panel shows only "
+                "this overview; for one service's details (how many failed attempts, how many addresses are "
+                "banned right now) use “sudo fail2ban-client status sshd” in a terminal."), "ust"),
     ]
     bolumler = [
         (T("Ne işe yarar", "What it is for"), [
@@ -72,7 +80,11 @@ def konu():
             ]),
         ]),
         (T("Çıktıyı nasıl okurum", "How to read the output"), [
-            ("kod", "\n".join(CIKTI[4:9])),
+            ("kod", "\n".join(CIKTI)),
+            ("p", T("Bir servisin ayrıntısı panelde değil, terminalde görünür (sudo fail2ban-client status sshd):",
+                    "One service's details are shown in a terminal, not in the panel (sudo fail2ban-client "
+                    "status sshd):")),
+            ("kod", "\n".join(SSHD_CIKTI)),
             ("tablo", [
                 (T("Currently failed", "Currently failed"), T("Son pencerede sayılan başarısız deneme sayısı.",
                                                               "Failed attempts counted in the recent window.")),

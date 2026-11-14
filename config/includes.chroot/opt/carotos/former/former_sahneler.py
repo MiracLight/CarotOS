@@ -13,7 +13,7 @@ Konu dosyalari (konular/) bu sahnelere adim listesi ekler.
 
 from __future__ import annotations
 
-from former_zaman import T
+from former_zaman import T, birlestir
 
 PW, PH = 760, 420
 UST = 26                    # pencere baslik cubugu
@@ -32,6 +32,13 @@ T_BITTI = T("[Bitti — çıkış kodu 0]", "[Finished — exit code 0]")
 T_ARAC_SEC = T("Soldan bir araç seçin", "Pick a tool on the left")
 T_ROOT_IPUCU = T("Bu araç yönetici yetkisi ister. “Root ile çalıştır”ı kullanın; parola penceresi açılır.",
                  "This tool needs administrator rights. Use “Run as root”; a password dialog will appear.")
+
+
+T_POLIGON_NOTU = T(
+    "Poligon sınıf içi kullanım için tasarlandı; güvendiğin bir ağda kullan. Sınıf ağındaki trafik "
+    "şifrelenmez, bu yüzden kafe ya da otel gibi ortak ağlarda açmamak en doğrusudur.",
+    "Poligon is designed for use inside a classroom; use it on a network you trust. Traffic on the class "
+    "network is not encrypted, so it is best not to use it on shared networks such as a café or hotel.")
 
 
 def _yan(marka, marka_alt, ogeler, adim=25, y0=64, grup="menu", genislik=150, sayfa=None, baslangic_aktif=None):
@@ -93,11 +100,9 @@ def panel_sahnesi(arac: dict) -> dict:
         {"id": "a_ne", "tur": "metin", "x": 182, "y": 86, "w": 554, "h": 14, "sayfa": "arac", "metin": arac["ne"],
          "boyut": 8.2, "sar": True},
         {"id": "a_zaman", "tur": "metin", "x": 182, "y": 104, "w": 554, "h": 14, "sayfa": "arac", "sar": True,
-         "metin": T("{}: {}".format(T_NE_ZAMAN["tr"], arac["ne_zaman"]["tr"]),
-                    "{}: {}".format(T_NE_ZAMAN["en"], arac["ne_zaman"]["en"])), "boyut": 8.2, "renk": "soluk"},
+         "metin": birlestir(T_NE_ZAMAN, ": ", arac["ne_zaman"]), "boyut": 8.2, "renk": "soluk"},
         {"id": "a_ornek", "tur": "metin", "x": 182, "y": 124, "w": 554, "h": 14, "sayfa": "arac", "sar": True,
-         "metin": T("{}: {}".format(T_ORNEK["tr"], arac["ornek"]["tr"]),
-                    "{}: {}".format(T_ORNEK["en"], arac["ornek"]["en"])), "boyut": 8.2, "renk": "soluk"},
+         "metin": birlestir(T_ORNEK, ": ", arac["ornek"]), "boyut": 8.2, "renk": "soluk"},
     ]
     y = 160
     for f in arac["alanlar"]:
@@ -243,20 +248,39 @@ def carotpot_sahnesi() -> dict:
          "birincil": True, "metin": T("Engelle", "Block")},
         {"id": "s_yoksay", "tur": "dugme", "x": 490, "y": 370, "w": 100, "h": 26, "sayfa": "saldirgan",
          "metin": T("Yok say", "Ignore")},
-        {"id": "s_engelli", "tur": "rozet", "x": 600, "y": 372, "w": 100, "h": 22, "sayfa": "saldirgan",
+        {"id": "s_engelli", "tur": "rozet", "x": 600, "y": 372, "w": 130, "h": 22, "sayfa": "saldirgan",
          "bayrak": "engelli", "renk": "kirmizi", "metin": T("ENGELLİ", "BLOCKED")},
+        # --- ayarlar (baglanti kapsami)
+        {"id": "ay_baslik", "tur": "metin", "x": 172, "y": 34, "w": 300, "h": 20, "sayfa": "ayar",
+         "metin": T("Ayarlar", "Settings"), "boyut": 14, "kalin": True},
+        {"id": "ay_kart", "tur": "kart", "x": 170, "y": 70, "w": 578, "h": 150, "sayfa": "ayar",
+         "baslik": T("Bağlantı kapsamı", "Connection scope")},
+        {"id": "ay_et", "tur": "metin", "x": 184, "y": 106, "w": 460, "h": 30, "sayfa": "ayar", "sar": True,
+         "boyut": 9, "metin": T("İnternetten gelen bağlantıları da kabul et", "Also accept connections from the internet")},
+        {"id": "ay_internet", "tur": "anahtar", "x": 690, "y": 104, "w": 40, "h": 22, "sayfa": "ayar",
+         "aktif": False},
+        {"id": "ay_not", "tur": "metin", "x": 184, "y": 142, "w": 550, "h": 70, "sayfa": "ayar", "sar": True,
+         "boyut": 8.2, "renk": "soluk",
+         "metin": T("Kapalıyken tuzaklar yalnızca yerel ağdaki cihazları kaydeder ve güvenlik duvarında yalnızca "
+                    "yerel ağa izin açılır. Açarsan ve bilgisayar internete açıksa gerçek saldırı denemeleri "
+                    "kaydedilir; yalnızca bilerek aç.",
+                    "When off, traps record only devices on the local network and the firewall allows only the "
+                    "local network. If you turn it on and the computer is reachable from the internet, real "
+                    "attack attempts are recorded; turn it on only on purpose.")},
         # --- baslatma onayi
         {"id": "b_perde", "tur": "perde", "x": 0, "y": UST, "w": PW, "h": PH - UST, "bayrak": "baslat_diyalog"},
         {"id": "b_kutu", "tur": "diyalog", "x": 200, "y": 96, "w": 360, "h": 206, "bayrak": "baslat_diyalog",
          "baslik": T("Tuzak açılsın mı?", "Turn the trap on?")},
         {"id": "b_metin", "tur": "metin", "x": 216, "y": 126, "w": 328, "h": 100, "bayrak": "baslat_diyalog",
          "sar": True, "boyut": 8.2, "renk": "soluk",
-         "metin": T("Bu bilgisayarda sahte hizmetler açılacak ve güvenlik duvarında bu portlara izin verilecek. "
-                    "Yalnızca güvendiğiniz ağlarda (ev, okul laboratuvarı) açın; kafe, otel gibi ortak ağlarda "
-                    "açmayın. Gerçek bir kabuk ya da hizmet yoktur; her giriş denemesi reddedilir.",
-                    "Fake services will be opened on this computer and the firewall will allow these ports. Turn "
-                    "it on only on networks you trust (home, school lab); not on shared networks such as cafés "
-                    "or hotels. There is no real shell or service; every login attempt is rejected.")},
+         "metin": T("Bu bilgisayarda sahte hizmetler açılacak; güvenlik duvarında yalnızca bu portlara ve "
+                    "yalnızca yerel ağdan izin verilecek. Yalnızca güvendiğiniz ağlarda (ev, okul laboratuvarı) "
+                    "açın; kafe, otel gibi ortak ağlarda açmayın. Gerçek bir kabuk ya da hizmet yoktur; her "
+                    "giriş denemesi reddedilir.",
+                    "Fake services will be opened on this computer and the firewall will allow only these ports, "
+                    "and only from the local network. Turn it on only on networks you trust (home, school lab); "
+                    "not on shared networks such as cafés or hotels. There is no real shell or service; every "
+                    "login attempt is rejected.")},
         {"id": "b_iptal", "tur": "dugme", "x": 360, "y": 256, "w": 90, "h": 28, "bayrak": "baslat_diyalog",
          "metin": T("İptal", "Cancel")},
         {"id": "b_tamam", "tur": "dugme", "x": 458, "y": 256, "w": 90, "h": 28, "bayrak": "baslat_diyalog",

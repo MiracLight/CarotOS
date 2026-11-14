@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from former_zaman import T, balon, git, yaz
+from former_zaman import birlestir, T, balon, git, yaz
 from konular._panel import T_DENEME_UYARISI, arac_sec, calistir, konu as _konu
 
 ARAC = {
@@ -42,11 +42,11 @@ def konu():
                 "network.")),
         git("alan:service"),
         balon("alan:service", T("Servis", "Service"),
-              T("Hangi giriş servisi deneniyor: ssh uzaktan bağlantı, ftp dosya sunucusu gibi. Panel sana "
-                "uygun olanı seçtirir, hydra arkada o servisin giriş protokolünü konuşur.",
+              T("Hangi giriş servisi deneniyor: ssh uzaktan bağlantı, ftp dosya sunucusu gibi. Servis "
+                "adını (ssh, ftp…) sen yazarsın; varsayılan ssh. hydra arkada o servisin giriş protokolünü konuşur.",
                 "Which login service is being tried: ssh is remote login, ftp is a file server, and so on. "
-                "The panel lets you pick the right one; hydra speaks that service's login protocol behind the "
-                "scenes.")),
+                "You type the service name (ssh, ftp…); the default is ssh. hydra speaks that service's login "
+                "protocol behind the scenes.")),
         git("alan:userlist"),
         balon("alan:userlist", T("Kullanıcı listesi", "Username list"),
               T("Denenecek kullanıcı adlarının olduğu dosya. Gerçek bir ortamda çoğu zaman “admin”, “root” "
@@ -97,11 +97,10 @@ def konu():
         ]),
         (T("Çıktıyı nasıl okurum", "How to read the output"), [
             ("kod", "\n".join(CIKTI[2:5])),
-            ("not", T("Bu araç gürültülüdür: her başarısız deneme sunucunun kayıtlarında (log) iz bırakır ve "
-                      "CarotPot ya da fail2ban gibi araçlar tarafından kolayca fark edilir. " +
-                      T_DENEME_UYARISI["tr"],
-                      "This tool is noisy: every failed attempt leaves a trace in the server's logs and is "
-                      "easily noticed by tools like CarotPot or fail2ban. " + T_DENEME_UYARISI["en"])),
+            ("not", birlestir(T("Bu araç gürültülüdür: her başarısız deneme sunucunun kayıtlarında (log) iz "
+                               "bırakır ve CarotPot ya da fail2ban gibi araçlar tarafından kolayca fark edilir. ",
+                               "This tool is noisy: every failed attempt leaves a trace in the server's logs and "
+                               "is easily noticed by tools like CarotPot or fail2ban. "), T_DENEME_UYARISI)),
         ]),
         (T("Kendin dene", "Try it yourself"), [
             ("liste", [

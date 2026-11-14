@@ -329,7 +329,7 @@ TERIMLER = [
                  "en": "An attack that tries a list of commonly used passwords instead of every random combination."},
         "aciklama": {
             "tr": "Sözlük saldırısı, saf kaba kuvvetin aksine önceden hazırlanmış, gerçek kullanıcıların "
-                  "sıkça seçtiği şifirelerden (\"123456\", \"sifre123\" gibi) oluşan bir liste kullanır; "
+                  "sıkça seçtiği şifrelerden (\"123456\", \"sifre123\" gibi) oluşan bir liste kullanır; "
                   "bu da onu çok daha hızlı ve pratik kılar. john gibi araçlar, çalınmış şifre özetlerini "
                   "(hash) kırmak için bu listeleri kullanır.",
             "en": "Unlike pure brute force, a dictionary attack uses a prepared list of passwords real "

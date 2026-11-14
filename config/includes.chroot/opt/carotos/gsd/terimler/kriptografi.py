@@ -93,7 +93,7 @@ TERIMLER = [
                  "en": "A function that turns any data into a fixed-length, irreversible fingerprint."},
         "aciklama": {
             "tr": "Bir özet (hash) fonksiyonu aynı girdi için her zaman aynı çıktıyı üretir, ama çıktıdan "
-                  "girdiyi geri hesaplamak (tersine çevirmek) pratikte imkânsızdır. Şifreler veritabanda "
+                  "girdiyi geri hesaplamak (tersine çevirmek) pratikte imkânsızdır. Şifreler veritabanında "
                   "düz metin yerine özetleri saklanarak korunur; bir dosyanın değişip değişmediğini "
                   "kontrol etmek için de kullanılır.",
             "en": "A hash function always produces the same output for the same input, but computing the "
@@ -220,7 +220,7 @@ TERIMLER = [
                   "and SHA-1, no practical collision attack (two different inputs producing the same "
                   "hash) has been found against it to date.",
         },
-        "ornek": "sha256sum carotos-1.3.iso",
+        "ornek": "sha256sum carotos-1.3-amd64.iso",
         "ilgili": ["hash_fonksiyonu", "md5"],
     },
     {
@@ -374,8 +374,8 @@ TERIMLER = [
         "baslik": {"tr": "Anahtar Parmak İzi (Fingerprint)", "en": "Key Fingerprint"},
         "kisa": {"tr": "Bir açık anahtarı kısa ve karşılaştırılabilir biçimde tanımlayan özet değeri.", "en": "A hash that identifies a public key in a short, comparable form."},
         "aciklama": {
-            "tr": "Bir GPG ya da SSH anahtarının parmak izi 40 karakterlik bir onaltılık dizidir. Bir anahtarın gerçekten beklediğiniz kişiye ait olduğunu, parmak izini birden çok bağımsız kaynaktan (site, GitHub, README) karşılaştırarak anlarsınız.\n\nSSH bir sunucuya ilk bağlanışta parmak izini gösterir; sonradan değişirse olası bir ortadaki adam saldırısı için uyarır.",
-            "en": "A GPG or SSH key's fingerprint is a 40-character hex string. You know a key really belongs to who you expect by comparing its fingerprint across several independent sources (website, GitHub, README).\n\nSSH shows the fingerprint on your first connection to a server and warns about a possible man-in-the-middle attack if it changes later.",
+            "tr": "Bir GPG anahtarının parmak izi 40 karakterlik bir onaltılık dizidir; SSH parmak izi ise SHA256:… biçiminde bir özettir. Bir anahtarın gerçekten beklediğiniz kişiye ait olduğunu, parmak izini birden çok bağımsız kaynaktan (site, GitHub, README) karşılaştırarak anlarsınız.\n\nSSH bir sunucuya ilk bağlanışta parmak izini gösterir; sonradan değişirse olası bir ortadaki adam saldırısı için uyarır.",
+            "en": "A GPG key's fingerprint is a 40-character hex string; an SSH fingerprint is a hash shown as SHA256:…. You know a key really belongs to who you expect by comparing its fingerprint across several independent sources (website, GitHub, README).\n\nSSH shows the fingerprint on your first connection to a server and warns about a possible man-in-the-middle attack if it changes later.",
         },
         "ornek": "gpg --show-keys --fingerprint anahtar.asc",
         "ilgili": ["pgp_gpg", "acik_anahtar", "mitm", "saglama_toplami"],

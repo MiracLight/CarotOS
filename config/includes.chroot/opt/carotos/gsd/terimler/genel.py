@@ -453,11 +453,11 @@ TERIMLER = [
         "aciklama": {
             "tr": "Hata ayıklama; günlük (log) mesajlarını okumak, kodu adım adım bir \"debugger\" "
                   "aracıyla izlemek ya da bölüp test ederek sorunu daraltmak gibi yöntemlerle yapılır. "
-                  "\"Bug\" (böcek) teriminin kökeni, 1947'de gerçek bir güve kelebeğinin bir bilgisayar "
-                  "rölesine sıkışıp arızaya yol açmasına dayanır.",
+                  "\"Bug\" (böcek) terimi, 1947'de gerçek bir güve kelebeğinin bir bilgisayar "
+                  "rölesine sıkışıp arızaya yol açmasıyla popülerleşti.",
             "en": "Debugging involves reading log messages, stepping through code with a debugger tool, "
                   "or narrowing down the problem by splitting and testing pieces of the program. The "
-                  "term \"bug\" itself traces back to 1947, when an actual moth got stuck in a computer "
+                  "term \"bug\" is much older, but it was popularised in 1947, when an actual moth got stuck in a computer "
                   "relay and caused a malfunction.",
         },
         "ilgili": ["log_dosyasi"],
@@ -528,7 +528,7 @@ TERIMLER = [
             "tr": "^ satır başı, $ satır sonu, . herhangi bir karakter, * tekrar, [0-9] rakam demektir. Günlüklerde IP adreslerini bulmak, belirli hata satırlarını süzmek ya da form girdisini doğrulamak için kullanılır. grep, sed ve hemen her programlama dili destekler.",
             "en": "^ means start of line, $ end of line, . any character, * repetition, [0-9] a digit. It is used to find IP addresses in logs, filter specific error lines or validate form input. grep, sed and almost every programming language support it.",
         },
-        "ornek": "grep -E 'Failed password .* from [0-9.]+' /var/log/auth.log",
+        "ornek": "journalctl -u ssh | grep -E 'Failed password .* from [0-9.]+'",
         "ilgili": ["grep", "log_dosyasi"],
     },
     {

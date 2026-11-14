@@ -3,7 +3,7 @@
 from former_zaman import T, ayarla, balon, bekle, git, ilerle, say, tikla
 from former_sahneler import carotene_sahnesi
 
-KOMUT = ["python3", "/opt/carotos/carotene/carotos-carotene.py"]
+KOMUT = ["python3", "/opt/carotos/carotene/carotene.py"]
 
 
 def konu():
@@ -54,13 +54,14 @@ def konu():
                 "need to. Delete removes it with no way back. Ignore does nothing; use it only when you are "
                 "sure the file is harmless.")),
         tikla("s_karantina", bayrak={"karantinada": True}),
-        git("t_tanim"),
-        balon("t_tanim", T("Tanımlar güncel mi", "Are the definitions up to date"),
-              T("Sağ üstteki rozet, virüs tanımlarının ne zaman güncellendiğini gösterir. Eski tanımlarla "
-                "yeni bir tehdit yakalanamaz; Ayarlar sayfasındaki “Tanımları güncelle”yi ara sıra "
+        tikla("ct:tanim", sayfa="tanim"),
+        git("d_guncelle"),
+        balon("d_guncelle", T("Tanımlar güncel mi", "Are the definitions up to date"),
+              T("Virüs tanımları bölümü, tanımların ne zaman güncellendiğini gösterir. Eski tanımlarla "
+                "yeni bir tehdit yakalanamaz; bu bölümdeki “Tanımları güncelle”yi ara sıra "
                 "kullanmak önemlidir.",
-                "The badge top-right shows when the virus definitions were last updated. Old definitions "
-                "cannot catch a new threat; using “Update definitions” on the Settings page now and then "
+                "The Virus definitions section shows when the definitions were last updated. Old definitions "
+                "cannot catch a new threat; using “Update definitions” in this section now and then "
                 "matters.")),
     ]
     bolumler = [

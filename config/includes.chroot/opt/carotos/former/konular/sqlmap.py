@@ -47,11 +47,13 @@ def konu():
     ] + calistir("sqlmap -u http://localhost/sayfa?id=1 --batch", CIKTI) + [
         balon("cikti", T("Sonucu oku", "Read the result"),
               T("sqlmap önce bağlantıyı dener, sonra tek tek teknikleri sırayla test eder. “does not seem to "
-                "be injectable” ya da “all tested parameters do not appear to be injectable” iyi haberdir: "
-                "bulduğu bir açık yok demektir.",
+                "be injectable” ya da “all tested parameters do not appear to be injectable” bu aramada "
+                "bir açık bulunamadı demektir; açık olmadığının kanıtı değildir (varsayılan düzey yalnızca temel "
+                "teknikleri dener).",
                 "sqlmap first tries the connection, then tests techniques one by one. “does not seem to be "
-                "injectable” or “all tested parameters do not appear to be injectable” is good news: it "
-                "means it found no flaw."), "ust"),
+                "injectable” or “all tested parameters do not appear to be injectable” means it "
+                "found no flaw in this run; it is not proof that none exists (the default level tries only "
+                "basic techniques)."), "ust"),
     ]
     bolumler = [
         (T("Ne işe yarar", "What it is for"), [
@@ -85,9 +87,11 @@ def konu():
                 (T("[WARNING]", "[WARNING]"), T("Bir teknik işe yaramadı, sıradaki deneniyor.",
                                                 "One technique did not work, the next is being tried.")),
                 (T("injectable", "injectable"), T("Bu kelime çıkarsa parametre savunmasız demektir; çıkmazsa "
-                                                  "iyi bir işarettir.",
+                                                  "yalnızca bu denemede bulunamadı demektir, güvende olduğunu "
+                                                  "kanıtlamaz.",
                                                   "If this word appears, the parameter is vulnerable; if not, "
-                                                  "that is a good sign.")),
+                                                  "it was only not found in this run, which does not prove it "
+                                                  "is safe.")),
             ]),
             ("not", T_DENEME_UYARISI),
         ]),

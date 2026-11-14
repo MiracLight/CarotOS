@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Giris/harita konusu: CarotOS guvenlik uygulamalarina genel bakis."""
 from former_zaman import T, ayarla, balon, bekle, git
-from former_sahneler import giris_sahnesi, KAROLAR
+from former_sahneler import giris_sahnesi, KAROLAR, T_POLIGON_NOTU
 
 
 def konu():
@@ -47,6 +47,9 @@ def konu():
                   "If you really want to try something, look at Poligon; there you practise in a safe, "
                   "isolated environment."),
             ]),
+        ]),
+        (T("Poligon hakkında", "About Poligon"), [
+            ("not", T_POLIGON_NOTU),
         ]),
         (T("Ortak kural", "The common rule"), [
             ("uyari", T("Bu uygulamalardaki hiçbir araç, kendi cihazların ve açıkça izin aldığın sistemler "

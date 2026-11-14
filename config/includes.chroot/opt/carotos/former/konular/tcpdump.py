@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from former_zaman import T, balon, git, yaz
+from former_zaman import birlestir, T, balon, git, yaz
 from konular._panel import T_DENEME_UYARISI, arac_sec, calistir, konu as _konu
 
 ARAC = {
@@ -113,10 +113,10 @@ def konu():
                 (T("[F.] / [R.]", "[F.] / [R.]"), T("Bağlantıyı kapatma / zorla koparma.",
                                                     "Closing / forcibly resetting the connection.")),
             ]),
-            ("not", T("Port 443 trafiği şifrelidir; tcpdump içeriği değil, yalnızca kimin kiminle konuştuğunu "
-                      "gösterir. " + T_DENEME_UYARISI["tr"],
-                      "Port 443 traffic is encrypted; tcpdump shows only who talks to whom, not the content. "
-                      + T_DENEME_UYARISI["en"])),
+            ("not", birlestir(T("Port 443 trafiği şifrelidir; tcpdump içeriği değil, yalnızca kimin kiminle "
+                               "konuştuğunu gösterir. ",
+                               "Port 443 traffic is encrypted; tcpdump shows only who talks to whom, not the "
+                               "content. "), T_DENEME_UYARISI)),
         ]),
         (T("Kendin dene", "Try it yourself"), [
             ("liste", [

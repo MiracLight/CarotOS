@@ -87,6 +87,16 @@ def _kucult(s):
     return (s or "").translate(_TR_KUCUK).lower()
 
 
+# Arama katlamasi (D-01): I/İ/ı hepsi "i"; Turkce harfsiz klavye icin ş/ç/ö/ü/ğ da
+# ASCII karsiligina iner. Dizin ve sorgu AYNI fonksiyondan gecer.
+_ARAMA_KAT = str.maketrans({"İ": "i", "I": "i", "ı": "i", "ş": "s", "Ş": "s", "ç": "c", "Ç": "c",
+                            "ö": "o", "Ö": "o", "ü": "u", "Ü": "u", "ğ": "g", "Ğ": "g"})
+
+
+def _ara_katla(s):
+    return (s or "").translate(_ARAMA_KAT).lower()
+
+
 # Doğru Türkçe alfabe sırası (q/w/x Türkçe'de yok ama İngilizce terimlerde
 # geçebildiği için en yakın konuma eklendi). Bu tablo duz ASCII a-z icin de
 # ayni bagil sirayi korur, yani Ingilizce basliklar da doğru sıralanır.
@@ -94,9 +104,10 @@ _TR_SIRA_HARF = "abcçdefgğhıijklmnoöpqrsştuüvwxyz"
 _TR_SIRA_INDEKS = {ch: i for i, ch in enumerate(_TR_SIRA_HARF)}
 
 
-def _tr_anahtar(s):
-    """Dogru Turkce alfabe sirasina gore karsilastirilabilir anahtar uretir."""
-    s = _kucult(s)
+def _tr_anahtar(s, tr=True):
+    """Dogru Turkce alfabe sirasina gore karsilastirilabilir anahtar uretir.
+    tr=False (Ingilizce arayuz): I harfi i ile ayni yerde siralanir."""
+    s = _kucult(s) if tr else (s or "").replace("I", "i").lower()
     return [_TR_SIRA_INDEKS.get(ch, 1000 + ord(ch)) for ch in s]
 
 
@@ -118,9 +129,9 @@ STRINGS = {
     "bos_baslik": T("Bir terim seçin", "Pick a term"),
     "bos_alt": T("Soldaki listeden bir terim seçin ya da arama kutusuna yazmaya başlayın. "
                  "Linux, ağ, siber güvenlik, kriptografi, algoritma ve genel bilgisayar bilimi "
-                 "üzerine 150'den fazla terim burada.",
+                 "üzerine 190'dan fazla terim burada.",
                  "Pick a term from the list on the left, or start typing in the search box. "
-                 "There are over 150 terms here on Linux, networking, cybersecurity, "
+                 "There are over 190 terms here on Linux, networking, cybersecurity, "
                  "cryptography, algorithms and general computer science."),
     "sonuc_yok_baslik": T("Sonuç bulunamadı", "No results found"),
     "sonuc_yok_alt": T("Farklı bir arama terimi deneyin ya da kategori filtresini değiştirin.",
@@ -203,7 +214,7 @@ class Uygulama(Gtk.Window):
                 if self.lang not in ("tr", "en"):
                     parcalar.append(metin_al(t.get(alan), self.lang))
             parcalar.append(t.get("ornek") or "")
-            self._arama_metni[t["id"]] = _kucult(" ".join(parcalar))
+            self._arama_metni[t["id"]] = _ara_katla(" ".join(parcalar))
 
     def t(self, anahtar, **kw):
         return dilkat.T(STRINGS.get(anahtar), self.lang, anahtar, **kw)
@@ -338,6 +349,7 @@ class Uygulama(Gtk.Window):
             ayar_yaz(self.ayar)
             self._arama_indeksi_kur()
             self._metinleri_uygula()
+            self._listeyi_yenile()
             if self._aktif_id:
                 self._detay_goster(self._aktif_id)
             else:
@@ -382,8 +394,9 @@ class Uygulama(Gtk.Window):
         return self._arama_sorgu in self._arama_metni[row.terim_id]
 
     def _satir_sirala(self, row1, row2):
-        a = _tr_anahtar(metin_al(self.terimler[row1.terim_id]["baslik"], self.lang))
-        b = _tr_anahtar(metin_al(self.terimler[row2.terim_id]["baslik"], self.lang))
+        tr = self.lang == "tr"
+        a = _tr_anahtar(metin_al(self.terimler[row1.terim_id]["baslik"], self.lang), tr)
+        b = _tr_anahtar(metin_al(self.terimler[row2.terim_id]["baslik"], self.lang), tr)
         if a < b:
             return -1
         if a > b:
@@ -391,7 +404,7 @@ class Uygulama(Gtk.Window):
         return 0
 
     def _arama_degisti(self, entry):
-        self._arama_sorgu = _kucult(entry.get_text().strip())
+        self._arama_sorgu = _ara_katla(entry.get_text().strip())
         self._listeyi_yenile()
 
     def _kategori_tiklandi(self, _d, anahtar):
@@ -451,6 +464,7 @@ class Uygulama(Gtk.Window):
             self.sag_kaydir.remove(eski)
         self.sag_kaydir.add(widget)
         widget.show_all()
+        self.sag_kaydir.get_vadjustment().set_value(0)      # D-03: yeni terim ustten baslar
 
     def _bos_goster(self):
         self._aktif_id = None
@@ -514,7 +528,7 @@ class Uygulama(Gtk.Window):
             tema.kart_basligi(ic, self.t("ornek_basligi"))
             ornek_kutu = Gtk.Box()
             tema.sinif(ornek_kutu, "secili-satir")
-            e = tema.etiket(t["ornek"], "mono", sar=True, genislik=90)
+            e = tema.etiket(t["ornek"], "mono", sar=True, genislik=90, sec=True)
             e.set_margin_top(10)
             e.set_margin_bottom(10)
             e.set_margin_start(14)

@@ -117,7 +117,7 @@ def konu():
                         "own “Be careful” section too; read those as well.")),
         ]),
     ]
-    k = _konu("panel", NMAP_ARAC, adimlar, bolumler, ikon="panel",
+    k = _konu("panel", NMAP_ARAC, adimlar, bolumler, ikon="kalkan",
               ozet=T("Güvenlik Paneli'nin genel yapısı: gezinme, araç sayfası, root ve ayarlar.",
                      "The Security Panel's general layout: navigation, a tool page, root and settings."))
     k["ad"] = T("Güvenlik Paneli", "Security Panel")

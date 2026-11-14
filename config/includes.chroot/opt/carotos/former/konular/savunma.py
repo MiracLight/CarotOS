@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """Savunmaci gorunumu: Poligon ogrenci uygulamasindaki "Savunmaci gorunumu" penceresi (olay gunlugu, bulgular, ufw/fail2ban)."""
-from former_sahneler import PH, PW
+from former_sahneler import PH, PW, T_POLIGON_NOTU
 from former_zaman import T, ayarla, balon, bekle, cikti, git, tikla
 
 KOMUT = ["python3", "/opt/carotos/poligon/ogrenci_uygulama.py"]
@@ -10,9 +10,9 @@ def _sahne():
     o = [
         {"id": "s_baslik", "tur": "metin", "x": 24, "y": 38, "w": 300, "h": 20, "boyut": 14, "kalin": True,
          "metin": T("Savunmacı görünümü", "Defender view")},
-        {"id": "s_ufw", "tur": "rozet", "x": 560, "y": 40, "w": 84, "h": 20, "renk": "gri",
+        {"id": "s_ufw", "tur": "rozet", "x": 470, "y": 40, "w": 132, "h": 20, "renk": "gri",
          "metin": T("ufw: kapalı", "ufw: off")},
-        {"id": "s_f2b", "tur": "rozet", "x": 650, "y": 40, "w": 96, "h": 20, "renk": "yesil",
+        {"id": "s_f2b", "tur": "rozet", "x": 608, "y": 40, "w": 138, "h": 20, "renk": "yesil",
          "metin": T("fail2ban: açık", "fail2ban: on")},
         {"id": "s_alt", "tur": "metin", "x": 24, "y": 66, "w": 712, "h": 14, "boyut": 8.4, "renk": "soluk",
          "metin": T("Saldırının sahte servislerde bıraktığı izleri gör.",
@@ -24,7 +24,7 @@ def _sahne():
         {"id": "s_bulgu_kart", "tur": "kart", "x": 22, "y": 116, "w": 716, "h": 88, "bayrak": "bulgu"},
         {"id": "s_bulgu_ad", "tur": "metin", "x": 36, "y": 126, "w": 360, "h": 16, "boyut": 9, "kalin": True,
          "bayrak": "bulgu", "metin": T("Parola deneme saldırısı", "Password guessing attack")},
-        {"id": "s_bulgu_onem", "tur": "rozet", "x": 220, "y": 125, "w": 100, "h": 18, "renk": "kirmizi",
+        {"id": "s_bulgu_onem", "tur": "rozet", "x": 260, "y": 125, "w": 140, "h": 18, "renk": "kirmizi",
          "bayrak": "bulgu", "metin": T("Önem: yüksek", "Severity: high")},
         {"id": "s_bulgu_ne", "tur": "metin", "x": 36, "y": 148, "w": 688, "h": 14, "boyut": 8.2, "sar": True,
          "bayrak": "bulgu", "metin": T("Kısa sürede çok sayıda başarısız giriş görüldü.",
@@ -97,6 +97,9 @@ def konu():
                     "bilirsen hem saldırıyı daha iyi anlar hem de kendi sistemini nasıl koruyacağını öğrenirsin.",
                     "An attacker sees getting in; a defender sees the trail left behind. If you know both you "
                     "understand the attack better and learn how to protect your own system.")),
+        ]),
+        (T("Hangi ağda kullanılır", "Which network to use it on"), [
+            ("not", T_POLIGON_NOTU),
         ]),
         (T("Nasıl kullanırım", "How do I use it"), [
             ("liste", [

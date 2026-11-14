@@ -402,7 +402,7 @@ TERIMLER = [
                   "string or regular expression, printing the matching lines. It's one of the most "
                   "common tools for hunting errors in logs or filtering large output.",
         },
-        "ornek": "grep -i \"error\" /var/log/syslog",
+        "ornek": "journalctl -b | grep -i \"error\"",
         "ilgili": ["log_dosyasi", "bash"],
     },
     {

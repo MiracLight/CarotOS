@@ -411,12 +411,12 @@ TERIMLER = [
                   "o çözümün doğruluğu hızlıca kontrol edilebilen problemlerin kümesidir. P=NP mi "
                   "sorusu, hızlı doğrulanabilen her şeyin hızlı da çözülüp çözülemeyeceğini sorar -- "
                   "çoğu bilgisayar bilimci hayır olduğuna inanır, ama bu kanıtlanmış değildir. Modern "
-                  "şifrelemenin güvenliği büyük ölçüde bu sorunun yanıtının \"hayır\" olmasına dayanır.",
+                  "şifrelemenin güvenliği için P≠NP'nin doğru olması gerekir, ama tek başına yetmez.",
             "en": "P is the set of problems solvable quickly (in polynomial time); NP is the set of "
                   "problems whose proposed solution can be checked quickly once you have one. The P=NP "
                   "question asks whether everything quickly verifiable can also be quickly solved -- most "
                   "computer scientists believe the answer is no, but it has never been proven. Much of "
-                  "modern encryption's security rests on that answer staying no.",
+                  "modern encryption needs P≠NP to hold, but that alone is not enough.",
         },
         "ilgili": ["karmasiklik", "rsa"],
     },

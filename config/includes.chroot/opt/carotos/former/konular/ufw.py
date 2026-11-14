@@ -44,6 +44,13 @@ def konu():
                 "Status shows the current rules without changing anything — start here if this is your first "
                 "time. Enable/Disable turns the firewall on or off. Allow port lets connections through to "
                 "the port you name.")),
+        balon("alan:action", T("CarotOS'ta varsayılan: kapalı", "On CarotOS the default is off"),
+              T("CarotOS'ta güvenlik duvarı varsayılan olarak kapalı gelir; böylece yeni başlayan ağ araçlarını "
+                "rahatça dener. Ortak bir ağdaysan (okul, kafe, otel) açmanı öneririz: Etkinleştir'i seç ya da "
+                "terminalde sudo ufw enable yaz.",
+                "On CarotOS the firewall is off by default so beginners can try network tools freely. If you are "
+                "on a shared network (school, café, hotel) we recommend turning it on: pick Enable, or type "
+                "sudo ufw enable in a terminal.")),
         sec("alan:action", 0),
     ] + calistir("ufw status verbose", CIKTI, kok=True) + [
         balon("cikti", T("Durumu oku", "Read the status"),
@@ -57,15 +64,26 @@ def konu():
     bolumler = [
         (T("Ne işe yarar", "What it is for"), [
             ("p", T("ufw (Uncomplicated Firewall), bilgisayarına hangi bağlantıların girebileceğini "
-                    "belirleyen basit bir güvenlik duvarı arayüzüdür. Varsayılan kural “gelen her şeyi "
-                    "reddet” olduğu için, sen açıkça izin vermediğin sürece dışarıdan kimse bir porta "
-                    "bağlanamaz.",
+                    "belirleyen basit bir güvenlik duvarı arayüzüdür. ufw açıkken varsayılan kural "
+                    "“gelen her şeyi reddet” olduğu için, sen açıkça izin vermediğin sürece dışarıdan kimse bir "
+                    "porta bağlanamaz.",
                     "ufw (Uncomplicated Firewall) is a simple firewall interface that decides which "
-                    "connections can reach your computer. Because the default rule is “deny everything "
-                    "incoming”, nobody from outside can connect to a port unless you explicitly allow it.")),
+                    "connections can reach your computer. While ufw is on, the default rule is “deny everything "
+                    "incoming”, so nobody from outside can connect to a port unless you explicitly allow it.")),
             ("p", T("Bir binanın kapıcısı gibi düşün: sen listeye yazmadığın hiç kimseyi içeri almaz.",
                     "Think of it like a building's doorkeeper: it lets in nobody you have not written on the "
                     "list.")),
+        ]),
+        (T("CarotOS'ta güvenlik duvarı", "The firewall on CarotOS"), [
+            ("p", T("CarotOS'ta güvenlik duvarı varsayılan olarak kapalı gelir: yeni başlayanlar ağ araçlarını "
+                    "(nmap, tcpdump, hydra gibi) engelsiz denesin diye. Bu, kapalıyken hiçbir bağlantının "
+                    "engellenmediği anlamına gelir.",
+                    "On CarotOS the firewall is off by default so beginners can try network tools (nmap, tcpdump, "
+                    "hydra and others) without obstacles. While it is off, no connection is blocked.")),
+            ("uyari", T("Okul, kafe ya da otel gibi ortak bir ağdaysan güvenlik duvarını aç: Güvenlik Paneli > "
+                        "ufw > Etkinleştir, ya da terminalde sudo ufw enable.",
+                        "If you are on a shared network such as a school, café or hotel, turn the firewall on: "
+                        "Security Panel > ufw > Enable, or sudo ufw enable in a terminal.")),
         ]),
         (T("Panelde adım adım", "Step by step in the panel"), [
             ("liste", [
@@ -113,6 +131,10 @@ def konu():
         ]),
         (T("Terminalde karşılığı", "The terminal equivalent"), [
             ("kod", "sudo ufw status verbose\nsudo ufw allow 22\nsudo ufw enable"),
+            ("p", T("Güvenlik duvarı kapalıysa açmak için: sudo ufw enable (önce sudo ufw allow 22 ile ssh'a izin "
+                    "ver, uzaktan bağlıysan).",
+                    "To turn the firewall on if it is off: sudo ufw enable (first allow ssh with sudo ufw allow "
+                    "22 if you are connected remotely).")),
             ("p", T("Bir kuralı kaldırmak için: sudo ufw delete allow 22",
                     "To remove a rule: sudo ufw delete allow 22")),
         ]),

@@ -3,7 +3,7 @@
 from former_zaman import T, ayarla, balon, git, tikla
 from former_sahneler import carotpot_sahnesi
 
-KOMUT = ["python3", "/opt/carotos/carotpot/carotos-carotpot.py"]
+KOMUT = ["python3", "/opt/carotos/carotpot/carotpot-arayuz.py"]
 
 
 def konu():
@@ -17,12 +17,14 @@ def konu():
                 "scans this computer or tries usernames and passwords."), "sag"),
         tikla("p_baslat", bayrak={"baslat_diyalog": True}),
         balon("b_metin", T("Açmadan önce", "Before you turn it on"),
-              T("Tuzağı açmak, güvenlik duvarında bazı portlara izin verir ve orada sahte bir servis "
-                "dinlemeye başlar. Bu yalnızca güvendiğin ağlarda (evin, okulun laboratuvarı) güvenlidir; "
-                "bir kafede ya da otel Wi-Fi'ında açma.",
-                "Turning the trap on opens some ports in the firewall and starts a fake service listening "
-                "there. This is safe only on networks you trust (your home, a school lab); do not turn it "
-                "on at a café or hotel Wi-Fi.")),
+              T("Tuzağı açınca sahte servisler dinlemeye başlar. Güvenlik duvarında yalnızca açılan tuzak "
+                "portlarına ve yalnızca yerel ağdan gelen bağlantılara izin verilir; tuzak kapanınca bu izinler "
+                "silinir. Yine de tuzağı yalnızca güvendiğin ağlarda (evin, okulun laboratuvarı) aç; bir kafede "
+                "ya da otel Wi-Fi'ında açma.",
+                "When you turn the trap on, fake services start listening. The firewall allows only the trap "
+                "ports that were opened, and only for connections from the local network; the permissions are "
+                "removed when the trap closes. Still, turn the trap on only on networks you trust (your home, "
+                "a school lab); do not turn it on at a café or hotel Wi-Fi.")),
         tikla("b_tamam", bayrak={"baslat_diyalog": False, "acik": True}, ayarla={
             "p_hap": {"metin": T("Tuzak açık", "Trap on"), "renk": "yesil"}}),
         ayarla(_bayrak={"o1": True}),
@@ -43,6 +45,8 @@ def konu():
                 "The same address now tried an SSH login; the username and password (hidden) are shown. "
                 "This is the moment CarotPot catches, live, the kind of brute-force attempt you saw in the "
                 "hydra topic.")),
+        ayarla(_bayrak={"o3": True}),
+        ayarla(_bayrak={"o4": True}),
         tikla("cp:saldirgan", sayfa="saldirgan"),
         balon("s_kaynak1", T("Saldırgan profili", "Attacker profile"),
               T("Saldırganlar sayfası, her kaynağı tek bir profilde toplar: kaç olay ürettiği, hangi "
@@ -71,6 +75,16 @@ def konu():
                 "kuralı gibi; CarotPot bu kuralı senin yerine ekledi.",
                 "Connections from this address are now rejected — just like the “DENY” rule you saw in the "
                 "ufw topic; CarotPot added that rule for you.")),
+        tikla("cp:ayar", sayfa="ayar"),
+        git("ay_internet"),
+        balon("ay_internet", T("Bağlantı kapsamı", "Connection scope"),
+              T("Varsayılan olarak CarotPot yalnızca yerel ağdan gelen bağlantıları kabul eder; anahtar kapalıdır. "
+                "“İnternetten gelen bağlantıları da kabul et” açılırsa ve bilgisayarın internete açıksa, gerçek "
+                "saldırı denemeleri kaydedilir. Bunu yalnızca bilerek ve istediğin için aç.",
+                "By default CarotPot accepts connections only from the local network; the switch is off. If "
+                "“Also accept connections from the internet” is turned on and your computer is reachable from "
+                "the internet, real attack attempts are recorded. Turn it on only on purpose, when you want "
+                "that."), "alt"),
     ]
     bolumler = [
         (T("CarotPot nedir", "What CarotPot is"), [
@@ -106,6 +120,22 @@ def konu():
                     "trying random addresses on the internet, can create an event. The point is not to "
                     "panic: ignore it if the address is familiar, and block it if it is unfamiliar and "
                     "persistent (many login attempts, for instance).")),
+        ]),
+        (T("Hangi bağlantılar kabul edilir", "Which connections are accepted"), [
+            ("p", T("CarotPot varsayılan olarak yalnızca yerel ağdan gelen bağlantıları kabul eder. Güvenlik "
+                    "duvarında (ufw) yalnızca açılan tuzak portlarına, yalnızca yerel ağdan izin verilir; tuzak "
+                    "kapanınca bu izinler silinir.",
+                    "By default CarotPot accepts connections only from the local network. In the firewall (ufw) "
+                    "only the trap ports that were opened are allowed, and only from the local network; the "
+                    "permissions are removed when the trap closes.")),
+            ("p", T("Ayarlar > Bağlantı kapsamı > “İnternetten gelen bağlantıları da kabul et” varsayılan olarak "
+                    "kapalıdır. Açarsan ve makine internete açıksa (port yönlendirme, genel IPv6 adresi, sunucu) "
+                    "gerçek saldırı denemeleri kaydedilir. Bu ayarı yalnızca bilerek aç; değişiklik tuzak "
+                    "yeniden başlatılınca uygulanır.",
+                    "Settings > Connection scope > “Also accept connections from the internet” is off by "
+                    "default. If you turn it on and the machine is reachable from the internet (port "
+                    "forwarding, a public IPv6 address, a server), real attack attempts are recorded. Turn this "
+                    "on only on purpose; the change applies when the trap restarts.")),
         ]),
         (T("Dikkat", "Be careful"), [
             ("uyari", T("Tuzağı yalnızca kendi güvendiğin ağında aç; paylaşılan bir ağda (kafe, otel, okul "
