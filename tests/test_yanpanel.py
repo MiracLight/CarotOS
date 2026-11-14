@@ -103,16 +103,12 @@ class AcilisDumaniTesti(unittest.TestCase):
         for i in range(7):                                    # 5'ten fazla: kaydirma yolu da kurulur
             with open(os.path.join(uyg, "carotos-test%d.desktop" % i), "w") as f:
                 f.write("[Desktop Entry]\nType=Application\nName=T%d\nExec=true\nIcon=application-x-executable\n" % i)
-        ortam = dict(os.environ, XDG_DATA_DIRS=kok, XDG_RUNTIME_DIR=kok)
-        try:
-            s = subprocess.run([sys.executable, "-I", BETIK, "--dizin", uyg], env=ortam, capture_output=True,
-                               text=True, timeout=4, stdin=subprocess.DEVNULL)
-        except subprocess.TimeoutExpired as hata:
-            cikti = (hata.stderr or b"")
-            cikti = cikti.decode("utf-8", "replace") if isinstance(cikti, bytes) else cikti
-            self.assertNotIn("Traceback", cikti, cikti)      # ana dongude kaldi = acilis basarili
-            return
-        self.fail("panel kendiliginden cikti: kod %s\n%s" % (s.returncode, s.stderr))
+        ortam = dict(os.environ, XDG_DATA_DIRS=kok + ":/usr/local/share:/usr/share", XDG_RUNTIME_DIR=kok)
+        # --dene: panel acilir (kayarak girer), bir kez kaydirilir, ~1 sn sonra duzgunce cikar
+        s = subprocess.run([sys.executable, "-I", BETIK, "--dizin", uyg, "--dene"], env=ortam,
+                           capture_output=True, text=True, timeout=20, stdin=subprocess.DEVNULL)
+        self.assertEqual(s.returncode, 0, s.stderr)
+        self.assertNotIn("Traceback", s.stderr, s.stderr)
 
 
 if __name__ == "__main__":

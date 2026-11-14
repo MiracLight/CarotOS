@@ -14,7 +14,7 @@ Tek ornek: ikinci baslatma sessizce cikar.
 
 Kullanim:  carotos-yanpanel.py            paneli baslatir
            carotos-yanpanel.py --liste    gorunecek uygulamalari yazar (GTK acmaz)
-           (--dizin <klasor>: yalniz testler icin baska bir applications klasoru)
+           (--dizin <klasor>, --dene: yalniz testler icin)
 """
 import os
 import re
@@ -26,8 +26,11 @@ UYGULAMALAR = "/usr/share/applications"
 GORUNEN = 5                 # ayni anda gorunen simge
 SIMGE_BOYU = 40
 OGE_YUKSEKLIGI = 56
-KENAR_GENISLIGI = 3         # imlecin yakalandigi gorunmez serit
-GIZLEME_GECIKMESI_MS = 350
+KENAR_GENISLIGI = 6         # imlecin yakalandigi gorunmez serit
+GIZLEME_GECIKMESI_MS = 700  # imlec panelden bu kadar suredir uzaksa gizlenir
+YAKLASMA_PAYI = 28          # panelin cevresinde imlecin "hala yakin" sayildigi alan (piksel)
+ANIMASYON_MS = 170          # kayarak girme/cikma suresi
+KONTROL_MS = 80             # imlec konumu denetim araligi
 # mantik: baslangic/yonetim -> koruma ve denetim -> ogrenme -> yardimci araclar
 SIRA = (
     "carotos-welcome.desktop", "carotos-magaza.desktop",
@@ -66,8 +69,10 @@ CSS = """
 #yanpanel button { background: transparent; background-image: none; border: none; box-shadow: none;
                    border-radius: 12px; padding: 4px; }
 #yanpanel button:hover { background-color: rgba(81, 150, 214, 0.30); }
-#yanpanel button.ok { min-height: 22px; padding: 0; color: #a9d1f5; }
-#yanpanel button.ok:disabled { color: rgba(169, 209, 245, 0.25); }
+#yanpanel button.ok { min-height: 30px; padding: 0; margin: 3px 0; font-size: 16px; font-weight: bold;
+                      color: #ffffff; background-color: rgba(81, 150, 214, 0.40); border-radius: 10px; }
+#yanpanel button.ok:hover { background-color: rgba(81, 150, 214, 0.70); }
+#yanpanel button.ok:disabled { color: rgba(255, 255, 255, 0.22); background-color: rgba(81, 150, 214, 0.10); }
 #yanserit { background-color: rgba(0, 18, 57, 0.01); }
 """
 
@@ -117,8 +122,16 @@ def main(argv):
 
     class Panel:
         def __init__(self):
-            self.zamanlayici = None
+            self.gorunur = False
+            self.anim = None
+            self.denetim = None
+            self.uzak_ms = 0
             self.gorunen = min(GORUNEN, len(bilgiler))
+            self.x_gizli = -400
+            self.x_acik = 6
+            self.y = 0
+            self.genislik = 80
+            self.yukseklik = 300
             # imleci yakalayan gorunmez serit (override-redirect: tam ekranin ustunde de calisir)
             self.serit = Gtk.Window(type=Gtk.WindowType.POPUP)
             self.serit.set_name("yanserit")
@@ -133,13 +146,10 @@ def main(argv):
             self.pencere.set_app_paintable(True)
             self._rgba(self.pencere)
             self.pencere.set_keep_above(True)
-            self.pencere.add_events(Gdk.EventMask.ENTER_NOTIFY_MASK | Gdk.EventMask.LEAVE_NOTIFY_MASK)
-            self.pencere.connect("enter-notify-event", self.imlec_girdi)
-            self.pencere.connect("leave-notify-event", self.imlec_cikti)
             kutu = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
             kutu.set_border_width(8)
-            self.yukari = self._ok("▲", -1)
-            self.asagi = self._ok("▼", 1)
+            self.yukari = self._ok("\u25b2", -1)
+            self.asagi = self._ok("\u25bc", 1)
             liste = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
             for bilgi in bilgiler:
                 liste.pack_start(self._oge(bilgi), False, False, 0)
@@ -156,7 +166,8 @@ def main(argv):
             kutu.pack_start(self.kaydirici, False, False, 0)
             kutu.pack_start(self.asagi, False, False, 0)
             self.pencere.add(kutu)
-            self.konumla()
+            kutu.show_all()
+            self.olc()
 
         @staticmethod
         def _rgba(pencere):
@@ -185,41 +196,85 @@ def main(argv):
             d.connect("clicked", lambda *_: self.baslat(bilgi))
             return d
 
-        def konumla(self):
+        def olc(self):
+            """Boyut ve konumlar (calisma alani degisebilir: her gosterimde yeniden hesaplanir)."""
             alan = calisma_alani()
+            self.genislik = self.pencere.get_preferred_width()[1]
+            self.yukseklik = self.pencere.get_preferred_height()[1]
             self.serit.resize(KENAR_GENISLIGI, max(1, alan.height))
             self.serit.move(alan.x, alan.y)
-            self.pencere.resize(1, 1)
-            ust = 2 * 22 + 2 * 2 + 16 + OGE_YUKSEKLIGI * self.gorunen
-            self.pencere.move(alan.x + 6, alan.y + max(0, (alan.height - ust) // 2))
+            self.pencere.resize(self.genislik, self.yukseklik)
+            self.x_acik = alan.x + 6
+            self.x_gizli = alan.x - self.genislik - 12
+            self.y = alan.y + max(0, (alan.height - self.yukseklik) // 2)
 
-        # --- gorunurluk ---
+        # --- gorunurluk: kayarak girer/cikar; gizleme imlec konumuna bakar (GTK enter/leave olaylarina degil) ---
+        def kay(self, hedef_x, bitince=None):
+            if self.anim is not None:
+                GLib.source_remove(self.anim)
+            basla_x = self.pencere.get_position()[0]
+            t0 = GLib.get_monotonic_time()
+
+            def adim():
+                oran = min(1.0, (GLib.get_monotonic_time() - t0) / 1000.0 / ANIMASYON_MS)
+                yumusak = 1 - (1 - oran) ** 3                     # ease-out
+                self.pencere.move(int(basla_x + (hedef_x - basla_x) * yumusak), self.y)
+                if oran >= 1.0:
+                    self.anim = None
+                    if bitince:
+                        bitince()
+                    return False
+                return True
+            self.anim = GLib.timeout_add(8, adim)
+
         def goster(self, *_):
-            self.konumla()
-            self.iptal()
-            self.pencere.show_all()
+            self.uzak_ms = 0
+            if self.gorunur:
+                return
+            self.olc()
+            self.gorunur = True
+            self.pencere.move(self.x_gizli, self.y)
+            self.pencere.show()
             self.oklari_guncelle()
+            self.kay(self.x_acik)
+            if self.denetim is None:
+                self.denetim = GLib.timeout_add(KONTROL_MS, self.imlec_denetle)
 
-        def gizle(self, *_):
-            self.zamanlayici = None
-            self.pencere.hide()
-            return False
+        def gizle(self):
+            if not self.gorunur:
+                return
 
-        def iptal(self):
-            if self.zamanlayici is not None:
-                GLib.source_remove(self.zamanlayici)
-                self.zamanlayici = None
+            def bitti():
+                self.pencere.hide()
+            self.gorunur = False
+            self.kay(self.x_gizli, bitti)
 
-        def imlec_girdi(self, *_):
-            self.iptal()
+        def imlec_yakin_mi(self):
+            _, x, y = Gdk.Display.get_default().get_default_seat().get_pointer().get_position()
+            alan = calisma_alani()
+            sol = alan.x
+            sag = self.x_acik + self.genislik + YAKLASMA_PAYI
+            ust = self.y - YAKLASMA_PAYI
+            alt = self.y + self.yukseklik + YAKLASMA_PAYI
+            return sol <= x <= sag and ust <= y <= alt
 
-        def imlec_cikti(self, *_):
-            self.iptal()
-            self.zamanlayici = GLib.timeout_add(GIZLEME_GECIKMESI_MS, self.gizle)
+        def imlec_denetle(self):
+            if not self.gorunur:
+                self.denetim = None
+                return False
+            if self.imlec_yakin_mi():
+                self.uzak_ms = 0
+            else:
+                self.uzak_ms += KONTROL_MS
+                if self.uzak_ms >= GIZLEME_GECIKMESI_MS:
+                    self.denetim = None
+                    self.gizle()
+                    return False
+            return True
 
         # --- kaydirma ---
         def kaydir(self, yon):
-            self.iptal()
+            self.uzak_ms = 0
             hedef = self.ayar.get_value() + yon * OGE_YUKSEKLIGI
             ust = max(0.0, self.ayar.get_upper() - self.ayar.get_page_size())
             self.ayar.set_value(max(0.0, min(ust, hedef)))
@@ -247,6 +302,10 @@ def main(argv):
 
     panel = Panel()
     panel.serit.show_all()
+    if "--dene" in argv[1:]:                 # yalniz testler icin: ac, kaydir, birkac kare ciz, cik
+        GLib.timeout_add(100, lambda: (panel.goster(), False)[1])
+        GLib.timeout_add(500, lambda: (panel.kaydir(1), False)[1])
+        GLib.timeout_add(1000, lambda: (Gtk.main_quit(), False)[1])
     Gtk.main()
     return 0
 
