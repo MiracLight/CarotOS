@@ -442,6 +442,15 @@ class ModernlestirUygulaTesti(ModernlestirTabani):
         self.assertFalse(os.path.exists(os.path.join(self.config, "plank", "dock2")))
         self.assertFalse([k for k in self.masa.gsettings if k.startswith("dock2/")])
 
+    def test_dock_tarayici_firefoxun_kendi_simgesiyle(self):
+        # Firefox kuruluysa dock'a genel 'web tarayicisi' degil firefox-esr.desktop konur (simge ve acilan ayni)
+        self.yaz(os.path.join(self.uyg, "firefox-esr.desktop"), "[Desktop Entry]\nName=Firefox ESR\nIcon=firefox-esr\n")
+        self.assertEqual(self.calistir("uygula"), 0, self.ciktilar)
+        alt = os.path.join(self.config, "plank", "dock1", "launchers")
+        adlar = os.listdir(alt)
+        self.assertIn("carotos-firefox-esr.dockitem", adlar)
+        self.assertNotIn("carotos-xfce4-web-browser.dockitem", adlar)
+
     def test_yan_panel_autostart_ve_baslatma(self):
         yanpanel = os.path.join(self.kok, "yanpanel.py")
         self.yaz(yanpanel, "# sahte\n")

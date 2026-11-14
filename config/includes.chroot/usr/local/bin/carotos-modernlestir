@@ -66,7 +66,7 @@ YAN_DOCK = "dock2"                             # ESKI deneme: plank -n dock2 (ar
 DOCK_VARSAYILAN = (
     ("xfce4-terminal-emulator.desktop", "xfce4-terminal.desktop"),
     ("xfce4-file-manager.desktop", "thunar.desktop"),
-    ("xfce4-web-browser.desktop", "firefox-esr.desktop", "firefox.desktop"),
+    ("firefox-esr.desktop", "firefox.desktop", "xfce4-web-browser.desktop"),   # Firefox'un kendi simgesi
     ("xfce4-appfinder.desktop",),
     ("xfce4-settings-manager.desktop",),
 )
@@ -712,8 +712,10 @@ def plan_olustur(o):
             if yol:
                 secilen.append(yol)
                 break
+    grup_adlari = {ad for grup in DOCK_VARSAYILAN for ad in grup}
     for yol in panel_baslaticilari:
-        if yol not in secilen:
+        # varsayilan gruplarin bir uyesi (ornegin genel 'web tarayicisi') zaten secildiyse ikinci kez ekleme
+        if yol not in secilen and os.path.basename(yol) not in grup_adlari:
             secilen.append(yol)
     plan["gsettings"] = []
     for dock, yollar, ayarlar in (
@@ -733,7 +735,10 @@ def plan_olustur(o):
         _, mevcut = o.calistir([o.prog("gsettings"), "get", PLANK_SEMA_SABLON % dock, "dock-items"])
         # bizim ogeler ONCE ve belirlenen sirada; alt dock'ta kullanicinin mevcut diger ogeleri sonda kalir,
         # yan dock yalniz CarotOS uygulamalaridir
-        ogeler = adlar + ([a for a in _gvariant_dizi(mevcut) if a not in adlar] if dock == "dock1" else [])
+        # 'carotos-' ile baslayan eski ogeler bizimdir (yeniden uretilir): listede degilse birakilmaz
+        # (ornegin eski tarayici baslaticisi cift simge olusturmasin)
+        ogeler = adlar + ([a for a in _gvariant_dizi(mevcut)
+                           if a not in adlar and not a.startswith("carotos-")] if dock == "dock1" else [])
         on = "" if dock == "dock1" else dock + "/"
         plan["gsettings"] += [(on + k, v) for k, v in ayarlar]
         plan["gsettings"].append((on + "dock-items", "[" + ", ".join("'%s'" % a for a in ogeler) + "]"))
