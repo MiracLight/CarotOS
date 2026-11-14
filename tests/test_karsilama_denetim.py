@@ -6,6 +6,8 @@ Calistirma:  xvfb-run -a python3 tests/test_karsilama_denetim.py
 """
 import json
 import os
+import shutil
+import tempfile
 import sys
 import unittest
 
@@ -232,6 +234,56 @@ class KarsilamaDenetimTesti(UygulamaDilTabani):
         p._on_lang_pick(None, None, "de")
         self.pompala()
         self.assertEqual(p.lang_combo.get_active_id(), "de")
+
+    # -- "Sistem temasini modernlestir" anahtari ------------------------------------------
+    def test_modern_anahtar_komutlari(self):
+        import types
+        W = self.m.WelcomeWindow
+        ns = types.SimpleNamespace(TEMA_KUR=W.TEMA_KUR, MODERNLESTIR=W.MODERNLESTIR)
+        ac = W.modern_komutlari(ns, True)
+        self.assertEqual(len(ac), 2)
+        self.assertTrue(ac[0][0].endswith("pkexec"))
+        self.assertEqual(ac[0][1:], ["/usr/local/sbin/carotos-tema-kur", "kur"])        # sabit, kullanici girdisi yok
+        self.assertEqual(ac[1], ["/usr/bin/python3", "-I", "/usr/local/bin/carotos-modernlestir", "uygula"])
+        self.assertEqual(W.modern_komutlari(ns, False),
+                         [["/usr/bin/python3", "-I", "/usr/local/bin/carotos-modernlestir", "geri-al"]])
+
+    def test_modern_calistir_ilk_hatada_durur(self):
+        import types
+        W = self.m.WelcomeWindow
+        ns = types.SimpleNamespace()
+        self.assertEqual(W.modern_calistir(ns, [["/bin/true"], ["/bin/true"]]), 0)
+        self.assertEqual(W.modern_calistir(ns, [["/bin/false"], ["/bin/true"]]), 1)
+        self.assertEqual(W.modern_calistir(ns, [["/yok/boyle/komut"]]), 1)
+
+    def test_modern_gorunum_aciksa_bitir_temayi_ezmez(self):
+        ev = tempfile.mkdtemp(prefix="karsilama-ev-")
+        self.addCleanup(shutil.rmtree, ev, True)
+        eski = os.environ.get("HOME")
+        os.environ["HOME"] = ev
+        self.addCleanup(lambda: os.environ.__setitem__("HOME", eski) if eski is not None
+                        else os.environ.pop("HOME", None))
+        cagrilar = []
+        eski_xfconf = self.m.xfconf
+        self.m.xfconf = lambda *a, **k: cagrilar.append(a) or True
+        self.addCleanup(setattr, self.m, "xfconf", eski_xfconf)
+        for ad, deger in (("available_theme", lambda liste: "Arc-Dark"),            # kurulu tema varmis gibi
+                          ("available_icon_theme", lambda liste: None),
+                          ("available_cursor_theme", lambda liste: None),
+                          ("has_xfwm_variant", lambda ad: False)):
+            self.addCleanup(setattr, self.m, ad, getattr(self.m, ad))
+            setattr(self.m, ad, deger)
+        self.assertFalse(self.m.sleek_uygulanmis_mi())
+        self.m.apply_desktop_theme("dark")
+        ilk = len(cagrilar)
+        self.assertGreater(ilk, 0)                              # modern gorunum yokken tema uygulanir
+        yedek = os.path.join(ev, ".local", "state", "carotos", "sleek-yedek.json")
+        os.makedirs(os.path.dirname(yedek))
+        with open(yedek, "w") as f:
+            f.write("{}")
+        self.assertTrue(self.m.sleek_uygulanmis_mi())
+        self.assertTrue(self.m.apply_desktop_theme("dark"))
+        self.assertEqual(len(cagrilar), ilk)                    # Orchis/Papirus/imlec ezilmedi
 
     # -- yeni icerik ------------------------------------------------------------------
     def _sayfa(self, kimlik):

@@ -34,6 +34,7 @@ if _BURASI not in sys.path:
     sys.path.insert(0, _BURASI)
 import gezinme  # noqa: E402  (merkez-kol gezinme modeli: gezinme.py)
 import tema  # noqa: E402
+import yetkili  # noqa: E402  (pkexec yalnizca sistem dizinlerinde aranir)
 
 VURGU = "karsilama"                 # ortak/tema.py: marka mavisi
 
@@ -1200,6 +1201,28 @@ def _varsayilan_dil():
 DEFAULTS = {"lang": _varsayilan_dil(), "theme": "dark", "show_on_startup": True,
             "wallpaper": "", "biten_konular": []}
 
+# "Sistem temasini modernlestir" anahtari (Gorunum sayfasi): yetkili anahtar karti metinleri
+MODERN_ANAHTAR = {
+    "baslik": {"tr": "Sistem temasını modernleştir", "en": "Modernize the system theme"},
+    "alt": {
+        "tr": "Koyu modern tema, yuvarlak köşeler, yumuşak gölgeler, alt dock ve kaydırmalı yan panel. "
+              "Paketler internetten indirilir (birkaç yüz MB olabilir) ve bellek kullanımı biraz artar. "
+              "Koyu tema kullanılır; bu durumda Açık/Koyu seçimi uygulanmaz. İstediğin an kapatıp varsayılan "
+              "görünüme dönebilirsin.",
+        "en": "A modern dark theme, rounded corners, soft shadows, a bottom dock and a scrolling side panel. "
+              "Packages are downloaded from the internet (it may be a few hundred MB) and memory use goes up a "
+              "little. It uses the dark theme, so the Light/Dark choice is not applied. You can turn it off at "
+              "any time to return to the default look.",
+    },
+    "acik": {"tr": "Açık: modern görünüm uygulandı.", "en": "On: the modern look is applied."},
+    "kapali": {"tr": "Kapalı: varsayılan CarotOS görünümü.", "en": "Off: the default CarotOS look."},
+    "hata": {
+        "tr": "Değiştirilemedi (internet yok, yetki verilmedi ya da bir hata oldu). Eski görünüm korunur.",
+        "en": "Could not be changed (no internet, permission was not granted or an error occurred). The old "
+              "look is kept.",
+    },
+}
+
 # Sihirbaz ust bandindaki secicilerin yaninda gosterilen aciklama
 PICK_TEXTS = {
     "lang_heading": {"tr": "Sistem dili", "en": "System language"},
@@ -1283,6 +1306,7 @@ UI = dil.zenginlestir(UI)
 KONULAR = dil.zenginlestir(gezinme.KONULAR)
 PAGES = dil.zenginlestir(PAGES)
 SCOPE_NOTE = dil.zenginlestir(SCOPE_NOTE)
+MODERN_ANAHTAR = dil.zenginlestir(MODERN_ANAHTAR)
 LANG_CHANGED_NOTE = dil.zenginlestir(LANG_CHANGED_NOTE)
 
 # Dil kartlarinin alt yazisi (kartin dilinin Ingilizce adi; tr/en eskisi gibi)
@@ -1526,8 +1550,16 @@ def has_xfwm_variant(name):
                for root in roots)
 
 
+def sleek_uygulanmis_mi():
+    """"Sistem temasini modernlestir" uygulanmis mi? (carotos-modernlestir yedegi var mi)"""
+    return os.path.isfile(os.path.join(os.path.expanduser("~"), ".local", "state", "carotos",
+                                       "sleek-yedek.json"))
+
+
 def apply_desktop_theme(theme):
     """Masaustu temasini degistirir (kullanici duzeyinde, root gerekmez)."""
+    if sleek_uygulanmis_mi():
+        return True                   # modern gorunum kendi (koyu) temasini, simgelerini ve imlecini yonetir
     name = available_theme(DARK_THEMES if theme == "dark" else LIGHT_THEMES)
     if not name:
         return False
@@ -1932,6 +1964,13 @@ class WelcomeWindow(Gtk.Window):
             card = self._lang_card(code, dil.gorunen_ad(code, name), DIL_ALT_ADI.get(code, ""))
             self.lang_cards[code] = card
             lang_row.attach(card["event"], sira % sutun, sira // sutun, 1, 1)
+
+        # --- sistem temasini modernlestir (internetten paket indirir; geri alinabilir) ---
+        modern_kart, self.modern_anahtar = self._yetkili_anahtar(
+            MODERN_ANAHTAR, sleek_uygulanmis_mi(),
+            lambda istenen: self.modern_calistir(self.modern_komutlari(istenen)))
+        modern_kart.set_margin_top(30)
+        outer.pack_start(modern_kart, False, False, 0)
 
         # --- aciklama ---
         note = Gtk.Label(label=UI["apply_note"][self.lang], xalign=0.0)
@@ -2536,6 +2575,29 @@ class WelcomeWindow(Gtk.Window):
             return subprocess.run(komut, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=120).returncode
         except (OSError, subprocess.SubprocessError):
             return 1
+
+    TEMA_KUR = "/usr/local/sbin/carotos-tema-kur"
+    MODERNLESTIR = "/usr/local/bin/carotos-modernlestir"
+
+    def modern_komutlari(self, acik):
+        """Sirayla calisacak komutlar: ac = paketleri kur (pkexec) + gorunumu uygula; kapat = geri al."""
+        python = "/usr/bin/python3"
+        if acik:
+            pkexec = yetkili.sistem_yolu("pkexec") or "pkexec"
+            return [[pkexec, self.TEMA_KUR, "kur"], [python, "-I", self.MODERNLESTIR, "uygula"]]
+        return [[python, "-I", self.MODERNLESTIR, "geri-al"]]
+
+    def modern_calistir(self, komutlar):
+        """0: hepsi basarili; aksi halde 1. Paket indirme uzun surebilir (30 dk sinir)."""
+        for komut in komutlar:
+            try:
+                kod = subprocess.run(komut, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                     stderr=subprocess.DEVNULL, timeout=1800).returncode
+            except (OSError, subprocess.SubprocessError):
+                return 1
+            if kod != 0:
+                return 1
+        return 0
 
     UFW_AYAR = "/usr/local/sbin/carotos-ufw-ayar"
     UFW_CONF = "/etc/ufw/ufw.conf"

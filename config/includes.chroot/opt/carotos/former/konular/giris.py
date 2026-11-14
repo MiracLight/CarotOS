@@ -48,6 +48,25 @@ def konu():
                   "isolated environment."),
             ]),
         ]),
+        (T("Sistem temasını modernleştir", "Modernize the system theme"), [
+            ("p", T("Karşılama'nın “Görünüm ve dil” sayfasındaki anahtar, masaüstünü tek adımda modern bir "
+                    "görünüme geçirir: koyu tema, yuvarlak köşeler, yumuşak gölgeler, altta sistem dock'u ve "
+                    "solda kaydırmalı bir CarotOS yan paneli (imleci ekranın sol kenarına götürünce çıkar).",
+                    "The switch on the “Appearance and language” page of Welcome turns the desktop into a modern "
+                    "look in one step: a dark theme, rounded corners, soft shadows, a system dock at the bottom "
+                    "and a scrolling CarotOS side panel on the left (move the pointer to the left edge of the "
+                    "screen to show it).")),
+            ("liste", [
+                T("Gereken paketler internetten indirilir (birkaç yüz MB olabilir); bunun için bir kez "
+                  "parolanı yazarsın.",
+                  "The packages it needs are downloaded from the internet (it may be a few hundred MB); you "
+                  "type your password once for that."),
+                T("Bellek kullanımı biraz artar. Sanal makinede bulanıklık kapalı kalır.",
+                  "Memory use goes up a little. Blur stays off inside a virtual machine."),
+                T("Beğenmezsen aynı anahtarı kapat: eski ayarların aynen geri gelir.",
+                  "If you do not like it, turn the same switch off: your old settings come back exactly."),
+            ]),
+        ]),
         (T("Poligon hakkında", "About Poligon"), [
             ("not", T_POLIGON_NOTU),
         ]),
