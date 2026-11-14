@@ -242,3 +242,30 @@ Ajanlar aynı dosyaya aynı anda dokunmasın diye iş dosya sahipliğine göre b
 | Rehber | `former/`, `gsd/` | R-, D- ve içerik tablosu | Sonnet |
 
 Sıra: önce 13 yüksek bulgu ve onlarla aynı dosyadaki ortalar; sonra kalan ortalar; en son düşükler ve içerik. Sistem ekibinin değişiklikleri VM'de derleme gerektirir ve ayrıca doğrulanır.
+
+### 2.7 Düzeltme durumu (14 Kasım 2026)
+
+Bütün ekiplerin değişiklikleri yöneten oturumda okundu, testleri çalıştırıldı ve ayrı commit'lerle kaydedildi. Tam test paketi: 73 dosya, kırmızı 0. Yeni metinlerin yedi dile çevirisi: `c1a1144` (kapsam %100).
+
+| Uygulama | Commit | Kapanan | Kısmen | Bırakılan (gerekçe raporda) |
+|---|---|---|---|---|
+| Ortak | `57718f5` | O-02; `sistem_yolu`, `temiz_ortam` | — | — |
+| Sistem Sağlığı | `15b4959` | H-01…H-07, H-10…H-12 | H-08 | H-09 |
+| CarotPot | `44498ca`, `f492c6e` | C-01…C-06, Ş-3, S-04 | C-09 | C-07, C-08, C-10, C-11 |
+| Carotene / USB Denetimi | `a4103b0` | T-01…T-05, U-01…U-06, U-08, O-01, O-04 | T-07 | T-06, T-08, U-07, U-09, U-10 |
+| Güvenlik Paneli | `96e3a5b` | G-01…G-14 | — | — |
+| Komut Açıklayıcı | `250bd0b` | A-01…A-08 | A-09, A-10 | — |
+| Karşılama | `2c57add`, `d03335d` | K-02…K-07, O-03 | K-01 (root süreci iptal edilemez; bilgi verilir) | — |
+| Filenor | `8f9bec7`, `d03335d` | F-01, F-02, F-04…F-06, F-08…F-11 | F-03, F-07 | — |
+| Former / GSD | `fcc14a7` | R-01…R-07, R-09, D-01…D-03, içerik tablosu (19 hariç) | R-08 | içerik 19 (şema değişikliği) |
+| Mağaza | `cc12638`, `13e0908` | M-01…M-07 | — | — |
+| Sistem (hook, betik, etc) | `8ea4eeb`, `d03335d` | S-02, S-03, S-05…S-07 | — | S-01 (karar: ufw kapalı kalır) |
+
+14 Kasım kararları (2.5'e ek):
+- K-06: Karşılama Bitir'e basılınca bir daha kendiliğinden açılmaz; yarıda kalırsa yine gelir.
+- F-10: Filenor PyPI kurulumundan önce onay ister; `--break-system-packages` kaldırıldı.
+- M-02: parola girildikten sonra "Gizle"; yalnızca indirme aşamasında "Güvenli iptal" (yeni yardımcı `/usr/local/sbin/carotos-magaza-apt`).
+- M-06: Mağaza tek örnek; ikinci başlatma açık pencereyi öne getirir.
+- S-06: os-prober açık kalır, `update-grub` başına bir kez çalışır.
+
+Açık kalanlar: P-10 (Poligon TLS, 1.5), yukarıdaki kısmi/bırakılan düşükler, panel kapanınca root araçlarını sonlandıran yetkili sarmalayıcı (öneri). Bütün düzeltmeler VM'de derleme ve canlı/kurulu sistemde doğrulama bekliyor.
