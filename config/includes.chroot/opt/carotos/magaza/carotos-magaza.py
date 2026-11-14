@@ -14,8 +14,9 @@ Bölümler:
   * Kategoriler   — her kategori ayrı bir liste
   * Ayrıntı       — bir uygulamanın tam açıklaması, boyutu, lisansı, sitesi
 
-Yetki gereken işlemler (kur/kaldır/güncelle/yenile) `pkexec apt-get` ile
-yapılır; pkexec yoksa elle çalıştırılacak komut gösterilir.
+Yetki gereken işlemler (kur/kaldır/güncelle/yenile) `pkexec carotos-magaza-apt`
+(root yardımcısı; yoksa doğrudan `pkexec apt-get`) ile yapılır; pkexec yoksa elle
+çalıştırılacak komut gösterilir. Tek örnek çalışır (Gtk.Application).
 """
 import base64
 import json
@@ -30,7 +31,7 @@ import gi
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("GdkPixbuf", "2.0")
-from gi.repository import Gtk, Gdk, GdkPixbuf, GLib, Pango  # noqa: E402
+from gi.repository import Gtk, Gdk, GdkPixbuf, Gio, GLib, Pango  # noqa: E402
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ORTAK = os.path.join(os.path.dirname(BASE_DIR), "ortak")
@@ -154,6 +155,11 @@ METIN = {
     "simdi": {"tr": "az önce", "en": "just now"},
     "kapat": {"tr": "Kapat", "en": "Close"},
     "iptal": {"tr": "İptal", "en": "Cancel"},
+    "gizle": {"tr": "Gizle", "en": "Hide"},
+    "guvenli_iptal": {"tr": "Güvenli iptal", "en": "Safe cancel"},
+    "guvenli_iptal_suruyor": {"tr": "İndirme durduruluyor…", "en": "Stopping the download…"},
+    "guvenli_iptal_bitti": {"tr": "İptal edildi, sistemde değişiklik yapılmadı.",
+                            "en": "Cancelled. No changes were made to the system."},
     "tamamlandi": {"tr": "Tamamlandı.", "en": "Done."},
     "hata_olustu": {"tr": "İşlem başarısız oldu.", "en": "The operation failed."},
     "iptal_edilemez": {
@@ -506,6 +512,33 @@ def apt_komutu(eylem, *paketler, izinli=None):
     return [pkexec, *ortam, apt_get, *kilit, *conf, eylem, "-y", "--", *paketler]
 
 
+# --- Root yardimcisi (M-02: guvenli iptal) -----------------------------------
+# /usr/local/sbin/carotos-magaza-apt indirme asamasinda stdin'den "iptal" alir ve apt'i
+# durdurur; faz satirlariyla Magaza'ya hangi asamada oldugunu soyler.
+YARDIMCI = "/usr/local/sbin/carotos-magaza-apt"
+FAZ_ISARETI = "@@CAROTOS-FAZ "
+IPTAL_ISARETI = "@@CAROTOS-IPTAL"
+IPTAL_KODU = 75
+
+
+def yardimci_komutu(eylem, *paketler, yardimci=YARDIMCI):
+    """Yardimci betik kuruluysa `pkexec <yardimci> <eylem> -- <paketler>`; yoksa None
+    (eski kurulum: dogrudan apt_komutu yolu kullanilir, guvenli iptal sunulmaz).
+    Adlar once apt_komutu ile ayni kurallarla denetlenmis olmalidir; burada da bicim
+    denetlenir (ValueError)."""
+    if eylem not in APT_EYLEMLERI:
+        raise ValueError("gecersiz apt eylemi: %r" % (eylem,))
+    if eylem in ("upgrade", "update"):
+        paketler = ()
+    for ad in paketler:
+        if not paket_adi_gecerli(ad):
+            raise ValueError("gecersiz paket adi: %r" % (ad,))
+    pkexec = sistem_yolu("pkexec")
+    if not pkexec or not os.path.isfile(yardimci) or not os.access(yardimci, os.X_OK):
+        return None
+    return [pkexec, yardimci, eylem, *(("--", *paketler) if paketler else ())]
+
+
 def kilit_iletisi(cikti):
     """Basarisiz apt ciktisinda kilit/yarim dpkg nedenini tanir: metin anahtari ya da None.
     apt LC_ALL=C ile calistigi icin iletiler Ingilizcedir."""
@@ -621,8 +654,14 @@ def korunan_etkiler(paketler, dil_kodu):
 
 # --- İşlem penceresi (apt çıktısı) ------------------------------------------
 class IslemPenceresi(Gtk.Window):
-    def __init__(self, ebeveyn, baslik, komut, bitince, otomatik_kapan=False):
+    def __init__(self, ebeveyn, baslik, komut, bitince, otomatik_kapan=False, yardimci=False):
         super().__init__(title=baslik)
+        # yardimci: komut carotos-magaza-apt'tir; faz satirlari okunur, indirmede guvenli
+        # iptal sunulur (M-02). Faz satiri gelene kadar pkexec parola bekliyordur.
+        self.yardimci = yardimci
+        self.faz = None              # None (parola bekleniyor) | "indirme" | "kurulum"
+        self.guvenli_iptal_istendi = False
+        self._guvenli_iptal_oldu = False
         self.set_transient_for(ebeveyn)
         # Modal DEGIL: kurulum surerken magaza gezilebilir, sepete urun eklenebilir.
         # Ikinci bir apt islemi MagazaPenceresi.mesgul ile engellenir.
@@ -672,7 +711,12 @@ class IslemPenceresi(Gtk.Window):
         for k in ("top", "bottom", "start", "end"):
             getattr(alt, f"set_margin_{k}")(12)
         alt.set_halign(Gtk.Align.END)
+        self.guvenli_dugme = tema.dugme(M("guvenli_iptal"), None, self._guvenli_iptal)
+        self.gizle_dugme = tema.dugme(M("gizle"), None, self.hide)
         self.kapat_dugme = tema.dugme(M("iptal"), None, self._kapat)
+        for d in (self.guvenli_dugme, self.gizle_dugme):
+            d.set_no_show_all(True)  # yalnizca parola girildikten sonra gorunur
+            alt.pack_start(d, False, False, 0)
         alt.pack_start(self.kapat_dugme, False, False, 0)
         dis.pack_start(alt, False, False, 0)
 
@@ -699,9 +743,12 @@ class IslemPenceresi(Gtk.Window):
         boylece root apt boru dolunca takilip dpkg kilidini tutmaz, _bitti yalnizca surec
         gercekten bittiginde gelir."""
         try:
+            # Dogrudan apt'e stdin verilmez (conffile sorusu EOF alip takilmasin). Yardimcinin
+            # stdin'i yalnizca "iptal" satiri icindir; apt'i o da stdin=DEVNULL ile calistirir.
+            girdi = subprocess.PIPE if self.yardimci else subprocess.DEVNULL
             self.surec = subprocess.Popen(
-                self.komut, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT)
+                self.komut, stdin=girdi,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         except Exception as exc:  # noqa: BLE001
             self._ekle(f"\n[hata] {exc}\n")
             GLib.idle_add(self._bitti, 1)
@@ -714,7 +761,16 @@ class IslemPenceresi(Gtk.Window):
         akis = self.surec.stdout
         try:
             for satir in iter(lambda: akis.readline(self._OKUMA_PARCASI), b""):
-                self._ekle(satir.decode("utf-8", "replace"))
+                metin_ = satir.decode("utf-8", "replace")
+                if self.yardimci and metin_.startswith("@@CAROTOS-"):
+                    isaret = metin_.strip()
+                    if isaret.startswith(FAZ_ISARETI):
+                        GLib.idle_add(self._faz_degisti, isaret[len(FAZ_ISARETI):])
+                        continue
+                    if isaret == IPTAL_ISARETI:
+                        self._guvenli_iptal_oldu = True
+                        continue
+                self._ekle(metin_)
         except Exception as exc:  # noqa: BLE001
             self._ekle(f"\n[hata] {exc}\n")
             try:                     # okumayi birak ama boruyu bosaltmayi surdur
@@ -726,11 +782,47 @@ class IslemPenceresi(Gtk.Window):
             kod = self.surec.wait()
         except Exception:  # noqa: BLE001
             kod = 1
-        try:
-            akis.close()
-        except OSError:
-            pass
+        for boru in (akis, self.surec.stdin):
+            try:
+                if boru is not None:
+                    boru.close()
+            except OSError:
+                pass
         GLib.idle_add(self._bitti, kod)
+
+    def _faz_degisti(self, faz):
+        """Yardimci faz bildirdi: parola girildi, pkexec artik root (M-02 karari).
+        indirme: Gizle + Guvenli iptal; kurulum: yalnizca Gizle."""
+        if self.bitti_mi or self._yok_edildi:
+            return False
+        self.faz = faz
+        self.durdurulamaz = True     # root surece sinyal gonderilemez; Iptal yerine Gizle
+        self.kapat_dugme.hide()
+        self.gizle_dugme.show()
+        if faz == "indirme" and not self.guvenli_iptal_istendi:
+            self.guvenli_dugme.show()
+        else:
+            self.guvenli_dugme.hide()
+            if self.guvenli_iptal_istendi:   # iptal gec kaldi: indirme bitmisti
+                self.durum.set_text(self.get_title() or "")
+        return False
+
+    def _guvenli_iptal(self):
+        """Yalnizca indirme asamasinda: yardimciya "iptal" yazar; o apt'i durdurur ve
+        sistemde degisiklik yapilmadan cikar. Kurulum basladiysa hicbir sey yapmaz."""
+        if self.faz != "indirme" or self.guvenli_iptal_istendi or not self.calisiyor():
+            return
+        stdin = getattr(self.surec, "stdin", None)
+        if stdin is None:
+            return
+        try:
+            stdin.write(b"iptal\n")
+            stdin.flush()
+        except (OSError, ValueError):
+            return
+        self.guvenli_iptal_istendi = True
+        self.guvenli_dugme.set_sensitive(False)
+        self.durum.set_text(M("guvenli_iptal_suruyor"))
 
     def _bosalt(self):
         """Biriken satirlari tek seferde tampona yazar ve bir kez kaydirir."""
@@ -752,18 +844,28 @@ class IslemPenceresi(Gtk.Window):
         if self._zamanlayici is not None:
             GLib.source_remove(self._zamanlayici)
             self._zamanlayici = None
+        guvenli = self.yardimci and self._guvenli_iptal_oldu and kod == IPTAL_KODU
+        if guvenli:
+            self.iptal_edildi = True     # sistemde degisiklik yok; basarisizlik sayilmaz
         basarili = (kod == 0 and not self.iptal_edildi)
         if not self._yok_edildi:
             self._bosalt()
             self.spinner.stop()
-            self.durum.get_style_context().add_class("basari-yazi" if basarili else "hata-yazi")
-            neden = None if basarili else kilit_iletisi(self._cikti_sonu)
-            self.durum.set_text(M(neden) if neden else
-                                M("tamamlandi") if basarili else M("hata_olustu"))
-            if neden:
+            neden = None if basarili or guvenli else kilit_iletisi(self._cikti_sonu)
+            if guvenli:
+                self.durum.set_text(M("guvenli_iptal_bitti"))
+            else:
+                self.durum.get_style_context().add_class(
+                    "basari-yazi" if basarili else "hata-yazi")
+                self.durum.set_text(M(neden) if neden else
+                                    M("tamamlandi") if basarili else M("hata_olustu"))
+            if neden or guvenli:
                 self.durum.set_ellipsize(Pango.EllipsizeMode.NONE)
                 self.durum.set_line_wrap(True)
+            self.guvenli_dugme.hide()
+            self.gizle_dugme.hide()
             self.kapat_dugme.set_label(M("kapat"))
+            self.kapat_dugme.show()
             if not basarili and not self.iptal_edildi and not self.get_visible():
                 self.present()       # gizlenmis islem basarisiz bitti: kullanici gorsun
         if self.bitince:
@@ -806,7 +908,8 @@ class IslemPenceresi(Gtk.Window):
         self.durum.set_ellipsize(Pango.EllipsizeMode.NONE)
         self.durum.set_line_wrap(True)
         self.durum.set_text(M("iptal_edilemez"))
-        self.kapat_dugme.set_label(M("kapat"))
+        self.kapat_dugme.hide()          # yetki verildi: Iptal yerine Gizle (M-02 karari)
+        self.gizle_dugme.show()
 
     def _kapatiliyor(self, *_):
         """Pencere yoneticisinin x dugmesi: islem suruyorsa pencere yok edilmez, gizlenir;
@@ -953,7 +1056,9 @@ class MagazaPenceresi(Gtk.Window):
         if pb is not None:
             self.set_icon(pb)
             Gtk.Window.set_default_icon(pb)
-        self.connect("destroy", lambda *_: Gtk.main_quit())
+        # Gtk.Application altinda pencere kapaninca uygulama kendiliginden biter (M-06);
+        # eski Gtk.main dongusuyle calisiliyorsa (testler) dongu bitirilir.
+        self.connect("destroy", lambda *_: Gtk.main_level() > 0 and Gtk.main_quit())
         self.connect("delete-event", self._kapanirken)
 
         bolumler = list(BOLUMLER) + [
@@ -1356,10 +1461,21 @@ class MagazaPenceresi(Gtk.Window):
                     self.sayfa_secildi(self.aktif)
                 return False
             self._kurulu_oku(oku_bitti)
-        self._islem_baslat(M("sepet_kuruluyor", n=len(paketler)), komut, bitince)
+        self._islem_baslat(M("sepet_kuruluyor", n=len(paketler)), komut, bitince,
+                           eylem="install", paketler=paketler)
 
-    def _islem_baslat(self, baslik, komut, bitince, otomatik_kapan=False):
-        self.islem_penceresi = IslemPenceresi(self, baslik, komut, bitince, otomatik_kapan)
+    def _islem_baslat(self, baslik, komut, bitince, otomatik_kapan=False, eylem=None,
+                      paketler=()):
+        """komut: apt_komutu ciktisi (adlar denetlenmis). Root yardimcisi kuruluysa onun
+        yerine `pkexec carotos-magaza-apt` kullanilir (guvenli iptal, M-02)."""
+        yk = None
+        if eylem is not None:
+            try:
+                yk = yardimci_komutu(eylem, *paketler)
+            except ValueError:
+                yk = None
+        self.islem_penceresi = IslemPenceresi(self, baslik, yk or komut, bitince,
+                                              otomatik_kapan, yardimci=yk is not None)
         self.islem_penceresi.baslat()
 
     def _kapanirken(self, *_):
@@ -1506,7 +1622,7 @@ class MagazaPenceresi(Gtk.Window):
                     self.sayfa_secildi(self.aktif)
                 return False
             self._kurulu_oku(oku_bitti)
-        self._islem_baslat(baslik, komut, bitince)
+        self._islem_baslat(baslik, komut, bitince, eylem=islem, paketler=(u["paket"],))
 
     def depoyu_yenile(self):
         if self.mesgul:
@@ -1521,7 +1637,8 @@ class MagazaPenceresi(Gtk.Window):
         def bitince(_b):
             self._mesgul_ayarla(None)
             self._guncelleme_denetle()
-        self._islem_baslat(M("yenileniyor"), komut, bitince, otomatik_kapan=True)
+        self._islem_baslat(M("yenileniyor"), komut, bitince, otomatik_kapan=True,
+                           eylem="update")
 
     def tumunu_guncelle(self):
         if self.mesgul:
@@ -1540,7 +1657,7 @@ class MagazaPenceresi(Gtk.Window):
                 self._guncelleme_denetle()
                 return False
             self._kurulu_oku(oku_bitti)
-        self._islem_baslat(M("guncelleniyor"), komut, bitince)
+        self._islem_baslat(M("guncelleniyor"), komut, bitince, eylem="upgrade")
 
     def _pkexec_yok(self, islem, paket):
         komut = {"update": "sudo apt-get update",
@@ -1580,6 +1697,64 @@ class MagazaPenceresi(Gtk.Window):
             target=lambda: GLib.idle_add(bitti, is_()), daemon=True).start()
 
 
+UYGULAMA_KIMLIGI = "org.carotos.Magaza"
+
+
+def paket_argumani(argv):
+    """argv'deki `--paket <ad>` degeri; yoksa ya da bicimi gecersizse None."""
+    if "--paket" not in argv:
+        return None
+    try:
+        ad = argv[argv.index("--paket") + 1]
+    except (IndexError, ValueError):
+        return None
+    return ad if paket_adi_gecerli(ad) else None
+
+
+def paketi_ac(pencere, ad, gecikme=600):
+    """Katalogdaki paketin ayrinti sayfasini acar (yalnizca katalogda secim yapar)."""
+    if not ad:
+        return
+    uygulama = next((u for u in pencere.uygulamalar if u.get("paket") == ad), None)
+    if uygulama is None:
+        return
+
+    def ac():
+        pencere.detay_goster(uygulama)
+        return False
+    if gecikme:
+        # pencere yerleştikten sonra aç; açılış sırasındaki sayfa
+        # kurulumu ayrıntı sayfasının üzerine yazmasın
+        GLib.timeout_add(gecikme, ac)
+    else:
+        ac()
+
+
+class MagazaUygulamasi(Gtk.Application):
+    """Tek ornek (M-06): ikinci baslatma yeni pencere acmaz, acik pencereyi one getirir;
+    `--paket <ad>` acik pencereye iletilir."""
+
+    def __init__(self, katalog):
+        super().__init__(application_id=UYGULAMA_KIMLIGI,
+                         flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE)
+        self.katalog = katalog
+        self.pencere = None
+
+    def do_command_line(self, komut_satiri):
+        argv = komut_satiri.get_arguments()
+        ad = paket_argumani(argv)
+        if self.pencere is None:
+            self.pencere = MagazaPenceresi(self.katalog)
+            self.add_window(self.pencere)
+            self.pencere.show_all()
+            paketi_ac(self.pencere, ad)
+        else:
+            # islem surse de gezinme serbesttir (islem penceresi modal degil)
+            paketi_ac(self.pencere, ad, gecikme=0)
+            self.pencere.present()
+        return 0
+
+
 def main():
     try:
         with open(KATALOG_YOLU, encoding="utf-8") as f:
@@ -1587,23 +1762,7 @@ def main():
     except Exception as exc:  # noqa: BLE001
         print(f"Katalog okunamadi ({KATALOG_YOLU}): {exc}", file=sys.stderr)
         sys.exit(1)
-    pencere = MagazaPenceresi(katalog)
-    pencere.show_all()
-    if "--paket" in sys.argv:
-        try:
-            ad = sys.argv[sys.argv.index("--paket") + 1]
-            uygulama = next((u for u in pencere.uygulamalar
-                             if u.get("paket") == ad), None)
-            if uygulama:
-                # pencere yerleştikten sonra aç; açılış sırasındaki sayfa
-                # kurulumu ayrıntı sayfasının üzerine yazmasın
-                def ac():
-                    pencere.detay_goster(uygulama)
-                    return False
-                GLib.timeout_add(600, ac)
-        except (IndexError, ValueError):
-            pass
-    Gtk.main()
+    sys.exit(MagazaUygulamasi(katalog).run(sys.argv))
 
 
 if __name__ == "__main__":

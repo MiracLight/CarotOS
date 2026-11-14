@@ -1,0 +1,147 @@
+#!/usr/bin/python3 -I
+# -*- coding: utf-8 -*-
+"""CarotOS Mağaza'nın root yardımcısı (M-02: güvenli iptal).
+
+Mağaza bunu `pkexec /usr/local/sbin/carotos-magaza-apt <eylem> -- <paketler>` ile çalıştırır.
+Argümanlar burada yeniden ve sıkı doğrulanır; apt-get yalnızca sabit yoldan, sabit ortamla
+ve sabit seçeneklerle çağrılır. Kabuk yok. Tek dosya, yalnızca standart kütüphane (bu dosya
+root olarak çalışır; kullanıcının yazabileceği hiçbir modüle dayanmaz).
+
+Protokol (stdout, satır satır):
+  @@CAROTOS-FAZ indirme   install/upgrade: paketler indiriliyor; sisteme henüz bir şey
+                          yazılmadı. Bu sırada stdin'den "iptal" satırı gelirse apt durdurulur,
+                          "@@CAROTOS-IPTAL" yazılır ve IPTAL_KODU ile çıkılır.
+  @@CAROTOS-FAZ kurulum   asıl işlem başladı; stdin artık dinlenmez (iptal yok).
+remove/update doğrudan "kurulum" fazıyla başlar.
+"""
+import os
+import re
+import signal
+import subprocess
+import sys
+import threading
+
+sys.dont_write_bytecode = True
+
+APT_GET = "/usr/bin/apt-get"
+EYLEMLER = ("install", "remove", "upgrade", "update")
+PAKET_ADI = re.compile(r"[a-z0-9][a-z0-9+.-]+\Z")
+IPTAL_KODU = 75
+KULLANIM_KODU = 64
+FAZ = "@@CAROTOS-FAZ "
+IPTAL_ISARETI = "@@CAROTOS-IPTAL"
+ORTAM = {
+    "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+    "DEBIAN_FRONTEND": "noninteractive",
+    "LC_ALL": "C",
+    "LANGUAGE": "C",
+}
+KILIT = ["-o", "DPkg::Lock::Timeout=60"]
+CONF = ["-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold"]
+
+
+def argumanlari_coz(argv):
+    """argv (program adı hariç) -> (eylem, [paketler]); geçersizse ValueError.
+
+    Biçim: <eylem> [-- <paket>...]. install/remove en az bir paket ister, upgrade/update
+    paket almaz. Paket adı ^[a-z0-9][a-z0-9+.-]+$ olmalı."""
+    if not argv or argv[0] not in EYLEMLER:
+        raise ValueError("gecersiz eylem")
+    eylem, kalan = argv[0], list(argv[1:])
+    if kalan:
+        if kalan[0] != "--":
+            raise ValueError("paket adlari '--' ardindan verilmeli")
+        kalan = kalan[1:]
+    if eylem in ("install", "remove"):
+        if not kalan:
+            raise ValueError("paket adi verilmedi")
+    elif kalan:
+        raise ValueError("bu eylem paket adi almaz")
+    for ad in kalan:
+        if not PAKET_ADI.match(ad):
+            raise ValueError("gecersiz paket adi: %r" % (ad,))
+    if len(set(kalan)) != len(kalan):
+        raise ValueError("yinelenen paket adi")
+    return eylem, kalan
+
+
+def komutlar(eylem, paketler, apt_get=APT_GET):
+    """(indirme komutu ya da None, asıl komut)."""
+    if eylem == "update":
+        return None, [apt_get, *KILIT, "update"]
+    if eylem == "upgrade":
+        return ([apt_get, *KILIT, "upgrade", "-y", "--download-only"],
+                [apt_get, *KILIT, *CONF, "upgrade", "-y"])
+    asil = [apt_get, *KILIT, *CONF, eylem, "-y", "--", *paketler]
+    if eylem == "install":
+        return [apt_get, *KILIT, "install", "-y", "--download-only", "--", *paketler], asil
+    return None, asil
+
+
+def yaz(satir):
+    sys.stdout.write(satir + "\n")
+    sys.stdout.flush()
+
+
+def calistir(komut, ortam):
+    return subprocess.Popen(komut, stdin=subprocess.DEVNULL, env=ortam, close_fds=True)
+
+
+def indir(komut, ortam, girdi):
+    """İndirme komutunu çalıştırır; girdi'den "iptal" gelirse durdurur.
+    Dönüş: (kod, iptal_edildi_mi)."""
+    surec = calistir(komut, ortam)
+    iptal = threading.Event()
+
+    def dinle():
+        try:
+            for satir in girdi:
+                if surec.poll() is not None:
+                    return
+                if satir.strip() == "iptal":
+                    iptal.set()
+                    for imza in (signal.SIGINT, signal.SIGTERM, signal.SIGKILL):
+                        try:
+                            surec.send_signal(imza)
+                            surec.wait(5)
+                            return
+                        except subprocess.TimeoutExpired:
+                            continue
+                        except OSError:
+                            return
+                    return
+        except (OSError, ValueError):
+            return
+
+    threading.Thread(target=dinle, daemon=True).start()
+    kod = surec.wait()
+    return kod, iptal.is_set()
+
+
+def main(argv=None, girdi=None, apt_get=APT_GET, ortam=None):
+    argv = sys.argv[1:] if argv is None else argv
+    girdi = sys.stdin if girdi is None else girdi
+    ortam = dict(ORTAM) if ortam is None else ortam
+    try:
+        eylem, paketler = argumanlari_coz(argv)
+    except ValueError as exc:
+        sys.stderr.write("carotos-magaza-apt: %s\n" % exc)
+        return KULLANIM_KODU
+    if not os.path.isabs(apt_get) or not os.access(apt_get, os.X_OK):
+        sys.stderr.write("carotos-magaza-apt: apt-get bulunamadi\n")
+        return 127
+    indirme, asil = komutlar(eylem, paketler, apt_get)
+    if indirme is not None:
+        yaz(FAZ + "indirme")
+        kod, iptal = indir(indirme, ortam, girdi)
+        if iptal:
+            yaz(IPTAL_ISARETI)
+            return IPTAL_KODU
+        if kod != 0:
+            return kod
+    yaz(FAZ + "kurulum")
+    return calistir(asil, ortam).wait()
+
+
+if __name__ == "__main__":
+    sys.exit(main())
