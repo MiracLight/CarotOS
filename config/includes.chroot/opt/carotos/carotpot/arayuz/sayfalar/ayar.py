@@ -40,6 +40,21 @@ class AyarSayfasi(Sayfa):
         ust.pack_start(dis, True, True, 0)
         kok.pack_start(ust, False, False, 0)
 
+        # Kapsam: varsayilan yalnizca yerel ag; acikca istenirse internet de
+        dis, ic = tema.kart()
+        tema.kart_basligi(ic, self.t("kapsam"))
+        u = Gtk.Box(spacing=10)
+        u.pack_start(tema.etiket(self.t("internet_kabul"), "soluk", sar=True, genislik=70),
+                     True, True, 0)
+        self.internet = Gtk.Switch()
+        self.internet.set_valign(Gtk.Align.CENTER)
+        self.internet.connect("notify::active", lambda *_: self.denetle())
+        u.pack_end(self.internet, False, False, 0)
+        ic.pack_start(u, False, False, 2)
+        ic.pack_start(tema.etiket(self.t("internet_kabul_not"), "kart-alt", sar=True, genislik=90),
+                      False, False, 0)
+        kok.pack_start(dis, False, False, 0)
+
         satir = Gtk.Box(spacing=12)
         self.hata = tema.etiket("", "hata-yazi")
         satir.pack_start(tema.etiket(self.t("kaydedilecek"), "kart-alt", sar=True, genislik=90),
@@ -92,6 +107,7 @@ class AyarSayfasi(Sayfa):
         self.sakla.set_value(a["sakla_gun"])
         self.dakika.set_value(a["dakikada_olay"])
         self.webhook.set_text(a["webhook"])
+        self.internet.set_active(bool(a.get("internet_kabul")))
         self.denetle()
 
     def taslak(self):
@@ -100,6 +116,7 @@ class AyarSayfasi(Sayfa):
         yeni["sakla_gun"] = int(self.sakla.get_value())
         yeni["dakikada_olay"] = int(self.dakika.get_value())
         yeni["webhook"] = self.webhook.get_text().strip()
+        yeni["internet_kabul"] = self.internet.get_active()
         return yeni
 
     def denetle(self):

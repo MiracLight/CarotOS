@@ -216,10 +216,11 @@ M = {
                      "en": "Port {port} is used by more than one trap."},
     "en_az_bir": {"tr": "En az bir tuzak açık olmalı.", "en": "At least one trap must be on."},
     "tuzak_not": {
-        "tr": "Tuzaklar yalnızca yerel ağ adreslerinden gelen bağlantıları kaydeder. "
-              "Portlar 1024–65535 arasında olmalıdır; yetki gerektirmeyen yüksek "
+        "tr": "Tuzaklar varsayılan olarak yalnızca yerel ağ adreslerinden gelen bağlantıları "
+              "kaydeder (Ayarlar'dan internet de açılabilir). Portlar 1024–65535 arasında olmalıdır; yetki gerektirmeyen yüksek "
               "portlar kullanılır.",
-        "en": "Traps record connections only from local network addresses. Ports "
+        "en": "By default, traps record connections only from local network addresses "
+              "(the internet can be allowed in Settings). Ports "
               "must be between 1024 and 65535; high ports that need no privileges "
               "are used."},
 
@@ -440,6 +441,20 @@ M = {
     "sakla_gun": {"tr": "Olayların saklanacağı süre (gün)", "en": "How long events are kept (days)"},
     "dakikada_olay": {"tr": "Kaynak başına dakikada en fazla kayıt",
                       "en": "Maximum records per source per minute"},
+    "kapsam": {"tr": "Bağlantı kapsamı", "en": "Connection scope"},
+    "internet_kabul": {"tr": "İnternetten gelen bağlantıları da kabul et",
+                       "en": "Also accept connections from the internet"},
+    "internet_kabul_not": {
+        "tr": "Kapalıyken tuzaklar yalnızca yerel ağdaki cihazları kaydeder ve güvenlik "
+              "duvarında yalnızca yerel ağa izin açılır. Açarsanız tuzak portları her adrese "
+              "açılır; bilgisayarınız internete açıksa (port yönlendirme, genel IPv6 adresi, "
+              "sunucu) gerçek saldırı denemelerini kaydedersiniz. Yalnızca bunu bilerek "
+              "istiyorsanız açın; değişiklik tuzak yeniden başlatılınca uygulanır.",
+        "en": "When off, traps record only devices on the local network and the firewall "
+              "allows only the local network. When on, the trap ports are opened to every "
+              "address; if your computer is reachable from the internet (port forwarding, a "
+              "public IPv6 address, a server) you will record real attack attempts. Turn it on "
+              "only if you want this on purpose; the change applies when the trap restarts."},
     "gorunum": {"tr": "Görünüm", "en": "Appearance"},
     "dil": {"tr": "Dil", "en": "Language"},
     "tema": {"tr": "Tema", "en": "Theme"},
@@ -449,13 +464,13 @@ M = {
               "bunlara bağlanması için neden yoktur; bu nedenle her bağlantı şüphelidir. "
               "Gerçek bir kabuk ya da hizmet yoktur; her giriş denemesi reddedilir. "
               "Hizmet yetkisiz bir kullanıcıyla, kısıtlı bir sistem biriminde çalışır ve "
-              "yalnızca yerel ağ adreslerinden gelen bağlantıları kaydeder. Parolalar "
+              "varsayılan olarak yalnızca yerel ağ adreslerinden gelen bağlantıları kaydeder. Parolalar "
               "günlükte maskelidir.",
         "en": "CarotPot opens fake services on this computer. A real user has no reason "
               "to connect to them, so every connection is suspicious. There is no real "
               "shell or service; every login attempt is rejected. The service runs as an "
-              "unprivileged user in a restricted system unit and records connections only "
-              "from local network addresses. Passwords are masked in the log."},
+              "unprivileged user in a restricted system unit and by default records "
+              "connections only from local network addresses. Passwords are masked in the log."},
     "kaydedilecek": {"tr": "Bildirim ve kayıt ayarları yönetici onayıyla kaydedilir. Dil ve "
                            "tema hemen uygulanır.",
                      "en": "Notification and record settings are saved with administrator "

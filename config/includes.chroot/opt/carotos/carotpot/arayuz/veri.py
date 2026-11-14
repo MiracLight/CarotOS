@@ -409,16 +409,25 @@ def degisim(simdi_, once):
     return round((simdi_ - once) * 100 / once)
 
 
+def csv_hucresi(deger):
+    """Tablo programinda formul olarak calismasin (C-06): = + - @ sekme ya da
+    satir basiyla baslayan metnin onune ' konur."""
+    if isinstance(deger, str) and deger[:1] in ("=", "+", "-", "@", "\t", "\r", "\n"):
+        return "'" + deger
+    return deger
+
+
 def rapor_csv(olaylar, bas, bit):
     cikti = io.StringIO()
     y = csv.writer(cikti)
     y.writerow(["zaman", "kaynak", "hizmet", "tur", "hedef_port", "kullanici",
                 "parola_maskeli", "ayrinti"])
     for o in aralikta(olaylar, bas, bit):
-        y.writerow([datetime.fromtimestamp(o.get("ts", 0)).strftime("%Y-%m-%d %H:%M:%S"),
+        y.writerow([csv_hucresi(h) for h in (
+                    datetime.fromtimestamp(o.get("ts", 0)).strftime("%Y-%m-%d %H:%M:%S"),
                     o.get("kaynak", ""), o.get("hizmet", ""), o.get("tur", ""),
                     o.get("hedef_port") or "", o.get("kullanici") or "",
-                    o.get("parola") or "", o.get("ayrinti") or ""])
+                    o.get("parola") or "", o.get("ayrinti") or "")])
     return cikti.getvalue()
 
 

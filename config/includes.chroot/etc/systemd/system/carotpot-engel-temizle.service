@@ -4,12 +4,15 @@ Documentation=file:///opt/carotos/carotpot/carotpot-yonet
 # Sureli engeller gecici bir zamanlayiciyla kaldirilir; bilgisayar o sure
 # dolmadan kapanirsa zamanlayici kaybolur. Bu birim acilista bir kez calisir
 # ve suresi dolmus engelleri kaldirir. Engel listesi yoksa hicbir sey yapmaz.
+# Ayrica tuzak acikken bilgisayar kapandiysa (ExecStopPost calismadi) kalan
+# tuzak izinlerini siler; izin-ac bu yuzden engel listesini bos da olsa olusturur.
 ConditionPathExists=/var/lib/carotos/carotpot/engelliler.json
 After=ufw.service
 
 [Service]
 Type=oneshot
 ExecStart=/usr/bin/python3 -I /opt/carotos/carotpot/carotpot-yonet sure-denetle
+ExecStart=/usr/bin/python3 -I /opt/carotos/carotpot/carotpot-yonet izin-temizle
 # Root olarak calisir. ufw'nun yazdigi yollar (/etc/ufw, /lib/ufw) kapatilmadan
 # kalan saldiri yuzeyi daraltilir. Hata durumu artik gizlenmez
 # (SuccessExitStatus kaldirildi).

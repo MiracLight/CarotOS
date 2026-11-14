@@ -42,14 +42,22 @@ def sunucu_sinifi(kupu):
             ad = conn.get_extra_info("peername")
             self.ip, self.port = ad[0], ad[1]
             self.hport = conn.get_extra_info("sockname")[1]
-            self.izin = kupu.kabul(self.ip)
             self.bildirildi = False
+            # SSH de cekirdegin baglanti sinirina dahildir (C-01); dolu ise
+            # baglanti beklemeden kapatilir. Toplam sureyi login_timeout bagler.
+            self.yer = kupu.kabul(self.ip) and kupu.yer_al(self.ip)
+            self.izin = self.yer
             if not self.izin:
-                conn.close()
+                conn.abort()
+
+        def connection_lost(self, exc):
+            if self.yer:
+                self.yer = False
+                kupu.yer_birak(self.ip)
 
         def kayit(self, tur, ozet, **kw):
-            asyncio.ensure_future(kupu.kaydet("ssh", self.ip, self.port, self.hport,
-                                              tur, ozet, **kw))
+            kupu.arka_plan(kupu.kaydet("ssh", self.ip, self.port, self.hport,
+                                       tur, ozet, **kw))
 
         def begin_auth(self, username):
             if self.izin and not self.bildirildi:

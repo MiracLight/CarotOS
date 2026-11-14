@@ -11,11 +11,13 @@ dizininde ayri bir moduldur ve kendini farkli bir cihaz olarak tanitabilir
 
 Guvenlik ilkeleri:
   * Gercek kabuk ya da gercek hizmet yoktur; her giris denemesi reddedilir.
-  * Yalnizca ozel ag adreslerinden gelen baglantilar kaydedilir.
+  * Varsayilan olarak yalnizca ozel ag adreslerinden gelen baglantilar
+    kaydedilir; "internet_kabul" ayari acilirsa her adresten kabul edilir.
   * Yuksek portlar kullanilir; hizmet yetkisiz "carotpot" kullanicisiyla ve
     kisitli bir systemd biriminde calisir (karar D5).
-  * Okuma boyutu, sure, eszamanli baglanti ve kaynak basina olay sayisi
-    sinirlidir.
+  * Okuma boyutu, baglanti basina toplam sure, eszamanli baglanti (toplam ve
+    kaynak basina; fazlasi beklemeden kapatilir, SSH dahil), kaynak basina ve
+    genel olay hizi ile veritabani satir sayisi sinirlidir.
   * Olay gunlugunde parolalar maskelidir; tam parola yalnizca hizmetin kendi
     veritabaninda (0700 dizin) tutulur.
 
@@ -23,12 +25,13 @@ Kullanim:
   carotpot.py run   --ayar /etc/carotpot/ayarlar.json   tuzaklari baslatir (hizmet)
   carotpot.py bildir                                     oturumda bildirim gosterir,
                                                          kanarya dosyalari izler
-  carotpot.py report --since 24h                         ozet rapor
+  carotpot.py report                                     son 24 saatin ozeti
 """
 
 import argparse
 import asyncio
 import collections
+import html
 import ipaddress
 import json
 import logging
@@ -73,6 +76,9 @@ VARSAYILAN = {
     "dakikada_olay": 120,
     "webhook": "",
     "dinle": "",       # "" = tum arayuzler; Poligon laboratuvari 127.x verir
+    # False = yalnizca yerel ag (tuzak kabulu ve ufw izni ozel adres bloklari);
+    # True = internetten gelen baglantilar da kabul edilir, ufw izni her adrese
+    "internet_kabul": False,
 }
 HIZMETLER = tuzaklar.SIRA
 
@@ -113,6 +119,34 @@ def maske(s):
     if not s:
         return ""
     return s[0] + "*" * (len(s) - 1) if len(s) > 1 else "*"
+
+
+def sinir_anahtari(ip):
+    """Sinirlarin sayildigi kaynak anahtari. IPv6 /64 onekine indirgenir:
+    saldirgan ayni agda sinirsiz IPv6 adresi uretebilir (C-04)."""
+    adr = adres_coz(ip)
+    if adr is None:
+        return str(ip)
+    if adr.version == 6:
+        return str(ipaddress.ip_network(f"{adr}/64", strict=False))
+    return str(adr)
+
+
+def bildirim_arindir(metin, uzunluk=300):
+    """Masaustu bildirim govdesi: denetim karakterleri temizlenir, Pango/HTML
+    isaretlemesi kacislanir (saldirganin yazdigi ad bildirimde baglanti
+    olamasin, C-05)."""
+    return html.escape(kes(metin, uzunluk), quote=False)
+
+
+# Webhook hedefleri (Discord, Slack...) bu karakterlerle anma, baglanti ve
+# bicim uretir; saldirganin metninde etkisizlestirilir.
+_WEBHOOK_DEGISTIR = str.maketrans({"<": "‹", ">": "›", "`": "ˋ", "[": "(", "]": ")"})
+
+
+def webhook_arindir(metin, uzunluk=500):
+    metin = kes(metin, uzunluk).translate(_WEBHOOK_DEGISTIR)
+    return metin.replace("@", "@​").replace("&", "&​")
 
 
 def ayar_dogrula(veri):
@@ -174,6 +208,10 @@ def ayar_dogrula(veri):
             raise ValueError("gecersiz dinleme adresi")
         dinle = str(adr)
     sonuc["dinle"] = dinle
+    internet = veri.get("internet_kabul", False)
+    if not isinstance(internet, bool):
+        raise ValueError("gecersiz deger: internet_kabul")
+    sonuc["internet_kabul"] = internet
     return sonuc
 
 
@@ -218,9 +256,20 @@ def olay_satiri_coz(satir):
 # --------------------------------------------------------------------------
 
 class Depo:
-    def __init__(self, yol):
+    # Satir ust siniri (C-03): asilinca en eskiler silinir. Alanlar kisaltildigi
+    # icin satir basina en fazla ~1,5 KB; tipik ~250 bayt.
+    EN_COK_SATIR = 100_000
+    BUDAMA_ARALIGI = 500        # bu kadar eklemede bir sayi denetlenir
+
+    def __init__(self, yol, en_cok_satir=None):
         self.kilit = threading.Lock()
+        self.en_cok_satir = en_cok_satir or self.EN_COK_SATIR
+        self.eklenen = 0
         self.db = sqlite3.connect(str(yol), check_same_thread=False)
+        # Silinen satirlarin yeri geri verilebilsin; eski dosyada bir kez VACUUM
+        if self.db.execute("PRAGMA auto_vacuum").fetchone()[0] != 2:
+            self.db.execute("PRAGMA auto_vacuum=INCREMENTAL")
+            self.db.execute("VACUUM")
         self.db.execute(
             """CREATE TABLE IF NOT EXISTS olaylar (
                  id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL NOT NULL,
@@ -243,13 +292,37 @@ class Depo:
                 (o["ts"], o["hizmet"], o["kaynak"], o.get("kaynak_port"),
                  o.get("hedef_port"), o["tur"], o.get("kullanici"),
                  o.get("parola"), o.get("ayrinti")))
+            self.eklenen += 1
+            if self.eklenen >= self.BUDAMA_ARALIGI:
+                self.eklenen = 0
+                self._buda()
             self.db.commit()
+
+    def _buda(self):
+        """Satir sayisi siniri asildiysa en eskileri siler (kilit altinda)."""
+        say = self.db.execute("SELECT COUNT(*) FROM olaylar").fetchone()[0]
+        if say <= self.en_cok_satir:
+            return 0
+        # sinirin %90'i kalir; budama her eklemede yapilmasin
+        kalan = self.en_cok_satir * 9 // 10
+        sinir = self.db.execute("SELECT id FROM olaylar ORDER BY id DESC LIMIT 1 OFFSET ?",
+                                (kalan - 1,)).fetchone()
+        if not sinir:
+            return 0
+        c = self.db.execute("DELETE FROM olaylar WHERE id < ?", (sinir[0],))
+        self.db.commit()
+        self.db.execute("PRAGMA incremental_vacuum")
+        LOG.warning("olay veritabani siniri (%d satir) asildi; en eski %d kayit silindi",
+                    self.en_cok_satir, c.rowcount)
+        return c.rowcount
 
     def temizle(self, gun):
         with self.kilit:
             c = self.db.execute("DELETE FROM olaylar WHERE ts < ?",
                                 (time.time() - gun * 86400,))
             self.db.commit()
+            self._buda()
+            self.db.execute("PRAGMA incremental_vacuum")
             return c.rowcount
 
     def sorgu(self, sql, args=()):
@@ -262,23 +335,34 @@ class Depo:
 # --------------------------------------------------------------------------
 
 class Webhook:
+    DAKIKADA_EN_COK = 10      # kaynak sayisindan bagimsiz genel sinir (C-04)
+
     def __init__(self, adres, bekleme):
         self.adres = adres
         self.bekleme = bekleme
         self.son = {}
+        self.gonderilen = collections.deque()
 
     async def olay(self, kaynak, ozet):
         if not self.adres:
             return
         simdi = time.time()
-        if simdi - self.son.get(kaynak, 0) < self.bekleme:
+        anahtar = sinir_anahtari(kaynak)
+        if simdi - self.son.get(anahtar, 0) < self.bekleme:
             return
-        self.son[kaynak] = simdi
+        while self.gonderilen and simdi - self.gonderilen[0] > 60:
+            self.gonderilen.popleft()
+        if len(self.gonderilen) >= self.DAKIKADA_EN_COK:
+            return
+        self.gonderilen.append(simdi)
+        self.son[anahtar] = simdi
         if len(self.son) > 5000:
             for k in sorted(self.son, key=self.son.get)[:1000]:
                 del self.son[k]
-        metin = f"CarotPot: {ozet}"
-        veri = json.dumps({"text": metin, "content": metin}).encode()
+        metin = f"CarotPot: {webhook_arindir(ozet)}"
+        # allowed_mentions: Discord hicbir anmayi (@everyone dahil) islemesin
+        veri = json.dumps({"text": metin, "content": metin,
+                           "allowed_mentions": {"parse": []}}).encode()
 
         def gonder():
             istek = urllib.request.Request(self.adres, data=veri,
@@ -296,8 +380,11 @@ class Webhook:
 # --------------------------------------------------------------------------
 
 class CarotPot:
-    ZAMAN_ASIMI = 15
-    EN_COK_BAGLANTI = 64
+    ZAMAN_ASIMI = 15          # tek okuma icin
+    TOPLAM_SURE = 60          # bir baglantinin en uzun suresi (C-01)
+    EN_COK_BAGLANTI = 64      # butun tuzaklar (SSH dahil) icin eszamanli
+    KAYNAK_BASINA_BAGLANTI = 8
+    DAKIKADA_GENEL_OLAY = 1200   # kaynak sayisindan bagimsiz yazma siniri (C-03/C-04)
 
     def __init__(self, ayar, depo, gunluk):
         self.ayar = ayar
@@ -305,24 +392,70 @@ class CarotPot:
         self.gunluk = gunluk
         self.webhook = Webhook(ayar["webhook"], ayar["bekleme"])
         self.yoksay = set(ayar["yoksay"])
+        self.internet = bool(ayar.get("internet_kabul"))
         self.dinle = None      # None = tum arayuzler (calistir() belirler)
-        self.kapasite = asyncio.Semaphore(self.EN_COK_BAGLANTI)
+        self.acik_baglanti = 0
+        self.kaynak_baglanti = collections.Counter()
         self.hiz = collections.defaultdict(collections.deque)
+        self.genel_hiz = collections.deque()
+        self.son_uyari = {}
+        self.gorevler = set()     # ensure_future gorevleri cop toplanmasin (S-3)
 
     def kabul(self, ip):
         adr = adres_coz(ip)
         if adr is None or str(adr) in self.yoksay:
             return False
+        if self.internet:
+            return not (adr.is_unspecified or adr.is_multicast)
         return ozel_adres_mi(adr)
+
+    def uyar(self, anahtar, metin, *arg):
+        """Saldiri altinda gunluk selini onlemek icin dakikada bir uyari."""
+        simdi = time.time()
+        if simdi - self.son_uyari.get(anahtar, 0) >= 60:
+            self.son_uyari[anahtar] = simdi
+            LOG.warning(metin, *arg)
+
+    def yer_al(self, ip):
+        """Baglanti icin yer ayirir; dolu ise False (baglanti hemen kapatilir,
+        kuyrukta beklemez). Basarili her cagri bir yer_birak ile eslenir."""
+        anahtar = sinir_anahtari(ip)
+        if (self.acik_baglanti >= self.EN_COK_BAGLANTI
+                or self.kaynak_baglanti[anahtar] >= self.KAYNAK_BASINA_BAGLANTI):
+            self.uyar("kapasite", "baglanti siniri dolu; fazla baglantilar kapatiliyor")
+            return False
+        self.acik_baglanti += 1
+        self.kaynak_baglanti[anahtar] += 1
+        return True
+
+    def yer_birak(self, ip):
+        anahtar = sinir_anahtari(ip)
+        self.acik_baglanti = max(0, self.acik_baglanti - 1)
+        self.kaynak_baglanti[anahtar] -= 1
+        if self.kaynak_baglanti[anahtar] <= 0:
+            del self.kaynak_baglanti[anahtar]
+
+    def arka_plan(self, coro):
+        gorev = asyncio.ensure_future(coro)
+        self.gorevler.add(gorev)
+        gorev.add_done_callback(self.gorevler.discard)
+        return gorev
 
     def hiz_siniri(self, ip):
         simdi = time.time()
-        d = self.hiz[ip]
+        g = self.genel_hiz
+        while g and simdi - g[0] > 60:
+            g.popleft()
+        if len(g) >= self.DAKIKADA_GENEL_OLAY:
+            self.uyar("hiz", "genel olay siniri asildi; fazla olaylar kaydedilmiyor")
+            return False
+        d = self.hiz[sinir_anahtari(ip)]
         while d and simdi - d[0] > 60:
             d.popleft()
         if len(d) >= self.ayar["dakikada_olay"]:
             return False
         d.append(simdi)
+        g.append(simdi)
         if len(self.hiz) > 5000:
             for k in list(self.hiz)[:1000]:
                 self.hiz.pop(k, None)
@@ -339,7 +472,7 @@ class CarotPot:
                 "ayrinti": ayrinti}
         self.depo.ekle(olay)
         self.gunluk.info(olay_satiri(olay))
-        await self.webhook.olay(kaynak, f"{kaynak} -> {hizmet} ({hedef_port}): {ozet}")
+        await self.webhook.olay(kaynak, f"{kaynak} → {hizmet} ({hedef_port}): {ozet}")
 
     @staticmethod
     def uclar(w):
@@ -348,32 +481,34 @@ class CarotPot:
 
     def isleyici(self, hizmet, fonk, persona):
         """Bir tuzak modulunun isle() fonksiyonunu asyncio sunucusuna baglar:
-        kabul denetimi, eszamanlilik siniri, hata yakalama ve kapatma."""
+        kabul denetimi, eszamanlilik siniri (islemeden once; dolu ise baglanti
+        beklemeden kapatilir), toplam sure siniri, hata yakalama ve kapatma."""
         async def isle(r, w):
             try:
                 ip, port, hport = self.uclar(w)
             except (TypeError, OSError):
                 w.close()
                 return
-            if not self.kabul(ip):
-                w.close()
+            if not self.kabul(ip) or not self.yer_al(ip):
+                w.transport.abort()
                 return
 
             async def kayit(tur, ozet, kullanici=None, parola=None, ayrinti=None):
                 await self.kaydet(hizmet, ip, port, hport, tur, ozet,
                                   kullanici=kullanici, parola=parola, ayrinti=ayrinti)
 
-            async with self.kapasite:
-                try:
-                    await fonk(kayit, r, w, persona, self.ZAMAN_ASIMI)
-                except (asyncio.TimeoutError, asyncio.IncompleteReadError,
-                        asyncio.LimitOverrunError, ConnectionError, OSError,
-                        ValueError, UnicodeError):
-                    pass
-                except Exception as hata:  # noqa: BLE001 -- bir tuzak hatasi digerlerini durdurmasin
-                    LOG.error("%s tuzaginda beklenmeyen hata: %r", hizmet, hata)
-                finally:
-                    w.close()
+            try:
+                await asyncio.wait_for(fonk(kayit, r, w, persona, self.ZAMAN_ASIMI),
+                                       self.TOPLAM_SURE)
+            except (asyncio.TimeoutError, asyncio.IncompleteReadError,
+                    asyncio.LimitOverrunError, ConnectionError, OSError,
+                    ValueError, UnicodeError):
+                pass
+            except Exception as hata:  # noqa: BLE001 -- bir tuzak hatasi digerlerini durdurmasin
+                LOG.error("%s tuzaginda beklenmeyen hata: %r", hizmet, hata)
+            finally:
+                self.yer_birak(ip)
+                w.close()
         return isle
 
 
@@ -515,7 +650,52 @@ def bildirim_metni(olay, lang):
     return baslik, f"{olay['kaynak']}: {olay_aciklamasi(olay, lang)}"
 
 
+def bildirim_ozeti(n, lang):
+    """Bildirim siniri asildiginda gosterilmeyen kaynaklarin ozeti."""
+    baslik = _dilli({"tr": "CarotPot: ağda şüpheli hareket",
+                     "en": "CarotPot: suspicious activity on the network"}, lang)
+    return baslik, _dilli({"tr": f"{n} kaynak daha tuzağa dokundu. Ayrıntılar CarotPot "
+                                 f"uygulamasında.",
+                           "en": f"{n} more sources touched the trap. See the CarotPot app "
+                                 f"for details."}, lang)
+
+
+class BildirimSiniri:
+    """Kaynak sayisindan bagimsiz genel bildirim siniri (C-04): dakikada en
+    fazla DAKIKADA_EN_COK bildirim; fazlasi sayilir ve yer acilinca tek bir
+    ozet bildirimiyle gosterilir."""
+    DAKIKADA_EN_COK = 3
+
+    def __init__(self):
+        self.zamanlar = collections.deque()
+        self.bekleyen = 0
+
+    def _temizle(self, simdi):
+        while self.zamanlar and simdi - self.zamanlar[0] > 60:
+            self.zamanlar.popleft()
+
+    def izin(self, simdi):
+        self._temizle(simdi)
+        if len(self.zamanlar) >= self.DAKIKADA_EN_COK:
+            self.bekleyen += 1
+            return False
+        self.zamanlar.append(simdi)
+        return True
+
+    def ozet_al(self, simdi):
+        """Gosterilmesi gereken ozet sayisi (0 = yok)."""
+        self._temizle(simdi)
+        if not self.bekleyen or len(self.zamanlar) >= self.DAKIKADA_EN_COK:
+            return 0
+        n, self.bekleyen = self.bekleyen, 0
+        self.zamanlar.append(simdi)
+        return n
+
+
 def bildirim_goster(baslik, govde):
+    # Govde isaretleme kabul eder (xfce4-notifyd body-markup); saldirganin
+    # yazdigi metin kacislanir (C-05).
+    govde = bildirim_arindir(govde)
     if shutil.which("notify-send"):
         try:
             subprocess.run(["notify-send", "-u", "critical", "-a", "CarotPot",
@@ -535,6 +715,7 @@ def bildir(a):
     bekleme = ayar["bekleme"]
     lang = "tr" if os.environ.get("LANG", "").lower().startswith("tr") else "en"
     son = {}
+    sinir = BildirimSiniri()
     konum = None
     son_denetim = 0
     izleyici = kanarya.Izleyici()
@@ -557,12 +738,22 @@ def bildir(a):
                         konum = fh.tell()
                     for satir in satirlar:
                         olay = olay_satiri_coz(satir)
-                        if not olay or simdi - son.get(olay["kaynak"], 0) < bekleme:
+                        if not olay:
                             continue
-                        son[olay["kaynak"]] = simdi
-                        bildirim_goster(*bildirim_metni(olay, lang))
+                        anahtar = sinir_anahtari(olay["kaynak"])
+                        if simdi - son.get(anahtar, 0) < bekleme:
+                            continue
+                        son[anahtar] = simdi
+                        if len(son) > 5000:
+                            for k in sorted(son, key=son.get)[:1000]:
+                                del son[k]
+                        if sinir.izin(simdi):
+                            bildirim_goster(*bildirim_metni(olay, lang))
             except OSError:
                 pass
+            n = sinir.ozet_al(simdi)
+            if n:
+                bildirim_goster(*bildirim_ozeti(n, lang))
             if izleyici.kanarya_var_mi():
                 for olay in izleyici.bekle(2):
                     bildirim_goster(*kanarya.bildirim_metni(olay, lang))

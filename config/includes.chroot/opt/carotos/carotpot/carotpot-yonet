@@ -7,8 +7,14 @@ Yalnizca sabit komutlar calistirir; disaridan gelen tek veri IP adresi ve
 ayar JSON'udur, ikisi de ipaddress/ayar_dogrula ile dogrulanir ve komutlara
 liste argumani olarak verilir (kabuk yok).
 
-  carotpot-yonet baslat            hizmeti baslatir, ufw'de tuzak portlarini acar
+  carotpot-yonet baslat            hizmeti baslatir (ufw izinlerini birimin
+                                   ExecStartPost'u acar: izin-ac)
   carotpot-yonet durdur            hizmeti durdurur, acilan portlari kapatir
+  carotpot-yonet izin-ac           (birim, root) hizmetin GERCEKTEN actigi
+                                   portlara ufw izni verir; varsayilan kapsam
+                                   yalnizca ozel ag adres bloklari
+  carotpot-yonet izin-kapat        (birim, root) CarotPot'un ekledigi izinleri siler
+  carotpot-yonet izin-temizle      (acilis) hizmet calismiyorsa kalmis izinleri siler
   carotpot-yonet ayar              stdin'den ayar JSON'u okur ve kaydeder
   carotpot-yonet engelle IP [DK]   IP'yi ufw ile engeller (onayli eylem, D8);
                                    DK verilirse engel o kadar dakika surer
@@ -45,7 +51,34 @@ ACILAN = "/etc/carotpot/acilan_portlar.json"
 # yonlendirilebilirdi.
 ENGELLILER = "/var/lib/carotos/carotpot/engelliler.json"
 JAIL = "/etc/fail2ban/jail.d/carotos-carotpot.local"
+DURUM = CP.DURUM_DOSYASI
+HIZMET = "carotpot.service"
 ORTAM = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL": "C", "LANG": "C"}
+
+
+def _sistem_yolu_yukle():
+    """Root olarak calisacak programlar yalnizca sistem dizinlerinde aranir
+    (ortak/yetkili.py). -I ile calistigimiz icin dosyadan yuklenir; ortak/
+    yoksa ayni kural yerel olarak uygulanir."""
+    yol = os.path.join(os.path.dirname(BURASI), "ortak", "yetkili.py")
+    try:
+        spec = importlib.util.spec_from_file_location("carotos_yetkili", yol)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod.sistem_yolu
+    except (OSError, ImportError, AttributeError):
+        def sistem_yolu(ad):
+            if not isinstance(ad, str) or not ad or "/" in ad or ad.startswith("-"):
+                return None
+            for dizin in ("/usr/sbin", "/usr/bin", "/sbin", "/bin"):
+                tam = os.path.join(dizin, ad)
+                if os.path.isfile(tam) and os.access(tam, os.X_OK):
+                    return tam
+            return None
+        return sistem_yolu
+
+
+sistem_yolu = _sistem_yolu_yukle()
 
 
 def cikis(kod, **ek):
@@ -54,8 +87,13 @@ def cikis(kod, **ek):
 
 
 def calistir(komut, zaman=60):
+    # Komutlar duz adla yazilir; tam yol PATH'e bakilmadan cozulur
+    tam = komut[0] if os.path.isabs(komut[0]) else sistem_yolu(komut[0])
+    if tam is None:
+        return 127, f"{komut[0]}: bulunamadi"
     try:
-        p = subprocess.run(komut, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        p = subprocess.run([tam] + list(komut[1:]), stdout=subprocess.PIPE,
+                           stderr=subprocess.STDOUT,
                            text=True, errors="replace", timeout=zaman, env=ORTAM)
         return p.returncode, p.stdout
     except (OSError, subprocess.TimeoutExpired) as hata:
@@ -135,22 +173,89 @@ def ufw_aktif():
     return kod == 0 and "Status: active" in cikti
 
 
-def portlari_ac(portlar):
+def izin_kaynaklari(ayar):
+    """ufw izninin kaynak bloklari. Varsayilan (yalnizca yerel ag): tuzagin
+    kabul ettigi ozel adres bloklari (geri dongu haric; ufw onu zaten kabul
+    eder). internet_kabul acikken [None] = her adres (C-02 karari)."""
+    if ayar.get("internet_kabul"):
+        return [None]
+    return [str(n) for n in CP.YEREL_AGLAR if not n.is_loopback]
+
+
+def izin_komutu(port, kaynak):
+    port = int(port)
+    if kaynak is None:
+        return [f"{port}/tcp"]
+    return ["from", kaynak, "to", "any", "port", str(port), "proto", "tcp"]
+
+
+def kural_eklendi_mi(kod, cikti):
+    """ufw yinelenen kurala da 0 doner ("Skipping adding existing rule") ve
+    yorumu farkli ayni kurali "Rule updated" ile gunceller: ikisinde de kural
+    kullanicinindir, CarotPot'un sayilmaz (durdur ona dokunmamali)."""
+    return (kod == 0 and ("Rule added" in cikti or "Rule inserted" in cikti)
+            and "Skipping" not in cikti and "updated" not in cikti)
+
+
+def portlari_ac(portlar, ayar=None):
+    """Verilen portlara ufw izni ekler; yalnizca GERCEKTEN eklenen kurallar
+    kaydedilir. Kayit bicimi: [{"port": N, "kaynak": "10.0.0.0/8" | null}]."""
+    ayar = ayar if ayar is not None else CP.ayar_oku(AYAR)
     acilan = []
     if ufw_aktif():
         for port in portlar:
-            kod, _ = calistir(["ufw", "allow", f"{int(port)}/tcp", "comment", "carotpot"])
-            if kod == 0:
-                acilan.append(int(port))
+            for kaynak in izin_kaynaklari(ayar):
+                kod, cikti = calistir(["ufw", "allow"] + izin_komutu(port, kaynak)
+                                      + ["comment", "carotpot"])
+                if kural_eklendi_mi(kod, cikti):
+                    acilan.append({"port": int(port), "kaynak": kaynak})
     json_yaz(ACILAN, acilan)
     return acilan
 
 
 def portlari_kapat():
-    for port in json_oku(ACILAN, []):
-        if isinstance(port, int) and 1024 <= port <= 65535:
-            calistir(["ufw", "delete", "allow", f"{port}/tcp"])
-    json_yaz(ACILAN, [])
+    """Yalnizca CarotPot'un kendi ekledigi (ACILAN'a yazilmis) kurallari siler."""
+    kalan = []
+    for kayit in json_oku(ACILAN, []):
+        if isinstance(kayit, int):                  # eski bicim: kaynaksiz kural
+            kayit = {"port": kayit, "kaynak": None}
+        if not isinstance(kayit, dict):
+            continue
+        port, kaynak = kayit.get("port"), kayit.get("kaynak")
+        if not isinstance(port, int) or isinstance(port, bool) or not 1024 <= port <= 65535:
+            continue
+        if kaynak is not None and kaynak not in izin_kaynaklari({}):
+            continue
+        kod, _ = calistir(["ufw", "delete", "allow"] + izin_komutu(port, kaynak))
+        if kod != 0:
+            kalan.append({"port": port, "kaynak": kaynak})   # sonraki denemede yine silinir
+    json_yaz(ACILAN, kalan)
+
+
+def hizmet_acik_portlari(ayar, sure=20.0):
+    """Hizmetin durum dosyasindan GERCEKTEN dinlenen tuzak portlari (port
+    baska programdaysa o port yoktur). Dosya hizmet kullanicisinin dizininde:
+    sembolik bag izlenmez, yalnizca ayardaki portlarla kesisim alinir.
+    Zamaninda hazir olmazsa bos liste."""
+    ana_pid = os.environ.get("MAINPID", "")
+    bas = time.time()
+    while time.time() - bas < sure:
+        try:
+            fd = os.open(DURUM, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+            with os.fdopen(fd, encoding="utf-8") as fh:
+                durum = json.loads(fh.read(65536))
+            yeni = (str(durum.get("pid")) == ana_pid if ana_pid.isdigit()
+                    else durum.get("baslangic", 0) >= bas - 10)
+            acik = durum.get("acik")
+            if yeni and isinstance(acik, dict):
+                izinli = {p for p in ayar["portlar"].values() if p}
+                return sorted({p for p in acik.values()
+                               if isinstance(p, int) and not isinstance(p, bool)
+                               and p in izinli})
+        except (OSError, ValueError, AttributeError):
+            pass
+        time.sleep(0.2)
+    return []
 
 
 # --- komutlar -------------------------------------------------------------------
@@ -159,21 +264,50 @@ def k_baslat():
     ayar = CP.ayar_oku(AYAR)
     if not os.path.exists(AYAR):
         json_yaz(AYAR, ayar)
-    portlar = [p for p in ayar["portlar"].values() if p]
     portlari_kapat()
-    acilan = portlari_ac(portlar)
-    kod, cikti = calistir(["systemctl", "start", "carotpot.service"])
+    # Izinleri birimin ExecStartPost'u (izin-ac) hizmet portlari actiktan sonra
+    # ekler; boylece cokup yeniden baslamada da ayni yoldan gecer.
+    kod, cikti = calistir(["systemctl", "start", HIZMET])
     if kod != 0:
         portlari_kapat()
         cikis("__BASLATILAMADI__", cikti=cikti[-2000:])
+    acilan = sorted({k["port"] for k in json_oku(ACILAN, []) if isinstance(k, dict)})
     cikis("__TAMAM__", ufw_izinleri=acilan)
 
 
 def k_durdur():
-    kod, cikti = calistir(["systemctl", "stop", "carotpot.service"])
-    portlari_kapat()
+    kod, cikti = calistir(["systemctl", "stop", HIZMET])
+    portlari_kapat()          # ExecStopPost zaten sildi; kalan varsa
     if kod != 0:
         cikis("__DURDURULAMADI__", cikti=cikti[-2000:])
+    cikis("__TAMAM__")
+
+
+def k_izin_ac():
+    """carotpot.service ExecStartPost (root): once kalmis izinler silinir,
+    sonra yalnizca hizmetin dinleyebildigi portlar acilir."""
+    ayar = CP.ayar_oku(AYAR)
+    portlari_kapat()
+    acilan = portlari_ac(hizmet_acik_portlari(ayar), ayar)
+    if acilan and not os.path.exists(ENGELLILER):
+        # Acilistaki temizlik birimi (carotpot-engel-temizle) bu dosya varsa
+        # calisir; makine tuzak acikken kapanirsa izinler orada silinir.
+        json_yaz(ENGELLILER, [])
+    cikis("__TAMAM__", ufw_izinleri=sorted({k["port"] for k in acilan}))
+
+
+def k_izin_kapat():
+    portlari_kapat()
+    cikis("__TAMAM__")
+
+
+def k_izin_temizle():
+    """Acilista: hizmet calismiyorsa (cokme, elektrik kesintisi) kalmis
+    izinleri siler. Yalnizca hizmet kesin olarak durmussa: "activating"
+    durumunda ExecStartPost izinleri ekliyor olabilir."""
+    kod, cikti = calistir(["systemctl", "show", "-p", "ActiveState", "--value", HIZMET])
+    if kod == 0 and cikti.strip() in ("inactive", "failed"):
+        portlari_kapat()
     cikis("__TAMAM__")
 
 
@@ -184,11 +318,11 @@ def k_ayar():
     except ValueError as hata:
         cikis("__AYAR_HATASI__", ayrinti=str(hata))
     json_yaz(AYAR, ayar)
-    kod, _ = calistir(["systemctl", "is-active", "--quiet", "carotpot.service"])
+    kod, _ = calistir(["systemctl", "is-active", "--quiet", HIZMET])
     if kod == 0:
-        portlari_kapat()
-        portlari_ac([p for p in ayar["portlar"].values() if p])
-        calistir(["systemctl", "restart", "carotpot.service"])
+        # ExecStopPost eski izinleri siler, ExecStartPost yeni ayarin
+        # kapsamiyla (yerel ag / internet) yalnizca acilan portlara ekler
+        calistir(["systemctl", "restart", HIZMET])
     cikis("__TAMAM__")
 
 
@@ -329,6 +463,12 @@ def main(argv):
         k_baslat()
     elif komut == "durdur":
         k_durdur()
+    elif komut == "izin-ac":
+        k_izin_ac()
+    elif komut == "izin-kapat":
+        k_izin_kapat()
+    elif komut == "izin-temizle":
+        k_izin_temizle()
     elif komut == "ayar":
         k_ayar()
     elif komut == "engelle" and arg:

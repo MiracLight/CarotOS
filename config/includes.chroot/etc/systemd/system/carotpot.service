@@ -3,6 +3,9 @@ Description=CarotPot - CarotOS yerel ag tuzagi (bal kupu)
 Documentation=file:///opt/carotos/carotpot/carotpot.py
 After=network-online.target
 Wants=network-online.target
+# Acilistaki izin temizligi (carotpot-engel-temizle) tuzak izinlerini eklemeden
+# once bitmeli; yoksa yeni eklenen izinleri silebilir.
+After=carotpot-engel-temizle.service
 
 # Acilista kendiliginden BASLAMAZ (karar D5): hook bu birimi etkinlestirmez.
 # Kullanici CarotPot uygulamasindan tek tikla acar ve kapatir.
@@ -14,6 +17,14 @@ Group=carotpot
 ExecStart=/usr/bin/python3 -I /opt/carotos/carotpot/carotpot.py \
     --ayar /etc/carotpot/ayarlar.json --durum-dizini /var/lib/carotpot \
     --gunluk /var/log/carotpot/olaylar.log --durum-dosyasi /run/carotpot/durum.json run
+# ufw izinleri tuzagin yasam suresine baglidir (C-02): hizmet portlarini
+# actiktan sonra yalnizca GERCEKTEN dinlenen portlara izin verilir; hizmet
+# durdugunda, coktugunde ve yeniden baslarken CarotPot'un ekledigi izinler
+# silinir. "+" = root olarak, kisitlamalar olmadan (ufw /etc/ufw'ye yazar);
+# "-" = hata hizmeti durdurmaz. Elektrik kesintisinde kalan izinleri
+# acilista carotpot-engel-temizle siler.
+ExecStartPost=-+/usr/bin/python3 -I /opt/carotos/carotpot/carotpot-yonet izin-ac
+ExecStopPost=-+/usr/bin/python3 -I /opt/carotos/carotpot/carotpot-yonet izin-kapat
 Restart=on-failure
 RestartSec=5
 UMask=0022
@@ -49,6 +60,8 @@ SystemCallArchitectures=native
 SystemCallFilter=@system-service
 MemoryMax=200M
 TasksMax=64
+# Baglanti siniri 64 (C-01); veritabani, gunluk ve SSH icin pay birakilir
+LimitNOFILE=4096
 
 [Install]
 WantedBy=multi-user.target

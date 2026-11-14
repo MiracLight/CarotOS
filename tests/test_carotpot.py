@@ -366,14 +366,29 @@ class YoneticiTesti(unittest.TestCase):
             self.assertEqual(json.load(fh), [])
 
     def test_baslat_portlari_acar_durdur_kapatir(self):
+        # C-02: izinler hizmet portlari actiktan sonra (ExecStartPost: izin-ac),
+        # yalnizca dinlenen portlara ve varsayilan olarak yalnizca yerel aga acilir.
         self.assertEqual(self.cagir("baslat")["kod"], "__TAMAM__")
-        izinler = [k for k in self.komutlar if k[:2] == ["ufw", "allow"]]
-        self.assertEqual(len(izinler), len(CP.HIZMETLER))
-        self.assertIn(["ufw", "allow", "2222/tcp", "comment", "carotpot"], self.komutlar)
         self.assertIn(["systemctl", "start", "carotpot.service"], self.komutlar)
+        self.assertFalse([k for k in self.komutlar if k[:2] == ["ufw", "allow"]])
+        durum = os.path.join(self.dizin, "durum.json")
+        with open(durum, "w") as fh:
+            json.dump({"baslangic": int(time.time()), "acik": {"ssh": 2222}}, fh)
+        eski = Y.DURUM
+        Y.DURUM = durum
+        self.addCleanup(setattr, Y, "DURUM", eski)
+        eski_ag = dict(self.AG)
+        self.AG[("ufw", "allow", "from", "10.0.0.0/8", "to", "any", "port", "2222", "proto",
+                 "tcp", "comment", "carotpot")] = "Rule added\n"
+        self.addCleanup(lambda: (self.AG.clear(), self.AG.update(eski_ag)))
+        self.assertEqual(self.cagir("izin-ac")["kod"], "__TAMAM__")
+        self.assertIn(["ufw", "allow", "from", "10.0.0.0/8", "to", "any", "port", "2222",
+                       "proto", "tcp", "comment", "carotpot"], self.komutlar)
+        self.assertNotIn(["ufw", "allow", "2222/tcp", "comment", "carotpot"], self.komutlar)
         self.komutlar.clear()
         self.assertEqual(self.cagir("durdur")["kod"], "__TAMAM__")
-        self.assertIn(["ufw", "delete", "allow", "2222/tcp"], self.komutlar)
+        self.assertIn(["ufw", "delete", "allow", "from", "10.0.0.0/8", "to", "any", "port",
+                       "2222", "proto", "tcp"], self.komutlar)
         with open(Y.ACILAN) as fh:
             self.assertEqual(json.load(fh), [])
 
