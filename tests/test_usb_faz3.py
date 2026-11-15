@@ -115,5 +115,106 @@ class OrtakMotorTesti(unittest.TestCase):
             self.assertFalse(os.path.exists(os.path.join(ortak, "__pycache__")))
 
 
+def gi_yokken_yukle():
+    """gi ice aktarilamazken modulu yukler: izleme kipi GLib'e dokunursa patlar."""
+    eski = {k: sys.modules.get(k) for k in ("gi", "gi.repository")}
+    sys.modules["gi"] = None            # "import gi" ImportError verir
+    sys.modules.pop("gi.repository", None)
+    try:
+        spec = importlib.util.spec_from_file_location("usb_gisiz", YOL)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+    finally:
+        for k, v in eski.items():
+            if v is None:
+                sys.modules.pop(k, None)
+            else:
+                sys.modules[k] = v
+
+
+class IzlemeBellekTesti(unittest.TestCase):
+    """--monitor oturum boyunca acik kalir: GLib/GTK yuklememeli (~12 MB)."""
+
+    def setUp(self):
+        self.M = gi_yokken_yukle()
+        self.baglar = []                 # removable_mounts() sonucu
+        self.M.mount_entries = lambda: [{"device": d, "mount": m} for d, m in self.baglar]
+        self.M.removable_mounts = lambda: [{"device": d, "mount": m} for d, m in self.baglar]
+        self.M.device_uuid = lambda d: "uuid-" + d
+        self.baslatilan = []
+
+    def izleyici(self):
+        mon = self.M.Monitor({"lang": "tr"}, baslat=lambda yol: self.baslatilan.append(yol))
+        mon.start()
+        return mon
+
+    def test_gi_olmadan_yuklenir_ve_glib_tembel(self):
+        self.assertIsInstance(self.M.GLib, self.M._TembelGLib)
+        self.assertIsNone(self.M.gi)
+
+    def test_yeni_aygit_olay_sureci_baslatir(self):
+        mon = self.izleyici()
+        self.baglar.append(("/dev/sdb1", "/media/u/BELLEK"))
+        mon.dongu(uyku=lambda s: None, tur_sayisi=2)
+        self.assertEqual(self.baslatilan, ["/media/u/BELLEK"])
+        self.assertIsInstance(self.M.GLib, self.M._TembelGLib)   # izleme GLib yuklemedi
+
+    def test_bekleme_suresinde_tekrar_baslatmaz(self):
+        mon = self.izleyici()
+        self.baglar.append(("/dev/sdb1", "/media/u/BELLEK"))
+        mon.yokla(lambda s: None)
+        self.baglar.clear()
+        mon.yokla(lambda s: None)
+        self.baglar.append(("/dev/sdb1", "/media/u/BELLEK"))
+        mon.yokla(lambda s: None)
+        self.assertEqual(len(self.baslatilan), 1)
+
+    def test_onceden_takili_aygit_icin_baslatmaz(self):
+        self.baglar.append(("/dev/sdc1", "/media/u/ESKI"))
+        mon = self.izleyici()
+        mon.dongu(uyku=lambda s: None, tur_sayisi=2)
+        self.assertEqual(self.baslatilan, [])
+
+    def test_olay_sureci_kabuksuz_argv(self):
+        cagrilar = []
+
+        class SahtePopen:
+            def __init__(self, argv, **kw):
+                cagrilar.append((argv, kw))
+        eski = self.M.subprocess.Popen
+        self.M.subprocess.Popen = SahtePopen
+        try:
+            self.M.Monitor._olay_sureci_baslat("/media/u/-garip ad")
+        finally:
+            self.M.subprocess.Popen = eski
+        argv, kw = cagrilar[0]
+        self.assertEqual(argv[-2:], ["--olay", "/media/u/-garip ad"])
+        self.assertNotIn("shell", kw)
+
+    def test_ayar_dizini_glib_kurali(self):
+        eski = os.environ.get("XDG_CONFIG_HOME")
+        try:
+            mutlak = os.path.join(tempfile.gettempdir(), "xdg-deneme")
+            os.environ["XDG_CONFIG_HOME"] = mutlak
+            self.assertEqual(self.M._kullanici_ayar_dizini(), mutlak)
+            os.environ["XDG_CONFIG_HOME"] = "goreli/yol"          # GLib goreli yolu yok sayar
+            self.assertEqual(self.M._kullanici_ayar_dizini(),
+                             os.path.join(os.path.expanduser("~"), ".config"))
+        finally:
+            if eski is None:
+                os.environ.pop("XDG_CONFIG_HOME", None)
+            else:
+                os.environ["XDG_CONFIG_HOME"] = eski
+
+    def test_olay_argumansiz_hata(self):
+        eski = sys.argv
+        try:
+            sys.argv = ["carotos-usb-check", "--olay"]
+            self.assertEqual(self.M.main(), 1)
+        finally:
+            sys.argv = eski
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)

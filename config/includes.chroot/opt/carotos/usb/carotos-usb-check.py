@@ -15,6 +15,8 @@ bulunan dosyalara dokunulmaz, yalnizca raporlanir.
 Kullanim:
     carotos-usb-check --monitor     Arka planda izler (oturum acilisinda)
     carotos-usb-check --scan YOL    Verilen yolu denetler
+    carotos-usb-check --olay YOL    (ic kullanim) izleyicinin yeni aygit icin baslattigi
+                                    kisa omurlu surec: tarar, bildirir, isi bitince cikar
     carotos-usb-check               Bagli tum cikarilabilir aygitlari denetler
 """
 
@@ -637,12 +639,40 @@ if __name__ == "__main__" and "--audit-json" in sys.argv:
 # CSS motoru) onceden yuklenirse bosuna ~15-45 MB tutulur. Pencere
 # GERCEKTEN acilacagi an GTK yuklenir, once degil.
 #
-# GLib ayri: monitor donguisu (GLib.MainLoop, GLib.timeout_add) icin
-# gerekli ve Gtk'ye gore cok daha hafif, o yuzden ust seviyede kaliyor.
+# GLib de tembel: --monitor kipi artik GLib'siz (yalniz standart kutuphane)
+# yoklar; gi + GLib tek basina ~12 MB tutuyordu ve izleyici oturum boyunca
+# acik kalir. GLib ilk gercek kullanimda (pencere, bildirim, --olay sureci)
+# yuklenir; modul icindeki "GLib.xxx" cagrilari degismeden calisir.
 
-import gi  # noqa: E402
-gi.require_version("GLib", "2.0")
-from gi.repository import GLib  # noqa: E402
+gi = None
+
+
+def _gi_yukle():
+    global gi
+    if gi is None:
+        import gi as _gi
+        gi = _gi
+    return gi
+
+
+class _TembelGLib:
+    """Ilk oznitelik erisiminde gercek GLib'i yukler ve kendini onunla degistirir."""
+
+    def __getattr__(self, ad):
+        return getattr(_glib_yukle(), ad)
+
+
+def _glib_yukle():
+    global GLib
+    if not isinstance(GLib, _TembelGLib):
+        return GLib
+    _gi_yukle().require_version("GLib", "2.0")
+    from gi.repository import GLib as _GLib
+    GLib = _GLib
+    return _GLib
+
+
+GLib = _TembelGLib()
 
 Gtk = None
 Gdk = None
@@ -665,7 +695,7 @@ def _notify_araclari():
         return HAVE_NOTIFY
     _notify_denendi = True
     try:
-        gi.require_version("Notify", "0.7")
+        _gi_yukle().require_version("Notify", "0.7")
         from gi.repository import Notify as _Notify
         Notify = _Notify
         HAVE_NOTIFY = True
@@ -684,7 +714,7 @@ def _gtk_araclari():
     if _ResultWindowClass is not None:
         return _ResultWindowClass
 
-    gi.require_version("Gtk", "3.0")
+    _gi_yukle().require_version("Gtk", "3.0")
     from gi.repository import Gtk as _Gtk, Gdk as _Gdk
     Gtk, Gdk = _Gtk, _Gdk
 
@@ -729,7 +759,16 @@ def clamav_bulgusu(bulgu):
             "detail": dict(UI["deep_finding_detail"])}
 
 
-CONFIG_DIR = os.path.join(GLib.get_user_config_dir(), "carotos-usb")
+def _kullanici_ayar_dizini():
+    """GLib.get_user_config_dir() ile ayni kural (XDG_CONFIG_HOME mutlaksa o,
+    degilse ~/.config); GLib yuklemeden, izleme kipi hafif kalsin diye."""
+    xdg = os.environ.get("XDG_CONFIG_HOME", "")
+    if xdg and os.path.isabs(xdg):
+        return xdg
+    return os.path.join(os.path.expanduser("~"), ".config")
+
+
+CONFIG_DIR = os.path.join(_kullanici_ayar_dizini(), "carotos-usb")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "settings.json")
 def _varsayilan_dil():
     """Ilk acilis dili: sistem dili etkin (cevirisi hazir) bir dilse o, degilse
@@ -1631,16 +1670,21 @@ def send_notification(result, settings, on_details=None):
 
 
 class Monitor:
-    """Bagli aygit degisikliklerini /proc/mounts uzerinden izler."""
+    """Bagli aygit degisikliklerini /proc/mounts uzerinden izler.
 
-    def __init__(self, settings):
+    BELLEK: bu sinif oturum boyunca acik kalir, bu yuzden GLib/GTK yuklemez
+    (yalniz standart kutuphane). Yeni bir cikarilabilir aygit baglaninca
+    tarama, bildirim ve gerekirse pencere kisa omurlu ayri bir surecte
+    (--olay) yapilir; o surec isi bitince kapanir ve bellegi geri verir.
+    """
+
+    def __init__(self, settings, baslat=None):
         self.settings = settings
         self.known = {e["mount"] for e in removable_mounts()}
         self.recent = {}
-        self.windows = {}        # mount -> ResultWindow
-        self.notifications = []  # cop toplayiciya karsi tutulur
-        self.pending = None      # debounce zamanlayici kimligi
         self.snapshot = set()    # bagli aygitlarin son goruntusu
+        self.cocuklar = []       # --olay surecleri (bitenler toplanir, zombi kalmaz)
+        self._baslat = baslat or self._olay_sureci_baslat
 
     # -- baslatma ---------------------------------------------------------
 
@@ -1649,12 +1693,11 @@ class Monitor:
 
         Eski surum /proc/mounts'u GLib.IOChannel ile olay-tabanli izliyordu;
         bu desen bazi cekirdek/PyGObject surumlerinde ya hic tetiklenmez ya da
-        POLLERR yuzunden bosa dongu yapip islemciyi mesgul eder — kararsizligin
-        ana nedeni buydu. Kucuk bir dosyayi saniyede bir okumanin maliyeti
-        ihmal edilebilir ve bu yontem her cekirdekte guvenilir calisir.
+        POLLERR yuzunden bosa dongu yapip islemciyi mesgul eder. Kucuk bir
+        dosyayi saniyede bir okumanin maliyeti ihmal edilebilir ve bu yontem
+        her cekirdekte guvenilir calisir.
         """
         self.snapshot = self._snapshot()
-        GLib.timeout_add_seconds(MONITOR_POLL_SECONDS, self._poll)
         return True
 
     def _snapshot(self):
@@ -1663,45 +1706,35 @@ class Monitor:
         except Exception:  # noqa: BLE001 -- gecici okuma hatasi izleyiciyi dusurmesin
             return self.snapshot
 
-    def _poll(self):
-        """Baglama tablosu degistiyse degerlendirmeyi tetikler. Tek bir hata
-        bile izleyiciyi durdurmasin diye bastan sona korumali."""
+    def dongu(self, uyku=time.sleep, tur_sayisi=None):
+        """Yoklama dongusu. tur_sayisi yalniz testler icindir (None = sonsuz)."""
+        tur = 0
+        while tur_sayisi is None or tur < tur_sayisi:
+            tur += 1
+            uyku(MONITOR_POLL_SECONDS)
+            self.yokla(uyku)
+
+    def yokla(self, uyku=time.sleep):
+        """Baglama tablosu degistiyse kisa bir yerlesme beklemesinden sonra
+        degerlendirir. Tek bir hata bile izleyiciyi durdurmasin diye korumali."""
         try:
+            self.cocuklar = [p for p in self.cocuklar if p.poll() is None]
             current = self._snapshot()
             if current != self.snapshot:
-                self.snapshot = current
-                self._schedule()
+                # Bir baglama islemi birden cok degisiklik uretebilir; son
+                # degisiklikten kisa bir sure sonra tek seferde degerlendirilir.
+                uyku(0.5)
+                self._settled()
         except Exception as exc:  # noqa: BLE001
             print(f"[usb-check] izleme hatasi: {exc}", file=sys.stderr)
-        return True  # yoklama surekli devam etsin
-
-    def _schedule(self):
-        # Bir baglama islemi birden cok olay uretebilir; son olaydan
-        # kisa bir sure sonra tek seferde degerlendirilir.
-        if self.pending is not None:
-            GLib.source_remove(self.pending)
-        self.pending = GLib.timeout_add(500, self._settled)
 
     def _settled(self):
-        self.pending = None
-        try:
-            self.snapshot = self._snapshot()
-            current = removable_mounts()
-            points = {e["mount"] for e in current}
-
-            # Cikarilan aygitlarin penceresi kapanmaz ama kaydi temizlenir
-            for mount in list(self.windows):
-                if mount not in points:
-                    self.windows.pop(mount, None)
-
-            for entry in current:
-                if entry["mount"] not in self.known:
-                    self._handle(entry)
-
-            self.known = points
-        except Exception as exc:  # noqa: BLE001 -- degerlendirme izleyiciyi dusurmesin
-            print(f"[usb-check] degerlendirme hatasi: {exc}", file=sys.stderr)
-        return False
+        self.snapshot = self._snapshot()
+        current = removable_mounts()
+        for entry in current:
+            if entry["mount"] not in self.known:
+                self._handle(entry)
+        self.known = {e["mount"] for e in current}
 
     # -- tarama -----------------------------------------------------------
 
@@ -1714,54 +1747,79 @@ class Monitor:
         # Uzun calismada sinirsiz buyumesin: cok eski kayitlari at.
         cutoff = now - COOLDOWN_SECONDS * 40
         self.recent = {k: v for k, v in self.recent.items() if v > cutoff}
+        surec = self._baslat(entry["mount"])
+        if surec is not None:
+            self.cocuklar.append(surec)
 
-        mount = entry["mount"]
+    @staticmethod
+    def _olay_sureci_baslat(mount):
+        """Tarama + bildirim + pencere ayri surecte (argv listesi; kabuk yok)."""
+        try:
+            return subprocess.Popen(
+                [sys.executable, os.path.abspath(__file__), "--olay", mount],
+                stdin=subprocess.DEVNULL, close_fds=True)
+        except OSError as exc:
+            print(f"[usb-check] olay sureci baslatilamadi ({mount}): {exc}", file=sys.stderr)
+            return None
 
-        # Tarama ayri is parcaciginda; masaustu donmasin.
-        def worker():
-            try:
-                result = enrich(scan_path(mount), mount)
-                GLib.idle_add(self._scan_done, result)
-            except Exception as exc:  # noqa: BLE001 -- tarama hatasi izleyiciyi dusurmesin
-                print(f"[usb-check] tarama hatasi ({mount}): {exc}", file=sys.stderr)
 
-        threading.Thread(target=worker, daemon=True).start()
+# --olay sureci en fazla bu kadar bildirim tiklamasi bekler (pencere aciksa beklemez,
+# pencere kapanana kadar surer).
+OLAY_BEKLEME_SANIYE = 900
 
-    def _scan_done(self, result):
-        findings = result["findings"]
-        has_button = False
 
-        if findings or self.settings.get("notify_when_clean", True):
-            note, has_button = send_notification(
-                result, self.settings,
-                on_details=lambda: self.show_window(result))
-            if note is not None:
-                # Nesne tutulmazsa cop toplayici siler ve dugme olu kalir.
-                self.notifications.append(note)
-                if len(self.notifications) > 12:
-                    self.notifications = self.notifications[-12:]
+def run_olay(mount, settings):
+    """Izleyicinin baslattigi kisa omurlu surec: aygiti tarar, bildirir,
+    gerekirse pencere acar; bildirim ve pencere kapaninca cikar."""
+    if not os.path.isdir(mount):
+        return 1
+    result = enrich(scan_path(mount), mount)
+    findings = result["findings"]
+    loop = GLib.MainLoop()
+    durum = {"pencere": 0, "not": None}
 
-        # Pencere yalnizca "Ayrintilar" dugmesi KONULAMADIYSA acilir.
-        # Dugme varsa kararı kullaniciya birakiriz.
-        if findings and not has_button:
-            self.show_window(result)
-        return False
+    def bitti_mi():
+        if durum["pencere"] == 0 and durum["not"] is None and loop.is_running():
+            loop.quit()
 
-    def show_window(self, result):
-        mount = result.get("root")
-        existing = self.windows.get(mount)
-        if existing is not None:
-            existing.present()
-            return
-        window = _gtk_araclari()(result, self.settings, on_destroy=self._forget)
-        self.windows[mount] = window
-        window.show_all()
-        window.present()
+    def pencere_ac():
+        def kapandi(_pencere):
+            durum["pencere"] -= 1
+            bitti_mi()
+        pencere = _gtk_araclari()(result, settings, on_destroy=kapandi)
+        durum["pencere"] += 1
+        pencere.show_all()
+        pencere.present()
 
-    def _forget(self, window):
-        for mount, candidate in list(self.windows.items()):
-            if candidate is window:
-                self.windows.pop(mount, None)
+    has_button = False
+    if findings or settings.get("notify_when_clean", True):
+        note, has_button = send_notification(result, settings, on_details=pencere_ac)
+        if note is not None and has_button:
+            # "Ayrintilar" dugmesi yalniz bu surec yasarken calisir: bildirim
+            # kapanana (ya da zaman asimina) kadar beklenir.
+            durum["not"] = note
+
+            def not_kapandi(*_):
+                durum["not"] = None
+                bitti_mi()
+            note.connect("closed", not_kapandi)
+
+            def zaman_asimi():
+                durum["not"] = None
+                bitti_mi()
+                return False
+            GLib.timeout_add_seconds(OLAY_BEKLEME_SANIYE, zaman_asimi)
+
+    # Pencere yalnizca "Ayrintilar" dugmesi KONULAMADIYSA acilir.
+    if findings and not has_button:
+        pencere_ac()
+    if durum["pencere"] == 0 and durum["not"] is None:
+        return 0
+    try:
+        loop.run()
+    except KeyboardInterrupt:
+        pass
+    return 0
 
 
 # ===========================================================================
@@ -1772,9 +1830,8 @@ def run_monitor(settings):
     monitor = Monitor(settings)
     if not monitor.start():
         return 1
-    loop = GLib.MainLoop()
     try:
-        loop.run()
+        monitor.dongu()
     except KeyboardInterrupt:
         pass
     return 0
@@ -1823,6 +1880,12 @@ def main():
 
     if "--monitor" in args:
         return run_monitor(settings)
+    if "--olay" in args:
+        index = args.index("--olay")
+        if index + 1 < len(args):
+            return run_olay(args[index + 1], settings)
+        print("--olay bir baglama noktasi bekliyor", file=sys.stderr)
+        return 1
     if "--scan" in args:
         index = args.index("--scan")
         if index + 1 < len(args):
