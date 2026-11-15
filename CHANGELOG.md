@@ -24,6 +24,8 @@ sayılmamıştır.
 - **Carot Sleek:** isteğe bağlı modern masaüstü teması ve CarotOS Yan Paneli.
 - **Sistem Sağlığı:** ağ keşfi (mDNS) aç-kapat; beklenen masaüstü dinleyicileri
   puanı düşürmez; 24 denetim. Mağaza 220 uygulama, GSD 197 terim.
+- **Pil göstergesi:** dizüstünde sağ üstte (sistem tepsisi), masaüstünde çıkmaz
+  (`xfce4-power-manager`).
 - **Çeviri:** yedi dilde arayüz (de, fr, es, pt, ru, ja, zh), %100 kapsam.
 - **Açılış:** Plymouth teması, GRUB 5/30 sn + os-prober, sessiz açılış,
   `i915.fastboot=1`.
