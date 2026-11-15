@@ -242,6 +242,41 @@ sudo /tmp/VBoxLinuxAdditions.run
 sudo reboot
 ```
 
+## Açılış ekranı sorun giderme
+
+CarotOS, açılış animasyonunun (Plymouth) titremeden ve kararlı açılması için çekirdek parametrelerinde
+`i915.fastboot=1` kullanır. Bu ayar yalnızca **Intel ekran kartlı** bilgisayarlarda etkilidir: Intel
+sürücüsü GRUB'un açtığı ekran modunu yeniden kullanır, böylece açılışta ikinci bir ekran modu değişimi
+(beliren ve kaybolan görüntü) olmaz. Yeni Intel kartlarda çekirdek bunu zaten kendiliğinden açar; Intel
+olmayan kartlarda ve sanal makinede hiçbir etkisi yoktur. Gerçek donanımda Toshiba Satellite C660
+(Intel Ironlake, eski BIOS) üzerinde sınanmıştır; çok eski bazı Intel kartlarda sınanmamıştır.
+
+**Belirti:** Açılışta ekran siyah kalıyor, bozuk ya da kaymış görünüyor ve giriş ekranına geçmiyor.
+
+**1) O açılış için geçici çözüm** (parola ya da başka bir şey gerekmez):
+
+1. Bilgisayarı yeniden başlatın. GRUB menüsü açılınca **CarotOS** satırı seçiliyken klavyeden `e` tuşuna basın.
+2. `linux` ile başlayan satırı bulun. Satırın sonundaki `i915.fastboot=1` ifadesini silin
+   (`Backspace` ile yalnızca o ifadeyi ve önündeki boşluğu).
+3. `Ctrl+X` (ya da `F10`) ile bu ayarsız açın. Değişiklik yalnızca bu açılış için geçerlidir.
+
+**2) Kalıcı olarak kaldırma** (sistem açıldıktan sonra terminalde, sırayla):
+
+```
+sudo sed -i 's/ i915.fastboot=1//' /etc/default/grub.d/carotos.cfg
+sudo update-grub
+```
+
+Kontrol: aşağıdaki satırda `i915.fastboot=1` görünmemelidir.
+
+```
+grep GRUB_CMDLINE_LINUX_DEFAULT /etc/default/grub.d/carotos.cfg
+```
+
+Not: CarotOS'u yeniden kurarsanız (yeni ISO) ayar geri gelir; adımları yeniden uygulayın.
+Sorunu, bilgisayarınızın modeliyle birlikte [GitHub'da](https://github.com/MiracLight/CarotOS/issues)
+bildirirseniz ayarı o kartlar için kapatabiliriz.
+
 ## Kendiniz derlemek
 
 CarotOS, Debian'ın `live-build` aracıyla üretilir. Derleme adımları,

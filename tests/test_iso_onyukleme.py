@@ -81,6 +81,22 @@ class GrubAyariTesti(unittest.TestCase):
         self.assertNotIn("noresume", p)                            # hibernate sonrasi is kaybi riski
         self.assertNotIn("systemd.show_status=auto", p)
 
+    def test_i915_fastboot_ve_sorun_giderme_notu(self):
+        """Titrek acilis animasyonu icin i915.fastboot=1 (gercek donanimda sinandi); sorun cikarsa kaldirma
+        adimlari README'de yazili olmali ve sed komutu cfg'deki gercek satirda calisip parametreyi silmeli."""
+        sat = [s for s in kod_satirlari(self.cfg) if s.startswith("GRUB_CMDLINE_LINUX_DEFAULT")][0]
+        p = re.search(r'"([^"]*)"', sat).group(1).split()
+        self.assertIn("i915.fastboot=1", p)
+        with open(os.path.join(KOK, "README.md"), encoding="utf-8") as f:
+            readme = f.read()
+        bolum = readme.split("## Açılış ekranı sorun giderme", 1)[1].split("\n## ", 1)[0]
+        for gerekli in ("`e` tuşuna", "Ctrl+X", "update-grub", "/etc/default/grub.d/carotos.cfg"):
+            self.assertIn(gerekli, bolum)
+        # README'deki sed komutu gercek satirdan parametreyi siler, digerlerine dokunmaz
+        sonuc = re.sub(r" i915\.fastboot=1", "", sat)
+        self.assertNotIn("i915", sonuc)
+        self.assertIn('quiet splash loglevel=3 systemd.show_status=error vt.global_cursor_default=0"', sonuc)
+
     def test_ana_grub_dosyasi_yok(self):
         self.assertFalse(os.path.exists(os.path.join(INC, "etc", "default", "grub")))
 
