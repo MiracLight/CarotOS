@@ -434,6 +434,16 @@ def _ufw_izinli_portlar():
 
 
 def check_listening_ports():
+    """Dinlenen portlar + (avahi kuruluysa) ag kesfi durumu: karttaki ac/kapat dugmesi buna bakar."""
+    sonuc = _dinleyen_portlar()
+    if have("avahi-daemon"):
+        _, avahi = run(["systemctl", "is-active", "avahi-daemon"])
+        _, soket = run(["systemctl", "is-active", "avahi-daemon.socket"])
+        sonuc["mdns"] = "active" if "active" in (avahi.strip(), soket.strip()) else "inactive"
+    return sonuc
+
+
+def _dinleyen_portlar():
     code, out = run(["ss", "-tulnpH"])
     if code != 0:
         return {"status": INFO, "unknown": True,
@@ -1429,6 +1439,22 @@ CHECKS = [
                 "en": "Every externally exposed port is an entry point. Only the "
                       "ones you need should be open."},
         "fix": "sudo ss -tulnp",       # hangi programin dinledigini gosterir; gereksizse o servisi kapatin
+        # Ag kesfi (mDNS/avahi) anahtari: varsayilan ACIK kalir (yazici/cihaz kesfi calissin); kapatmak
+        # gizlilik icindir. Dugme sonucun "mdns" durumuna gore secilir (ac / kapat), geri alinabilir.
+        "mdns": {
+            "active": {"cmd": "systemctl disable --now avahi-daemon.socket avahi-daemon.service",
+                       "label": {"tr": "Ağ keşfini kapat", "en": "Turn off network discovery"},
+                       "confirm": True,
+                       "note": {"tr": "Ağdaki yazıcılar ve cihazlar kendiliğinden bulunmaz, ad.local adresleri "
+                                      "çalışmaz. Bilgisayarının adı ağda duyurulmaz. İstediğin an bu karttan "
+                                      "tekrar açabilirsin.",
+                                "en": "Printers and devices on the network will no longer be found automatically, "
+                                      "and name.local addresses stop working. Your computer's name is no longer "
+                                      "announced on the network. You can turn it back on from this card at any time."}},
+            "inactive": {"cmd": "systemctl enable --now avahi-daemon.socket avahi-daemon.service",
+                         "label": {"tr": "Ağ keşfini aç", "en": "Turn on network discovery"},
+                         "confirm": False},
+        },
     },
     {
         "id": "fail2ban", "category": "network", "func": check_fail2ban,
@@ -2140,6 +2166,15 @@ class HealthWindow(Gtk.Window):
             top.pack_end(off_btn, False, False, 0)
             top.pack_end(off_bar, False, False, 0)
             self.job_attach(("fix", meta["id"]), off_btn, off_bar)
+        # Ag kesfi (mDNS) anahtari: kapaliysa "ac" (ana dugme), aciksa "kapat" (tehlike dugmesi)
+        mdns = (meta.get("mdns") or {}).get(result.get("mdns")) if meta else None
+        if mdns:
+            mdns_btn = tema.dugme(mdns["label"][self.lang], "tehlike" if result["mdns"] == "active" else "ana",
+                                  self.on_fix, meta, mdns)
+            mdns_bar = self.new_bar()
+            top.pack_end(mdns_btn, False, False, 0)
+            top.pack_end(mdns_bar, False, False, 0)
+            self.job_attach(("fix", meta["id"]), mdns_btn, mdns_bar)
         ic.pack_start(top, False, False, 0)
 
         ic.pack_start(tema.etiket(result["detail"][self.lang], None, sar=True, genislik=96),

@@ -203,6 +203,13 @@ PAGES = [
                  "en": "When checking for updates, apt also connects to the CarotOS repository "
                        "(apt.carotos.org) besides Debian. These requests appear in the server log; "
                        "CarotOS does not collect usage data."},
+                {"tr": "Ağ keşfi (mDNS/avahi) varsayılan olarak açıktır, böylece ağdaki yazıcılar bulunur. "
+                       "Bilgisayarının adını ağda duyurmasını istemezsen Sistem Sağlığı'nda “Dinlenen "
+                       "portlar” kartındaki düğmeyle kapatabilir, istediğin an tekrar açabilirsin.",
+                 "en": "Network discovery (mDNS/avahi) is on by default so that printers on the network "
+                       "are found. If you do not want your computer's name announced on the network, you can "
+                       "turn it off with the button on the “Listening ports” card in System Health, and turn "
+                       "it back on at any time."},
             ]),
             ("mac_anahtar", {
                 "baslik": {"tr": "Her ağ için farklı sahte donanım adresi (MAC)",

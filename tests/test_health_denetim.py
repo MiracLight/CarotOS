@@ -378,6 +378,38 @@ class H10DinlenenPortlar(Taban):
         durum["ufw"] += "8080/tcp   ALLOW   Anywhere\n"
         self.assertEqual(H.check_listening_ports()["status"], H.WARN)
 
+    def _avahi(self, kurulu, servis, soket="inactive"):
+        def run(cmd, timeout=12, env=None):
+            if cmd[0] == "ss":
+                return 0, ""
+            if cmd[:2] == ["systemctl", "is-active"]:
+                return 0, {"avahi-daemon": servis, "avahi-daemon.socket": soket}.get(cmd[2], "inactive")
+            return 1, ""
+        self.kur(run=run, have=lambda b: kurulu)
+
+    def test_ag_kesfi_durumu_sonuca_yazilir(self):
+        self._avahi(True, "active")
+        self.assertEqual(H.check_listening_ports()["mdns"], "active")
+        self._avahi(True, "inactive", soket="active")        # yalniz soket etkin: istek gelince acilir
+        self.assertEqual(H.check_listening_ports()["mdns"], "active")
+        self._avahi(True, "inactive")
+        self.assertEqual(H.check_listening_ports()["mdns"], "inactive")
+
+    def test_avahi_kurulu_degilse_dugme_icin_durum_yok(self):
+        self._avahi(False, "inactive")
+        self.assertNotIn("mdns", H.check_listening_ports())
+
+    def test_ag_kesfi_dugmesi_tanimi(self):
+        meta = [m for m in H.CHECKS if m["id"] == "ports"][0]
+        kapat, ac = meta["mdns"]["active"], meta["mdns"]["inactive"]
+        self.assertIn("disable --now avahi-daemon.socket avahi-daemon.service", kapat["cmd"])
+        self.assertIn("enable --now avahi-daemon.socket avahi-daemon.service", ac["cmd"])
+        self.assertTrue(kapat["confirm"])                    # kapatmadan once onay + etkiler yazilir
+        self.assertIn("note", kapat)
+        self.assertFalse(ac["confirm"])                      # geri acmak zararsiz
+        for e in (kapat, ac):
+            self.assertTrue(e["label"]["tr"] and e["label"]["en"] and e["label"]["de"])   # 7 dile cevrilmis
+
     def test_oneri_komutu_sureci_gosterir(self):
         meta = [m for m in H.CHECKS if m["id"] == "ports"][0]
         self.assertEqual(meta["fix"], "sudo ss -tulnp")
