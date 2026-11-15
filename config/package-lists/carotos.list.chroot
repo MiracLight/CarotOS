@@ -23,6 +23,7 @@ gir1.2-gtk-3.0
 polkitd
 pkexec
 git
+rsync
 librsvg2-bin
 libxml-writer-perl
 network-manager

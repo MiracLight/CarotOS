@@ -1,0 +1,19 @@
+#!/bin/sh
+set -e
+
+# CarotOS Kurtarma: "sistemi son kaydedilen kararli noktaya dondur" araci
+# (Linux Mint'in Timeshift'i, Windows'un Sistem Geri Yukleme'siyle ayni fikir;
+# rsync + sabit bag ile artimli nokta, disk duzeni degismez). bkz. docs/KURTARMA.md
+
+chmod 755 /opt/carotos/kurtarma/carotos-kurtarma.py /opt/carotos/kurtarma/carotos-kurtarma-yonet
+chmod 644 /opt/carotos/kurtarma/kurtarma_motor.py
+chmod 644 /usr/share/applications/carotos-kurtarma.desktop
+
+# apt kancasi: her kurulum/guncellemeden once otomatik nokta acar (varsayilan
+# ayarla acik; Kurtarma > Ayarlar'dan kapatilabilir). Sessizce eksik kalmasin.
+chmod 644 /etc/apt/apt.conf.d/50carotos-kurtarma
+grep -q 'carotos-kurtarma-yonet oto-guncelleme-oncesi' /etc/apt/apt.conf.d/50carotos-kurtarma \
+    || { echo "CarotOS HATA: apt kancasi (50carotos-kurtarma) beklenen komutu icermiyor." >&2; exit 1; }
+
+update-desktop-database /usr/share/applications || true
+echo "CarotOS: Kurtarma yerlestirildi."

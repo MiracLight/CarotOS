@@ -1,0 +1,7 @@
+// CarotOS Kurtarma: her apt kurulum/guncellemesinden HEMEN ONCE otomatik bir
+// kurtarma noktasi acar (Windows'un Sistem Geri Yukleme'sinin guncelleme
+// oncesi nokta almasiyla ayni fikir). Komut KENDI icinde ayari (Kurtarma
+// uygulamasi > Ayarlar) kontrol eder ve kapaliysa ya da son nokta cok
+// yakinsa sessizce hicbir sey yapmaz. "|| true": bu adim HICBIR KOSULDA
+// apt islemini durdurmamalidir (disk dolu, program eksik vb.).
+DPkg::Pre-Invoke {"/opt/carotos/kurtarma/carotos-kurtarma-yonet oto-guncelleme-oncesi >/dev/null 2>&1 || true";};
