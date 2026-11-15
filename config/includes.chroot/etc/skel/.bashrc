@@ -111,3 +111,13 @@ if ! shopt -oq posix; then
     . /etc/bash_completion
   fi
 fi
+
+# fastfetch: bilgi sutunu logonun yaninda (44. sutundan) baslar; terminal 100 sutundan darsa
+# satirlar sarilir ve hizalama bozulur. Dar pencerede logosuz calistir.
+fastfetch() {
+  if [ "$(tput cols 2>/dev/null || echo 100)" -lt 100 ]; then
+    command fastfetch --logo none "$@"
+  else
+    command fastfetch "$@"
+  fi
+}
