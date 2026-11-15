@@ -1,0 +1,156 @@
+#!/usr/bin/python3 -I
+# -*- coding: utf-8 -*-
+"""
+CarotOS Kurtarma yonetici yardimcisi. Arayuz bunu pkexec ile cagirir; apt
+kancasi (DPkg::Pre-Invoke) ise apt zaten root oldugu icin DOGRUDAN cagirir.
+
+Yalnizca sabit komutlar calistirir (rsync/dpkg/apt-get/du); hepsi liste
+argumaniyla verilir (kabuk yok) ve tam yol PATH'e bakmadan cozulur
+(ortak/yetkili.py). Disaridan gelen tek veri nokta id'si ve etikettir;
+ikisi de kurtarma_motor'daki duzenli ifadeyle dogrulanir.
+
+  carotos-kurtarma-yonet olustur [--etiket METIN]   elle kurtarma noktasi acar
+  carotos-kurtarma-yonet oto-guncelleme-oncesi       apt kancasinin cagirdigi
+                                                     komut; kapaliysa ya da
+                                                     cok yakinda biri varsa
+                                                     SESSIZCE hicbir sey yapmaz
+  carotos-kurtarma-yonet liste                       JSON nokta listesi (liste
+                                                     icin root GEREKMEZ ama bu
+                                                     yardimci hep root ister;
+                                                     arayuz dogrudan okur)
+  carotos-kurtarma-yonet geri-yukle ID [--paketler]  noktayi geri yukler
+  carotos-kurtarma-yonet sil ID                      noktayi siler
+  carotos-kurtarma-yonet ayar-yaz                    stdin'den ayar JSON'u okur
+
+Cikti tek satir JSON: {"kod": "__TAMAM__", ...} ya da {"kod": "<hata>", ...}.
+"""
+import importlib.util
+import json
+import os
+import sys
+
+BURASI = os.path.dirname(os.path.abspath(__file__))
+
+
+def _yukle(ad, dosya):
+    spec = importlib.util.spec_from_file_location(ad, dosya)
+    mod = importlib.util.module_from_spec(spec)
+    sys.dont_write_bytecode = True
+    spec.loader.exec_module(mod)
+    return mod
+
+
+K = _yukle("kurtarma_motor", os.path.join(BURASI, "kurtarma_motor.py"))
+
+try:
+    YET = _yukle("carotos_yetkili", os.path.join(os.path.dirname(BURASI), "ortak", "yetkili.py"))
+    sistem_yolu, temiz_ortam = YET.sistem_yolu, YET.temiz_ortam
+except (OSError, ImportError, AttributeError):
+    def sistem_yolu(ad):
+        if not isinstance(ad, str) or not ad or "/" in ad or ad.startswith("-"):
+            return None
+        for dizin in ("/usr/sbin", "/usr/bin", "/sbin", "/bin"):
+            tam = os.path.join(dizin, ad)
+            if os.path.isfile(tam) and os.access(tam, os.X_OK):
+                return tam
+        return None
+
+    def temiz_ortam(ek=None):
+        ortam = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL": "C", "LANGUAGE": "C"}
+        if ek:
+            ortam.update(ek)
+        return ortam
+
+
+import subprocess  # noqa: E402
+
+
+def calistir(komut, zaman=120):
+    tam = komut[0] if os.path.isabs(komut[0]) else sistem_yolu(komut[0])
+    if tam is None:
+        return 127, f"{komut[0]}: bulunamadi"
+    try:
+        p = subprocess.run([tam] + list(komut[1:]), stdout=subprocess.PIPE,
+                           stderr=subprocess.STDOUT, text=True, errors="replace",
+                           timeout=zaman, env=temiz_ortam())
+        return p.returncode, p.stdout
+    except (OSError, subprocess.TimeoutExpired) as hata:
+        return 127, str(hata)
+
+
+def cikis(kod, **ek):
+    print(json.dumps(dict(kod=kod, **ek), ensure_ascii=False))
+    sys.exit(0 if kod == "__TAMAM__" else 1)
+
+
+def k_olustur(etiket):
+    try:
+        sonuc = K.nokta_olustur(calistir, etiket=etiket, tetikleyici="elle")
+    except K.KurtarmaHatasi as hata:
+        cikis(hata.kod, **hata.ek)
+    cikis("__TAMAM__", nokta=sonuc["nokta"], silinen=sonuc["silinen"])
+
+
+def k_oto_guncelleme_oncesi():
+    # Apt islemini ASLA durdurmaz: her kosulda 0 ile cikar.
+    sonuc = K.oto_guncelleme_oncesi(calistir)
+    cikis("__TAMAM__", **sonuc)
+
+
+def k_geri_yukle(nokta_id, paketler):
+    try:
+        sonuc = K.nokta_geri_yukle(calistir, nokta_id, paketleri_de_kur=paketler)
+    except K.KurtarmaHatasi as hata:
+        cikis(hata.kod, **hata.ek)
+    cikis("__TAMAM__", **sonuc)
+
+
+def k_sil(nokta_id):
+    try:
+        K.nokta_sil(nokta_id)
+    except K.KurtarmaHatasi as hata:
+        cikis(hata.kod, **hata.ek)
+    cikis("__TAMAM__")
+
+
+def k_liste():
+    cikis("__TAMAM__", noktalar=K.noktalari_listele())
+
+
+def k_ayar_yaz():
+    try:
+        veri = json.load(sys.stdin)
+    except (ValueError, UnicodeDecodeError):
+        cikis("__GECERSIZ_AYAR__")
+    if not isinstance(veri, dict):
+        cikis("__GECERSIZ_AYAR__")
+    yeni = K.ayarlari_yaz(veri)
+    cikis("__TAMAM__", ayar=yeni)
+
+
+def main(argv):
+    if os.geteuid() != 0:
+        cikis("__YETKI_YOK__")
+    if not argv:
+        cikis("__GECERSIZ_KOMUT__")
+    komut, kalan = argv[0], argv[1:]
+    if komut == "olustur":
+        etiket = None
+        if len(kalan) >= 2 and kalan[0] == "--etiket":
+            etiket = kalan[1]
+        k_olustur(etiket)
+    elif komut == "oto-guncelleme-oncesi":
+        k_oto_guncelleme_oncesi()
+    elif komut == "liste":
+        k_liste()
+    elif komut == "geri-yukle" and kalan:
+        k_geri_yukle(kalan[0], "--paketler" in kalan[1:])
+    elif komut == "sil" and kalan:
+        k_sil(kalan[0])
+    elif komut == "ayar-yaz":
+        k_ayar_yaz()
+    cikis("__GECERSIZ_KOMUT__")
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
