@@ -1,5 +1,6 @@
 [Configuration]
 MiscDefaultGeometry=100x30
+ShortcutsNoMnemonics=TRUE
 FontName=JetBrains Mono 11
 FontUseSystem=FALSE
 BackgroundMode=TERMINAL_BACKGROUND_TRANSPARENT

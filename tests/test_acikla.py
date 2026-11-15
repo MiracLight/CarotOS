@@ -325,6 +325,13 @@ class BashBaglantisiTesti(unittest.TestCase):
         self.assertIn("chmod 755 /usr/bin/carotos-acikla", hook)
         self.assertIn("/usr/share/carotos/acikla.bash", hook)
 
+    def test_terminal_alt_e_yi_menu_kisayolu_olarak_yutmaz(self):
+        # xfce4-terminal varsayilan olarak Alt+harf'i menu mnemonic'i yapar (Sekmeler, Dosya...);
+        # bu ayar olmadan Alt+E once terminalin menusunu acar, bind -x readline'a hic ulasmaz.
+        trc = open(os.path.join(INC, "etc", "skel", ".config", "xfce4", "terminal", "terminalrc"),
+                  encoding="utf-8").read()
+        self.assertIn("ShortcutsNoMnemonics=TRUE", trc)
+
     @unittest.skipUnless(shutil.which("bash") and os.name == "posix", "bash gerekir")
     def test_interaktif_bash_dosyayi_okur_ve_baglar(self):
         kok = tempfile.mkdtemp(prefix="acikla-bash-")
