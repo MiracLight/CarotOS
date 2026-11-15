@@ -264,7 +264,7 @@ Bütün ekiplerin değişiklikleri yöneten oturumda okundu, testleri çalışt�
 14 Kasım kararları (2.5'e ek):
 - K-06: Karşılama Bitir'e basılınca bir daha kendiliğinden açılmaz; yarıda kalırsa yine gelir.
 - F-10: Filenor PyPI kurulumundan önce onay ister; `--break-system-packages` kaldırıldı.
-- M-02: parola girildikten sonra "Gizle"; yalnızca indirme aşamasında "Güvenli iptal" (yeni yardımcı `/usr/local/sbin/carotos-magaza-apt`).
+- M-02: parola girildikten sonra "Gizle"; yalnızca indirme aşamasında "Güvenli iptal" (yeni yardımcı `/usr/sbin/carotos-magaza-apt`).
 - M-06: Mağaza tek örnek; ikinci başlatma açık pencereyi öne getirir.
 - S-06: os-prober açık kalır, `update-grub` başına bir kez çalışır.
 

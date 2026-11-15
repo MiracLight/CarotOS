@@ -6,14 +6,14 @@ locale'in uretilmesi (locale-gen), Japonca/Cince icin CJK yazi tipi, kurulu Fire
 icin dil paketi ve yazim denetimi sozlugu. CarotOS uygulamalarinin kendi cevirileri zaten
 ortak/diller/*.json icindedir; bunlar icin paket gerekmez.
 
-GTK'siz, yalniz standart kutuphane. Yetki gerektiren kisim /usr/local/sbin/carotos-dil-hazirla
+GTK'siz, yalniz standart kutuphane. Yetki gerektiren kisim /usr/sbin/carotos-dil-hazirla
 (pkexec ile); o betik BU modulun tablolarini kullanir ve yalnizca tablodaki degerleri yazar.
 /etc/default/locale (sistem geneli varsayilan) degistirilmez.
 """
 import os
 import subprocess
 
-HAZIRLA_BETIGI = "/usr/local/sbin/carotos-dil-hazirla"
+HAZIRLA_BETIGI = "/usr/sbin/carotos-dil-hazirla"
 
 # kod -> locale, ek paketler, Firefox ESR dil eki, LibreOffice dil eki (kurulu ise eklenir)
 HAZIRLIK = {

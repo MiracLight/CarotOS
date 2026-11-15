@@ -33,7 +33,7 @@ KOK = os.path.dirname(BURASI)
 INC = os.path.join(KOK, "config", "includes.chroot")
 WELCOME = os.path.join(INC, "opt", "carotos", "welcome")
 WELCOME_PY = os.path.join(WELCOME, "carotos-welcome.py")
-BETIK = os.path.join(INC, "usr", "local", "sbin", "carotos-ufw-ayar")
+BETIK = os.path.join(INC, "usr", "sbin", "carotos-ufw-ayar")
 sys.path.insert(0, WELCOME)
 
 import gezinme as G  # noqa: E402
@@ -143,7 +143,7 @@ class UfwSayfasiTesti(unittest.TestCase):
 
     def test_yardimci_yolu(self):
         k = oku(WELCOME_PY)
-        self.assertIn('UFW_AYAR = "/usr/local/sbin/carotos-ufw-ayar"', k)
+        self.assertIn('UFW_AYAR = "/usr/sbin/carotos-ufw-ayar"', k)
         self.assertIn('UFW_CONF = "/etc/ufw/ufw.conf"', k)
         self.assertIn('return ["pkexec", self.UFW_AYAR, "ac" if acik else "kapat"]', k)
 

@@ -39,14 +39,21 @@ echo "CarotOS kurulum betiği tamamlandı."
 
 # İlk açılış servisi (kurulum sonrası sudo düzeltmesi)
 chmod 755 /usr/local/sbin/carotos-firstboot.sh
-chmod 755 /usr/local/sbin/carotos-dil-hazirla
-chmod 755 /usr/local/sbin/carotos-mac-ayar
-chmod 755 /usr/local/sbin/carotos-ufw-ayar
-chmod 755 /usr/local/sbin/carotos-magaza-apt
-chmod 755 /usr/local/sbin/carotos-tema-kur
-chmod 755 /usr/local/bin/carotos-modernlestir
-chmod 755 /usr/local/bin/carotos-saat-eslestir
-chmod 755 /usr/local/bin/carotos-acikla
+chmod 755 /usr/sbin/carotos-dil-hazirla
+chmod 755 /usr/sbin/carotos-mac-ayar
+chmod 755 /usr/sbin/carotos-ufw-ayar
+chmod 755 /usr/sbin/carotos-magaza-apt
+chmod 755 /usr/sbin/carotos-tema-kur
+chmod 755 /usr/bin/carotos-modernlestir
+chmod 755 /usr/bin/carotos-saat-eslestir
+chmod 755 /usr/bin/carotos-acikla
+# Yardimci betikler /usr/sbin ve /usr/bin altindadir (paketlerle ayni yer); includes.chroot dosyalarinin kipi ve
+# sahibi derleme klonundan gelir, root'a ait ve yalnizca root'ca yazilabilir olmali.
+for yol in /usr/sbin/carotos-dil-hazirla /usr/sbin/carotos-mac-ayar /usr/sbin/carotos-ufw-ayar /usr/sbin/carotos-magaza-apt            /usr/sbin/carotos-tema-kur /usr/bin/carotos-modernlestir /usr/bin/carotos-saat-eslestir /usr/bin/carotos-acikla; do
+    [ -f "$yol" ] || { echo "CarotOS HATA: $yol yok." >&2; exit 1; }
+    chown root:root "$yol"
+    chmod 755 "$yol"
+done
 chmod 644 /usr/share/carotos/acikla.bash
 # Komut Aciklayici (Alt+E): etkilesimli bash'e baglanti (yinelenmez)
 if ! grep -q 'carotos/acikla.bash' /etc/bash.bashrc; then

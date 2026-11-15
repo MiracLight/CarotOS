@@ -513,9 +513,9 @@ def apt_komutu(eylem, *paketler, izinli=None):
 
 
 # --- Root yardimcisi (M-02: guvenli iptal) -----------------------------------
-# /usr/local/sbin/carotos-magaza-apt indirme asamasinda stdin'den "iptal" alir ve apt'i
+# /usr/sbin/carotos-magaza-apt indirme asamasinda stdin'den "iptal" alir ve apt'i
 # durdurur; faz satirlariyla Magaza'ya hangi asamada oldugunu soyler.
-YARDIMCI = "/usr/local/sbin/carotos-magaza-apt"
+YARDIMCI = "/usr/sbin/carotos-magaza-apt"
 FAZ_ISARETI = "@@CAROTOS-FAZ "
 IPTAL_ISARETI = "@@CAROTOS-IPTAL"
 IPTAL_KODU = 75

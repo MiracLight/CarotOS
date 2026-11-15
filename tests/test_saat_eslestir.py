@@ -15,7 +15,7 @@ sys.dont_write_bytecode = True
 
 KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 INC = os.path.join(KOK, "config", "includes.chroot")
-BETIK = os.path.join(INC, "usr", "local", "bin", "carotos-saat-eslestir")
+BETIK = os.path.join(INC, "usr", "bin", "carotos-saat-eslestir")
 SH = shutil.which("sh")
 
 XFCONF_TAKLIT = r"""#!/bin/sh
@@ -165,9 +165,9 @@ class DosyaTesti(unittest.TestCase):
     def test_autostart_ve_hook_ve_paket(self):
         desk = open(os.path.join(INC, "etc", "skel", ".config", "autostart", "carotos-saat-eslestir.desktop"),
                     encoding="utf-8").read()
-        self.assertIn("Exec=/usr/local/bin/carotos-saat-eslestir --izle", desk)
+        self.assertIn("Exec=/usr/bin/carotos-saat-eslestir --izle", desk)
         hook = open(os.path.join(KOK, "config", "hooks", "live", "9999-carotos-setup.hook.chroot"), encoding="utf-8").read()
-        self.assertIn("chmod 755 /usr/local/bin/carotos-saat-eslestir", hook)
+        self.assertIn("chmod 755 /usr/bin/carotos-saat-eslestir", hook)
         paketler = open(os.path.join(KOK, "config", "package-lists", "carotos.list.chroot"), encoding="utf-8").read().split()
         self.assertIn("systemd-timesyncd", paketler)
 

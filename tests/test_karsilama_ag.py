@@ -76,7 +76,7 @@ class AgSayfasiTesti(unittest.TestCase):
         # sahte MAC anahtarlari artik varsayilan degil, anahtarin yazdigi 91-carotos-mac.conf'ta
         import importlib.machinery
         import importlib.util
-        yol = os.path.join(KOK, "config", "includes.chroot", "usr", "local", "sbin", "carotos-mac-ayar")
+        yol = os.path.join(KOK, "config", "includes.chroot", "usr", "sbin", "carotos-mac-ayar")
         yukleyici = importlib.machinery.SourceFileLoader("mac_ayar_karsilama", yol)
         modul = importlib.util.module_from_spec(importlib.util.spec_from_loader("mac_ayar_karsilama", yukleyici))
         yukleyici.exec_module(modul)

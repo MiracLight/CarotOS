@@ -88,7 +88,7 @@ class YeniSayfaTesti(unittest.TestCase):
             self.assertIn("Alt+E", tum_metin(self.s["acikla"], dil))
         bash = oku("usr", "share", "carotos", "acikla.bash")
         self.assertIn(r'"\ee"', bash)                               # Alt+E = ESC e
-        self.assertTrue(os.path.isfile(os.path.join(INC, "usr", "local", "bin", "carotos-acikla")))
+        self.assertTrue(os.path.isfile(os.path.join(INC, "usr", "bin", "carotos-acikla")))
         kodlar = [y for t, y in self.s["acikla"]["body"] if t == "code"]
         self.assertIn("carotos-acikla tar xzf arsiv.tar.gz", kodlar)
         self.assertIn("sudo ufw status verbose", kodlar)

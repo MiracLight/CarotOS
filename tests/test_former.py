@@ -457,7 +457,7 @@ class YeniKonuIddiaTesti(unittest.TestCase):
         bash = os.path.join(INC, "usr", "share", "carotos", "acikla.bash")
         with open(bash, encoding="utf-8") as f:
             self.assertIn(r'"\ee"', f.read())                  # Alt+E = ESC e
-        self.assertTrue(os.path.isfile(os.path.join(INC, "usr", "local", "bin", "carotos-acikla")))
+        self.assertTrue(os.path.isfile(os.path.join(INC, "usr", "bin", "carotos-acikla")))
         self.assertIn("Alt+E", self._metinler("acikla"))
 
 

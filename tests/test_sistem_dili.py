@@ -18,7 +18,7 @@ sys.dont_write_bytecode = True
 KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 INC = os.path.join(KOK, "config", "includes.chroot")
 ORTAK = os.path.join(INC, "opt", "carotos", "ortak")
-BETIK = os.path.join(INC, "usr", "local", "sbin", "carotos-dil-hazirla")
+BETIK = os.path.join(INC, "usr", "sbin", "carotos-dil-hazirla")
 sys.path.insert(0, ORTAK)
 
 import dil  # noqa: E402
@@ -102,7 +102,7 @@ class SecimTesti(unittest.TestCase):
         self.assertFalse(SD.hazirlik_gerekli_mi("xx", set(), []))                    # bilinmeyen
 
     def test_komut(self):
-        self.assertEqual(SD.hazirla_komutu("de"), ["pkexec", "/usr/local/sbin/carotos-dil-hazirla", "de"])
+        self.assertEqual(SD.hazirla_komutu("de"), ["pkexec", "/usr/sbin/carotos-dil-hazirla", "de"])
         self.assertEqual(SD.locale_gen_satiri("ja"), "ja_JP.UTF-8 UTF-8")
         self.assertIsNone(SD.locale_gen_satiri("xx"))
 
@@ -209,7 +209,7 @@ class DosyaTesti(unittest.TestCase):
     def test_hook_izin_veriyor(self):
         hook = open(os.path.join(KOK, "config", "hooks", "live", "9999-carotos-setup.hook.chroot"),
                     encoding="utf-8").read()
-        self.assertIn("chmod 755 /usr/local/sbin/carotos-dil-hazirla", hook)
+        self.assertIn("chmod 755 /usr/sbin/carotos-dil-hazirla", hook)
 
     def test_karsilama_hepsini_bagli(self):
         k = open(os.path.join(INC, "opt", "carotos", "welcome", "carotos-welcome.py"), encoding="utf-8").read()

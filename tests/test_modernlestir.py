@@ -23,8 +23,8 @@ sys.dont_write_bytecode = True
 
 KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CHROOT = os.path.join(KOK, "config", "includes.chroot")
-TEMA_KUR = os.path.join(CHROOT, "usr", "local", "sbin", "carotos-tema-kur")
-MODERN = os.path.join(CHROOT, "usr", "local", "bin", "carotos-modernlestir")
+TEMA_KUR = os.path.join(CHROOT, "usr", "sbin", "carotos-tema-kur")
+MODERN = os.path.join(CHROOT, "usr", "bin", "carotos-modernlestir")
 POSIX = os.name == "posix"
 
 

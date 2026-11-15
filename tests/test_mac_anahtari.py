@@ -24,7 +24,7 @@ from test_dil_uygulamalar import EKRAN, UygulamaDilTabani  # noqa: E402
 
 KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 INC = os.path.join(KOK, "config", "includes.chroot")
-BETIK = os.path.join(INC, "usr", "local", "sbin", "carotos-mac-ayar")
+BETIK = os.path.join(INC, "usr", "sbin", "carotos-mac-ayar")
 NM_90 = os.path.join(INC, "etc", "NetworkManager", "conf.d", "90-carotos-gizlilik.conf")
 
 
@@ -59,7 +59,7 @@ class AyarDosyalariTesti(unittest.TestCase):
 
     def test_hook_betigi_calistirilabilir_yapar(self):
         hook = oku(os.path.join(KOK, "config", "hooks", "live", "9999-carotos-setup.hook.chroot"))
-        self.assertIn("chmod 755 /usr/local/sbin/carotos-mac-ayar", hook)
+        self.assertIn("chmod 755 /usr/sbin/carotos-mac-ayar", hook)
 
     def test_betik_shebang_ve_kabuk_yok(self):
         k = oku(BETIK)

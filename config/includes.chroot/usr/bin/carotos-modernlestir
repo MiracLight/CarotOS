@@ -5,7 +5,7 @@
 Kullanim:  carotos-modernlestir uygula | geri-al | durum | picom-baslat
 
 Paketler (Orchis, Papirus, Inter, JetBrains Mono, picom, plank, rofi) once
-/usr/local/sbin/carotos-tema-kur ile kurulmus olmalidir; bu betik paket kurmaz.
+/usr/sbin/carotos-tema-kur ile kurulmus olmalidir; bu betik paket kurmaz.
 
 uygula   Degisecek her xfconf degerinin, dosyanin ve gsettings anahtarinin ESKI halini
          ~/.local/state/carotos/sleek-yedek.json dosyasina (0600, atomik) yazar, sonra:
@@ -77,7 +77,7 @@ DOCK_VARSAYILAN = (
 )
 # SOL yan panel: kendi yazdigimiz kaydirmali panel (5 simge gorunur); plank degil
 YANPANEL = "/opt/carotos/yanpanel/carotos-yanpanel.py"
-KENDI = "/usr/local/bin/carotos-modernlestir"          # autostart: oturumda 'picom-baslat'
+KENDI = "/usr/bin/carotos-modernlestir"          # autostart: oturumda 'picom-baslat'
 PICOM_BEKLE = 2.5          # sn: glx baglami acilamazsa picom bu surede coker
 # xfconf'ta calisan panele ancak panel yeniden baslatilinca yansiyan anahtarlar
 PANEL_ANAHTARI = re.compile(r"^/panels(/panel-\d+/plugin-ids)?$")
@@ -1059,7 +1059,7 @@ def eksik_programlar(o):
 def uygula(o, cikti=print):
     eksik = eksik_programlar(o)
     if eksik:
-        cikti("eksik: %s (once paketleri kurun: pkexec /usr/local/sbin/carotos-tema-kur)" % " ".join(eksik))
+        cikti("eksik: %s (once paketleri kurun: pkexec /usr/sbin/carotos-tema-kur)" % " ".join(eksik))
         return KOD_EKSIK
     try:
         onceki = yedek_oku(o)

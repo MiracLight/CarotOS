@@ -240,7 +240,7 @@ class DilTesti(unittest.TestCase):
 
 
 class CliTesti(unittest.TestCase):
-    CLI = os.path.join(INC, "usr", "local", "bin", "carotos-acikla")
+    CLI = os.path.join(INC, "usr", "bin", "carotos-acikla")
 
     def calistir(self, *argv, girdi=None):
         s = subprocess.run([sys.executable, self.CLI, *argv], input=girdi, capture_output=True, text=True,
@@ -268,7 +268,7 @@ class BashBaglantisiTesti(unittest.TestCase):
         self.assertIn('bind -x \'"\\ee": carotos_acikla_satir\'', bash)      # Alt+E
         self.assertIn("READLINE_LINE", bash)
         hook = open(os.path.join(KOK, "config", "hooks", "live", "9999-carotos-setup.hook.chroot"), encoding="utf-8").read()
-        self.assertIn("chmod 755 /usr/local/bin/carotos-acikla", hook)
+        self.assertIn("chmod 755 /usr/bin/carotos-acikla", hook)
         self.assertIn("/usr/share/carotos/acikla.bash", hook)
 
     @unittest.skipUnless(shutil.which("bash") and os.name == "posix", "bash gerekir")

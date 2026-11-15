@@ -21,7 +21,7 @@ sys.dont_write_bytecode = True
 KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 INC = os.path.join(KOK, "config", "includes.chroot")
 ACIKLA = os.path.join(INC, "opt", "carotos", "acikla")
-CLI = os.path.join(INC, "usr", "local", "bin", "carotos-acikla")
+CLI = os.path.join(INC, "usr", "bin", "carotos-acikla")
 BASH_DOSYASI = os.path.join(INC, "usr", "share", "carotos", "acikla.bash")
 sys.path.insert(0, os.path.join(INC, "opt", "carotos", "ortak"))
 sys.path.insert(0, ACIKLA)

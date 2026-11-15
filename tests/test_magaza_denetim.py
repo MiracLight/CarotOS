@@ -527,7 +527,7 @@ class M03OnayPenceresiTesti(unittest.TestCase):
 
 
 # --- M-02 karari: root yardimcisi carotos-magaza-apt ---------------------------------
-YARDIMCI_YOL = os.path.join(KOK, "config", "includes.chroot", "usr", "local", "sbin",
+YARDIMCI_YOL = os.path.join(KOK, "config", "includes.chroot", "usr", "sbin",
                             "carotos-magaza-apt")
 with open(YARDIMCI_YOL, "rb") as _f:
     YARDIMCI_KAYNAK = _f.read().decode("utf-8")
@@ -678,10 +678,10 @@ class M02YardimciKomutuTesti(unittest.TestCase):
         with mock.patch("os.path.isfile", return_value=True), \
                 mock.patch("os.access", return_value=True):
             k = self.a["yardimci_komutu"]("install", "nmap", "htop")
-            self.assertEqual(k, ["/usr/bin/pkexec", "/usr/local/sbin/carotos-magaza-apt",
+            self.assertEqual(k, ["/usr/bin/pkexec", "/usr/sbin/carotos-magaza-apt",
                                  "install", "--", "nmap", "htop"])
             self.assertEqual(self.a["yardimci_komutu"]("upgrade", "x"),
-                             ["/usr/bin/pkexec", "/usr/local/sbin/carotos-magaza-apt",
+                             ["/usr/bin/pkexec", "/usr/sbin/carotos-magaza-apt",
                               "upgrade"])
             with self.assertRaises(ValueError):
                 self.a["yardimci_komutu"]("install", "-oAPT::x=y")

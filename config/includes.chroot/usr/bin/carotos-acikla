@@ -20,7 +20,7 @@ try:
 except (AttributeError, ValueError):
     pass
 _BURASI = os.path.dirname(os.path.abspath(__file__))
-for _yol in ("/opt/carotos/acikla", os.path.join(_BURASI, "..", "..", "..", "opt", "carotos", "acikla")):
+for _yol in ("/opt/carotos/acikla", os.path.join(_BURASI, "..", "..", "opt", "carotos", "acikla")):
     if os.path.isdir(_yol):
         sys.path.insert(0, os.path.abspath(_yol))
         break

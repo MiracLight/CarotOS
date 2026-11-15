@@ -57,7 +57,7 @@ class NetworkManagerTesti(unittest.TestCase):
             self.assertNotIn(anahtar, self.c["connection"])
         import importlib.machinery
         import importlib.util
-        yol = os.path.join(CHROOT, "usr/local/sbin/carotos-mac-ayar")
+        yol = os.path.join(CHROOT, "usr/sbin/carotos-mac-ayar")
         yukleyici = importlib.machinery.SourceFileLoader("mac_ayar_ag", yol)
         modul = importlib.util.module_from_spec(importlib.util.spec_from_loader("mac_ayar_ag", yukleyici))
         yukleyici.exec_module(modul)

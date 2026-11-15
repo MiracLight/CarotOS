@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """CarotOS Mağaza'nın root yardımcısı (M-02: güvenli iptal).
 
-Mağaza bunu `pkexec /usr/local/sbin/carotos-magaza-apt <eylem> -- <paketler>` ile çalıştırır.
+Mağaza bunu `pkexec /usr/sbin/carotos-magaza-apt <eylem> -- <paketler>` ile çalıştırır.
 Argümanlar burada yeniden ve sıkı doğrulanır; apt-get yalnızca sabit yoldan, sabit ortamla
 ve sabit seçeneklerle çağrılır. Kabuk yok. Tek dosya, yalnızca standart kütüphane (bu dosya
 root olarak çalışır; kullanıcının yazabileceği hiçbir modüle dayanmaz).

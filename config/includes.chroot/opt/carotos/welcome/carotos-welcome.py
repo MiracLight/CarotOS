@@ -2567,7 +2567,7 @@ class WelcomeWindow(Gtk.Window):
 
         return None
 
-    MAC_AYAR = "/usr/local/sbin/carotos-mac-ayar"
+    MAC_AYAR = "/usr/sbin/carotos-mac-ayar"
     MAC_DOSYASI = "/etc/NetworkManager/conf.d/91-carotos-mac.conf"
 
     def mac_acik_mi(self):
@@ -2583,8 +2583,8 @@ class WelcomeWindow(Gtk.Window):
         except (OSError, subprocess.SubprocessError):
             return 1
 
-    TEMA_KUR = "/usr/local/sbin/carotos-tema-kur"
-    MODERNLESTIR = "/usr/local/bin/carotos-modernlestir"
+    TEMA_KUR = "/usr/sbin/carotos-tema-kur"
+    MODERNLESTIR = "/usr/bin/carotos-modernlestir"
 
     def modern_komutlari(self, acik):
         """Sirayla calisacak komutlar: ac = paketleri kur (pkexec) + gorunumu uygula; kapat = geri al."""
@@ -2606,7 +2606,7 @@ class WelcomeWindow(Gtk.Window):
                 return 1
         return 0
 
-    UFW_AYAR = "/usr/local/sbin/carotos-ufw-ayar"
+    UFW_AYAR = "/usr/sbin/carotos-ufw-ayar"
     UFW_CONF = "/etc/ufw/ufw.conf"
 
     def ufw_acik_mi(self):

@@ -243,10 +243,10 @@ class KarsilamaDenetimTesti(UygulamaDilTabani):
         ac = W.modern_komutlari(ns, True)
         self.assertEqual(len(ac), 2)
         self.assertTrue(ac[0][0].endswith("pkexec"))
-        self.assertEqual(ac[0][1:], ["/usr/local/sbin/carotos-tema-kur", "kur"])        # sabit, kullanici girdisi yok
-        self.assertEqual(ac[1], ["/usr/bin/python3", "-I", "/usr/local/bin/carotos-modernlestir", "uygula"])
+        self.assertEqual(ac[0][1:], ["/usr/sbin/carotos-tema-kur", "kur"])        # sabit, kullanici girdisi yok
+        self.assertEqual(ac[1], ["/usr/bin/python3", "-I", "/usr/bin/carotos-modernlestir", "uygula"])
         self.assertEqual(W.modern_komutlari(ns, False),
-                         [["/usr/bin/python3", "-I", "/usr/local/bin/carotos-modernlestir", "geri-al"]])
+                         [["/usr/bin/python3", "-I", "/usr/bin/carotos-modernlestir", "geri-al"]])
 
     def test_modern_calistir_ilk_hatada_durur(self):
         import types

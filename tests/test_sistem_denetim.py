@@ -338,7 +338,7 @@ class FirstbootBirimTesti(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # S-05: saat eslestirme oturumla biter
 # ---------------------------------------------------------------------------
-SAAT = os.path.join(INC, "usr", "local", "bin", "carotos-saat-eslestir")
+SAAT = os.path.join(INC, "usr", "bin", "carotos-saat-eslestir")
 
 
 @unittest.skipUnless(SH and POSIX and shutil.which("pgrep") and shutil.which("sleep")
@@ -376,7 +376,7 @@ class SaatOturumTesti(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # S-07: carotos-dil-hazirla modulu denetlenmis kaynaktan yukler
 # ---------------------------------------------------------------------------
-DIL_HAZIRLA = os.path.join(INC, "usr", "local", "sbin", "carotos-dil-hazirla")
+DIL_HAZIRLA = os.path.join(INC, "usr", "sbin", "carotos-dil-hazirla")
 IYI = 'HAZIRLIK = {"de": {}}\nKAYNAK = "iyi"\n'
 KOTU = 'HAZIRLIK = {"de": {}}\nKAYNAK = "kotu"\n'
 
