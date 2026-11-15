@@ -34,6 +34,22 @@ sayılmamıştır.
   Carotene, USB, Filenor, Sistem Sağlığı ve hook düzeltmeleri.
 - **Düzeltmeler:** fastfetch uzun donanım adında satır sarması; Former sol menü
   kaydırma; Sistem Sağlığı "Dinlenen portlar" yanlış uyarısı.
+- **Ayrıca eklendi:** şifresiz swap denetimi ve kapatma eylemi (Sistem Sağlığı),
+  Karşılama'da `ufw` açma/kapatma anahtarı, ağ gizliliği varsayılanları (DHCP'de
+  makine adı yok, IPv6 geçici adres, sysctl) ve zram takas, sistem dili hazırlığı
+  (dil paketi ve yerel ayar Bitir adımında kurulur, yabancı diller "beta"),
+  `/usr/lib/os-release` CarotOS, hafif `gtk.css` cilası, JetBrains Mono'lu CarotOS
+  terminali.
+- **Değişti/kaldırıldı:** sahte MAC artık varsayılan değil; `noresume` kaldırıldı;
+  Karşılama Bitir'den sonra kendiliğinden açılmaz; Filenor'da
+  `--break-system-packages` kaldırıldı ve PyPI kurulumu onay ister; Poligon'da
+  şifresiz `/durum` kaldırıldı; Carot Sleek'te Bibata imleci ve markalı tarayıcı
+  simgesi bırakıldı; Windows sayfasından saat kayması notu çıktı; hook'lar
+  başarısızlıkta derlemeyi durdurur; `xfwm4` ve dil katmanı değişiklikleriyle
+  boşta bellek düştü.
+- **Düzeltildi (ek):** panel saatine sistem saat dilimi yazılır; CarotPot bağlantı
+  ve yeniden başlatma sınırları; Mağaza yetkili işlemleri yalnız sistem
+  dizinlerinden; Carotene/USB dosya kimliği ve "temiz" sonucu denetimi.
 
 ## Sürüm 16 — 1.3.2 (ara sürüm)
 **Durum:** Derlendi ve sınanıyor. Ana sürüm 1.3 olarak kalır
