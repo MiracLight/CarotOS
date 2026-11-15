@@ -149,6 +149,54 @@ class TehlikeKurallariTesti(unittest.TestCase):
         self.assertIn("Dangerous pattern", M.acikla("rm -rf /", "en"))
         self.assertIn("Tehlikeli kalıp", M.acikla("rm -rf /", "tr"))
 
+    def test_find_sistem_genelinde_suzgecli_silme(self):
+        # Ad suzgeci sistem dosyalarini korumaz; ev dizini ve bulunulan dizindeki suzgecli kullanim sessiz kalir
+        for satir in ("find / -name '*.conf' -exec rm {} \\;", "find /etc -name '*.bak' -delete",
+                      "sudo find /usr -type f -name '*.so' -exec shred {} +"):
+            with self.subTest(satir=satir):
+                self.assertIn("find_sistem_sil", tehlike_idleri(satir))
+        for satir in ("find . -name '*.pyc' -delete", "find ~/Indirilenler -name '*.tmp' -delete",
+                      "find / -name '*.conf'", "find /tmp/proje -name '*.o' -delete"):
+            with self.subTest(satir=satir):
+                self.assertEqual(tehlike_idleri(satir), set(), satir)
+        # suzgecsiz genis silme eski kuralla yakalanir, ikisi birden uyarmaz
+        self.assertEqual(tehlike_idleri("find / -delete"), {"find_sil"})
+
+
+class KapsamTesti(unittest.TestCase):
+    """Yeni baslayanin sik yazdigi komutlar taninmali (1.4'te 160 komutun 108'i taninmiyordu)."""
+    YAYGIN = ("ls cd pwd mkdir rmdir rm cp mv touch cat less more head tail nano vim vi grep find locate which "
+              "whereis man help echo printf clear history alias whoami id passwd useradd usermod groups chmod chown "
+              "chgrp ps top htop kill killall pkill jobs bg fg free df du lsblk mount umount blkid uname hostname "
+              "uptime date cal reboot shutdown poweroff systemctl journalctl dmesg lsusb lspci apt apt-get dpkg snap "
+              "flatpak ping ip ifconfig ss netstat curl wget ssh scp rsync nslookup dig traceroute nmap tcpdump tshark "
+              "wireshark nc netcat telnet ftp tar zip unzip gzip gunzip xz sha256sum md5sum gpg base64 diff sort uniq "
+              "wc cut awk sed tr tee export source bash sh python3 python pip make git ufw fail2ban-client iptables "
+              "nft john hydra sqlmap nikto aircrack-ng airmon-ng airodump-ng hashcat gobuster dirb ffuf whois openssl "
+              "ln stat file strings crontab at screen tmux lsof chattr shred dd mkfs wipefs parted cryptsetup "
+              "ssh-keygen").split()
+
+    def test_yaygin_komutlar_taninir(self):
+        bilinmeyen = [k for k in self.YAYGIN if M._tanim_bul(k)[1] is None]
+        self.assertEqual(bilinmeyen, [])
+
+    def test_magaza_guvenlik_araclari_ayrintili_ve_etik(self):
+        for arac in ("gobuster", "dirb", "ffuf", "airodump-ng"):
+            with self.subTest(arac=arac):
+                self.assertTrue(veri_saldiri.KOMUTLAR[arac].get("etik"), arac)
+                self.assertIn(M.ETIKETLER["etik"]["tr"], M.acikla(arac + " -h", "tr"))
+
+    def test_sarmalayicilar_ic_komutu_aciklar(self):
+        satir = "find . -name '*.log' -print0 | xargs -0 grep -n hata"
+        self.assertIn("Searches text for a pattern", M.acikla(satir, "en"))      # xargs'in actigi grep
+        find_parcasi = M.ayristir(satir)["parcalar"][0]
+        self.assertEqual(find_parcasi["bilinmeyen"], [])                         # -print0 taniniyor
+
+    def test_git_reset_hard_bayragi_ve_uyari(self):
+        p = M.ayristir("git reset --hard")["parcalar"][0]
+        self.assertEqual(p["bilinmeyen"], [])
+        self.assertIn("git reset --hard", M.acikla("git reset --hard", "en"))
+
 
 class CalistirmazTesti(unittest.TestCase):
     def test_kaynakta_komut_calistirma_yok(self):
@@ -260,6 +308,12 @@ class CliTesti(unittest.TestCase):
 
     def test_yardim(self):
         self.assertIn("ÇALIŞTIRMADAN", self.calistir("--help"))
+
+    def test_her_cikti_satir_sonuyla_biter(self):
+        # bos ve tamamlanmamis satir iletileri sonsuzdu; Alt+E'de istem iletinin arkasina yapisiyordu
+        for satir in ("", "echo 'acik", "ls -l"):
+            with self.subTest(satir=satir):
+                self.assertTrue(self.calistir("--dil", "en", "--satir", satir).endswith("\n"))
 
 
 class BashBaglantisiTesti(unittest.TestCase):

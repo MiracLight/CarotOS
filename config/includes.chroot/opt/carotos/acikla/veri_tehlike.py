@@ -88,24 +88,50 @@ _FIND_DAR = {"-name", "-iname", "-path", "-ipath", "-wholename", "-iwholename", 
 _YIKICI = {"rm", "shred", "dd", "unlink", "wipefs", "truncate", "chmod", "chown", "mv"}
 
 
-def _find_sil(p):
+def _find_parca(p):
+    """find parcasi icin (baslangic yollari, yikici eylem var mi); find degilse None."""
     if p["komut"] != "find":
-        return False
+        return None
     a = p["argumanlar"]
     baslar = []
     for x in a:
         if x.startswith("-") or x in ("(", "!", ")"):
             break
         baslar.append(x)
-    if any(x in _FIND_DAR for x in a):
-        return False
     sil = "-delete" in a
     for i, x in enumerate(a):
         if x in ("-exec", "-execdir", "-ok", "-okdir") and i + 1 < len(a):
             ad = os.path.basename(a[i + 1])
             if ad in _YIKICI or ad.startswith("mkfs"):
                 sil = True
-    return sil and any(tehlikeli_yol(b) for b in (baslar or ["."]))
+    return baslar or ["."], sil
+
+
+def _find_sil(p):
+    f = _find_parca(p)
+    if not f or any(x in _FIND_DAR for x in p["argumanlar"]):
+        return False
+    baslar, sil = f
+    return sil and any(tehlikeli_yol(b) for b in baslar)
+
+
+def _sistem_kapsamli(h):
+    """Kok ya da bir sistem dizini (/, /etc, /usr, /home…): ev dizini ve bulunulan dizin degil."""
+    if not h or not h.startswith("/"):
+        return False
+    n = posixpath.normpath(h)
+    return n == "/" or n in _SISTEM
+
+
+def _find_sistem_sil(p):
+    # Ad suzgeci (-name '*.conf') varken find_sil susar, cunku ev dizininde ya da bulunulan dizinde
+    # (find . -name '*.pyc' -delete) yaygin ve zararsizdir. Kokten ya da bir sistem dizininden baslayan
+    # silmede ise suzgec sistemi korumaz: find / -name '*.conf' -exec rm {} \; yine her yerdeki ayarlari siler.
+    f = _find_parca(p)
+    if not f or not any(x in _FIND_DAR for x in p["argumanlar"]):
+        return False
+    baslar, sil = f
+    return sil and any(_sistem_kapsamli(b) for b in baslar)
 
 
 # ---- aygıtlar ve yönlendirme ------------------------------------------------
@@ -280,6 +306,11 @@ PARCA_KURALLARI = [
                 "(-delete, -exec rm…). Önce -delete olmadan çalıştırıp listeye bak.",
                 "`find` deletes or changes everything it finds in a broad directory (/, your home, the current folder…) without a "
                 "name filter (-delete, -exec rm…). First run it without -delete and check the list.")},
+    {"id": "find_sistem_sil", "siddet": "yuksek", "kosul": _find_sistem_sil,
+     "neden": T("`find` kökten ya da bir sistem dizininden (/, /etc, /usr…) başlayıp eşleşen her dosyayı siliyor ya da değiştiriyor. "
+                "Ad süzgeci sistem dosyalarını korumaz (ör. tüm *.conf dosyaları gider). Önce -delete/-exec olmadan çalıştırıp listeye bak.",
+                "`find` starts at the root or a system directory (/, /etc, /usr…) and deletes or changes every matching file. "
+                "A name filter does not protect system files (e.g. every *.conf goes). First run it without -delete/-exec and check the list.")},
     {"id": "diske_yaz", "siddet": "yuksek", "kosul": _diske_yaz,
      "neden": T("Bir aygıta (/dev/sda, /dev/nvme0n1, /dev/mapper/…) doğrudan yazıyor; diskteki veri ve bölümler bozulur.",
                 "It writes straight to a device (/dev/sda, /dev/nvme0n1, /dev/mapper/…); the data and partitions on it are destroyed.")},

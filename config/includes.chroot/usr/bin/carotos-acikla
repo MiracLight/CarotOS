@@ -52,7 +52,10 @@ def main(argv):
     else:
         print(__doc__.strip())
         return 0
-    sys.stdout.write(acikla_motor.acikla(satir, kod))
+    metin = acikla_motor.acikla(satir, kod)
+    # Her durumda satir sonuyla biter: bos/tamamlanmamis satir iletileri sonsuzdu ve Alt+E'de
+    # terminal istemi iletinin hemen arkasina yapisiyordu.
+    sys.stdout.write(metin if metin.endswith("\n") else metin + "\n")
     return 0
 
 
