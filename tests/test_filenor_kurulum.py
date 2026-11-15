@@ -94,6 +94,9 @@ class PlanTesti(unittest.TestCase):
 
 class KurTesti(unittest.TestCase):
     def setUp(self):
+        # baska test modulleri ayni surecte HOME'u degistirebilir (discover): bu sinifin sahte evi sabitlenir
+        os.environ["HOME"] = _EV
+        os.environ["XDG_CONFIG_HOME"] = os.path.join(_EV, ".config")
         self.d = tempfile.mkdtemp(prefix="fn-kur-")
         self.bin = os.path.join(self.d, "bin")
         os.makedirs(self.bin)
