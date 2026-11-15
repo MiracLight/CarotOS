@@ -93,7 +93,9 @@ def cikar():
                     else:
                         dinamik.append((rel, dugum.lineno))
             elif (isinstance(dugum, ast.Call) and isinstance(dugum.func, ast.Name) and dugum.func.id in ("T", "A")
-                  and len(dugum.args) == 2 and not dugum.keywords
+                  and len(dugum.args) == 2
+                  # A(tr, en, deger=True, root=True, g=...): anahtar sozcukler metin degil; T anahtar sozcuk almaz
+                  and (not dugum.keywords or dugum.func.id == "A")
                   and _sabit(dugum.args[0]) and _sabit(dugum.args[1])):
                 tr, en = dugum.args[0].value, dugum.args[1].value
             if en is not None and en.strip():
