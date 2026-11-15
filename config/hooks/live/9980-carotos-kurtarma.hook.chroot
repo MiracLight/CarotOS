@@ -15,5 +15,10 @@ chmod 644 /etc/apt/apt.conf.d/50carotos-kurtarma
 grep -q 'carotos-kurtarma-yonet oto-guncelleme-oncesi' /etc/apt/apt.conf.d/50carotos-kurtarma \
     || { echo "CarotOS HATA: apt kancasi (50carotos-kurtarma) beklenen komutu icermiyor." >&2; exit 1; }
 
+chmod 644 /usr/share/icons/hicolor/*/apps/carotos-kurtarma.png
+[ -s /usr/share/icons/hicolor/256x256/apps/carotos-kurtarma.png ] \
+    || { echo "CarotOS HATA: carotos-kurtarma simgesi eksik." >&2; exit 1; }
+
 update-desktop-database /usr/share/applications || true
+gtk-update-icon-cache -f -t /usr/share/icons/hicolor || true
 echo "CarotOS: Kurtarma yerlestirildi."
