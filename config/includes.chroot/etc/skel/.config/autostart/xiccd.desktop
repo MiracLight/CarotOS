@@ -1,0 +1,8 @@
+[Desktop Entry]
+# CarotOS: ekran renk profili (ICC) servisi varsayilan olarak oturumda baslamaz.
+# xiccd her oturumda colord'u da uyandirip bosuna bellek tutuyordu; renk profili
+# kullanan biri bu dosyayi silerek (ya da Hidden=false yaparak) geri acabilir.
+Type=Application
+Name=xiccd
+Exec=xiccd
+Hidden=true
