@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """CarotOS: "Carot Sleek" gorunumunu uygular ya da geri alir (KULLANICI olarak; root DEGIL).
 
-Kullanim:  carotos-modernlestir uygula | geri-al | durum
+Kullanim:  carotos-modernlestir uygula | geri-al | durum | picom-baslat
 
 Paketler (Orchis, Papirus, Inter, JetBrains Mono, picom, plank, rofi) once
 /usr/local/sbin/carotos-tema-kur ile kurulmus olmalidir; bu betik paket kurmaz.
@@ -11,10 +11,13 @@ uygula   Degisecek her xfconf degerinin, dosyanin ve gsettings anahtarinin ESKI 
          ~/.local/state/carotos/sleek-yedek.json dosyasina (0600, atomik) yazar, sonra:
            - GTK/xfwm4 temasi, simgeler, Inter 10, ortali baslik (imlec DEGISMEZ: Breeze korunur)
            - picom (yuvarlak kose, golge; gercek makinede bulanıklik+solma; sanal makinede
-             xrender, bulanıklik/solma kapali) + xfwm4'un kendi birlestiricisi kapatilir
-           - ust panel ince (30) ve yari saydam (gtk.css blogu), saat bicimi; eklenti yerlesimine
-             dokunulmaz. Yalniz baslaticidan olusan ikinci panel (alt dock) plank ile cakismasin diye
-             panel listesinden cikarilir (ayarlari silinmez; geri al ile doner)
+             xrender, bulanıklik/solma kapali) + xfwm4'un kendi birlestiricisi kapatilir.
+             picom ayakta kalmazsa (eski GPU: "Failed to get GLX context") ayar xrender'a cevrilip
+             yeniden denenir; o da olmazsa xfwm4'un birlestiricisi geri acilir (masaustu opak kalmaz)
+           - ust panel ince (30) ve yari saydam (gtk.css blogu), saat bicimi. Ust paneldeki CarotOS
+             uygulama baslaticilari kaldirilir (onlar yan panelde); diger eklentilere dokunulmaz.
+             Yalniz baslaticidan olusan ikinci panel (alt dock) plank ile cakismasin diye panel
+             listesinden cikarilir (ayarlari silinmez; geri al ile ikisi de doner)
            - plank: ALT dock (sistem: terminal, dosyalar, tarayici, uygulama arama, ayarlar); SOL yan
              PANEL (kendi uygulamamiz /opt/carotos/yanpanel: 5 simge gorunur, kaydirmali, sol kenarda
              gizli); rofi (Super+Space), terminal (JetBrains Mono,
@@ -25,6 +28,8 @@ geri-al  Yedegi geri yukler: xfconf eski degerler (yoksa silinir), bizim dosyala
          icerige doner, gtk.css'ten yalniz bizim blok kalkar, terminalrc'de yalniz bizim anahtarlar
          eski degerine doner, picom/plank kapatilir. Paketler kaldirilmaz.
 durum    Uygulanmis mi, sanal makine mi, eksik program var mi.
+picom-baslat  Oturum acilisinda (autostart) picom'u ayni guvenlik agiyla baslatir; Sleek
+         uygulanmamissa hicbir sey yapmaz.
 
 Disaridan girdi almaz. Programlar yalniz /usr/bin altindaki tam yollariyla, kabuksuz, temiz ortamla
 calistirilir. Tek dosya, yalnizca standart kutuphane.
@@ -72,6 +77,10 @@ DOCK_VARSAYILAN = (
 )
 # SOL yan panel: kendi yazdigimiz kaydirmali panel (5 simge gorunur); plank degil
 YANPANEL = "/opt/carotos/yanpanel/carotos-yanpanel.py"
+KENDI = "/usr/local/bin/carotos-modernlestir"          # autostart: oturumda 'picom-baslat'
+PICOM_BEKLE = 2.5          # sn: glx baglami acilamazsa picom bu surede coker
+# xfconf'ta calisan panele ancak panel yeniden baslatilinca yansiyan anahtarlar
+PANEL_ANAHTARI = re.compile(r"^/panels(/panel-\d+/plugin-ids)?$")
 GEREKLI_PROGRAMLAR = ("xfconf-query", "picom", "plank", "rofi", "gsettings")
 
 # Marka renkleri (logo mavisi #5196d6, koyu #2568a9, zemin #001239 / #000b24)
@@ -285,14 +294,22 @@ def autostart_metni(ad, argv):
 # Uretilen metinler
 # ---------------------------------------------------------------------------
 
-def picom_conf(sanal):
-    """picom 10..12.5 ile uyumlu eski tip anahtarlar ("rules" kullanilmaz, karistirilmaz)."""
+def picom_conf(sanal, yedek=False):
+    """picom 10..12.5 ile uyumlu eski tip anahtarlar ("rules" kullanilmaz, karistirilmaz).
+
+    yedek=True: gercek makinede glx acilamadi; sanal makinedeki gibi xrender (bulaniklik/solma kapali)."""
     tam_ekran = "\"_NET_WM_STATE@:32a *= '_NET_WM_STATE_FULLSCREEN'\""
+    if yedek:
+        mod = "gercek makine, glx acilamadi: xrender yedegi (bulaniklik ve solma kapali)"
+    elif sanal:
+        mod = "sanal makine (xrender, bulaniklik ve solma kapali)"
+    else:
+        mod = "gercek makine (glx, bulaniklik ve solma acik)"
+    sanal = sanal or yedek
     s = [
         "# CarotOS \"Carot Sleek\" picom ayarlari (carotos-modernlestir uretti).",
         "# Geri almak icin: carotos-modernlestir geri-al",
-        "# Mod: %s" % ("sanal makine (xrender, bulaniklik ve solma kapali)" if sanal
-                       else "gercek makine (glx, bulaniklik ve solma acik)"),
+        "# Mod: %s" % mod,
         "",
         'backend = "%s";' % ("xrender" if sanal else "glx"),
         "vsync = %s;" % ("false" if sanal else "true"),
@@ -560,6 +577,32 @@ def _baslatici_kaynagi(o, dosya):
     return dosya
 
 
+def _baslatici_kaynaklari(o, eid):
+    """launcher eklentisinin ogelerinin asil .desktop yollari (okunamayanlar atlanir)."""
+    _, ogeler = xq_oku(o, "xfce4-panel", "/plugins/plugin-%s/items" % eid)
+    kaynaklar = []
+    for oge in ogeler if isinstance(ogeler, list) else []:
+        oge = oge.strip()
+        if "/" in oge or not oge.endswith(".desktop"):
+            continue
+        dosya = o.yol("xfce4", "panel", "launcher-%s" % eid, oge)
+        if os.path.isfile(dosya):
+            kaynak = _baslatici_kaynagi(o, dosya)
+            if kaynak:
+                kaynaklar.append(kaynak)
+    return kaynaklar
+
+
+def _carotos_uygulamasi_mi(yol):
+    return os.path.basename(yol).startswith("carotos-")
+
+
+def _carotos_baslaticisi_mi(o, eid):
+    """Ogelerinin HEPSI CarotOS uygulamasi olan (bos olmayan) baslatici."""
+    kaynaklar = _baslatici_kaynaklari(o, eid)
+    return bool(kaynaklar) and all(_carotos_uygulamasi_mi(k) for k in kaynaklar)
+
+
 def _int_listesi(deger):
     if not isinstance(deger, list):
         return []
@@ -578,11 +621,21 @@ def panel_plani(o, plan):
         ("xfce4-panel", "/panels/panel-%s/background-style" % ana, "uint", 0),
     ]
     _, ana_eklentiler = xq_oku(o, "xfce4-panel", "/panels/panel-%s/plugin-ids" % ana)
+    ana_kalan, ana_cikan = [], []
     for eid in _int_listesi(ana_eklentiler):
         _, tur = xq_oku(o, "xfce4-panel", "/plugins/plugin-%s" % eid)
         if tur == "clock":
             plan["xfconf"].append(("xfce4-panel", "/plugins/plugin-%s/digital-time-format" % eid,
                                    "string", SAAT_BICIMI))
+        # CarotOS uygulama baslaticilari yan panelde: ust panelde ikinci kez durmasin
+        if tur == "launcher" and _carotos_baslaticisi_mi(o, eid):
+            ana_cikan.append(eid)
+        else:
+            ana_kalan.append(eid)
+    if ana_cikan and ana_kalan:
+        plan["xfconf"].append(("xfce4-panel", "/panels/panel-%s/plugin-ids" % ana, "dizi:int", ana_kalan))
+        plan["uyarilar"].append("ust paneldeki %d CarotOS baslaticisi kaldirildi (yan panelde); geri al ile "
+                                "doner" % len(ana_cikan))
     baslaticilar, gizlenen = [], []
     for pid in paneller[1:]:
         _, eklentiler = xq_oku(o, "xfce4-panel", "/panels/panel-%s/plugin-ids" % pid)
@@ -596,18 +649,8 @@ def panel_plani(o, plan):
             continue
         gizlenen.append(pid)
         for eid in eklentiler:
-            if turler[eid] != "launcher":
-                continue
-            _, ogeler = xq_oku(o, "xfce4-panel", "/plugins/plugin-%s/items" % eid)
-            for oge in ogeler if isinstance(ogeler, list) else []:
-                oge = oge.strip()
-                if "/" in oge or not oge.endswith(".desktop"):
-                    continue
-                dosya = o.yol("xfce4", "panel", "launcher-%s" % eid, oge)
-                if os.path.isfile(dosya):
-                    kaynak = _baslatici_kaynagi(o, dosya)
-                    if kaynak:
-                        baslaticilar.append(kaynak)
+            if turler[eid] == "launcher":
+                baslaticilar += _baslatici_kaynaklari(o, eid)
     if gizlenen:
         plan["paneller"] = [p for p in paneller if p not in gizlenen]
         plan["uyarilar"].append("alt dock paneli (panel-%s) plank ile cakismasin diye gizlendi; "
@@ -695,8 +738,9 @@ def plan_olustur(o):
     # 1) picom + xfwm4 birlestiricisi (EN SON: picom hemen ardindan baslar)
     picom = o.yol("picom", "picom.conf")
     plan["dosyalar"][picom] = picom_conf(sanal)
+    # oturumda dogrudan picom degil 'picom-baslat': glx cokerse xrender'a / xfwm4'e duser
     plan["dosyalar"][o.yol("autostart", "carotos-picom.desktop")] = autostart_metni(
-        "CarotOS picom", [o.prog("picom"), "--config", picom])
+        "CarotOS picom", [o.prog("python3"), "-I", KENDI, "picom-baslat"])
     plan["dosyalar"][o.yol("autostart", "carotos-plank.desktop")] = autostart_metni(
         "CarotOS plank", [o.prog("plank")])
     plan["dosyalar"][o.yol("autostart", "carotos-yanpanel.desktop")] = autostart_metni(
@@ -715,7 +759,8 @@ def plan_olustur(o):
     grup_adlari = {ad for grup in DOCK_VARSAYILAN for ad in grup}
     for yol in panel_baslaticilari:
         # varsayilan gruplarin bir uyesi (ornegin genel 'web tarayicisi') zaten secildiyse ikinci kez ekleme
-        if yol not in secilen and os.path.basename(yol) not in grup_adlari:
+        # CarotOS uygulamalari alt dock'a degil yan panele aittir
+        if yol not in secilen and os.path.basename(yol) not in grup_adlari and not _carotos_uygulamasi_mi(yol):
             secilen.append(yol)
     plan["gsettings"] = []
     for dock, yollar, ayarlar in (
@@ -833,6 +878,34 @@ def surec_durdur(o, ad):
     o.calistir([o.prog("pkill"), "-u", str(o.uid), "-x", ad])
 
 
+def picom_baslat(o, conf_yolu):
+    """picom'u baslatir ve ayakta kaldigini dogrular.
+
+    glx ile acilamazsa (eski GPU/surucu: "Failed to get GLX context", picom hemen coker) ayari xrender'a
+    (bulaniklik/solma kapali) cevirip bir kez daha dener; o da olmazsa xfwm4'un kendi birlestiricisini
+    acar ki masaustu saydamliksiz, golgesiz ve animasyonsuz kalmasin.
+    Donus: 'picom' | 'picom-xrender' | 'xfwm4'. picom hic calistirilamazsa UygulamaHatasi."""
+    for deneme in range(2):
+        if not o.baslat([o.prog("picom"), "--config", conf_yolu]):
+            raise UygulamaHatasi("picom baslatilamadi")
+        o.bekle(PICOM_BEKLE)
+        if surec_calisiyor(o, "picom"):
+            return "picom" if deneme == 0 else "picom-xrender"
+        if deneme == 0 and 'backend = "glx";' in (oku(conf_yolu) or ""):
+            atomik_yaz(conf_yolu, picom_conf(False, yedek=True), 0o600)
+            continue
+        break
+    xq_yaz(o, "xfwm4", "/general/use_compositing", "bool", True)
+    return "xfwm4"
+
+
+BIRLESTIRICI_NOTU = {
+    "picom-xrender": "ekran karti glx'i desteklemedi: picom xrender ile calisiyor (bulaniklik ve solma kapali)",
+    "xfwm4": "picom bu ekran kartinda calismadi: xfwm4'un kendi birlestiricisi acildi "
+             "(saydamlik var; yuvarlak kose ve bulaniklik yok)",
+}
+
+
 def paneli_yeniden_kur(o, ayarla):
     """/panels degisikligi calisan panele ancak yeniden baslatinca yansir: kapat, ayarla, baslat."""
     calisiyor = surec_calisiyor(o, "xfce4-panel")
@@ -876,10 +949,16 @@ def eski_yan_dock_temizle(o):
 
 def _uygula_plan(o, plan):
     eski_yan_dock_temizle(o)
+    panel_yazimlari = []
     for kanal, ozellik, tur, deger in plan["xfconf"]:
         if (kanal, ozellik) == ("xfwm4", "/general/use_compositing"):
             continue
+        if kanal == "xfce4-panel" and PANEL_ANAHTARI.match(ozellik):
+            panel_yazimlari.append((ozellik, tur, deger))      # panel kapaliyken yazilir (asagida)
+            continue
         xq_yaz(o, kanal, ozellik, tur, deger)
+    if plan["paneller"] is not None:
+        panel_yazimlari.append(("/panels", "dizi:int", plan["paneller"]))
     for yol, metin in plan["dosyalar"].items():
         atomik_yaz(yol, metin, 0o644 if yol.endswith(".desktop") else 0o600)
     css = o.yol("gtk-3.0", "gtk.css")
@@ -897,16 +976,16 @@ def _uygula_plan(o, plan):
     surec_durdur(o, "picom")
     xq_yaz(o, "xfwm4", "/general/use_compositing", "bool", False)
     o.bekle(1.0)
-    if not o.baslat([o.prog("picom"), "--config", o.yol("picom", "picom.conf")]):
-        raise UygulamaHatasi("picom baslatilamadi")
+    plan["birlestirici"] = picom_baslat(o, o.yol("picom", "picom.conf"))
     if not surec_calisiyor(o, "plank"):
         o.baslat([o.prog("plank")])
     if os.path.isfile(YANPANEL):
         kod, _ = o.calistir([o.prog("pgrep"), "-u", str(o.uid), "-f", "carotos-yanpanel.py"])
         if kod != 0:
             o.baslat([o.prog("python3"), "-I", YANPANEL])
-    if plan["paneller"] is not None:
-        paneli_yeniden_kur(o, lambda: xq_yaz(o, "xfce4-panel", "/panels", "dizi:int", plan["paneller"]))
+    if panel_yazimlari:
+        paneli_yeniden_kur(o, lambda: [xq_yaz(o, "xfce4-panel", oz, tur, deger)
+                                       for oz, tur, deger in panel_yazimlari])
 
 
 def geri_yukle(o, yedek):
@@ -915,11 +994,11 @@ def geri_yukle(o, yedek):
     surec_durdur(o, "plank")
     surec_durdur(o, "picom")
     o.calistir([o.prog("pkill"), "-u", str(o.uid), "-f", "carotos-yanpanel.py"])
-    panel_kaydi = None
+    panel_kayitlari = []
     for x in reversed(yedek.get("xfconf", [])):
         try:
-            if x["ozellik"] == "/panels":
-                panel_kaydi = x
+            if x["kanal"] == "xfce4-panel" and PANEL_ANAHTARI.match(x["ozellik"]):
+                panel_kayitlari.append(x)          # panel kapaliyken geri yazilir (asagida)
                 continue
             if x["var"]:
                 xq_yaz(o, x["kanal"], x["ozellik"], x["tur"], x["deger"])
@@ -963,12 +1042,12 @@ def geri_yukle(o, yedek):
                 else [o.prog("gsettings"), "reset", sema, ad])
         if o.calistir(argv)[0] != 0:
             hatalar.append("plank ayari geri yuklenemedi: %s" % anahtar)
-    if panel_kaydi is not None:
+    geri_yazilacak = [x for x in panel_kayitlari if x.get("var")]
+    if geri_yazilacak:
         try:
-            if panel_kaydi["var"]:
-                paneli_yeniden_kur(o, lambda: xq_yaz(o, "xfce4-panel", "/panels", "dizi:int",
-                                                     panel_kaydi["deger"]))
-        except UygulamaHatasi as exc:
+            paneli_yeniden_kur(o, lambda: [xq_yaz(o, "xfce4-panel", x["ozellik"], x["tur"], x["deger"])
+                                           for x in geri_yazilacak])
+        except (UygulamaHatasi, KeyError, TypeError) as exc:
             hatalar.append(str(exc))
     return hatalar
 
@@ -1008,7 +1087,34 @@ def uygula(o, cikti=print):
         return KOD_HATA
     for u in plan["uyarilar"]:
         cikti("uyari: " + u)
+    if plan.get("birlestirici") in BIRLESTIRICI_NOTU:
+        cikti("uyari: " + BIRLESTIRICI_NOTU[plan["birlestirici"]])
     cikti("uygulandi (%s)" % ("sanal makine: bulaniklik ve solma kapali" if plan["sanal"] else "gercek makine"))
+    return 0
+
+
+def picom_oturum(o, cikti=print):
+    """Oturum acilisi (autostart): Sleek uygulanmissa picom'u guvenlik agiyla baslatir."""
+    try:
+        yedek = yedek_oku(o)
+    except UygulamaHatasi:
+        yedek = None
+    conf = o.yol("picom", "picom.conf")
+    if not yedek or not os.path.isfile(conf):
+        cikti("sleek uygulanmamis; picom baslatilmadi")
+        return 0
+    if surec_calisiyor(o, "picom"):
+        return 0
+    try:
+        sonuc = picom_baslat(o, conf)
+    except (UygulamaHatasi, OSError) as exc:
+        try:
+            xq_yaz(o, "xfwm4", "/general/use_compositing", "bool", True)
+        except UygulamaHatasi:
+            pass
+        cikti("hata: %s; xfwm4 birlestiricisi acildi" % exc)
+        return KOD_HATA
+    cikti("birlestirici %s" % sonuc)
     return 0
 
 
@@ -1047,8 +1153,8 @@ def durum(o, cikti=print):
 
 def main(argv=None, o=None, cikti=print):
     argv = sys.argv[1:] if argv is None else list(argv)
-    if len(argv) != 1 or argv[0] not in ("uygula", "geri-al", "durum"):
-        sys.stderr.write("kullanim: carotos-modernlestir uygula|geri-al|durum\n")
+    if len(argv) != 1 or argv[0] not in ("uygula", "geri-al", "durum", "picom-baslat"):
+        sys.stderr.write("kullanim: carotos-modernlestir uygula|geri-al|durum|picom-baslat\n")
         return KOD_KULLANIM
     if o is None:
         if os.geteuid() == 0:
@@ -1057,7 +1163,8 @@ def main(argv=None, o=None, cikti=print):
         import pwd
         ev = pwd.getpwuid(os.getuid()).pw_dir
         o = Ortam(ev, config=os.environ.get("XDG_CONFIG_HOME"))
-    return {"uygula": uygula, "geri-al": geri_al, "durum": durum}[argv[0]](o, cikti)
+    return {"uygula": uygula, "geri-al": geri_al, "durum": durum,
+            "picom-baslat": picom_oturum}[argv[0]](o, cikti)
 
 
 if __name__ == "__main__":

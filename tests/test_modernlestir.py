@@ -12,6 +12,7 @@ import importlib.util
 import io
 import json
 import os
+import re
 import shutil
 import stat
 import sys
@@ -190,6 +191,7 @@ class SahteMasaustu:
         self.yazi_tipleri = set(yazi_tipleri)
         self.gsettings_hata = False
         self.picom_hata = False
+        self.picom_coker = set()        # bu backend'lerle picom baslar ama hemen coker (eski GPU)
         self.komutlar = []
 
     def calistir(self, argv):
@@ -203,6 +205,11 @@ class SahteMasaustu:
         if self.picom_hata and argv[0] == "/usr/bin/picom":
             return False
         self.baslatilan.append(argv)
+        if argv[0] == "/usr/bin/picom" and self.picom_coker:
+            with open(argv[argv.index("--config") + 1], encoding="utf-8") as f:
+                backend = re.search(r'^backend = "(\w+)";', f.read(), re.M).group(1)
+            if backend in self.picom_coker:
+                return True                     # Popen basarili, surec hemen oldu (pgrep bulamaz)
         self.calisan.add(os.path.basename(argv[0]))
         return True
 
@@ -403,7 +410,8 @@ class ModernlestirUygulaTesti(ModernlestirTabani):
                     ("autostart", "carotos-plank.desktop"), ("rofi", "carotos.rasi")):
             self.assertTrue(os.path.isfile(os.path.join(self.config, *yol)), yol)
         oto = self.oku(os.path.join(self.config, "autostart", "carotos-picom.desktop"))
-        self.assertIn("Exec=/usr/bin/picom --config ", oto)
+        # oturumda picom dogrudan degil, guvenlik agiyla baslatilir
+        self.assertIn("Exec=/usr/bin/python3 -I %s picom-baslat" % md.KENDI, oto)
         self.assertIn(md.DESKTOP_ISARETI, oto)
         css = self.oku(os.path.join(self.config, "gtk-3.0", "gtk.css"))
         self.assertTrue(css.startswith(GTK_CSS))
@@ -564,6 +572,81 @@ class ModernlestirUygulaTesti(ModernlestirTabani):
         self.assertIn('backend = "glx";', conf)
         self.assertIn('blur-method = "dual_kawase";', conf)
         self.assertIn("fading = true;", conf)
+
+    # --- eski GPU: picom glx ile acilamaz (Toshiba Satellite C660: "Failed to get GLX context") ---
+    def picom_baslatma_sayisi(self):
+        return len([a for a in self.masa.baslatilan if a[0] == "/usr/bin/picom"])
+
+    def test_picom_glx_cokerse_xrender_e_duser(self):
+        self.masa.picom_coker = {"glx"}
+        self.assertEqual(self.calistir("uygula"), 0, self.ciktilar)
+        conf = self.oku(os.path.join(self.config, "picom", "picom.conf"))
+        self.assertIn('backend = "xrender";', conf)
+        self.assertIn("glx acilamadi", conf)
+        self.assertNotIn("blur-method", conf)
+        self.assertEqual(self.picom_baslatma_sayisi(), 2)
+        self.assertIn("picom", self.masa.calisan)
+        self.assertEqual(self.x("xfwm4", "/general/use_compositing"), "false")   # birlestirici picom
+        self.assertTrue(any("glx'i desteklemedi" in c for c in self.ciktilar), self.ciktilar)
+        # geri alinca her sey eski haline
+        self.assertEqual(self.calistir("geri-al"), 0, self.ciktilar)
+        self.assertEqual(self.masa.xfconf, BASLANGIC_XFCONF)
+
+    def test_picom_hic_calismazsa_xfwm4_birlestiricisi_acilir(self):
+        self.masa.picom_coker = {"glx", "xrender"}
+        self.assertEqual(self.calistir("uygula"), 0, self.ciktilar)
+        self.assertNotIn("picom", self.masa.calisan)
+        self.assertEqual(self.x("xfwm4", "/general/use_compositing"), "true")    # masaustu opak kalmaz
+        self.assertTrue(any("xfwm4'un kendi birlestiricisi" in c for c in self.ciktilar), self.ciktilar)
+        self.assertEqual(self.calistir("geri-al"), 0, self.ciktilar)
+        self.assertEqual(self.masa.xfconf, BASLANGIC_XFCONF)
+
+    def test_picom_baslat_oturum(self):
+        # Sleek uygulanmadiysa hicbir sey baslatmaz
+        self.assertEqual(self.calistir("picom-baslat"), 0, self.ciktilar)
+        self.assertEqual(self.picom_baslatma_sayisi(), 0)
+        self.assertEqual(self.calistir("uygula"), 0, self.ciktilar)
+        # yeni oturum: picom calismiyor, glx bu sefer coker -> xrender
+        self.masa.calisan.discard("picom")
+        self.masa.picom_coker = {"glx"}
+        once = self.picom_baslatma_sayisi()
+        self.assertEqual(self.calistir("picom-baslat"), 0, self.ciktilar)
+        self.assertEqual(self.picom_baslatma_sayisi(), once + 2)
+        self.assertIn("picom", self.masa.calisan)
+        self.assertIn("birlestirici picom-xrender", self.ciktilar)
+        # zaten calisiyorsa ikinci kez baslatmaz
+        self.assertEqual(self.calistir("picom-baslat"), 0, self.ciktilar)
+        self.assertEqual(self.picom_baslatma_sayisi(), once + 2)
+
+    # --- ust paneldeki CarotOS baslaticilari (yan panelde oldugu icin) kaldirilir ---
+    def test_ust_paneldeki_carotos_baslaticilari_kalkar(self):
+        m = self.masa.xfconf
+        m[("xfce4-panel", "/panels/panel-1/plugin-ids")] = ["1", "19", "20", "8"]
+        m[("xfce4-panel", "/plugins/plugin-19")] = "launcher"
+        m[("xfce4-panel", "/plugins/plugin-19/items")] = ["111.desktop"]
+        m[("xfce4-panel", "/plugins/plugin-20")] = "launcher"
+        m[("xfce4-panel", "/plugins/plugin-20/items")] = ["222.desktop"]
+        self.yaz(os.path.join(self.config, "xfce4", "panel", "launcher-19", "111.desktop"),
+                 "[Desktop Entry]\nX-XFCE-Source=file://%s\n" % os.path.join(self.uyg, "carotos-magaza.desktop"))
+        self.yaz(os.path.join(self.config, "xfce4", "panel", "launcher-20", "222.desktop"),
+                 "[Desktop Entry]\nX-XFCE-Source=file://%s\n" % os.path.join(self.uyg, "xfce4-terminal.desktop"))
+        baslangic = {k: list(v) if isinstance(v, list) else v for k, v in m.items()}
+        self.assertEqual(self.calistir("uygula"), 0, self.ciktilar)
+        # CarotOS baslaticisi cikti, digerleri (menu, terminal baslaticisi, saat) yerinde
+        self.assertEqual(self.x("xfce4-panel", "/panels/panel-1/plugin-ids"), ["1", "20", "8"])
+        self.assertTrue(any("CarotOS baslaticisi kaldirildi" in c for c in self.ciktilar), self.ciktilar)
+        # eklenti ayarlari silinmedi (geri al icin)
+        self.assertEqual(self.x("xfce4-panel", "/plugins/plugin-19"), "launcher")
+        # CarotOS uygulamasi alt dock'a da gitmez
+        self.assertNotIn("carotos-magaza", self.masa.gsettings["dock-items"])
+        self.assertEqual(self.calistir("geri-al"), 0, self.ciktilar)
+        self.assertEqual(self.masa.xfconf, baslangic)
+
+    def test_ust_panelde_carotos_yoksa_eklenti_listesine_dokunulmaz(self):
+        self.assertEqual(self.calistir("uygula"), 0, self.ciktilar)
+        self.assertEqual(self.x("xfce4-panel", "/panels/panel-1/plugin-ids"), ["1", "8"])
+        yedek = json.loads(self.oku(self.o.yedek_yolu))
+        self.assertFalse([x for x in yedek["xfconf"] if x["ozellik"].endswith("/plugin-ids")])
 
 
 class ModernlestirSanalMakineTesti(ModernlestirTabani):
