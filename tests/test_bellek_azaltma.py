@@ -38,6 +38,14 @@ class XiccdOturumda(unittest.TestCase):
         self.assertRegex(d, r"(?m)^Hidden=true$")
 
 
+class PencereEfektleri(unittest.TestCase):
+    def test_varsayilan_xfwm4_efektleri_kapali(self):
+        # Toshiba olcumu: bosta ~25 MB (ekran tamponlari); efektleri Carot Sleek (picom) getirir
+        d = oku(CH, "etc", "skel", ".config", "xfce4", "xfconf", "xfce-perchannel-xml", "xfwm4.xml")
+        self.assertIn('<property name="use_compositing" type="bool" value="false"/>', d)
+        self.assertNotIn('<property name="use_compositing" type="bool" value="true"/>', d)
+
+
 class UsbIzleyici(unittest.TestCase):
     def test_autostart_hala_monitor(self):
         d = oku(CH, "etc", "xdg", "autostart", "carotos-usb-check.desktop")

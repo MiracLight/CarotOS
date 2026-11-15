@@ -601,6 +601,30 @@ class ModernlestirUygulaTesti(ModernlestirTabani):
         self.assertEqual(self.calistir("geri-al"), 0, self.ciktilar)
         self.assertEqual(self.masa.xfconf, BASLANGIC_XFCONF)
 
+    # --- 1.4 bellek karari: varsayilan xfwm4 efektleri KAPALI, efektleri Sleek getirir ---
+    def varsayilan_kapali(self):
+        self.masa.xfconf[("xfwm4", "/general/use_compositing")] = "false"
+        return dict(self.masa.xfconf)
+
+    def test_varsayilan_kapali_sleek_efektleri_acar_geri_al_kapatir(self):
+        once = self.varsayilan_kapali()
+        self.assertEqual(self.calistir("uygula"), 0, self.ciktilar)
+        self.assertIn("picom", self.masa.calisan)                                 # efektler picom'dan
+        self.assertEqual(self.x("xfwm4", "/general/use_compositing"), "false")
+        self.assertEqual(self.calistir("geri-al"), 0, self.ciktilar)
+        self.assertNotIn("picom", self.masa.calisan)
+        self.assertEqual(self.x("xfwm4", "/general/use_compositing"), "false")   # normal kullanici: kapali
+        self.assertEqual(self.masa.xfconf, once)
+
+    def test_varsayilan_kapali_picom_calismazsa_xfwm4_acar_geri_al_kapatir(self):
+        once = self.varsayilan_kapali()
+        self.masa.picom_coker = {"glx", "xrender"}
+        self.assertEqual(self.calistir("uygula"), 0, self.ciktilar)
+        self.assertEqual(self.x("xfwm4", "/general/use_compositing"), "true")    # Sleek'te efektler acik
+        self.assertEqual(self.calistir("geri-al"), 0, self.ciktilar)
+        self.assertEqual(self.x("xfwm4", "/general/use_compositing"), "false")
+        self.assertEqual(self.masa.xfconf, once)
+
     def test_picom_baslat_oturum(self):
         # Sleek uygulanmadiysa hicbir sey baslatmaz
         self.assertEqual(self.calistir("picom-baslat"), 0, self.ciktilar)
