@@ -1,10 +1,10 @@
 #!/bin/bash
 # .deb uretir (WSL/Debian'da, kok yetkisiz):  tools/apt/paket-yap.sh <paket> <cikti-dizini>
-# Paketler: ortak keyring gsd former health usb security-panel magaza carotene filenor
+# Paketler: ortak keyring gsd former health usb security-panel magaza carotene filenor carotpot poligon welcome acikla sleek yardimci
 # Kaynak tek yerde: config/includes.chroot. Dosyalar root:root, hook'taki izinlerle ayni.
 # Surum: SURUM ortam degiskeni (varsayilan 1.4.0).
 set -euo pipefail
-TUMU="ortak keyring gsd former health usb security-panel magaza carotene filenor"
+TUMU="ortak keyring gsd former health usb security-panel magaza carotene filenor carotpot poligon welcome acikla sleek yardimci"
 [ $# -eq 2 ] || { echo "Kullanim: $0 <paket> <cikti-dizini>  (paket: $TUMU)" >&2; exit 2; }
 PAKET="$1"; CIKTI="$2"
 AD="$(cd "$(dirname "$0")" && pwd)"
@@ -20,9 +20,11 @@ fi
 
 # ---- paket tablosu ---------------------------------------------------------------------------------------
 # OPT: /opt/carotos/<OPT>   MASAUSTU: usr/share/applications/<ad>.desktop   EK: ek dosyalar (KAYNAK'a gore)
-# EXEC: OPT icindeki calistirilabilir dosyalar   BIN: "komut=OPT-icindeki-dosya" (/usr/bin baglari)
+# EXEC: OPT icindeki calistirilabilir dosyalar   EXEC_ABS: paket kokune gore calistirilabilir dosyalar (usr/local/...)   BIN: "komut=OPT-icindeki-dosya" (/usr/bin baglari)
+# ESKI: ISO 1.4'te /usr/local altinda dpkg sahipsiz duran eski yollar (ilk kurulumda kaldirilir)   COMPAT: "eski:yeni" uyumluluk
+# baglari (kullanicilarin otomatik baslatma girdileri eski yolu gosterir; yalniz eski dosya varsa postinst olusturur)
 # PNG_AD: ikonlar.b64'ten acilacak PNG adi   BAGIMLI/ONERILEN: ek paketler   ACIKLAMA: kisa + uzun aciklama
-OPT=""; MASAUSTU=""; EK=""; EXEC=""; BIN=""; PNG_AD=""; BAGIMLI=""; ONERILEN=""; ONERI=""; ACIKLAMA=""
+OPT=""; MASAUSTU=""; EK=""; EXEC=""; EXEC_ABS=""; ESKI=""; COMPAT=""; BIN=""; PNG_AD=""; BAGIMLI=""; ONERILEN=""; ONERI=""; ACIKLAMA=""
 # ONERILEN -> Recommends (apt varsayilan kurar), ONERI -> Suggests (kurmaz). rkhunter Recommends'i exim4/ruby ceker:
 # guvenlik dagitiminda istenmez, bu yuzden Suggests (ISO'da hook'lar zaten kurar).
 HICOLOR="usr/share/icons/hicolor"
@@ -57,7 +59,7 @@ security-panel)
     ACIKLAMA="CarotOS Guvenlik Paneli: guvenlik duvari, ag ve tarama
  Guvenlik duvari, ag durumu ve Nmap taramalari icin tek pencere." ;;
 magaza)
-    OPT=magaza; MASAUSTU=carotos-magaza; EXEC=carotos-magaza.py; BAGIMLI="$UYG_BAGIMLI"
+    OPT=magaza; MASAUSTU=carotos-magaza; EXEC=carotos-magaza.py; BAGIMLI="$UYG_BAGIMLI, carotos-yardimci"
     EK="$HICOLOR/256x256/apps/carotos-magaza.png $HICOLOR/scalable/apps/carotos-magaza.svg usr/share/pixmaps/carotos-magaza.png"
     ACIKLAMA="CarotOS Magaza: secilmis uygulama katalogu
  Aciklamali, secilmis uygulamalari kurmak ve guncellemek icin arac." ;;
@@ -74,6 +76,67 @@ filenor)
     ONERILEN="tesseract-ocr, tesseract-ocr-tur, tesseract-ocr-eng, python3-pillow-heif"
     ACIKLAMA="Filenor: dosya donusturucu
  Goruntu, belge, ses ve video dosyalarini cihazdan cikmadan donusturur." ;;
+carotpot)
+    OPT=carotpot; MASAUSTU=carotos-carotpot; EXEC="carotpot.py carotpot-yonet carotpot-arayuz.py"
+    BAGIMLI="$UYG_BAGIMLI, python3-asyncssh"; ONERILEN="ufw, fail2ban"
+    EK=""; for b in 16x16 22x22 24x24 32x32 48x48 64x64 128x128 256x256; do EK="$EK $HICOLOR/$b/apps/carotpot.png"; done
+    EK="$EK etc/carotpot/ayarlar.json etc/systemd/system/carotpot.service etc/systemd/system/carotpot-engel-temizle.service"
+    EK="$EK etc/fail2ban/filter.d/carotos-carotpot.conf etc/fail2ban/jail.d/carotos-carotpot.local etc/xdg/autostart/carotpot-bildirim.desktop"
+    AYAR="etc/carotpot/ayarlar.json"
+    ACIKLAMA="CarotPot: yerel ag tuzagi (bal kupu)
+ Yerel agda bu bilgisayari tarayan ya da saldiran cihazlari sahte hizmetlerle yakalayan arac. Hizmet acilista kendiliginden baslamaz."
+    POSTINST='if [ -z "${DPKG_ROOT:-}" ]; then
+    getent passwd carotpot >/dev/null || adduser --system --group --no-create-home --home /var/lib/carotpot --shell /usr/sbin/nologin carotpot
+    systemctl daemon-reload >/dev/null 2>&1 || true
+    systemctl enable carotpot-engel-temizle.service >/dev/null 2>&1 || true
+fi'
+    PRERM='if [ "$1" = remove ] && [ -z "${DPKG_ROOT:-}" ]; then
+    systemctl stop carotpot.service >/dev/null 2>&1 || true
+    systemctl disable carotpot-engel-temizle.service >/dev/null 2>&1 || true
+fi'
+    POSTRM='if [ "$1" = purge ]; then rm -rf "${DPKG_ROOT:-}/var/lib/carotpot" "${DPKG_ROOT:-}/var/log/carotpot"; fi
+if [ -z "${DPKG_ROOT:-}" ]; then systemctl daemon-reload >/dev/null 2>&1 || true; fi' ;;
+poligon)
+    OPT=poligon; MASAUSTU=carotos-poligon-ogrenci; EXEC="ogrenci_uygulama.py ogretmen_uygulama.py"
+    BAGIMLI="$UYG_BAGIMLI"; ONERILEN="nmap, hydra, john, sqlmap, tshark, ufw, fail2ban"
+    EK="usr/share/applications/carotos-poligon-ogretmen.desktop $HICOLOR/256x256/apps/carotos-poligon-ogrenci.png $HICOLOR/256x256/apps/carotos-poligon-ogretmen.png"
+    ACIKLAMA="CarotOS Poligon: guvenli sizma testi laboratuvari
+ Ogrenci ve ogretmen uygulamalariyla yerel agda gorev, CTF yarismasi ve savunmaci gorunumu." ;;
+welcome)
+    OPT=welcome; MASAUSTU=carotos-welcome; EXEC=carotos-welcome.py
+    BAGIMLI="$UYG_BAGIMLI, carotos-yardimci"; ONERILEN="carotos-acikla, carotos-sleek"
+    EK="usr/share/carotos/welcome"
+    ACIKLAMA="CarotOS Karsilama Sihirbazi
+ Ilk oturumda acilan, Linux ve CarotOS uygulamalarini konu konu anlatan tanitim rehberi." ;;
+acikla)
+    OPT=acikla; ESKI="usr/local/bin/carotos-acikla"; EXEC_ABS="usr/bin/carotos-acikla"; BAGIMLI="python3, carotos-ortak (>= $ORTAK_MIN)"
+    EK="usr/bin/carotos-acikla usr/share/carotos/acikla.bash"
+    ACIKLAMA="CarotOS Komut Aciklayici (Alt+E)
+ Bir komutu calistirmadan once ne yapacagini aciklar; terminalde Alt+E ile acilir."
+    POSTINST='B="${DPKG_ROOT:-}/etc/bash.bashrc"
+if [ -f "$B" ] && ! grep -q "carotos/acikla.bash" "$B"; then
+    printf "\n# CarotOS Komut Aciklayici (Alt+E)\n[ -r /usr/share/carotos/acikla.bash ] && . /usr/share/carotos/acikla.bash\n" >> "$B"
+fi'
+    POSTRM='B="${DPKG_ROOT:-}/etc/bash.bashrc"
+if { [ "$1" = remove ] || [ "$1" = purge ]; } && [ -f "$B" ]; then
+    sed -i "/CarotOS Komut Aciklayici (Alt+E)/d;/carotos\/acikla.bash/d" "$B"
+fi' ;;
+sleek)
+    OPT=yanpanel; EXEC=carotos-yanpanel.py
+    ESKI="usr/local/sbin/carotos-tema-kur"; COMPAT="usr/local/bin/carotos-modernlestir:/usr/bin/carotos-modernlestir"
+    EXEC_ABS="usr/bin/carotos-modernlestir usr/sbin/carotos-tema-kur"
+    BAGIMLI="python3, python3-gi, gir1.2-gtk-3.0, python3-gi-cairo, carotos-ortak (>= $ORTAK_MIN)"
+    EK="usr/bin/carotos-modernlestir usr/sbin/carotos-tema-kur"
+    ACIKLAMA="CarotOS Carot Sleek: modern masaustu temasi ve yan panel
+ Isteze bagli koyu tema, yuvarlak koseler, dock ve kenardan kayan CarotOS yan paneli; geri alinabilir." ;;
+yardimci)
+    ESKI="usr/local/sbin/carotos-dil-hazirla usr/local/sbin/carotos-mac-ayar usr/local/sbin/carotos-magaza-apt usr/local/sbin/carotos-ufw-ayar"
+    COMPAT="usr/local/bin/carotos-saat-eslestir:/usr/bin/carotos-saat-eslestir"
+    EXEC_ABS="usr/sbin/carotos-dil-hazirla usr/sbin/carotos-mac-ayar usr/sbin/carotos-magaza-apt usr/sbin/carotos-ufw-ayar usr/bin/carotos-saat-eslestir"
+    BAGIMLI="python3"; ONERILEN="pkexec"
+    EK="usr/sbin/carotos-dil-hazirla usr/sbin/carotos-mac-ayar usr/sbin/carotos-magaza-apt usr/sbin/carotos-ufw-ayar usr/bin/carotos-saat-eslestir"
+    ACIKLAMA="CarotOS yardimci betikleri
+ Uygulamalarin pkexec ile cagirdigi yetkili yardimcilar (dil hazirlama, MAC, guvenlik duvari, Magaza kurulumu, saat)." ;;
 *) echo "Bilinmeyen paket: $PAKET (paket: $TUMU)" >&2; exit 2 ;;
 esac
 
@@ -83,7 +146,9 @@ if [ -z "${SOURCE_DATE_EPOCH:-}" ]; then
     case "$PAKET" in
         ortak) YOL="config/includes.chroot/opt/carotos/ortak" ;;
         keyring) YOL="tools/apt/keyring-paketi" ;;
-        *) YOL="config/includes.chroot/opt/carotos/$OPT config/includes.chroot/usr/share/applications/$MASAUSTU.desktop"
+        *) YOL=""
+           [ -z "$OPT" ] || YOL="config/includes.chroot/opt/carotos/$OPT"
+           [ -z "$MASAUSTU" ] || YOL="$YOL config/includes.chroot/usr/share/applications/$MASAUSTU.desktop"
            for e in $EK; do YOL="$YOL config/includes.chroot/$e"; done ;;
     esac
     # shellcheck disable=SC2086
@@ -113,10 +178,10 @@ keyring)
     cp -r "$AD/keyring-paketi/." "$S/"
     SURUM="$(sed -n 's/^Version: //p' "$S/DEBIAN/control")" ;;
 *)
-    ekle "opt/carotos/$OPT"; temizle
-    rm -f "$S/opt/carotos/$OPT/ikonlar.b64"
-    ekle "usr/share/applications/$MASAUSTU.desktop"
+    if [ -n "$OPT" ]; then ekle "opt/carotos/$OPT"; rm -f "$S/opt/carotos/$OPT/ikonlar.b64"; fi
+    [ -z "$MASAUSTU" ] || ekle "usr/share/applications/$MASAUSTU.desktop"
     for e in $EK; do ekle "$e"; done
+    temizle
     if [ -n "$PNG_AD" ]; then   # PNG simgeler kaynakta "<boyut> <base64>" satirlari olarak durur
         while read -r boyut veri; do
             [ -n "$boyut" ] || continue
@@ -129,29 +194,108 @@ keyring)
     done ;;
 esac
 
-# ---- postrm ----------------------------------------------------------------------------------------------
+# ---- bakim betikleri ---------------------------------------------------------------------------------------
+# DPKG_ROOT: test ortaminda (dpkg --instdir) gercek sisteme dokunmaz. ISO 1.4 bu dosyalari dpkg sahipsiz koydu:
+# preinst ilk kurulumda sahipsiz eski kopyalari kaldirir (yoksa dpkg "baska yerden geliyor" diye reddeder);
+# Kullanici ayari dosyalari (AYAR) silinmez: yedeklenip postinst'te (paketin varsayilanindan farkliysa) geri konur;
+# diger sahipsiz /etc dosyalari (servis birimleri vb.) paketin surumuyle degisir.
 # Uygulama root olarak (pkexec) calisinca olusan __pycache__ dpkg'nin bilmedigi dosyalardir; kaldirmada dizin
-# bos kalsin diye uygulama dizini silinir. DPKG_ROOT: test ortaminda (dpkg --root) gercek /opt'a dokunmaz.
+# bos kalsin diye uygulama dizini silinir.
+POSTINST="${POSTINST:-}"; PRERM="${PRERM:-}"; POSTRM="${POSTRM:-}"; AYAR="${AYAR:-}"
 if [ "$PAKET" != keyring ]; then
-    D="${OPT:-ortak}"
-    cat > "$S/DEBIAN/postrm" <<EOS
-#!/bin/sh
-set -e
-case "\$1" in
-    remove|purge)
-        rm -rf "\${DPKG_ROOT:-}/opt/carotos/$D"
-        rmdir "\${DPKG_ROOT:-}/opt/carotos" 2>/dev/null || true
-        ;;
-esac
-exit 0
-EOS
-    chmod 755 "$S/DEBIAN/postrm"
+    D="$OPT"; [ "$PAKET" = ortak ] && D=ortak
+    LISTE="$T/liste"
+    (cd "$S" && find . -path ./DEBIAN -prune -o \( -type f -o -type l \) -print | sed 's|^\./|/|' | sort) > "$LISTE"
+    ETC="$(grep '^/etc/' "$LISTE" || true)"        # hepsi conffile
+    AYAR_L=""; for a in $AYAR; do AYAR_L="$AYAR_L /$a"; done   # AYAR: kullanicinin degistirdigi dosyalar (yedeklenir, geri konur)
+    if [ -n "$D" ]; then
+        DIGER="$(grep -v "^/opt/carotos/$D/" "$LISTE" || true)"
+        PROBE="$(grep "^/opt/carotos/$D/" "$LISTE" | head -1 || true)"
+    else
+        DIGER="$(cat "$LISTE")"; PROBE=""
+    fi
+    for a in $AYAR_L; do DIGER="$(printf '%s
+' "$DIGER" | grep -vxF "$a" || true)"; done
+    {
+        echo '#!/bin/sh'
+        echo 'set -e'
+        echo '[ "$1" = install ] || exit 0'
+        echo 'R="${DPKG_ROOT:-}"'
+        echo 'SAHIPSIZ() { ! dpkg -S "$1" >/dev/null 2>&1; }'
+        echo "YEDEK=\"\$R/var/lib/carotos-gecis/$PAKET\""
+        if [ -n "$PROBE" ]; then
+            echo "if [ -e \"\$R$PROBE\" ] && SAHIPSIZ \"$PROBE\"; then rm -rf \"\$R/opt/carotos/$D\"; fi"
+        fi
+        for f in $DIGER; do
+            echo "if { [ -e \"\$R$f\" ] || [ -L \"\$R$f\" ]; } && SAHIPSIZ \"$f\"; then rm -f \"\$R$f\"; fi"
+        done
+        for f in $ESKI; do
+            echo "if { [ -e \"\$R/$f\" ] || [ -L \"\$R/$f\" ]; } && SAHIPSIZ \"/$f\"; then rm -f \"\$R/$f\"; fi"
+        done
+        echo "UYUM=\"\$R/var/lib/carotos-gecis/$PAKET.uyum\""
+        for c in $COMPAT; do
+            e="${c%%:*}"; k="$(echo "$e" | tr / _)"
+            echo "if { [ -e \"\$R/$e\" ] || [ -L \"\$R/$e\" ]; } && SAHIPSIZ \"/$e\"; then mkdir -p \"\$UYUM\"; : > \"\$UYUM/$k\"; rm -f \"\$R/$e\"; fi"
+        done
+        for f in $AYAR_L; do
+            echo "if [ -f \"\$R$f\" ] && SAHIPSIZ \"$f\"; then mkdir -p \"\$YEDEK$(dirname "$f")\"; mv \"\$R$f\" \"\$YEDEK$f\"; fi"
+        done
+        echo 'exit 0'
+    } > "$S/DEBIAN/preinst"
+    {
+        echo '#!/bin/sh'
+        echo 'set -e'
+        echo '[ "$1" = configure ] || exit 0'
+        echo 'R="${DPKG_ROOT:-}"'
+        echo "YEDEK=\"\$R/var/lib/carotos-gecis/$PAKET\""
+        echo 'if [ -d "$YEDEK" ]; then'
+        echo '    (cd "$YEDEK" && find . -type f) | while read -r f; do'
+        echo '        f="${f#.}"'
+        echo '        if [ -f "$R$f" ] && ! cmp -s "$YEDEK$f" "$R$f"; then cp -p "$YEDEK$f" "$R$f"; fi'
+        echo '    done'
+        echo '    rm -rf "$YEDEK"; rmdir "$R/var/lib/carotos-gecis" 2>/dev/null || true'
+        echo 'fi'
+        echo "UYUM=\"\$R/var/lib/carotos-gecis/$PAKET.uyum\""
+        for c in $COMPAT; do
+            e="${c%%:*}"; y="${c#*:}"; k="$(echo "$e" | tr / _)"
+            echo "if [ -e \"\$UYUM/$k\" ]; then ln -sf \"$y\" \"\$R/$e\"; fi"
+        done
+        echo 'rm -rf "$UYUM"; rmdir "$R/var/lib/carotos-gecis" 2>/dev/null || true'
+        [ -z "$POSTINST" ] || echo "$POSTINST"
+        if grep -q '^/usr/share/icons/' "$LISTE"; then
+            echo '[ -n "${DPKG_ROOT:-}" ] || gtk-update-icon-cache -f -t /usr/share/icons/hicolor >/dev/null 2>&1 || true'
+        fi
+        echo 'exit 0'
+    } > "$S/DEBIAN/postinst"
+    if [ -n "$PRERM" ]; then { echo '#!/bin/sh'; echo 'set -e'; echo "$PRERM"; echo 'exit 0'; } > "$S/DEBIAN/prerm"; fi
+    {
+        echo '#!/bin/sh'
+        echo 'set -e'
+        if [ -n "$D" ]; then
+            echo 'case "$1" in'
+            echo '    remove|purge)'
+            echo "        rm -rf \"\${DPKG_ROOT:-}/opt/carotos/$D\""
+            echo '        rmdir "${DPKG_ROOT:-}/opt/carotos" 2>/dev/null || true'
+            echo '        ;;'
+            echo 'esac'
+        fi
+        for c in $COMPAT; do
+            e="${c%%:*}"; y="${c#*:}"
+            echo "if [ \"\$1\" = remove ] || [ \"\$1\" = purge ]; then if [ -L \"\${DPKG_ROOT:-}/$e\" ] && [ \"\$(readlink \"\${DPKG_ROOT:-}/$e\")\" = \"$y\" ]; then rm -f \"\${DPKG_ROOT:-}/$e\"; fi; fi"
+        done
+        [ -z "$POSTRM" ] || echo "$POSTRM"
+        echo 'exit 0'
+    } > "$S/DEBIAN/postrm"
+    for b in preinst postinst prerm postrm; do [ -f "$S/DEBIAN/$b" ] && chmod 755 "$S/DEBIAN/$b"; done
+    # /etc altindaki dosyalar conffile (kullanici degistirebilir; dpkg sormadan ezmez)
+    [ -z "$ETC" ] || echo "$ETC" > "$S/DEBIAN/conffiles"
 fi
 
 # ---- izinler: dizin 755, dosya 644, betikler 755 ---------------------------------------------------------
 find "$S" -mindepth 1 -type d -exec chmod 755 {} +
 find "$S" -type f -not -path "$S/DEBIAN/*" -exec chmod 644 {} +
 for x in $EXEC; do chmod 755 "$S/opt/carotos/$OPT/$x"; done
+for x in $EXEC_ABS; do chmod 755 "$S/$x"; done
 [ -d "$S/opt/carotos/ortak" ] && find "$S/opt/carotos/ortak" -name '*.py' -perm -u+x -exec chmod 644 {} + 2>/dev/null || true
 find "$S" -exec touch -h -d "@$SOURCE_DATE_EPOCH" {} +
 
@@ -172,6 +316,7 @@ else
     } > "$S/DEBIAN/control"
 fi
 chmod 644 "$S/DEBIAN/control" "$S/DEBIAN/md5sums"
+[ ! -f "$S/DEBIAN/conffiles" ] || chmod 644 "$S/DEBIAN/conffiles"
 mkdir -p "$CIKTI"
 dpkg-deb --root-owner-group --build "$S" "$CIKTI/${AD_PAKET}_${SURUM}_all.deb" >/dev/null
 echo "$CIKTI/${AD_PAKET}_${SURUM}_all.deb"

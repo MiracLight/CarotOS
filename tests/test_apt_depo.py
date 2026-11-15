@@ -90,16 +90,19 @@ class DepoYapilandirmasi(unittest.TestCase):
     def test_paket_betigi_kurallari(self):
         p = oku("paket-yap.sh")
         self.assertIn("--root-owner-group", p)
-        self.assertNotIn("usr/local", p)                       # paket /usr/local'e yazmaz (Debian politikasi)
+        for ad, deger in re.findall(r'(EK|EXEC_ABS)="([^"]*)"', p):   # paket /usr/local'e yazmaz (Debian politikasi)
+            self.assertNotIn("usr/local", deger, ad)
+        self.assertIn('ESKI="usr/local/', p)                  # ISO 1.4'ten gelen sahipsiz eski yollar yalniz silinir
         self.assertIn('rm -f "$S/opt/carotos/$OPT/ikonlar.b64"', p)
         self.assertIn("keyring)", p)
         for ad in ("ortak", "keyring", "gsd", "former", "health", "usb", "security-panel", "magaza", "carotene",
-                   "filenor"):
+                   "filenor", "carotpot", "poligon", "welcome", "acikla", "sleek", "yardimci"):
             self.assertRegex(p, r'(?m)^%s\)' % ad, ad)          # her paket tabloda tanimli
-        self.assertNotIn("welcome", p)                         # Karsilama ayri ele alinacak (/usr/local/sbin baglari)
         self.assertIn("SOURCE_DATE_EPOCH", p)                  # tekrarlanabilir derleme: ayni surum, ayni ozet
         self.assertIn("carotos-ortak (>=", p)                  # gsd, ortak katmana bagli
-        self.assertNotIn("postinst", p)                        # postinst yok: simge/masaustu onbellegi trigger ile
+        self.assertIn("DEBIAN/preinst", p)                     # ISO 1.4'ten gecis: sahipsiz eski kopyalar silinir
+        self.assertIn("SAHIPSIZ", p)
+        self.assertIn("DEBIAN/conffiles", p)                   # /etc dosyalari conffile
         self.assertIn("DEBIAN/postrm", p)                      # root'un biraktigi __pycache__ kaldirmada temizlenir
         self.assertIn("${DPKG_ROOT:-}/opt/carotos/", p)        # test ortaminda gercek /opt'a dokunmaz
         self.assertIn("remove|purge)", p)                      # yukseltmede (upgrade) silmez
@@ -119,7 +122,8 @@ class DepoYapilandirmasi(unittest.TestCase):
                 self.assertRegex(sur, r"^\d+\.\d+\.\d+$", ad)
                 tablo[ad] = (sur, ortak_min)
         self.assertEqual(set(tablo), {"ortak", "gsd", "former", "health", "usb", "security-panel", "magaza",
-                                      "carotene", "filenor"})
+                                      "carotene", "filenor", "carotpot", "poligon", "welcome", "acikla",
+                                      "sleek", "yardimci"})
         for ad, (sur, ortak_min) in tablo.items():
             if ad != "ortak":
                 self.assertRegex(ortak_min, r"^\d+\.\d+\.\d+$", ad)
