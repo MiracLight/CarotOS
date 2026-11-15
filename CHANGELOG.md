@@ -10,6 +10,29 @@ sayılmamıştır.
 
 ---
 
+## Sürüm 17 — 1.4 "Eggshell"
+**Durum:** Derlendi (`carotos-1.4-amd64.iso`), donanımda denendi; yayın hazırlığında.
+- **Poligon:** CTF yarışması (öğretmen paneli, canlı skor, CSV, öğrenciye özel
+  bayraklar, dinamik puan) ve savunmacı görünümü (sahte servis olay günlüğü,
+  bulgu analizi, ufw/fail2ban durumu).
+- **Komut Açıklayıcı** (terminalde Alt+E, Güvenlik Paneli'nde "Açıkla") ve
+  **etik koruma** (onaylı ağlar hatırlanır, Ayarlar'dan sıfırlanır).
+- **Karşılama:** 29 sayfa; Ağ ve gizlilik, Güvenlik duvarı, Disk şifreleme,
+  Terminal, Komut Açıklayıcı, Etik, Windows ile birlikte ve İndirdiğini doğrula;
+  konular seçilebilir. Görseller 1.4 uygulamalarının gerçek ekran görüntüleridir.
+- **ISO doğrulama:** SHA256SUMS ve ayrık imza (`tools/iso/imzala-iso.sh`).
+- **Carot Sleek:** isteğe bağlı modern masaüstü teması ve CarotOS Yan Paneli.
+- **Sistem Sağlığı:** ağ keşfi (mDNS) aç-kapat; beklenen masaüstü dinleyicileri
+  puanı düşürmez; 24 denetim. Mağaza 220 uygulama, GSD 197 terim.
+- **Çeviri:** yedi dilde arayüz (de, fr, es, pt, ru, ja, zh), %100 kapsam.
+- **Açılış:** Plymouth teması, GRUB 5/30 sn + os-prober, sessiz açılış,
+  `i915.fastboot=1`.
+- **Güvenlik denetimi:** 12 uygulama ve sistem betikleri tek tek gözden
+  geçirildi (`docs/DENETIM.md`); Poligon, Mağaza, CarotPot, Güvenlik Paneli,
+  Carotene, USB, Filenor, Sistem Sağlığı ve hook düzeltmeleri.
+- **Düzeltmeler:** fastfetch uzun donanım adında satır sarması; Former sol menü
+  kaydırma; Sistem Sağlığı "Dinlenen portlar" yanlış uyarısı.
+
 ## Sürüm 16 — 1.3.2 (ara sürüm)
 **Durum:** Derlendi ve sınanıyor. Ana sürüm 1.3 olarak kalır
 (`carotos-1.3-amd64.iso`, 2.597.928.960 bayt).

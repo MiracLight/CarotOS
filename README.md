@@ -57,7 +57,7 @@ anlatılmış.**
 
 <img src="docs/screenshots/sistem-sagligi.webp" alt="CarotOS Sistem Sağlığı" width="760">
 
-*CarotOS Sistem Sağlığı — Sistem durumu 23 denetimle kontrol edilir ve bir sağlık puanı olarak gösterilir.*
+*CarotOS Sistem Sağlığı — Sistem durumu 24 denetimle kontrol edilir ve bir sağlık puanı olarak gösterilir.*
 
 <br><br>
 
@@ -69,7 +69,7 @@ anlatılmış.**
 
 <img src="docs/screenshots/magaza.webp" alt="CarotOS Mağaza" width="760">
 
-*CarotOS Mağaza — On kategorideki 153 uygulama tek tıkla kurulur ve kaldırılır.*
+*CarotOS Mağaza — On kategorideki 220 uygulama tek tıkla kurulur ve kaldırılır.*
 
 <br><br>
 
@@ -99,7 +99,7 @@ anlatılmış.**
 
 <img src="docs/screenshots/gsd.webp" alt="CarotOS GSD" width="760">
 
-*CarotOS GSD — 161 terimlik, aranabilir, Türkçe ve İngilizce sözlük.*
+*CarotOS GSD — 197 terimlik, aranabilir, Türkçe ve İngilizce sözlük.*
 
 <br><br>
 
@@ -113,40 +113,40 @@ anlatılmış.**
 ## Uygulamalar
 
 ### CarotOS Güvenlik Paneli
-nmap, tcpdump ve hydra gibi on güvenlik aracını komut yazmadan kullanabileceğiniz grafik arayüz. Her aracın ne işe yaradığı ekranda anlatılır, sonuçlar canlı olarak izlenir.
+nmap, tcpdump ve hydra gibi on güvenlik aracını komut yazmadan kullanabileceğiniz grafik arayüz. Her aracın ne işe yaradığı ekranda anlatılır, sonuçlar canlı olarak izlenir. Her aracın yanındaki “Açıkla” düğmesi komutun parçalarını sade Türkçeyle anlatır; terminalde Alt+E ile aynı Komut Açıklayıcı açılır. Etik koruma, taramadan önce hedef için onay ister ve onayladığınız ağları hatırlar; hatırladıklarını Ayarlar'dan sıfırlayabilirsiniz.
 
 ### CarotOS Karşılama Sihirbazı
-CarotOS'u ilk açtığınızda karşınıza gelen tanıtım rehberi. Linux'un temel kavramlarını, masaüstünü ve CarotOS ile gelen uygulamaları 21 sayfada Türkçe ve İngilizce anlatır. Tema, dil ve masaüstü arka planını da buradan seçebilirsiniz.
+CarotOS'u ilk açtığınızda karşınıza gelen tanıtım rehberi. Linux'un temel kavramlarını, masaüstünü ve CarotOS ile gelen uygulamaları 29 sayfada Türkçe ve İngilizce anlatır. Tema, dil ve masaüstü arka planını da buradan seçebilirsiniz. Konuları siz seçersiniz: ağ ve gizlilik, güvenlik duvarı, disk şifreleme, Windows ile birlikte kurulum, terminal, Komut Açıklayıcı, etik ve indirdiğiniz ISO'nun doğrulanması ayrı kartlardır. İsterseniz Görünüm sayfasından modern masaüstü teması (Carot Sleek) açılır ve kapatınca geri alınır.
 
 ### CarotOS Sistem Sağlığı
-Bilgisayarınızın genel durumunu kontrol eden araç. Sistem, güncellemeler, ağ ve güvenlik duvarı, koruma katmanları, hesaplar ve disk gibi alanlarda 23 denetim yapar, sonucu bir sağlık puanı olarak gösterir. Sorunların çoğu tek tıkla düzeltilebilir, ayrıntılı tarama yapılabilir ve sonuçlar rapor olarak kaydedilir.
+Bilgisayarınızın genel durumunu kontrol eden araç. Sistem, güncellemeler, ağ ve güvenlik duvarı, koruma katmanları, hesaplar ve disk gibi alanlarda 24 denetim yapar, sonucu bir sağlık puanı olarak gösterir. DHCP ve mDNS gibi beklenen masaüstü dinleyicileri puanı düşürmez; ağ keşfini (mDNS) buradan açıp kapatabilirsiniz. Sorunların çoğu tek tıkla düzeltilebilir, ayrıntılı tarama yapılabilir ve sonuçlar rapor olarak kaydedilir.
 
 ### CarotOS USB Denetimi
 USB belleklerde zararlı yazılım belirtilerini arayan araç. Oturum açıldığında arka planda başlar, bir bellek takıldığında autorun.inf dosyalarını, çift uzantılı dosyaları ve klasör gibi görünen kısayolları kontrol eder. Bu kontrol dosyaların içini okumaz. İsterseniz ClamAV ile ayrıntılı bir tarama da başlatabilirsiniz. Bulunan dosyalara dokunulmaz, yalnızca raporlanır.
 
 ### CarotOS Poligon
-Öğrencilerin sızma testini güvenli bir ortamda öğrendiği uygulama. Görevler hydra, nmap, john, sqlmap ve tshark ile çözülür, ufw ve fail2ban ile savunma da denenir. Tüm çalışma kendi bilgisayarınızda kalır. Kaynak kodu ayrı bir depoda tutulur: [CarotOS-Poligon](https://github.com/MiracLight/CarotOS-Poligon).
+Öğrencilerin sızma testini güvenli bir ortamda öğrendiği uygulama. Görevler hydra, nmap, john, sqlmap ve tshark ile çözülür, ufw ve fail2ban ile savunma da denenir. Sınıfta CTF yarışması da yapılabilir: herkese kendi bayrağı üretilir, puanlar canlı skor tablosunda görünür. Savunmacı görünümü ise sahte servislere gelen saldırıları ve ufw ile fail2ban durumunu gösterir. Tüm çalışma kendi bilgisayarınızda kalır. Kaynak kodu ayrı bir depoda tutulur: [CarotOS-Poligon](https://github.com/MiracLight/CarotOS-Poligon).
 
 ### CarotOS Poligon Öğretmen
-Öğretmenlerin sınıfı yönettiği uygulama. Tek tıkla sınıf odası açar, öğrencilerin ilerlemesini izler, görev yönlendirir ve istenen öğrenciye ipucu gönderir.
+Öğretmenlerin sınıfı yönettiği uygulama. Tek tıkla sınıf odası açar, öğrencilerin ilerlemesini izler, görev yönlendirir ve istenen öğrenciye ipucu gönderir. CTF yarışmasını başlatır ve bitirir, canlı skoru izler, sonuçları CSV olarak kaydeder.
 
 ### CarotOS Mağaza
-Debian depolarındaki 153 uygulamayı on kategoride listeleyen yazılım mağazası. Uygulamaları tek tıkla kurup kaldırabilirsiniz. Açık ve koyu tema ile Türkçe ve İngilizce arayüz seçeneği vardır.
+Debian depolarındaki 220 uygulamayı on kategoride listeleyen yazılım mağazası. Uygulamaları tek tıkla kurup kaldırabilirsiniz. Açık ve koyu tema ile Türkçe ve İngilizce arayüz seçeneği vardır.
 
 ### Carotene
-ClamAV tabanlı antivirüs uygulaması. Hızlı tarama, ana klasör taraması ve seçtiğiniz klasörün taranması mümkündür. Bulunan dosyalar karantinaya alınır, virüs tanımları uygulamadan güncellenir ve tarama geçmişi saklanır. Arka planda çalışan bir hizmet kurmaz, yalnızca siz başlattığınızda tarar.
+ClamAV tabanlı antivirüs uygulaması. Hızlı tarama, ana klasör taraması ve seçtiğiniz klasörün taranması mümkündür. Bulunan dosyalar karantinaya alınır, virüs tanımları uygulamadan güncellenir ve tarama geçmişi saklanır. Arka planda çalışan bir hizmet kurmaz, yalnızca siz başlattığınızda tarar. Temiz sonuç yalnızca tarama sorunsuz bittiyse gösterilir.
 
 ### CarotPot
-Yerel ağınızdaki şüpheli hareketleri yakalayan tuzak sistemi. SSH, Telnet, FTP ve MySQL gibi sahte hizmetler açar, bunlara bağlanan cihazları kaydeder ve sizi uyarır. Gerçek bir giriş yapılamaz. Tuzak dosyalar açıldığında ya da değiştirildiğinde de uyarır. Sistem açılışında kendiliğinden başlamaz.
+Yerel ağınızdaki şüpheli hareketleri yakalayan tuzak sistemi. SSH, Telnet, FTP ve MySQL gibi sahte hizmetler açar, bunlara bağlanan cihazları kaydeder ve sizi uyarır. Gerçek bir giriş yapılamaz. Tuzak dosyalar açıldığında ya da değiştirildiğinde de uyarır. Her saldırgan için risk puanı ve zaman çizelgesi çıkarılır; saldırganı engelleyebilir, süreli engelleyebilir ya da not ekleyebilirsiniz. Sistem açılışında kendiliğinden başlamaz.
 
 ### Filenor
 Görsel, ses, video, belge, tablo, sunum ve yazı tipi dosyalarını tek arayüzden dönüştüren uygulama. PDF dosyalarını birleştirebilir, bölebilir, döndürebilir, küçültebilir ve kilitleyebilir, taranmış belgelerde metin tanıma (OCR) yapabilirsiniz. Var olan bir dosyanın üzerine hiçbir zaman yazmaz. Komut satırı sürümü de vardır.
 
 ### CarotOS Former
-Güvenlik araçlarını animasyonlarla öğreten rehber uygulama. Güvenlik Paneli'ndeki araçların ve CarotPot ile Carotene'in her biri için konu anlatımı, oynatılabilir bir animasyon ve “kendin dene” bölümü bulunur. Türkçe ve İngilizce çalışır.
+Güvenlik araçlarını animasyonlarla öğreten rehber uygulama. Güvenlik Paneli'ndeki araçların ve CarotPot ile Carotene'in her biri için konu anlatımı, oynatılabilir bir animasyon ve “kendin dene” bölümü bulunur. CTF yarışması, Komut Açıklayıcı, etik, disk şifreleme, ISO doğrulama ve savunmacı görünümü konuları da vardır. Türkçe ve İngilizce çalışır.
 
 ### CarotOS GSD
-Genel Sistem Sözlüğü. Linux, ağ, siber güvenlik, kriptografi ve bilgisayar bilimi alanlarında 161 terim içerir. Terimleri arayabilir, örnek komutları görebilir ve ilgili terimlere geçebilirsiniz. Türkçe ve İngilizce kullanılabilir.
+Genel Sistem Sözlüğü. Linux, ağ, siber güvenlik, kriptografi ve bilgisayar bilimi alanlarında 197 terim içerir. Terimleri arayabilir, örnek komutları görebilir ve ilgili terimlere geçebilirsiniz. Türkçe ve İngilizce kullanılabilir.
 
 ## Güvenlik araçları
 
