@@ -460,4 +460,139 @@ KOMUTLAR = {
         "uyari": T("Dinleyen bir port açtığında ağdaki herkes ona bağlanabilir; işin bitince kapat.",
                    "When you open a listening port anyone on the network can connect to it; close it when you're done."),
     },
+    # ---- 1.4 eklemeleri: Magaza'nin guvenlik bolumundeki araclar ----
+    "hashcat": {
+        "ozet": T("Ekran kartını kullanan, çok hızlı bir parola özeti (hash) kırma aracı; john'un GPU ile çalışan karşılığı.",
+                  "A very fast password hash cracker that uses the graphics card; the GPU counterpart of john."),
+        "nasil": T("Aday parolaları özet algoritmasıyla hesaplayıp hedef özetle karşılaştırır, ama bunu ekran kartının binlerce "
+                   "çekirdeğinde aynı anda yapar. -a 0 kelime listesi, -a 3 maske (ör. ?d?d?d?d: dört rakam), -a 6/7 liste ile "
+                   "maskenin karışımıdır. Özet türü -m ile seçilir (0 MD5, 1000 NTLM, 1800 sha512crypt, 22000 Wi-Fi WPA).",
+                   "It hashes candidate passwords and compares them with the target hash, but does it on thousands of graphics "
+                   "card cores at once. -a 0 is a wordlist, -a 3 a mask (e.g. ?d?d?d?d: four digits), -a 6/7 a mix of list and "
+                   "mask. The hash type is chosen with -m (0 MD5, 1000 NTLM, 1800 sha512crypt, 22000 Wi-Fi WPA)."),
+        "savunma": T("Çevrimdışı çalışır, hedefte iz bırakmaz; asıl olay özet dosyasının çalınmasıdır. Yavaş ve tuzlu algoritmalar "
+                     "(bcrypt, yescrypt, Argon2) ekran kartının hız üstünlüğünü büyük ölçüde siler; en etkili savunma uzun parolalardır.",
+                     "Runs offline and leaves no trace on the target; the real incident is the hash file being stolen. Slow salted "
+                     "algorithms (bcrypt, yescrypt, Argon2) largely cancel the graphics card's speed advantage; long passwords are "
+                     "the most effective defence."),
+        "gurultu": "dusuk", "yetki": "yok", "gsd": "Hash",
+        "bayraklar": {
+            "-m": A("Özet türünü seçer (ör. 0 MD5, 1000 NTLM, 22000 WPA).", "Chooses the hash type (e.g. 0 MD5, 1000 NTLM, 22000 WPA).", deger=True),
+            "-a": A("Saldırı kipini seçer (0 kelime listesi, 3 maske, 6/7 karışık).", "Chooses the attack mode (0 wordlist, 3 mask, 6/7 hybrid).", deger=True),
+            "-o": A("Kırılan parolaları bu dosyaya yazar.", "Writes cracked passwords to this file.", deger=True),
+            "-r": A("Kelime listesine kural dosyası uygular (büyük harf, sona rakam…).", "Applies a rules file to the wordlist (capitals, trailing digits…).", deger=True),
+            "-w": A("İş yükü düzeyi (1 düşük … 4 en yüksek; masaüstü yavaşlar).", "Workload level (1 low … 4 highest; the desktop slows down).", deger=True),
+            "-O": A("Hızlı çekirdekleri kullanır (parola uzunluğu sınırlanır).", "Uses optimised kernels (password length is limited)."),
+            "--show": A("Daha önce kırılmış parolaları gösterir.", "Shows passwords cracked earlier."),
+            "--force": A("Uyarıları yok sayar (desteklenmeyen sürücüde yanlış sonuç verebilir).", "Ignores warnings (can give wrong results on unsupported drivers)."),
+        },
+    },
+    "gobuster": {
+        "ozet": T("Bir web sitesinde gizli klasör ve dosyaları (ya da alt alan adlarını) kelime listesiyle tahmin ederek arar.",
+                  "Searches a website for hidden folders and files (or subdomains) by guessing from a wordlist."),
+        "nasil": T("Kelime listesindeki her kelimeyi adrese ekleyip (site/admin, site/backup.zip…) istek gönderir ve cevap koduna "
+                   "bakar: 200 ya da 301 bulundu, 404 yok demektir. dir kipi klasör ve dosya, dns kipi alt alan adı, vhost kipi "
+                   "sanal sunucu dener.",
+                   "It appends each wordlist entry to the address (site/admin, site/backup.zip…), sends a request and looks at the "
+                   "status code: 200 or 301 means found, 404 means not there. dir mode tries folders and files, dns mode "
+                   "subdomains, vhost mode virtual hosts."),
+        "savunma": T("Kısa sürede gelen yüzlerce 404 isteği web sunucusu günlüğünde açıkça görünür; fail2ban ve WAF bunu yakalar. "
+                     "Asıl savunma yedek dosyaları ve yönetim panellerini herkese açık klasörlerde bırakmamaktır.",
+                     "Hundreds of 404 requests in a short time stand out in the web server log; fail2ban and a WAF catch it. The "
+                     "real defence is not leaving backups and admin panels in publicly reachable folders."),
+        "gurultu": "yuksek", "yetki": "yok", "etik": True, "gsd": "Web server",
+        "altkomut": {
+            "dir": T("Klasör ve dosya adlarını dener.", "Tries folder and file names."),
+            "dns": T("Alt alan adlarını dener (ör. mail.site.com).", "Tries subdomains (e.g. mail.site.com)."),
+            "vhost": T("Aynı sunucudaki sanal siteleri dener.", "Tries virtual hosts on the same server."),
+            "fuzz": T("Adresteki FUZZ kelimesinin yerine listeyi koyar.", "Replaces the word FUZZ in the address with the list."),
+        },
+        "bayraklar": {
+            "-u": A("Hedef adres.", "Target address.", deger=True),
+            "-w": A("Kelime listesi dosyası.", "Wordlist file.", deger=True),
+            "-x": A("Her kelimeye eklenecek uzantılar (ör. php,txt,bak).", "Extensions to add to each word (e.g. php,txt,bak).", deger=True),
+            "-t": A("Aynı anda kaç istek gönderileceği (arttıkça gürültü artar).", "How many requests at once (more means noisier).", deger=True),
+            "-s": A("Bulundu sayılacak cevap kodları.", "Status codes that count as found.", deger=True),
+            "-b": A("Yok sayılacak cevap kodları (ör. 404).", "Status codes to ignore (e.g. 404).", deger=True),
+            "-o": A("Sonuçları dosyaya yazar.", "Writes the results to a file.", deger=True),
+            "-k": A("TLS sertifikasını doğrulamaz.", "Doesn't verify the TLS certificate."),
+            "-q": A("Yalnızca sonuçları yazar.", "Prints only the results."),
+        },
+    },
+    "dirb": {
+        "ozet": T("Web sitelerinde gizli klasör ve dosyaları kelime listesiyle arayan klasik araç.",
+                  "The classic tool for finding hidden folders and files on websites with a wordlist."),
+        "nasil": T("Kelime listesindeki her adı sitenin köküne ekleyip istek gönderir ve bulduğu klasörlerin içine de özyinelemeli "
+                   "iner. Liste verilmezse /usr/share/dirb/wordlists/common.txt kullanılır. Kullanım: dirb ADRES [LİSTE] [seçenekler].",
+                   "It appends each name in the wordlist to the site root, sends a request and descends recursively into the "
+                   "folders it finds. Without a list it uses /usr/share/dirb/wordlists/common.txt. Usage: dirb URL [LIST] [options]."),
+        "savunma": T("Art arda gelen 404 istekleri ve dirb'ün kendi kullanıcı aracısı (user agent) sunucu günlüğünde kolayca fark "
+                     "edilir. Herkese açık klasörlerde yedek, .git ya da yönetim paneli bırakmamak asıl korumadır.",
+                     "The stream of 404 requests and dirb's own user agent are easy to spot in the server log. Not leaving "
+                     "backups, .git folders or admin panels in public folders is the real protection."),
+        "gurultu": "yuksek", "yetki": "yok", "etik": True, "gsd": "Web server",
+        "bayraklar": {
+            "-X": A("Her kelimeye eklenecek uzantılar (ör. .php,.bak).", "Extensions to add to each word (e.g. .php,.bak).", deger=True),
+            "-o": A("Sonuçları dosyaya yazar.", "Writes the results to a file.", deger=True),
+            "-a": A("Kullanıcı aracısını (user agent) değiştirir.", "Changes the user agent.", deger=True),
+            "-z": A("İstekler arasına milisaniye cinsinden bekleme koyar (daha az gürültü).", "Adds a delay in milliseconds between requests (less noise).", deger=True),
+            "-N": A("Bu cevap kodunu yok sayar.", "Ignores this status code.", deger=True),
+            "-r": A("Bulunan klasörlerin içine inmez.", "Doesn't descend into folders it finds."),
+            "-S": A("Sessiz: denenen kelimeleri yazmaz.", "Silent: doesn't print the words being tried."),
+            "-w": A("Uyarı iletilerinde durmaz.", "Doesn't stop on warning messages."),
+        },
+    },
+    "ffuf": {
+        "ozet": T("Çok hızlı bir web 'fuzzing' aracı: adresteki FUZZ kelimesinin yerine listedeki her kelimeyi koyup dener "
+                  "(klasör, parametre, alt alan adı).",
+                  "A very fast web fuzzer: replaces the word FUZZ in the address with every word in a list (folders, "
+                  "parameters, subdomains)."),
+        "nasil": T("-u ile verilen adreste (ör. http://site/FUZZ) FUZZ'ın yerine listedeki her satırı koyar ve istekleri paralel "
+                   "gönderir. Cevap koduna, boyutuna ve kelime sayısına göre süzerek yalnızca ilginç cevapları gösterir.",
+                   "In the address given with -u (e.g. http://site/FUZZ) it puts every line of the list in place of FUZZ and "
+                   "sends the requests in parallel, filtering by status code, size and word count to show only interesting answers."),
+        "savunma": T("Saniyede yüzlerce istek gönderdiği için sunucu günlüğünde ve hız sınırlamasında hemen görünür. Hız sınırı, "
+                     "fail2ban ve gereksiz dosyaları yayından kaldırmak etkili savunmadır.",
+                     "It sends hundreds of requests per second, so it shows up immediately in the server log and rate limits. "
+                     "Rate limiting, fail2ban and removing unneeded files from the site are effective defences."),
+        "gurultu": "yuksek", "yetki": "yok", "etik": True, "gsd": "Web server",
+        "bayraklar": {
+            "-u": A("Hedef adres (FUZZ yer tutucusuyla).", "Target address (with the FUZZ placeholder).", deger=True),
+            "-w": A("Kelime listesi dosyası.", "Wordlist file.", deger=True),
+            "-mc": A("Yalnızca bu cevap kodlarını gösterir.", "Shows only these status codes.", deger=True),
+            "-fc": A("Bu cevap kodlarını gizler.", "Hides these status codes.", deger=True),
+            "-fs": A("Bu boyuttaki cevapları gizler (hep aynı 'bulunamadı' sayfası için).", "Hides answers of this size (for an always-identical 'not found' page).", deger=True),
+            "-t": A("Aynı anda kaç istek gönderileceği.", "How many requests at once.", deger=True),
+            "-H": A("İsteğe başlık ekler (ör. Cookie).", "Adds a header to the request (e.g. Cookie).", deger=True),
+            "-X": A("HTTP yöntemi (GET, POST…).", "HTTP method (GET, POST…).", deger=True),
+            "-d": A("POST gövdesi (form verisi).", "POST body (form data).", deger=True),
+            "-o": A("Sonuçları dosyaya yazar.", "Writes the results to a file.", deger=True),
+        },
+    },
+    "airodump-ng": {
+        "ozet": T("Monitör kipindeki kablosuz kartla çevredeki Wi-Fi ağlarını ve bağlı cihazları listeler; istenirse paketleri "
+                  "(WPA el sıkışması dahil) dosyaya kaydeder.",
+                  "With a wireless card in monitor mode it lists the Wi-Fi networks and connected devices around you; it can "
+                  "save packets to a file (including the WPA handshake)."),
+        "nasil": T("Kanallar arasında atlayarak ağların yayın (beacon) çerçevelerini ve cihazların paketlerini dinler; ağ adını, "
+                   "BSSID'yi, kanalı, şifreleme türünü ve sinyal gücünü tabloya döker. -c ile kanal, --bssid ile tek ağa odaklanıp "
+                   "-w ile kaydettiği dosya aircrack-ng'ye verilir. Önce kart airmon-ng ile monitör kipine alınır.",
+                   "It hops between channels listening to networks' beacon frames and devices' packets, and lays out the network "
+                   "name, BSSID, channel, encryption and signal strength in a table. Focused on one network with -c and --bssid, "
+                   "the file it writes with -w is fed to aircrack-ng. The card is first put into monitor mode with airmon-ng."),
+        "savunma": T("Tamamen pasiftir, ağ yöneticisi fark etmez. Yakalanan el sıkışmasının kırılması parolanın gücüne bağlıdır: uzun "
+                     "ve rastgele bir Wi-Fi parolası ve WPA3 bu saldırıyı pratikte boşa çıkarır.",
+                     "It is completely passive; the network owner won't notice. Cracking a captured handshake depends on the "
+                     "password: a long random Wi-Fi password and WPA3 make the attack practically useless."),
+        "gurultu": "dusuk", "yetki": "root", "etik": True, "gsd": "WPA",
+        "bayraklar": {
+            "-c": A("Yalnızca bu kanalı dinler.", "Listens only on this channel.", deger=True),
+            "--bssid": A("Yalnızca bu erişim noktasını (MAC adresi) izler.", "Watches only this access point (MAC address).", deger=True),
+            "--essid": A("Yalnızca bu ağ adını izler.", "Watches only this network name.", deger=True),
+            "-w": A("Paketleri bu adla başlayan dosyalara kaydeder.", "Saves packets to files starting with this name.", deger=True),
+            "--band": A("Taranacak bant (a 5 GHz, bg 2,4 GHz).", "Band to scan (a 5 GHz, bg 2.4 GHz).", deger=True),
+            "--output-format": A("Kayıt biçimi (pcap, csv…).", "Output format (pcap, csv…).", deger=True),
+            "-a": A("Yalnızca bir ağa bağlı cihazları gösterir.", "Shows only devices associated with a network."),
+        },
+    },
 }
