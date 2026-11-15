@@ -415,6 +415,48 @@ class H10DinlenenPortlar(Taban):
         self.assertEqual(meta["fix"], "sudo ss -tulnp")
 
 
+class MobilModemAnahtari(Taban):
+    """ModemManager CarotOS'ta varsayilan kapali; Bellek kartindan acilip kapatilir."""
+    MEMINFO = "MemTotal:       2000000 kB\nMemAvailable:   1500000 kB\n"
+
+    def _modem(self, kurulu, durum):
+        def run(cmd, timeout=12, env=None):
+            if cmd[:2] == ["systemctl", "is-active"] and cmd[2] == "ModemManager":
+                return 0, durum
+            return 1, ""
+        self.kur(run=run, have=lambda b: kurulu and b == "ModemManager",
+                 read_file=lambda y, limit=200000: self.MEMINFO)
+
+    def test_modem_durumu_sonuca_yazilir(self):
+        self._modem(True, "inactive")
+        s = H.check_memory()
+        self.assertEqual(s["modem"], "inactive")
+        self.assertIn("Mobil modem desteği kapalı", s["detail"]["tr"])
+        self._modem(True, "active")
+        s = H.check_memory()
+        self.assertEqual(s["modem"], "active")
+        self.assertIn("Mobile modem support is on", s["detail"]["en"])
+
+    def test_modem_kurulu_degilse_dugme_icin_durum_yok(self):
+        self._modem(False, "inactive")
+        self.assertNotIn("modem", H.check_memory())
+
+    def test_modem_dugmesi_tanimi(self):
+        self.assertIn("modem", H.ANAHTAR_ALANLARI)
+        meta = [m for m in H.CHECKS if m["id"] == "memory"][0]
+        ac, kapat = meta["modem"]["inactive"], meta["modem"]["active"]
+        self.assertEqual(ac["cmd"], "systemctl enable --now ModemManager.service")
+        self.assertEqual(kapat["cmd"], "systemctl disable --now ModemManager.service")
+        for e in (ac, kapat):
+            self.assertTrue(e["confirm"])                    # her iki yonde etkiler yazilir
+            self.assertIn("note", e)
+            self.assertTrue(e["label"]["tr"] and e["label"]["en"] and e["label"]["de"])   # 7 dile cevrilmis
+
+    def test_denetim_sayisi_degismedi(self):
+        # Anahtar mevcut Bellek kartina eklendi; duyurulardaki "24 denetim" korunur
+        self.assertEqual(len(H.CHECKS), 24)
+
+
 class H11SwapZram(Taban):
     BASLIK = "Filename\t\t\t\tType\t\tSize\t\tUsed\t\tPriority\n"
 

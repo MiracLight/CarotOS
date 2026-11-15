@@ -20,6 +20,18 @@ update-alternatives --set x-www-browser /usr/bin/firefox-esr
 # fail2ban'ı açılışta otomatik başlat
 systemctl enable fail2ban
 
+# ModemManager varsayilan KAPALI: cogu bilgisayarda mobil (4G/LTE) modem yok, servis bosuna bellek
+# tutuyor. Disable D-Bus takma adini da kaldirir, yani kendiliginden de baslatilmaz. Kullanici
+# Sistem Sagligi > Bellek kartindaki dugmeyle acar (systemctl enable --now). Karar sessizce bozulmasin.
+if [ -e /usr/lib/systemd/system/ModemManager.service ] || [ -e /lib/systemd/system/ModemManager.service ]; then
+    systemctl disable ModemManager.service
+    if systemctl is-enabled --quiet ModemManager.service 2>/dev/null; then
+        echo "CarotOS HATA: ModemManager.service hala etkin." >&2
+        exit 1
+    fi
+    echo "CarotOS: ModemManager varsayilan olarak kapatildi."
+fi
+
 # Not: derleme aninda UID >= 1000 kullanici yoktur; ilk kullanicinin yetkisi
 # kurucu (preseed, passwd/root-login false) ve carotos-firstboot ile verilir.
 

@@ -1162,9 +1162,20 @@ def check_memory():
     total = values.get("MemTotal", 0) / 1048576
     available = values.get("MemAvailable", 0) / 1048576
     used = total - available
-    return {"status": INFO,
-            "detail": {"tr": f"{used:.2f} GB / {total:.2f} GB kullanımda",
-                       "en": f"{used:.2f} GB / {total:.2f} GB in use"}}
+    sonuc = {"status": INFO,
+             "detail": {"tr": f"{used:.2f} GB / {total:.2f} GB kullanımda",
+                        "en": f"{used:.2f} GB / {total:.2f} GB in use"}}
+    # Mobil modem (ModemManager) anahtari: CarotOS'ta varsayilan KAPALI (bellek). Karttaki
+    # dugme bu duruma gore "ac" ya da "kapat" olur (bkz. KONTROLLER "memory" -> "modem").
+    if have("ModemManager"):
+        _, durum = run(["systemctl", "is-active", "ModemManager"])
+        sonuc["modem"] = "active" if durum.strip() == "active" else "inactive"
+        ek = ({"tr": " Mobil modem desteği açık.", "en": " Mobile modem support is on."}
+              if sonuc["modem"] == "active" else
+              {"tr": " Mobil modem desteği kapalı (bellek için).",
+               "en": " Mobile modem support is off (to save memory)."})
+        sonuc["detail"] = {k: v + ek[k] for k, v in sonuc["detail"].items()}
+    return sonuc
 
 
 def swap_cihazlari(swaps_metni):
@@ -1279,6 +1290,10 @@ CATEGORIES = [
     ("storage",  {"tr": "Disk ve bellek",      "en": "Storage & memory"}),
     ("deep",     {"tr": "Ayrıntılı taramalar", "en": "Detailed scans"}),
 ]
+
+# Karttaki ac/kapat servis anahtarlari: denetim sonucunda bu adla "active"/"inactive"
+# durumu, CHECKS kaydinda ayni adla iki eylem bulunur (ports -> mdns, memory -> modem).
+ANAHTAR_ALANLARI = ("mdns", "modem")
 
 CHECKS = [
     {
@@ -1632,6 +1647,27 @@ CHECKS = [
                       "çalıştığını gösterir.",
                 "en": "Idle memory usage shows how lightweight the system is."},
         "fix": "free -h",
+        # Mobil modem (ModemManager) anahtari: varsayilan KAPALI; USB/dahili 4G modem kullanan acar.
+        "modem": {
+            "inactive": {"cmd": "systemctl enable --now ModemManager.service",
+                         "label": {"tr": "Mobil modem desteğini aç", "en": "Turn on mobile modem support"},
+                         "confirm": True,
+                         "note": {"tr": "USB ya da dahili 4G/LTE modemin kendiliğinden tanınması için "
+                                        "ModemManager servisi başlatılır ve açılışta da çalışır. Arka planda "
+                                        "biraz bellek kullanır. İstediğin an bu karttan kapatabilirsin.",
+                                  "en": "The ModemManager service is started, and runs at boot, so that a USB "
+                                        "or built-in 4G/LTE modem is recognised automatically. It uses a little "
+                                        "memory in the background. You can turn it off from this card at any time."}},
+            "active": {"cmd": "systemctl disable --now ModemManager.service",
+                       "label": {"tr": "Mobil modem desteğini kapat", "en": "Turn off mobile modem support"},
+                       "confirm": True,
+                       "note": {"tr": "USB ya da dahili 4G/LTE modemler artık kendiliğinden tanınmaz ve "
+                                      "ModemManager servisinin kullandığı bellek boşalır. İstediğin an bu "
+                                      "karttan tekrar açabilirsin.",
+                                "en": "USB or built-in 4G/LTE modems will no longer be recognised "
+                                      "automatically, and the memory used by the ModemManager service is freed. "
+                                      "You can turn it back on from this card at any time."}},
+        },
     },
     {
         "id": "swap_crypt", "category": "storage", "func": check_swap_encryption,
@@ -2166,15 +2202,18 @@ class HealthWindow(Gtk.Window):
             top.pack_end(off_btn, False, False, 0)
             top.pack_end(off_bar, False, False, 0)
             self.job_attach(("fix", meta["id"]), off_btn, off_bar)
-        # Ag kesfi (mDNS) anahtari: kapaliysa "ac" (ana dugme), aciksa "kapat" (tehlike dugmesi)
-        mdns = (meta.get("mdns") or {}).get(result.get("mdns")) if meta else None
-        if mdns:
-            mdns_btn = tema.dugme(mdns["label"][self.lang], "tehlike" if result["mdns"] == "active" else "ana",
-                                  self.on_fix, meta, mdns)
-            mdns_bar = self.new_bar()
-            top.pack_end(mdns_btn, False, False, 0)
-            top.pack_end(mdns_bar, False, False, 0)
-            self.job_attach(("fix", meta["id"]), mdns_btn, mdns_bar)
+        # Servis anahtarlari (ag kesfi mDNS, mobil modem): sonuctaki duruma gore kapaliysa "ac"
+        # (ana dugme), aciksa "kapat" (tehlike dugmesi). Durum alani = KONTROLLER'deki anahtar adi.
+        for alan in ANAHTAR_ALANLARI:
+            anahtar = (meta.get(alan) or {}).get(result.get(alan)) if meta else None
+            if not anahtar:
+                continue
+            a_btn = tema.dugme(anahtar["label"][self.lang], "tehlike" if result[alan] == "active" else "ana",
+                               self.on_fix, meta, anahtar)
+            a_bar = self.new_bar()
+            top.pack_end(a_btn, False, False, 0)
+            top.pack_end(a_bar, False, False, 0)
+            self.job_attach(("fix", meta["id"]), a_btn, a_bar)
         ic.pack_start(top, False, False, 0)
 
         ic.pack_start(tema.etiket(result["detail"][self.lang], None, sar=True, genislik=96),
