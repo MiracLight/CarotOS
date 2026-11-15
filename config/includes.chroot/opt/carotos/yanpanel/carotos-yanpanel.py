@@ -35,6 +35,7 @@ KONTROL_MS = 80             # imlec konumu denetim araligi
 SIRA = (
     "carotos-welcome.desktop", "carotos-magaza.desktop",
     "carotos-security-panel.desktop", "carotos-health.desktop", "carotos-usb-check.desktop",
+    "carotos-kurtarma.desktop",
     "carotos-carotene.desktop", "carotos-carotpot.desktop",
     "carotos-poligon-ogrenci.desktop", "carotos-poligon-ogretmen.desktop",
     "carotos-former.desktop", "carotos-gsd.desktop", "carotos-filenor.desktop",

@@ -70,6 +70,7 @@ VURGULAR = {
     "filenor": "#3f9be6",      # gok mavisi (dosya donusturucu)
     "former": "#f0747a",       # mercan (rehber / egitim)
     "gsd": "#6366f1",          # indigo (sozluk / bilgi)
+    "kurtarma": "#5b8def",     # cakmaktasi mavisi (sistemi guvenli noktaya dondurme)
 }
 
 
