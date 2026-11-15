@@ -12,7 +12,7 @@ apt root olarak çalışır: **depo ele geçerse bütün kullanıcılarda root k
 - Anahtar **canlı CarotOS oturumunda** (RAM'de, kapanınca silinir) üretilir ve imzalama orada yapılır.
 - Claude özel anahtarı **görmez ve üretmez**. Bana yalnızca **genel anahtar ve parmak izi** gelir.
 - Otomatik sistem (CI) imza yapmaz: ben imzasız depo ağacını üretirim, **imzayı sen yaparsın**, yüklemeyi sen yaparsın.
-- `Valid-Until` (60 gün) ve düzenli yeniden imzalama (dondurma saldırısına karşı). Not: Debian trixie `reprepro` 5.3 `Acquire-By-Hash` üretmez; `tools/apt/by_hash.py` imzadan önce `by-hash/SHA256` dizinlerini ve Release alanını ekler (apt ile doğrulandı). Ek olarak `dists/*` önbellek atlama ve `dists`i en son yükleme.
+- `Valid-Until` (180 gün; imza elle atıldığı için yılda iki yeniden imzalama) ve düzenli yeniden imzalama (dondurma saldırısına karşı). Not: Debian trixie `reprepro` 5.3 `Acquire-By-Hash` üretmez; `tools/apt/by_hash.py` imzadan önce `by-hash/SHA256` dizinlerini ve Release alanını ekler (apt ile doğrulandı). Ek olarak `dists/*` önbellek atlama ve `dists`i en son yükleme.
 - Ana (sertifika) anahtar ile **imzalama alt anahtarı** ayrıdır; alt anahtarın 2 yıllık son kullanma tarihi olur.
 - Depo için **ayrı ve yalnızca o kovaya yetkili** R2 token'ı kullanılır (mevcut `downloads` token'ı bu iş için kullanılmaz).
 - Gizlilik notu (dürüstçe yazılır): `apt update` istekleri Cloudflare günlüğüne düşer; CarotOS telemetri toplamaz.
@@ -95,7 +95,7 @@ desteklemez) **sonra** alınabilir (aşama 2).
 
 **Aşama 1 — boş ama doğru depo:**
 - `tools/apt/`: `reprepro` yapılandırması (`conf/distributions`: Origin/Label CarotOS, Codename `trixie`, bileşen `main`,
-  `Valid-Until` (`ValidFor: 60d`); imza **yok**, imzayı sen yaparsın), depo üretim ve imzalama betikleri.
+  `Valid-Until` (`ValidFor: 180d`); imza **yok**, imzayı sen yaparsın), depo üretim ve imzalama betikleri.
 - `carotos-archive-keyring` paketi: `/usr/share/keyrings/carotos-archive-keyring.gpg` ve
   `/etc/apt/sources.list.d/carotos.sources` (deb822, `Signed-By` ile; genel `trusted.gpg.d` KULLANILMAZ). Boş depo bile
   `apt update`'i bozmamalı; bunu WSL'de kök yetkisiz, ayrı dizinlerle test ederim.

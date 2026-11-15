@@ -25,6 +25,12 @@ class DepoYapilandirmasi(unittest.TestCase):
         self.assertIn("Architectures: amd64 source", d)
         self.assertRegex(d, r"(?m)^ValidFor: \d+d$")
 
+    def test_valid_until_suresi_sinirli(self):
+        # dondurma saldirisina karsi sure olmali; elle imzalama yuku icin 180 gune kadar (yilda iki imza)
+        gun = int(re.search(r"(?m)^ValidFor: (\d+)d$", oku("conf", "distributions")).group(1))
+        self.assertGreaterEqual(gun, 30)
+        self.assertLessEqual(gun, 180)
+
     def test_distributions_imza_icermez(self):
         # imza canli oturumda elle atilir; yapilandirmada SignWith olursa otomatik/yanlis anahtarla imzalanir
         self.assertNotRegex(oku("conf", "distributions"), r"(?m)^SignWith")
