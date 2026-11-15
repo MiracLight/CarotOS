@@ -309,6 +309,79 @@ class H10DinlenenPortlar(Taban):
         self.sahte_run(0, "")
         self.assertEqual(H.check_listening_ports()["status"], H.OK)
 
+    # Toshiba C660 (gercek cikti): avahi mDNS + gecici UDP portlari + DHCPv6 istemcisi
+    TOSHIBA = ("udp UNCONN 0 0 0.0.0.0:46127 0.0.0.0:*\n"
+               "udp UNCONN 0 0 0.0.0.0:5353 0.0.0.0:*\n"
+               "udp UNCONN 0 0 [::]:5353 [::]:*\n"
+               "udp UNCONN 0 0 [fe80::b674:9fff:fe9d:acbd]%wlp6s0b1:546 [::]:*\n"
+               "udp UNCONN 0 0 [::]:35472 [::]:*\n")
+
+    def _sahte(self, ss, avahi="inactive", ufw="inactive"):
+        def run(cmd, timeout=12, env=None):
+            if cmd[0] == "ss":
+                return 0, ss
+            if cmd[:2] == ["systemctl", "is-active"]:
+                return 0, avahi if cmd[2] == "avahi-daemon" else ufw
+            return 1, ""
+        self.kur(run=run)
+
+    def test_avahi_ve_dhcpv6_beklenen_sayilir(self):
+        self._sahte(self.TOSHIBA, avahi="active")
+        r = H.check_listening_ports()
+        self.assertEqual(r["status"], H.OK, r)                  # artik puan kirmaz
+        self.assertIn("DHCP/mDNS", r["detail"]["tr"])
+
+    def test_avahi_yokken_gecici_udp_portlari_beklenmez(self):
+        self._sahte(self.TOSHIBA, avahi="inactive")
+        r = H.check_listening_ports()
+        self.assertEqual(r["status"], H.WARN)
+        self.assertIn("udp/46127", r["detail"]["en"])
+        self.assertNotIn("5353", r["detail"]["en"])
+
+    def test_surec_adi_varsa_ona_gore_karar_verilir(self):
+        ss = ('udp UNCONN 0 0 0.0.0.0:40000 0.0.0.0:* users:(("avahi-daemon",pid=612,fd=14))\n'
+              'tcp LISTEN 0 128 0.0.0.0:8080 0.0.0.0:* users:(("python3",pid=900,fd=3))\n')
+        self._sahte(ss)
+        r = H.check_listening_ports()
+        self.assertEqual(r["status"], H.WARN)
+        self.assertIn("tcp/8080 (python3)", r["detail"]["en"])
+        self.assertNotIn("40000", r["detail"]["en"])
+
+    def test_guvenlik_duvari_engelliyorsa_beklenmeyen_dinleyici_puan_kirmaz_ama_bilgi_verir(self):
+        ss = "tcp LISTEN 0 128 0.0.0.0:8080 0.0.0.0:*\n"
+        self._sahte(ss, ufw="active")
+        self.kur(read_file=lambda y, limit=200000: (
+            "ENABLED=yes\n" if y.endswith("ufw.conf") else 'DEFAULT_INPUT_POLICY="DROP"\n'),
+            is_root=lambda: False)
+        r = H.check_listening_ports()
+        self.assertEqual(r["status"], H.INFO)           # puana girmez; root olmadan izin kurali okunamaz
+        self.assertTrue(r.get("unknown"))
+        self.assertIn("8080", r["detail"]["tr"])
+
+    def test_root_ve_izin_kurali_yoksa_tamam_varsa_uyarir(self):
+        ss = "tcp LISTEN 0 128 0.0.0.0:8080 0.0.0.0:*\n"
+        self._sahte(ss, ufw="active")
+        durum = {"ufw": "Status: active\n\nTo   Action  From\n22/tcp   ALLOW   Anywhere\n"}
+
+        def run(cmd, timeout=12, env=None):
+            if cmd[0] == "ss":
+                return 0, ss
+            if cmd[:2] == ["systemctl", "is-active"]:
+                return 0, "active" if cmd[2] == "ufw" else "inactive"
+            if cmd[-1] == "status":
+                return 0, durum["ufw"]
+            return 1, ""
+        self.kur(run=run, is_root=lambda: True, bin_path=lambda n: "/usr/sbin/" + n,
+                 read_file=lambda y, limit=200000: (
+                     "ENABLED=yes\n" if y.endswith("ufw.conf") else 'DEFAULT_INPUT_POLICY="DROP"\n'))
+        self.assertEqual(H.check_listening_ports()["status"], H.OK)
+        durum["ufw"] += "8080/tcp   ALLOW   Anywhere\n"
+        self.assertEqual(H.check_listening_ports()["status"], H.WARN)
+
+    def test_oneri_komutu_sureci_gosterir(self):
+        meta = [m for m in H.CHECKS if m["id"] == "ports"][0]
+        self.assertEqual(meta["fix"], "sudo ss -tulnp")
+
 
 class H11SwapZram(Taban):
     BASLIK = "Filename\t\t\t\tType\t\tSize\t\tUsed\t\tPriority\n"

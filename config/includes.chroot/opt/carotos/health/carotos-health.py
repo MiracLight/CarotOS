@@ -384,13 +384,66 @@ def _loopback_mi(addr):
         return False
 
 
+# Dis tehdit olusturmayan, normal bir masaustunde hep dinleyen servisler.
+# Surec adi biliniyorsa ona, bilinmiyorsa (root olmadan baskasinin sureci gorunmez) porta bakilir.
+BEKLENEN_SURECLER = ("avahi-daemon", "NetworkManager", "dhclient", "dhcpcd", "systemd-network")
+BEKLENEN_UDP_PORTLARI = {"68", "546", "5353"}       # DHCP istemcisi, DHCPv6 istemcisi, mDNS
+_SUREC_RE = re.compile(r'\(\("([^"]+)"')
+
+
+def _guvenlik_duvari_engelliyor():
+    """Root gerektirmez: ufw calisiyor + ufw.conf ENABLED=yes + gelen varsayilan DROP/REJECT."""
+    _, active = run(["systemctl", "is-active", "ufw"])
+    if active.strip() != "active":
+        return False
+    if "ENABLED=yes" not in (read_file("/etc/ufw/ufw.conf") or ""):
+        return False
+    return re.search(r'^DEFAULT_INPUT_POLICY="(DROP|REJECT)"',
+                     read_file("/etc/default/ufw") or "", re.M) is not None
+
+
+def _beklenen_dinleyici(proto, port, surec, avahi_aktif):
+    """Bu dinleyici normal bir masaustu servisi mi? (surec adi > bilinen port > avahi'nin gecici portu)"""
+    if surec:
+        return surec in BEKLENEN_SURECLER
+    if proto.startswith("udp"):
+        if port in BEKLENEN_UDP_PORTLARI:
+            return True
+        # avahi mDNS'in yaninda IPv4 ve IPv6 icin gecici UDP portlari da acar
+        if avahi_aktif and port.isdigit() and int(port) >= 32768:
+            return True
+    return False
+
+
+def _ufw_izinli_portlar():
+    """Root ise ufw'de acikca izin verilmis port/protokoller kumesi; okunamazsa None."""
+    if not is_root():
+        return None
+    ufw = bin_path("ufw")
+    if ufw is None:
+        return None
+    code, out = run([ufw, "status"])
+    if code != 0:
+        return None
+    izinli = set()
+    for line in out.splitlines():
+        m = re.match(r"\s*(\d+)(?:/(tcp|udp))?\s.*ALLOW", line)
+        if m:
+            izinli.add((m.group(1), m.group(2)))
+    return izinli
+
+
 def check_listening_ports():
-    code, out = run(["ss", "-tulnH"])
+    code, out = run(["ss", "-tulnpH"])
     if code != 0:
         return {"status": INFO, "unknown": True,
                 "detail": {"tr": "Dinlenen portlar okunamadı.",
                            "en": "Could not read listening ports."}}
-    external = []
+    _, avahi = run(["systemctl", "is-active", "avahi-daemon"])
+    avahi_aktif = avahi.strip() == "active"
+    external = []          # beklenmeyen, dis arayuzde dinleyenler: "proto/port" ya da "proto/port (surec)"
+    external_pp = []       # ayni liste (port, proto) ciftleriyle (ufw izin kurali eslestirmesi icin)
+    expected = []
     local_only = 0
     parsed = 0
     for line in out.splitlines():
@@ -406,8 +459,14 @@ def check_listening_ports():
         parsed += 1
         if _loopback_mi(addr):
             local_only += 1
+            continue
+        m = _SUREC_RE.search(" ".join(parts[6:]))
+        surec = m.group(1) if m else None
+        if _beklenen_dinleyici(proto, port, surec, avahi_aktif):
+            expected.append(f"{proto}/{port}")
         else:
-            external.append(f"{proto}/{port}")
+            external.append(f"{proto}/{port}" + (f" ({surec})" if surec else ""))
+            external_pp.append((port, "udp" if proto.startswith("udp") else "tcp"))
     if out.strip() and not parsed:
         # H-10: cikti dolu ama hicbir satir ayristirilamadi: "sorun yok" denemez
         return {"status": INFO, "unknown": True,
@@ -415,12 +474,43 @@ def check_listening_ports():
                            "en": "The listening-ports output could not be "
                                  "interpreted."}}
     if not external:
+        if expected:
+            n = len(set(expected))
+            return {"status": OK,
+                    "detail": {"tr": f"Dışarıya açık yalnızca beklenen masaüstü servisleri var "
+                                     f"(DHCP/mDNS, {n} dinleyici). {local_only} servis yalnızca yerelde.",
+                               "en": f"Only expected desktop services listen externally "
+                                     f"(DHCP/mDNS, {n} listener(s)). {local_only} local-only."}}
         return {"status": OK,
                 "detail": {"tr": f"Dışarıya açık dinleyen servis yok. "
                                  f"({local_only} servis yalnızca yerelde)",
                            "en": f"No services are listening externally. "
                                  f"({local_only} local-only)"}}
     listed = ", ".join(sorted(set(external))[:10])
+    if _guvenlik_duvari_engelliyor():
+        # Dinliyor olmak tek basina risk degil: gelen varsayilan kural engelse dis dunyadan ulasilamaz,
+        # ta ki bu portlara acikca izin verilmemisse (kural listesi yalniz root ile okunur).
+        izinli = _ufw_izinli_portlar()
+        if izinli is None:
+            return {"status": INFO, "unknown": True,
+                    "detail": {"tr": f"{len(set(external))} servis dinliyor: {listed}. Güvenlik duvarı gelen "
+                                     f"bağlantıları engelliyor; bu portlara izin kuralı olup olmadığı root "
+                                     f"olmadan okunamadı.",
+                               "en": f"{len(set(external))} service(s) listening: {listed}. The firewall "
+                                     f"blocks incoming connections; whether these ports have allow rules "
+                                     f"could not be read without root."}}
+        acik = [x for x, pp in zip(external, external_pp) if (pp[0], pp[1]) in izinli or (pp[0], None) in izinli]
+        if not acik:
+            return {"status": OK,
+                    "detail": {"tr": f"{len(set(external))} servis dinliyor ({listed}) ama güvenlik duvarı "
+                                     f"gelen bağlantıları engelliyor; dışarıdan ulaşılamaz.",
+                               "en": f"{len(set(external))} service(s) listening ({listed}) but the "
+                                     f"firewall blocks incoming connections; not reachable from outside."}}
+        listed = ", ".join(sorted(set(acik))[:10])
+        return {"status": WARN,
+                "detail": {"tr": f"Güvenlik duvarında izinli {len(set(acik))} servis dışarıya açık: {listed}",
+                           "en": f"{len(set(acik))} service(s) explicitly allowed through the firewall "
+                                 f"are exposed: {listed}"}}
     return {"status": WARN,
             "detail": {"tr": f"{len(set(external))} servis tüm arayüzlerde "
                              f"dinliyor: {listed}",
@@ -1338,7 +1428,7 @@ CHECKS = [
                       "ihtiyaç duyulanlar açık olmalıdır.",
                 "en": "Every externally exposed port is an entry point. Only the "
                       "ones you need should be open."},
-        "fix": "ss -tuln",
+        "fix": "sudo ss -tulnp",       # hangi programin dinledigini gosterir; gereksizse o servisi kapatin
     },
     {
         "id": "fail2ban", "category": "network", "func": check_fail2ban,
