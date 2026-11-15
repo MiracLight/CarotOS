@@ -1106,13 +1106,23 @@ class Kabuk(Gtk.Box):
         marka.pack_start(mv, True, True, 0)
         yan.pack_start(marka, False, False, 0)
 
+        # Menu (bolum basliklari + listeler) kendi kaydirma alaninda: cok konulu uygulamalarda (Former 20 konu)
+        # menu ekrandan uzun olunca pencere asgari yuksekligi ekrani asar, kucuk ekranda alt kisim kesilir ve
+        # tam ekran/yeniden boyutlandirma olmaz. Marka ustte, dil/gorunum altta sabit kalir.
+        self._menu_kutu = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        self.menu_kaydir = Gtk.ScrolledWindow()
+        self.menu_kaydir.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        self.menu_kaydir.set_min_content_height(120)
+        self.menu_kaydir.add(self._menu_kutu)
+        yan.pack_start(self.menu_kaydir, True, True, 0)
+
         self.listeler = []
         for bolum, sayfalar in bolumler:
             be = etiket("", "menu-baslik")
             be.set_margin_start(22)
             be.set_margin_top(8)
             be.set_margin_bottom(2)
-            yan.pack_start(be, False, False, 0)
+            self._menu_kutu.pack_start(be, False, False, 0)
             self._bolum_etiketleri[bolum] = be
             liste = Gtk.ListBox()
             sinif(liste, "menu")
@@ -1139,7 +1149,7 @@ class Kabuk(Gtk.Box):
                 row.add(b)
                 liste.add(row)
                 self._satirlar[anahtar] = row
-            yan.pack_start(liste, False, False, 0)
+            self._menu_kutu.pack_start(liste, False, False, 0)
             self.listeler.append(liste)
 
         # alt kisim: uygulamanin kendi denetimleri (dil, gorunum)
@@ -1238,8 +1248,19 @@ class Kabuk(Gtk.Box):
                 diger.unselect_all()
         for r in self._satirlar.values():
             r.ikon.renk_ayarla("vurgu" if r is row else "soluk")
+        GLib.idle_add(self._satiri_goster, row)       # secili satir kaydirilan menude gorunur kalsin
         if self._secildi:
             self._secildi(row.anahtar)
+
+    def _satiri_goster(self, row):
+        try:
+            nokta = row.translate_coordinates(self._menu_kutu, 0, 0)
+            if nokta is not None:
+                self.menu_kaydir.get_vadjustment().clamp_page(nokta[1] - 8,
+                                                              nokta[1] + row.get_allocated_height() + 8)
+        except (TypeError, AttributeError):
+            pass
+        return False
 
     def icerik(self, widget):
         eski = self.kaydir.get_child()

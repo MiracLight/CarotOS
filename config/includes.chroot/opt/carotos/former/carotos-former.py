@@ -121,6 +121,18 @@ def ac(komut):
         return False
 
 
+def ekran_siniri(pay=24):
+    """(genislik, yukseklik): birincil monitorun kullanilabilir alani (panel/dock dusulmus) eksi pay.
+    Monitor okunamazsa buyuk degerler doner (pencere eski boyutuna yakin acilir)."""
+    try:
+        ekran = Gdk.Display.get_default()
+        monitor = ekran.get_primary_monitor() or ekran.get_monitor(0)
+        alan = monitor.get_workarea()
+        return max(alan.width - pay, 400), max(alan.height - pay, 320)
+    except (AttributeError, TypeError):
+        return 4096, 4096
+
+
 class Uygulama(Gtk.Window):
     def __init__(self, konu_id=None):
         super().__init__(title=metin_al(STRINGS["app_title"], "tr"))
@@ -132,8 +144,11 @@ class Uygulama(Gtk.Window):
         self.lang = self.ayar["dil"]
         tema.uygula(self.ayar["tema"], "former")
 
-        self.set_default_size(1180, 820)
-        self.set_size_request(980, 600)
+        # Pencere calisma alanina sigar (panel/dock cikarilmis): 1366x768 gibi ekranlarda alt kisim kesilmez,
+        # tam ekran/buyutme calisir. Genis ekranda eski boyut (1180x820) korunur.
+        gen, yuk = ekran_siniri()
+        self.set_default_size(min(1180, gen), min(820, yuk))
+        self.set_size_request(min(980, gen), min(600, yuk))
         self.set_position(Gtk.WindowPosition.CENTER)
         try:
             if LOGO:

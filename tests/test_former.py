@@ -461,5 +461,53 @@ class YeniKonuIddiaTesti(unittest.TestCase):
         self.assertIn("Alt+E", self._metinler("acikla"))
 
 
+@unittest.skipUnless(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"),
+                     "ekran yok (xvfb-run ile calistirin)")
+class PencereBoyutuTesti(unittest.TestCase):
+    """Former kucuk ekranda (1366x768 laptop) alt kismi ekran disinda kalmamali ve buyutulebilmeli:
+    pencerenin asgari yuksekligi ekrani asmamali (menu kaydirilabilir olmali)."""
+
+    @classmethod
+    def setUpClass(cls):
+        import tempfile
+        import gi
+        gi.require_version("Gtk", "3.0")
+        from gi.repository import Gtk
+        cls.Gtk = Gtk
+        os.environ["HOME"] = tempfile.mkdtemp(prefix="former-ev-")
+        yol = os.path.join(FORMER, "carotos-former.py")
+        cls.mod = {"__file__": yol, "__name__": "carotos_former_boyut_mod"}
+        with open(yol, encoding="utf-8") as fh:
+            kaynak = fh.read().replace('if __name__ == "__main__":\n    main()', "")
+        exec(compile(kaynak, yol, "exec"), cls.mod)
+
+    def test_asgari_yukseklik_600u_asmaz(self):
+        app = self.mod["Uygulama"]()
+        self.addCleanup(app.destroy)
+        asgari, _ = app.get_preferred_size()
+        # menu 20 konu: kaydirilmasaydi asgari yukseklik 1120 olurdu (768 px'lik ekranda alt kisim kesiliyordu)
+        self.assertLessEqual(asgari.height, 600, asgari.height)
+        self.assertLessEqual(app.kabuk.get_preferred_size()[0].height, 600)
+
+    def test_menu_kaydirma_alaninda(self):
+        app = self.mod["Uygulama"]()
+        self.addCleanup(app.destroy)
+        Gtk = self.Gtk
+        for liste in app.kabuk.listeler:
+            self.assertIs(liste.get_ancestor(Gtk.ScrolledWindow), app.kabuk.menu_kaydir)
+        # dil/gorunum denetimleri kaydirilan alanin DISINDA, altta sabit
+        self.assertIsNone(app.dil_kutu.get_ancestor(Gtk.ScrolledWindow))
+
+    def test_pencere_ekrana_sigar(self):
+        gen, yuk = self.mod["ekran_siniri"]()
+        app = self.mod["Uygulama"]()
+        self.addCleanup(app.destroy)
+        w, h = app.get_default_size()
+        self.assertLessEqual(w, gen)
+        self.assertLessEqual(h, yuk)
+        self.assertLessEqual(w, 1180)
+        self.assertLessEqual(h, 820)
+
+
 if __name__ == "__main__":
     unittest.main()
