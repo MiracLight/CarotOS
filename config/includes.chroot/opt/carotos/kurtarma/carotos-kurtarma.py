@@ -45,6 +45,8 @@ METIN = {
     "bolum": {"tr": "Kurtarma", "en": "Recovery"},
     "men_noktalar": {"tr": "Kurtarma noktaları", "en": "Recovery points"},
     "men_ayarlar": {"tr": "Ayarlar", "en": "Settings"},
+    "theme_light": {"tr": "Açık tema", "en": "Light theme"},
+    "theme_dark": {"tr": "Koyu tema", "en": "Dark theme"},
     "ust_noktalar": {"tr": "Sistemi bu noktaya alabilirsin",
                      "en": "You can bring the system back to one of these"},
     "aciklama": {"tr": "/etc, /root ve kurulu paket listesinin yedeği. Kişisel dosyalarına "
@@ -230,12 +232,20 @@ class KurtarmaPenceresi(Gtk.Window):
         alt.pack_start(self.theme_btn, False, False, 0)
         self.kabuk.yan_alt.pack_start(alt, False, False, 0)
 
+        self._tema_dugmesi_yaz()
+
         self._noktalar_sayfasi_kur()
         self._ayarlar_sayfasi_kur()
         self.kabuk.sec("noktalar")
         self._yenile()
 
     # -- yardimcilar ---------------------------------------------------------
+
+    def _tema_dugmesi_yaz(self):
+        koyu = self.theme == "dark"
+        self.theme_btn.set_label("☀" if koyu else "☾")
+        self.theme_btn.set_tooltip_text(
+            METIN["theme_light" if koyu else "theme_dark"][self.lang])
 
     def _dil_degisti(self, combo):
         kod = combo.get_active_id()
@@ -248,6 +258,7 @@ class KurtarmaPenceresi(Gtk.Window):
         self.kabuk.marka_ayarla(METIN["baslik"][self.lang], "v" + APP_VERSION)
         for anahtar in ("noktalar", "ayarlar"):
             self.kabuk.menu_metni(anahtar, METIN["men_" + anahtar][self.lang])
+        self._tema_dugmesi_yaz()
         self._yenile()
         self._ayarlar_sayfasi_doldur()
 
@@ -256,6 +267,7 @@ class KurtarmaPenceresi(Gtk.Window):
         self.ayar["theme"] = self.theme
         arayuz_ayarlarini_yaz(self.ayar)
         tema.uygula(self.theme, VURGU)
+        self._tema_dugmesi_yaz()
         self._yenile()
         self._ayarlar_sayfasi_doldur()
 
