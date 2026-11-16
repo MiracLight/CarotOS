@@ -3,9 +3,11 @@
    ornek: calamares/src/calamares/calamares-sidebar.qml (GPL-3.0-or-later).
    Adimlar ViewManager modelinden gelir ("display" = Calamares'in cevirdigi adim adi).
    Renkler slayt gosterisiyle (show.qml) ayni; Branding enum'larina baglanmaz. */
+// ViewManager ve Branding io.calamares.ui'dadir (Qml.cpp registerQmlModels); core'da Global/Network var
+import io.calamares.ui 1.0
 import io.calamares.core 1.0
 
-import QtQuick 2.3
+import QtQuick 2.15
 
 Rectangle {
     id: kenar

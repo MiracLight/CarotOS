@@ -22,7 +22,10 @@ for yol in /etc/calamares/settings.conf \
            /etc/calamares/modules/finished.conf \
            /etc/calamares/modules/shellprocess_carotos_once.conf \
            /etc/calamares/modules/shellprocess_carotos_sonra.conf \
+           /etc/calamares/branding/carotos/stylesheet.qss \
+           /etc/calamares/branding/carotos/s-destek.png \
            /usr/bin/carotos-kur /usr/bin/carotos-kur-simge \
+           /usr/lib/carotos/kur-bin/xdg-open \
            /usr/share/applications/carotos-kur.desktop \
            /etc/xdg/autostart/carotos-kur-simge.desktop \
            /usr/share/icons/hicolor/256x256/apps/carotos-kur.png; do
@@ -35,6 +38,8 @@ find /etc/calamares -type d -exec chmod 755 {} +
 find /etc/calamares -type f -exec chmod 644 {} +
 chown root:root /usr/bin/carotos-kur /usr/bin/carotos-kur-simge
 chmod 755 /usr/bin/carotos-kur /usr/bin/carotos-kur-simge
+chown -R root:root /usr/lib/carotos/kur-bin
+chmod 755 /usr/lib/carotos/kur-bin /usr/lib/carotos/kur-bin/xdg-open
 chmod 644 /usr/share/applications/carotos-kur.desktop /etc/xdg/autostart/carotos-kur-simge.desktop
 chmod 644 /usr/share/icons/hicolor/*/apps/carotos-kur.png
 

@@ -1,0 +1,41 @@
+#!/bin/sh
+# CarotOS: Calamares root olarak calisir; "CarotOS Destek" gibi baglantilari xdg-open ile
+# acar. Root'tan acilan Firefox kullanicinin oturumunda calismaz. Bu araci yalniz carotos-kur
+# PATH'inde one konur: baglantiyi pkexec'i baslatan canli kullanicinin tarayicisinda acar.
+# Yalniz http(s) adresi kabul edilir; dosya/komut acilmaz.
+set -eu
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+
+url="${1-}"
+case "$url" in
+    https://*|http://*) ;;
+    *) exit 1 ;;
+esac
+case "$url" in
+    *[[:space:]]*|*[[:cntrl:]]*) exit 1 ;;
+esac
+
+uid="${PKEXEC_UID-}"
+case "$uid" in
+    ''|*[!0-9]*) exit 1 ;;
+esac
+[ "$uid" -ne 0 ] || exit 1
+kullanici="$(id -nu -- "$uid")" || exit 1
+
+ekran="${DISPLAY-}"
+case "$ekran" in
+    :[0-9]|:[0-9][0-9]|:[0-9].[0-9]|:[0-9][0-9].[0-9]) ;;
+    *) exit 1 ;;
+esac
+
+ev="$(getent passwd "$kullanici" | cut -d: -f6)"
+set -- "HOME=$ev" "PATH=/usr/local/bin:/usr/bin:/bin" "DISPLAY=$ekran" \
+       "XDG_RUNTIME_DIR=/run/user/$uid" "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$uid/bus"
+if [ -n "${XAUTHORITY-}" ] && [ -f "$XAUTHORITY" ]; then
+    set -- "$@" "XAUTHORITY=$XAUTHORITY"
+fi
+
+# Arka planda: Calamares beklemesin
+runuser -u "$kullanici" -- env -i "$@" /usr/bin/xdg-open "$url" >/dev/null 2>&1 &
+exit 0

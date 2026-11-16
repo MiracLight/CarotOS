@@ -2,7 +2,8 @@
 // Turkce secilirse Turkce, diger tum dillerde Ingilizce gosterilir. Dil, Calamares'in
 // Karsilama adiminda sectigi yerel ayardan (QLocale varsayilani) onActivate'te okunur.
 // Simgeler bu dizindeki s-*.png dosyalaridir (sistem simge yoluna baglanmaz).
-import QtQuick 2.0;
+// Qt 6 ozellikleri ithal surumune gore acar (2.0'da Image.mipmap yok, dosya hic yuklenmez)
+import QtQuick 2.15;
 import calamares.slideshow 1.0;
 
 Presentation {

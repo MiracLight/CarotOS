@@ -232,6 +232,37 @@ class SarmalayiciTesti(unittest.TestCase):
         self.assertRegex(ayar, r"(?m)^modules-search: \[ local, /usr/lib/calamares/modules \]$")
         self.assertIn("/usr/lib/calamares/modules/$m/module.desc", oku(HOOK))
 
+    def test_baglanti_araci_kullanici_tarayicisi(self):
+        # Calamares (root) baglantiyi xdg-open ile acar; root Firefox oturumda acilmaz
+        self.assertIn("PATH=/usr/lib/carotos/kur-bin:$PATH /usr/bin/calamares", self.k)
+        arac = oku(CHROOT, "usr", "lib", "carotos", "kur-bin", "xdg-open")
+        self.assertTrue(arac.startswith("#!/bin/sh\n"))
+        self.assertIn('runuser -u "$kullanici"', arac)
+        self.assertIn("env -i", arac)
+        self.assertNotRegex("\n".join(kod_satirlari(arac)), r"\beval\b")
+        sonra = oku(MODULLER, "shellprocess_carotos_sonra.conf")
+        self.assertIn("rm -rf /usr/lib/carotos/kur-bin", sonra)
+
+    @unittest.skipIf(shutil.which("sh") is None, "sh yok")
+    def test_baglanti_araci_reddeder(self):
+        yol = os.path.join(CHROOT, "usr", "lib", "carotos", "kur-bin", "xdg-open")
+        betik = oku(yol)
+        sh = shutil.which("sh")
+        self.assertEqual(subprocess.run([sh, "-n"], input=betik.encode(), timeout=30).returncode, 0)
+        durumlar = [
+            ("file:///etc/shadow", {"PKEXEC_UID": "1000", "DISPLAY": ":0"}),
+            ("https://ornek.org", {"DISPLAY": ":0"}),                       # PKEXEC_UID yok
+            ("https://ornek.org", {"PKEXEC_UID": "0", "DISPLAY": ":0"}),    # root'a acmaz
+            ("https://ornek.org", {"PKEXEC_UID": "1x", "DISPLAY": ":0"}),
+            ("https://ornek.org x", {"PKEXEC_UID": "1000", "DISPLAY": ":0"}),
+            ("https://ornek.org", {"PKEXEC_UID": "1000", "DISPLAY": "evil:0"}),
+        ]
+        for url, ortam in durumlar:
+            with self.subTest(url=url, ortam=ortam):
+                r = subprocess.run([sh, "-c", betik, "xdg-open", url], env=ortam,
+                                   capture_output=True, timeout=30)
+                self.assertNotEqual(r.returncode, 0)
+
     def test_xcb_cursor_paketi(self):
         liste = oku(os.path.dirname(CHROOT), "package-lists", "calamares.list.chroot")
         self.assertRegex(liste, r"(?m)^libxcb-cursor0$")
@@ -361,6 +392,28 @@ class MarkaTesti(unittest.TestCase):
         self.assertNotIn("Branding.", k)                       # enum adlarina baglanmaz
         self.assertEqual(k.count("{"), k.count("}"))
         self.assertIn("calamares-sidebar.qml", oku(HOOK))
+
+    def test_qml_surumleri_qt6(self):
+        # Qt 6.8 ozellikleri ithal surumune gore acar: "QtQuick 2.0" ile Image.mipmap reddedilir,
+        # dosya hic yuklenmez (canlida bos/beyaz slayt alani). Kenar cubugu ViewManager'i ui'dan alir.
+        d = os.path.join(CALAMARES, "branding", "carotos")
+        for ad in ("show.qml", "calamares-sidebar.qml"):
+            with self.subTest(dosya=ad):
+                m = re.search(r"(?m)^import QtQuick (\d+)\.(\d+)", oku(d, ad))
+                self.assertIsNotNone(m)
+                self.assertGreaterEqual((int(m.group(1)), int(m.group(2))), (2, 15))
+        self.assertIn("import io.calamares.ui 1.0", oku(d, "calamares-sidebar.qml"))
+
+    def test_stil_dosyasi(self):
+        d = os.path.join(CALAMARES, "branding", "carotos")
+        q = oku(d, "stylesheet.qss")
+        self.assertRegex(q, r"(?s)QWidget \{\s+background-color: #e9edf5;\s+color: #1c2236;")
+        # Stil verilen onay kutusu/radyo dugmesi Fusion'da isaretsiz kaliyor: kural yazilmaz
+        self.assertNotRegex(q, r"(?m)^\s*QCheckBox|^\s*QRadioButton")
+        self.assertIn('url("/etc/calamares/branding/carotos/s-destek.png")', q)
+        self.assertTrue(os.path.isfile(os.path.join(d, "s-destek.png")))
+        self.assertEqual(q.count("{"), q.count("}"))
+        self.assertIn("stylesheet.qss", oku(HOOK))
 
     def test_dil_listesi_yazi_tipleri(self):
         liste = oku(os.path.dirname(CHROOT), "package-lists", "calamares.list.chroot")

@@ -1,0 +1,163 @@
+/* CarotOS 1.4 Calamares temasi: parlak beyaz yerine yumusak acik gri-mavi.
+   Calamares bu dosyayi marka dizininden okur (Branding::stylesheet).
+   Yazilar koyu kalir (okunurluk); kenar cubugu ve slaytlar QML'dir, buradan etkilenmez.
+   Kutu oklari ve onay isaretleri Qt'nin kendi stilinde kalir (alt denetim cizimi yok). */
+
+/* Zemin ve yazi rengi her bilesene: root oturumunun Qt paleti koyu olsa bile (kaydirma
+   alanlari paletin Window rengini kullanir) koyu yazi koyu zemine dusmesin */
+QWidget {
+    background-color: #e9edf5;
+    color: #1c2236;
+}
+#mainApp, QDialog {
+    background-color: #e9edf5;
+    color: #1c2236;
+}
+
+QLabel {
+    color: #1c2236;
+    background: transparent;
+}
+
+/* Giris kutulari ve listeler: zeminden biraz acik, ince cerceve */
+QLineEdit, QSpinBox, QPlainTextEdit, QTextEdit, QTextBrowser,
+QListView, QTreeView, QTableView, QListWidget, QTreeWidget, QTableWidget {
+    background-color: #f6f8fc;
+    color: #1c2236;
+    border: 1px solid #c3cbdf;
+    border-radius: 6px;
+    selection-background-color: #5b8def;
+    selection-color: #ffffff;
+}
+QLineEdit { padding: 4px 6px; }
+QLineEdit:focus, QSpinBox:focus, QPlainTextEdit:focus, QTextEdit:focus {
+    border: 1px solid #5b8def;
+}
+QLineEdit:disabled, QSpinBox:disabled {
+    background-color: #e3e7f0;
+    color: #7a8299;
+}
+
+QHeaderView::section {
+    background-color: #dfe4ef;
+    color: #1c2236;
+    border: none;
+    border-right: 1px solid #c3cbdf;
+    padding: 4px 6px;
+}
+
+QComboBox {
+    background-color: #f6f8fc;
+    color: #1c2236;
+    selection-background-color: #5b8def;
+    selection-color: #ffffff;
+}
+QComboBox QAbstractItemView {
+    background-color: #f6f8fc;
+    color: #1c2236;
+    selection-background-color: #5b8def;
+    selection-color: #ffffff;
+}
+
+/* Dugmeler */
+QPushButton {
+    background-color: #dfe4ef;
+    color: #1c2236;
+    border: 1px solid #c3cbdf;
+    border-radius: 6px;
+    padding: 5px 14px;
+}
+QPushButton:hover { background-color: #d3daea; }
+QPushButton:pressed { background-color: #c6cfe4; }
+QPushButton:disabled {
+    background-color: #e6e9f1;
+    color: #9aa1b5;
+    border-color: #d5dae6;
+}
+QPushButton:default, QPushButton:focus:default {
+    background-color: #5b8def;
+    color: #ffffff;
+    border: 1px solid #4a7be0;
+}
+QPushButton:default:hover { background-color: #4f82e6; }
+QPushButton:default:disabled {
+    background-color: #b9c9ec;
+    color: #eef2fb;
+    border-color: #b9c9ec;
+}
+
+/* QCheckBox/QRadioButton'a kural YAZILMAZ: stil verilince Fusion kutu/daire isaretini cizmiyor */
+
+QGroupBox {
+    color: #1c2236;
+    border: 1px solid #c3cbdf;
+    border-radius: 8px;
+    margin-top: 10px;
+    padding-top: 6px;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 4px;
+}
+
+/* Ilerleme cubugu (kurulum adimi) */
+QProgressBar {
+    background-color: #dfe4ef;
+    color: #1c2236;
+    border: 1px solid #c3cbdf;
+    border-radius: 6px;
+    text-align: center;
+    min-height: 18px;
+}
+QProgressBar::chunk {
+    background-color: #5b8def;
+    border-radius: 5px;
+}
+
+/* Karsilama sayfasindaki "CarotOS Destek" (supportUrl: GitHub issues): baglanti gibi,
+   kendi simgesiyle (root'ta simge temasi yok, kare gorunuyordu) */
+QPushButton#supportButton {
+    qproperty-icon: url("/etc/calamares/branding/carotos/s-destek.png");
+    qproperty-iconSize: 18px 18px;
+    background: transparent;
+    border: none;
+    color: #3d6fd8;
+    font-weight: bold;
+    padding: 4px 8px;
+}
+QPushButton#supportButton:hover {
+    color: #2a56b8;
+    text-decoration: underline;
+}
+
+QToolTip {
+    background-color: #1c2236;
+    color: #eef1f8;
+    border: 1px solid #3d5fb8;
+    padding: 4px;
+}
+
+QScrollBar:vertical {
+    background: transparent;
+    width: 10px;
+    margin: 0;
+}
+QScrollBar::handle:vertical {
+    background: #b9c2d8;
+    border-radius: 5px;
+    min-height: 24px;
+}
+QScrollBar::handle:vertical:hover { background: #9eaac6; }
+QScrollBar:horizontal {
+    background: transparent;
+    height: 10px;
+    margin: 0;
+}
+QScrollBar::handle:horizontal {
+    background: #b9c2d8;
+    border-radius: 5px;
+    min-width: 24px;
+}
+QScrollBar::add-line, QScrollBar::sub-line { width: 0; height: 0; }
+QScrollBar::add-page, QScrollBar::sub-page { background: transparent; }

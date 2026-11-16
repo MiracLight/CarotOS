@@ -85,7 +85,9 @@ if [ "${1-}" = "--root" ]; then
     QT_AUTO_SCREEN_SCALE_FACTOR=1
     export QT_AUTO_SCREEN_SCALE_FACTOR
     rc=0
-    /usr/bin/calamares || rc=$?
+    # Baglantilar (CarotOS Destek) root yerine canli kullanicinin tarayicisinda acilsin:
+    # kur-bin yalniz xdg-open aracisini icerir (usr/lib/carotos/kur-bin/xdg-open)
+    PATH=/usr/lib/carotos/kur-bin:$PATH /usr/bin/calamares || rc=$?
     exit "$rc"
 fi
 
