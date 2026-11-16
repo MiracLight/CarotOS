@@ -106,6 +106,17 @@ METIN = {
     "ayar_sakla_baslik": {"tr": "Kaç nokta saklansın", "en": "How many points to keep"},
     "ayar_sakla_alt": {"tr": "Bu sayıyı aşan en eski noktalar otomatik silinir.",
                        "en": "The oldest points beyond this number are deleted automatically."},
+    "ayar_aralik_baslik": {"tr": "Otomatik noktalar arası en az süre (dakika)",
+                          "en": "Minimum time between automatic points (minutes)"},
+    "ayar_aralik_alt": {"tr": "Güncelleme öncesi otomatik nokta, öncekinden bu kadar dakika "
+                             "geçmeden tekrar açılmaz.",
+                       "en": "An automatic point before an update won't open again until "
+                             "this many minutes have passed since the last one."},
+    "ayar_disk_baslik": {"tr": "Nokta için gereken en az boş alan (MB)",
+                        "en": "Minimum free space required for a point (MB)"},
+    "ayar_disk_alt": {"tr": "Bundan az boş disk alanı varsa yeni nokta oluşturulmaz.",
+                     "en": "If there's less free disk space than this, a new point won't "
+                           "be created."},
     "ayar_kaydet": {"tr": "Kaydet", "en": "Save"},
     "ayar_kaydedildi": {"tr": "Ayarlar kaydedildi.", "en": "Settings saved."},
     "canli_uyari": {"tr": "Canlı (USB) oturumundasın: oluşturulacak nokta yalnızca bu "
@@ -452,6 +463,22 @@ class KurtarmaPenceresi(Gtk.Window):
                           self.sakla_spin)
         self.ayarlar_kutu.pack_start(dis2, False, False, 0)
 
+        dis3, ic3 = tema.kart()
+        self.aralik_spin = Gtk.SpinButton.new_with_range(1, 1440, 1)
+        self.aralik_spin.set_value(ayar["min_aralik_dk"])
+        self.aralik_spin.set_valign(Gtk.Align.CENTER)
+        tema.kart_basligi(ic3, METIN["ayar_aralik_baslik"][self.lang], METIN["ayar_aralik_alt"][self.lang],
+                          self.aralik_spin)
+        self.ayarlar_kutu.pack_start(dis3, False, False, 0)
+
+        dis4, ic4 = tema.kart()
+        self.disk_spin = Gtk.SpinButton.new_with_range(64, 20480, 64)
+        self.disk_spin.set_value(ayar["min_bos_mb"])
+        self.disk_spin.set_valign(Gtk.Align.CENTER)
+        tema.kart_basligi(ic4, METIN["ayar_disk_baslik"][self.lang], METIN["ayar_disk_alt"][self.lang],
+                          self.disk_spin)
+        self.ayarlar_kutu.pack_start(dis4, False, False, 0)
+
         kaydet_btn = tema.dugme(METIN["ayar_kaydet"][self.lang], "ana", self._ayarlari_kaydet)
         kaydet_btn.set_halign(Gtk.Align.START)
         self.ayarlar_kutu.pack_start(kaydet_btn, False, False, 4)
@@ -461,7 +488,9 @@ class KurtarmaPenceresi(Gtk.Window):
         if self._kilitli_mi():
             return
         yeni = {"oto_guncelleme_oncesi": self.oto_anahtari.get_active(),
-               "sakla": int(self.sakla_spin.get_value())}
+               "sakla": int(self.sakla_spin.get_value()),
+               "min_aralik_dk": int(self.aralik_spin.get_value()),
+               "min_bos_mb": int(self.disk_spin.get_value())}
         self.mesgul = True
 
         def isci():
