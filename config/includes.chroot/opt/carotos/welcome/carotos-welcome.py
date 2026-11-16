@@ -1097,6 +1097,60 @@ PAGES = [
         ],
     },
     {
+        "id": "kur",
+        "title": {"tr": "CarotOS'u kurmak", "en": "Installing CarotOS"},
+        "subtitle": {
+            "tr": "Canlı masaüstünden, birkaç adımda bilgisayarına kur",
+            "en": "Install it on your computer from the live desktop, in a few steps",
+        },
+        "body": [
+            ("p", {
+                "tr": "Şu an CarotOS'u canlı oturumda deniyorsun: hiçbir şey diske yazılmaz. Beğendiysen masaüstündeki "
+                      "\"CarotOS'u Kur\" simgesine çift tıkla; kurulum penceresi açılır. Kurulum sırasında canlı "
+                      "oturum çalışmaya devam eder, internete ihtiyaç yoktur.",
+                "en": "You are trying CarotOS in the live session right now: nothing is written to the disk. If you "
+                      "like it, double-click the \"Install CarotOS\" icon on the desktop and the installer window "
+                      "opens. The live session keeps working during the installation, and no internet connection "
+                      "is needed.",
+            }),
+            ("bullets", [
+                {"tr": "Dil: canlı oturum İngilizce olsa bile kurucunun ilk ekranında dili seçersin.",
+                 "en": "Language: even if the live session is in English, you choose the language on the "
+                       "installer's first screen."},
+                {"tr": "Konum: saat dilimini seç (varsayılan İstanbul). Sonra klavye düzenini seç.",
+                 "en": "Location: pick your time zone (Istanbul by default). Then pick the keyboard layout."},
+                {"tr": "Bölümler: tüm diski sil, mevcut sistemin (örneğin Windows) yanına kur ya da elle bölümle. "
+                       "İstersen disk şifrelemeyi de buradan açarsın.",
+                 "en": "Partitions: erase the whole disk, install alongside an existing system (for example "
+                       "Windows), or partition by hand. You can also turn on disk encryption here."},
+                {"tr": "Kullanıcı: bir kullanıcı adı ve parola belirle. Bu kullanıcı sudo kullanabilir; root girişi "
+                       "kilitli kalır. Bilgisayar adı carotos olur.",
+                 "en": "User: choose a user name and password. This user can use sudo; root login stays locked. "
+                       "The computer name is carotos."},
+                {"tr": "Özet: yapılacakları son kez gör, \"Kur\"a bas. Kurulum sürerken slaytlar gösterilir; "
+                       "bitince bilgisayarı yeniden başlat.",
+                 "en": "Summary: review what will happen one last time and press \"Install\". Slides are shown "
+                       "during the installation; when it ends, restart the computer."},
+            ]),
+            ("note", {
+                "tr": "Diske dokunmadan önce önemli dosyalarının yedeğini al. \"Tüm diski sil\" diskteki her şeyi "
+                      "siler. Windows yanına kuracaksan \"Windows ile birlikte\" sayfasındaki hazırlıkları yap. "
+                      "Şifreli diskin parolasını unutursan verilerin kurtarılamaz.",
+                "en": "Back up your important files before touching the disk. \"Erase disk\" deletes everything "
+                      "on it. If you will install next to Windows, follow the preparations on the \"Alongside "
+                      "Windows\" page. If you forget an encrypted disk's password, your data cannot be recovered.",
+            }),
+            ("p", {
+                "tr": "Kurulu sistemde kurucu ve canlı oturum paketleri bulunmaz. Kurucu açılmazsa ya da takılırsa, "
+                      "bilgisayarı yeniden başlatıp USB açılış menüsünde eski metin tabanlı Debian kurucusunu seçebilirsin; "
+                      "o yedek olarak durur.",
+                "en": "The installed system does not contain the installer or the live-session packages. If the "
+                      "installer does not open or gets stuck, restart the computer and choose the older text-based "
+                      "Debian installer in the USB boot menu; it stays there as a fallback.",
+            }),
+        ],
+    },
+    {
         "id": "windows",
         "title": {"tr": "Windows ile birlikte", "en": "Alongside Windows"},
         "subtitle": {

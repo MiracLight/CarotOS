@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.join(INC, "opt", "carotos", "welcome"))
 import gezinme  # noqa: E402
 
 
-YENI = ("acikla", "etik", "disk", "dogrula", "windows")
+YENI = ("acikla", "etik", "disk", "dogrula", "windows", "kur")
 
 
 def sayfalar():
@@ -118,6 +118,18 @@ class YeniSayfaTesti(unittest.TestCase):
         self.assertIn("swap-priority", zram)
 
 
+    def test_kur_iddialari(self):
+        # kurulum sayfasi Calamares ayarlariyla tutarli olmali: root kilitli, bilgisayar adi, yedek kurucu, internetsiz
+        users = oku("etc", "calamares", "modules", "users.conf")
+        self.assertIn("setRootPassword: false", users)
+        self.assertIn('template: "carotos"', users)
+        self.assertTrue(os.path.isfile(os.path.join(INC, "usr", "share", "applications", "carotos-kur.desktop")))
+        tr, en = tum_metin(self.s["kur"], "tr"), tum_metin(self.s["kur"], "en")
+        for parca in ("CarotOS'u Kur", "yedek", "sudo", "carotos", "açılış menüsü"):
+            self.assertIn(parca, tr)
+        for parca in ("Install CarotOS", "Back up", "sudo", "carotos", "boot menu", "fallback"):
+            self.assertIn(parca, en)
+
     def test_windows_iddialari(self):
         # sayfadaki 30/5 sn, os-prober ve saat komutu koddaki ayarlarla ayni olmali
         sure = oku("etc", "grub.d", "99_carotos_sure")
@@ -158,7 +170,7 @@ class KonuKartiTesti(unittest.TestCase):
         self.assertEqual(konular["ag"], ["network"])
         self.assertEqual(konular["disk"], ["disk"])
         self.assertEqual(konular["guvenlik_duvari"], ["guvenlik_duvari"])
-        self.assertEqual(konular["sistem"][-1], "windows")
+        self.assertEqual(konular["sistem"][-2:], ["kur", "windows"])
         self.assertEqual(konular["koruma"][-1], "dogrula")
 
     def test_her_sayfa_tam_bir_konuda(self):

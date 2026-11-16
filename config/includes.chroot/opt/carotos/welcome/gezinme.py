@@ -24,10 +24,10 @@ HUB = "hub"
 SON = "resources"
 
 KONULAR = [
-    {"id": "sistem", "sayfalar": ["linux", "desktop", "files", "home", "windows"],
+    {"id": "sistem", "sayfalar": ["linux", "desktop", "files", "home", "kur", "windows"],
      "baslik": T("Linux ve masaüstü", "Linux and the desktop"),
-     "aciklama": T("Linux nedir, masaüstü, dosyalar, ev klasörü ve Windows ile birlikte kullanım.",
-                   "What Linux is, the desktop, files, your home folder and using it alongside Windows.")},
+     "aciklama": T("Linux nedir, masaüstü, dosyalar, ev klasörü, CarotOS'u kurmak ve Windows ile birlikte kullanım.",
+                   "What Linux is, the desktop, files, your home folder, installing CarotOS and using it alongside Windows.")},
     {"id": "yazilim", "sayfalar": ["software", "magaza"],
      "baslik": T("Yazılım ve Mağaza", "Software and the Store"),
      "aciklama": T("Yazılım nasıl kurulur ve CarotOS Mağaza ile nasıl yönetilir.",

@@ -132,14 +132,14 @@ class ZamanMotoruTesti(unittest.TestCase):
 
 # ---------------------------------------------------------------------------
 class IcerikTesti(unittest.TestCase):
-    """konular/ altindaki 20 konunun yapisal dogrulugu."""
+    """konular/ altindaki 22 konunun yapisal dogrulugu."""
 
     @classmethod
     def setUpClass(cls):
         cls.konular = konular.tumu()
 
-    def test_yirmi_bir_konu_ve_benzersiz_kimlik(self):
-        self.assertEqual(len(self.konular), 21)
+    def test_yirmi_iki_konu_ve_benzersiz_kimlik(self):
+        self.assertEqual(len(self.konular), 22)
         kimlikler = [k["id"] for k in self.konular]
         self.assertEqual(len(kimlikler), len(set(kimlikler)), kimlikler)
         self.assertEqual(set(kimlikler), set(konular.SIRA))
