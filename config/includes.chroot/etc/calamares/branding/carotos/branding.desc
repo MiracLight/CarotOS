@@ -1,0 +1,43 @@
+# CarotOS 1.4 Calamares markalamasi. Surum degeri surum.json'dan gelir
+# (python3 tools/surum_esitle.py uygula ile esitlenir; tests/test_calamares.py denetler).
+---
+componentName:  carotos
+
+welcomeStyleCalamares: true
+welcomeExpandingLogo:  true
+
+windowExpanding:  normal
+windowSize:       800px,580px
+windowPlacement:  center
+
+strings:
+    productName:         CarotOS
+    shortProductName:    CarotOS
+    version:             "1.4"
+    shortVersion:        "1.4"
+    versionedName:       CarotOS 1.4
+    shortVersionedName:  CarotOS 1.4
+    # Yalniz menu girdisi adi; EFI dizin kimligi bootloader.conf'taki efiBootloaderId "debian"dir
+    bootloaderEntryName: CarotOS
+    productUrl:          https://carotos.org
+    supportUrl:          https://github.com/MiracLight/CarotOS/issues
+    knownIssuesUrl:      https://github.com/MiracLight/CarotOS/issues
+    releaseNotesUrl:     https://carotos.org
+    donateUrl:           https://carotos.org
+
+images:
+    productLogo:    "logo.png"
+    productIcon:    "logo.png"
+    productWelcome: "welcome.png"
+
+slideshow:     "show.qml"
+slideshowAPI:  2
+
+sidebar:    widget
+navigation: widget
+
+style:
+    sidebarBackground:    "#1b1e29"
+    sidebarText:          "#e6e9f2"
+    sidebarTextSelect:    "#1b1e29"
+    sidebarTextHighlight: "#5b8def"

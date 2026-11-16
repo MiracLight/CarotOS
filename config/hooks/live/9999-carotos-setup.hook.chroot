@@ -120,13 +120,15 @@ echo "CarotOS: paket deposu tanimi yerlestirildi (apt.carotos.org)."
 # (carotos-dil-hazirla, pkexec betikleri, systemd birimleri, oturum betikleri).
 for yol in /opt/carotos /usr/local/bin /usr/local/sbin /usr/share/carotos \
            /etc/systemd/system /etc/grub.d /etc/default/grub.d /etc/X11/Xsession.d \
-           /etc/xdg/autostart /etc/skel /etc/carotpot /etc/live/config.conf.d; do
+           /etc/xdg/autostart /etc/skel /etc/carotpot /etc/live/config.conf.d \
+           /etc/calamares /usr/share/calamares; do
     [ -e "$yol" ] || continue
     chown -R -h root:root "$yol"
     chmod -R go-w "$yol"
 done
 KOTU="$(find /opt/carotos /usr/local/bin /usr/local/sbin /usr/share/carotos /etc/systemd/system \
-        /etc/grub.d /etc/default/grub.d /etc/X11/Xsession.d -xdev ! -type l \
+        /etc/grub.d /etc/default/grub.d /etc/X11/Xsession.d /etc/calamares /usr/share/calamares \
+        -xdev ! -type l \
         \( -perm /022 -o ! -user root \) -print 2>/dev/null | head -n 5)"
 [ -z "$KOTU" ] || { echo "CarotOS HATA: root disinda yazilabilir dosya kaldi: $KOTU" >&2; exit 1; }
 echo "CarotOS: sahiplik ve izinler denetlendi (root, go-w)."

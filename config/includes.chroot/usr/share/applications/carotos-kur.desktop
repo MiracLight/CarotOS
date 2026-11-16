@@ -1,0 +1,22 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Install CarotOS
+Name[tr]=CarotOS'u Kur
+Name[de]=CarotOS installieren
+Name[ru]=Установить CarotOS
+Name[es]=Instalar CarotOS
+Name[pt]=Instalar o CarotOS
+Name[ja]=CarotOS をインストール
+Name[zh]=安装 CarotOS
+Name[fr]=Installer CarotOS
+GenericName=System installer
+GenericName[tr]=Sistem kurucu
+Comment=Install CarotOS on this computer
+Comment[tr]=CarotOS'u bu bilgisayara kur
+Exec=/usr/bin/carotos-kur
+Icon=carotos-kur
+Terminal=false
+Categories=System;
+Keywords=install;installer;calamares;kur;kurulum;
+Keywords[tr]=kur;kurulum;yükle;

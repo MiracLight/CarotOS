@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=CarotOS installer icon
+Comment=Puts the Install CarotOS icon on the desktop (live session only)
+Exec=/usr/bin/carotos-kur-simge
+Terminal=false
+NoDisplay=true
+OnlyShowIn=XFCE;
+X-GNOME-Autostart-enabled=true

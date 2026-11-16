@@ -22,5 +22,10 @@ chmod +x -- "$HEDEF"
 # Xfce/Thunar guvenilir olarak isaretlenmemis baslaticiyi calistirmaz
 if command -v gio >/dev/null 2>&1; then
     gio set -- "$HEDEF" metadata::trusted true >/dev/null 2>&1 || true
+    # Xfce 4.18+ (xfdesktop) guveni dosyanin sha256 ozetiyle tutar
+    if command -v sha256sum >/dev/null 2>&1; then
+        OZET="$(sha256sum -- "$HEDEF" | cut -d' ' -f1)"
+        gio set -t string -- "$HEDEF" metadata::xfce-exe-checksum "$OZET" >/dev/null 2>&1 || true
+    fi
 fi
 exit 0

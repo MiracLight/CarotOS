@@ -402,6 +402,67 @@ cd ~ && sudo umount ~/iso-mount
 Yolun `install/gtk/` olduğuna dikkat edin. Debian belgelerinin çoğunda geçen
 `install.amd/gtk/` yolu, `live-build` ile üretilen ISO'da bulunmaz.
 
+## Calamares (canlıdan kurulum)
+
+Canlı masaüstündeki "CarotOS'u Kur" simgesi Calamares'i açar. Önyükleme
+menüsündeki **debian-installer (d-i) yedek olarak kalır** ve ayrı yol olarak
+test edilir (BIOS ve UEFI). Araştırma ve gerekçeler: `docs/CALAMARES_ARASTIRMA.md`.
+
+Dosyalar: `config/package-lists/calamares.list.chroot`,
+`config/includes.chroot/etc/calamares/` (settings.conf, modules/, branding/carotos/),
+`usr/bin/carotos-kur` ve `carotos-kur-simge`, `usr/share/applications/carotos-kur.desktop`,
+`etc/xdg/autostart/carotos-kur-simge.desktop`, simge `carotos-kur`, hook
+`config/hooks/live/9979-carotos-calamares.hook.chroot` (kip 755).
+
+Kurallar:
+
+- **`efiBootloaderId: "debian"` zorunludur** (`modules/bootloader.conf`). Debian'ın
+  imzalı `grubx64.efi` dosyasına `debian` dizini gömülüdür; başka ad Secure Boot'ta
+  GRUB istemine düşürür. Branding'deki `bootloaderEntryName: CarotOS` bunu etkilemez.
+  `installEFIFallback` şimdilik `false`; VM'de `true` ve `false` ile **iki ayrı kurulum**
+  denenmeli.
+- **`sources-final` dizide olmamalı.** `/etc/apt/sources.list` yazar ve backports
+  ekler; CarotOS kaynakları deb822 (`debian.sources`, `carotos.sources`) dosyalarındadır.
+- `shim-signed` ve `grub-efi-amd64-signed` hiçbir paket listesine eklenmez (yukarıdaki
+  Secure Boot bölümü). Calamares BIOS'ta yalnız `grub-pc`, UEFI'de `grub-efi` kurar.
+- `packages.conf` yalnız imajda kurulu paketleri `remove`, emin olunmayanları
+  `try_remove` ile kaldırır; `autoremove` kapalı (sudo silinmesin). Bilinmeyen paket
+  adı apt `remove`'u düşürür.
+- **Kurtarma kancası:** `shellprocess@carotos_once`, `etc/apt/apt.conf.d/50carotos-kurtarma`
+  dosyasını (DPkg::Pre-Invoke) ve deb822 kaynaklarını kurulum boyunca
+  `/var/lib/carotos-kurulum/` altına taşır (taşıma başarısızsa kurulum durur);
+  `shellprocess@carotos_sonra` geri koyar, `/etc/live`, `/etc/calamares` ve
+  `carotos-kur*` dosyalarını/simgesini kurulu sistemden siler.
+- `carotos-kur` yalnızca `/run/live/medium` varken çalışır (sources-media medium
+  yoksa yanlış yere yazabilir), `LANG/LC_ALL/LANGUAGE` değerlerini doğrulayıp
+  `pkexec env` ile geçirir. Masaüstü simgesini yalnız canlıda `carotos-kur-simge` koyar.
+- `/etc/calamares` altındaki her dosya root olarak çalışır: 9999 hook'u sahipliği ve
+  `go-w` izni denetler.
+
+Doğrulama (`-a` şart; hepsi sonuç vermeli):
+
+```
+grep -ai "calamares yapilandirmasi yerlestirildi" build.log
+grep -ai "CarotOS: calamares bulundu" build.log
+grep -ai "calamares baslaticisi yerlestirildi" build.log
+grep -a "calamares" carotos-*-amd64.packages | head
+```
+
+Ve ISO havuzunda (BUILD.md "Doğrulama" bölümündeki `iso-mount` ile):
+
+```
+find ~/iso-mount/pool \( -name 'grub-efi_*' -o -name 'grub-pc_*' -o -name 'shim-signed_*' -o -name 'grub-efi-amd64-signed_*' \)
+```
+
+VM test planı özeti (her deneme temiz disk, en az 25 GB, 4 GB RAM): (1) BIOS
+çevrimiçi tüm disk; `sudo whoami`, `passwd -S root` (L), `hostnamectl`, `dpkg -l | grep -E
+"live-boot|live-config|calamares"` boş, `cat /etc/apt/sources.list.d/*`; (2) UEFI Secure
+Boot kapalı: `ls /boot/efi/EFI/*`, `efibootmgr -v`; (3) UEFI + Secure Boot: GRUB istemi
+gelmemeli, `installEFIFallback` true/false; (4) tamamen çevrimdışı BIOS ve UEFI
+(`apt-get update` takılması, `grub-efi` havuzdan); (5) LUKS1 + takas; (6) çift açılış
+(os-prober); (7) d-i yedek yolu BIOS ve UEFI; (8) canlıda RAM, simgenin yalnız canlıda
+çıkması, kurulu sistemde görünen "Debian" ibaresi (EFI kimliği hariç).
+
 ## Debian 13 paket notları
 
 - `policykit-1` kaldırıldı; yerine `polkitd`.

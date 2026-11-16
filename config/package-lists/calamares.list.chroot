@@ -1,0 +1,14 @@
+# CarotOS 1.4: canli masaustunden Calamares kurulumu (docs/CALAMARES_ARASTIRMA.md)
+# d-i (onyukleme menusu) yedek olarak kalir. shim-signed ve grub-efi-amd64-signed
+# BURAYA EKLENMEZ (BUILD.md "Secure Boot ve UEFI").
+# Calamares + moduller + Debian yardimci betikleri (calamares, cryptsetup, keyutils, pkexec, rsync ...)
+calamares-settings-debian
+# users modulu sudoersGroup: sudo yazar; live-config kurulumdan sonra kaldirilinca sudo "otomatik kurulu"
+# kalip silinmesin diye elle de listelenir
+sudo
+# carotos-kur xhost kullanir (Calamares root olarak X'e baglanir)
+x11-xserver-utils
+# EFI sistem bolumunu bicimlendirmek icin (mkfs.fat)
+dosfstools
+# NTFS bolumu kucultme/okuma (Windows ile cift acilis)
+ntfs-3g
