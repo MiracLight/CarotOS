@@ -55,7 +55,7 @@ done
 # Ayarlar: paket dosyasi bizimkini ezmis olmasin (conffile), yanlis dizi olmasin
 grep -q '^branding: carotos$' /etc/calamares/settings.conf \
     || hata "settings.conf 'branding: carotos' icermiyor (paket dosyasi ezmis olabilir)."
-if grep -q 'sources-final' /etc/calamares/settings.conf; then
+if grep -v '^[[:space:]]*#' /etc/calamares/settings.conf | grep -q 'sources-final'; then
     hata "settings.conf sources-final iceriyor (CarotOS deb822 kaynaklarini bozar)."
 fi
 grep -q 'shellprocess@carotos_once' /etc/calamares/settings.conf \
@@ -72,8 +72,9 @@ command -v calamares >/dev/null 2>&1 || hata "calamares kurulu degil (config/pac
 echo "CarotOS: calamares bulundu: $(command -v calamares)"
 
 # Calamares modul betikleri (Debian paketinden): sources-media vb. bulunmali
-[ -d /usr/lib/calamares/modules/sources-media ] \
-    || hata "calamares-settings-debian modulleri (sources-media) yok."
+SM="$(find /usr/lib/calamares /usr/share/calamares /etc/calamares -name 'sources-media*' 2>/dev/null | head -n 1)"
+[ -n "$SM" ] || hata "calamares-settings-debian modulleri (sources-media) yok."
+echo "CarotOS: calamares sources-media modulu: $SM"
 
 update-desktop-database /usr/share/applications || true
 gtk-update-icon-cache -f -t /usr/share/icons/hicolor || true
