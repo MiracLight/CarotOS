@@ -322,14 +322,30 @@ class MarkaTesti(unittest.TestCase):
     def test_slayt_turkce_ingilizce(self):
         q = oku(CALAMARES, "branding", "carotos", "show.qml")
         # Dil yuklemede degil etkinlestirmede okunur (Karsilama'da secilen dil)
-        self.assertRegex(q, r"function onActivate\(\) \{ diliOku\(\); \}")
+        self.assertRegex(q, r"function onActivate\(\) \{ diliOku\(\);")
         self.assertIn('=== "tr"', q)
         # Yalniz iki dil: t(tr, en)
         self.assertNotRegex(q, r"\b(de|ru|ja|zh|fr|es|pt):\s*\"")
         self.assertEqual(q.count("{"), q.count("}"))
         self.assertEqual(q.count("("), q.count(")"))
         # Beyaz kenar kalmasin: tam ekran zemin
-        self.assertIn("anchors.fill: parent; color: presentation.zemin; z: -1", q)
+        self.assertRegex(q, r"id: zemin\s+anchors\.fill: parent\s+z: -1")
+
+    def test_slayt_sayisi_ve_simgeler(self):
+        d = os.path.join(CALAMARES, "branding", "carotos")
+        q = oku(d, "show.qml")
+        self.assertGreaterEqual(len(re.findall(r"(?m)^    CarotSlayt \{$", q)), 10)
+        # Slaytin kullandigi her simge branding dizininde olmali (sistem simge yoluna baglanmaz)
+        adlar = set(re.findall(r'"((?:s-[a-z]+|logo)\.png)"', q))
+        self.assertIn("s-panel.png", adlar)
+        for ad in adlar:
+            with self.subTest(simge=ad):
+                yol = os.path.join(d, ad)
+                self.assertTrue(os.path.isfile(yol), ad)
+                with open(yol, "rb") as f:
+                    self.assertEqual(f.read(8), b"\x89PNG\r\n\x1a\n")
+        self.assertNotIn("/usr/share/icons", q)
+        self.assertIn("toLocaleUpperCase()", q)
 
     def test_dil_listesi_yazi_tipleri(self):
         liste = oku(os.path.dirname(CHROOT), "package-lists", "calamares.list.chroot")
