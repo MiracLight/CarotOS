@@ -3,11 +3,12 @@
 ---
 componentName:  carotos
 
-welcomeStyleCalamares: true
+# false: baslik "CarotOS 1.4 kurulum programina hos geldiniz" (Calamares adi gecmez, pencereye sigar)
+welcomeStyleCalamares: false
 welcomeExpandingLogo:  true
 
 windowExpanding:  normal
-windowSize:       800px,580px
+windowSize:       900px,620px
 windowPlacement:  center
 
 strings:
@@ -36,8 +37,10 @@ slideshowAPI:  2
 sidebar:    widget
 navigation: widget
 
+# Calamares 3.3 anahtar adlari buyuk harfle baslar (3.2'deki sidebarText vb. yok sayilir;
+# yan panel siyah zemin + siyah yazi kaliyordu).
 style:
-    sidebarBackground:    "#1b1e29"
-    sidebarText:          "#e6e9f2"
-    sidebarTextSelect:    "#1b1e29"
-    sidebarTextHighlight: "#5b8def"
+    SidebarBackground:        "#1b1e29"
+    SidebarText:              "#e6e9f2"
+    SidebarTextCurrent:       "#ffffff"
+    SidebarBackgroundCurrent: "#5b8def"

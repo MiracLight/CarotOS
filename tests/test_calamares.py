@@ -311,6 +311,31 @@ class MarkaTesti(unittest.TestCase):
             self.assertTrue(os.path.isfile(os.path.join(d, ad)), ad)
         self.assertFalse(os.path.exists(os.path.join(CALAMARES, "branding", "debian")))
 
+    def test_yan_panel_renkleri_33(self):
+        # Calamares 3.3 buyuk harfli anahtarlari okur; kucuk harfliler yok sayilir (siyah yazi kalir)
+        b = oku(CALAMARES, "branding", "carotos", "branding.desc")
+        for anahtar in ("SidebarBackground", "SidebarText", "SidebarTextCurrent", "SidebarBackgroundCurrent"):
+            self.assertRegex(b, r'(?m)^    %s:\s+"#[0-9a-fA-F]{6}"$' % anahtar)
+        self.assertNotRegex(b, r"(?m)^    sidebar[A-Z]")
+        self.assertRegex(b, r"(?m)^welcomeStyleCalamares:\s+false$")
+
+    def test_slayt_turkce_ingilizce(self):
+        q = oku(CALAMARES, "branding", "carotos", "show.qml")
+        # Dil yuklemede degil etkinlestirmede okunur (Karsilama'da secilen dil)
+        self.assertRegex(q, r"function onActivate\(\) \{ diliOku\(\); \}")
+        self.assertIn('=== "tr"', q)
+        # Yalniz iki dil: t(tr, en)
+        self.assertNotRegex(q, r"\b(de|ru|ja|zh|fr|es|pt):\s*\"")
+        self.assertEqual(q.count("{"), q.count("}"))
+        self.assertEqual(q.count("("), q.count(")"))
+        # Beyaz kenar kalmasin: tam ekran zemin
+        self.assertIn("anchors.fill: parent; color: presentation.zemin; z: -1", q)
+
+    def test_dil_listesi_yazi_tipleri(self):
+        liste = oku(os.path.dirname(CHROOT), "package-lists", "calamares.list.chroot")
+        for paket in ("fonts-lohit-deva", "fonts-lohit-mlym", "fonts-lklug-sinhala", "fonts-tlwg-garuda-ttf"):
+            self.assertRegex(liste, r"(?m)^%s$" % re.escape(paket))
+
     def test_yeni_dosyalar_lf(self):
         for kok, _, dosyalar in os.walk(CALAMARES):
             for ad in dosyalar:

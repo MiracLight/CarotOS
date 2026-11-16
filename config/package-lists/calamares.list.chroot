@@ -10,6 +10,15 @@ sudo
 x11-xserver-utils
 # Qt 6.5+ xcb eklentisi bunu ister (yoksa Calamares X'te acilmaz)
 libxcb-cursor0
+# Calamares dil listesindeki alfabeler kare gorunmesin (Hintce/Marathi, Bengalce, Tamilce,
+# Telugu, Malayalam, Sinhala, Tayca); CJK fonts-noto-cjk ile carotos listesinden gelir
+fonts-lohit-deva
+fonts-lohit-beng-bengali
+fonts-lohit-taml
+fonts-lohit-telu
+fonts-lohit-mlym
+fonts-lklug-sinhala
+fonts-tlwg-garuda-ttf
 # EFI sistem bolumunu bicimlendirmek icin (mkfs.fat)
 dosfstools
 # NTFS bolumu kucultme/okuma (Windows ile cift acilis)
