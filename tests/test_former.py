@@ -138,8 +138,8 @@ class IcerikTesti(unittest.TestCase):
     def setUpClass(cls):
         cls.konular = konular.tumu()
 
-    def test_on_dokuz_konu_ve_benzersiz_kimlik(self):
-        self.assertEqual(len(self.konular), 20)
+    def test_yirmi_bir_konu_ve_benzersiz_kimlik(self):
+        self.assertEqual(len(self.konular), 21)
         kimlikler = [k["id"] for k in self.konular]
         self.assertEqual(len(kimlikler), len(set(kimlikler)), kimlikler)
         self.assertEqual(set(kimlikler), set(konular.SIRA))
