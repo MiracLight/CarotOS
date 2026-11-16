@@ -774,6 +774,55 @@ PAGES = [
         ],
     },
     {
+        "id": "kurtarma",
+        "title": {"tr": "CarotOS Kurtarma", "en": "CarotOS Recovery"},
+        "subtitle": {
+            "tr": "Bir güncelleme ya da yanlış ayar sistemi bozarsa son kararlı duruma dönün",
+            "en": "Go back to the last stable state when an update or a wrong setting breaks the system",
+        },
+        "image": "kurtarma.png",
+        "body": [
+            ("p", {
+                "tr": "CarotOS Kurtarma, sisteminizin belirli anlardaki kopyalarını "
+                      "(kurtarma noktalarını) saklar. Bir güncelleme ya da yanlış bir ayar "
+                      "sistemi bozduğunda, ilgili noktayı seçip o ana geri dönebilirsiniz. "
+                      "Windows'un Sistem Geri Yükleme'siyle aynı fikirdir.",
+                "en": "CarotOS Recovery keeps copies of your system at chosen moments "
+                      "(recovery points). When an update or a wrong setting breaks the system, "
+                      "you can pick a point and go back to that moment. It is the same idea as "
+                      "Windows System Restore.",
+            }),
+            ("bullets", [
+                {"tr": "“Şimdi nokta oluştur” ile büyük bir değişiklikten önce elle nokta alabilirsiniz.",
+                 "en": "Use “Create a point now” to take a point by hand before a big change."},
+                {"tr": "apt ile paket kurup güncellerken, değişiklikten hemen önce kendiliğinden bir "
+                       "nokta açılır (ayarlardan kapatılabilir).",
+                 "en": "When you install or update packages with apt, a point is opened "
+                       "automatically right before the change (you can turn this off in settings)."},
+                {"tr": "Her nokta /etc, /root ve kurulu paket listesini içerir. Sabit bağlar "
+                       "sayesinde yalnızca değişen dosyalar yer kaplar.",
+                 "en": "Each point holds /etc, /root and the installed package list. Thanks to "
+                       "hard links, only changed files take up space."},
+                {"tr": "Noktaları geri yükleyebilir ya da silebilirsiniz.",
+                 "en": "You can restore or delete any point."},
+                {"tr": "Ayarlar: otomatik nokta açık/kapalı, kaç nokta saklanacağı (varsayılan 5), "
+                       "otomatik noktalar arası en az süre (10 dakika) ve gereken en az boş alan "
+                       "(512 MB).",
+                 "en": "Settings: automatic point on/off, how many points to keep (default 5), "
+                       "the minimum time between automatic points (10 minutes) and the minimum "
+                       "free space required (512 MB)."},
+            ]),
+            ("note", {
+                "tr": "Bu bir yedekleme aracı değildir: kişisel dosyalarınıza (Belgeler, "
+                      "Masaüstü, fotoğraflar, /home) dokunmaz ve onları korumaz; onlar için ayrıca "
+                      "yedek alın. Noktalar aynı diskte durur, disk bozulursa onlar da gider.",
+                "en": "This is not a backup tool: it does not touch or protect your personal "
+                      "files (Documents, Desktop, photos, /home), so back those up separately. "
+                      "Points live on the same disk, so if the disk fails they go with it.",
+            }),
+        ],
+    },
+    {
         "id": "filenor",
         "title": {"tr": "Filenor", "en": "Filenor"},
         "subtitle": {
@@ -1409,6 +1458,7 @@ SIBLING_CONFIGS = [
     ("carotos-former", "settings.json"),
     ("carotos-gsd", "settings.json"),
     ("carotene", "settings.json"),
+    ("carotos-kurtarma", "arayuz.json"),  # Kurtarma: anahtarlar "lang" ve "theme"
     ("carotos-magaza", "ayarlar.json"),
     ("carotpot", "settings.json"),
     ("carotos-poligon", "ayar.json"),     # Poligon: anahtarlar "dil" ve "gorunum"

@@ -95,7 +95,8 @@ class KonuSirasiTesti(unittest.TestCase):
         self.assertEqual(konular["disk"], ["disk"])
         self.assertEqual(konular["etik"], ["etik"])
         self.assertNotIn("guvenlik_duvari", konular["koruma"])
-        self.assertEqual(konular["koruma"], ["usb", "carotpot", "carotene", "health", "dogrula"])
+        self.assertEqual(konular["koruma"], ["usb", "carotpot", "carotene", "health", "kurtarma", "dogrula"])
+        self.assertIn("kurtarma", pages_kimlikleri())
 
     def test_her_konu_sayfasi_gercek_sayfa(self):
         gercek = set(pages_kimlikleri())

@@ -52,6 +52,10 @@ class KarsilamaGorselleriTesti(unittest.TestCase):
                 self.assertGreaterEqual(gen, 678, ad)
                 self.assertGreaterEqual(yuk, 300, ad)
 
+    def test_kurtarma_sayfasi_gorseli(self):
+        self.assertIn("kurtarma.png", sayfa_gorselleri())
+        self.assertIsNotNone(png_boyut(os.path.join(GORSEL, "kurtarma.png")))
+
     def test_logo_png(self):
         self.assertIsNotNone(png_boyut(os.path.join(GORSEL, "logo.png")))
 
