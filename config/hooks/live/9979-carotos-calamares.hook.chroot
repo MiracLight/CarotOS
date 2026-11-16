@@ -1,0 +1,80 @@
+#!/bin/sh
+set -e
+
+# CarotOS 1.4: Calamares ile canlidan kurulum (docs/CALAMARES_ARASTIRMA.md, BUILD.md "Calamares").
+# d-i onyukleme menusunde yedek olarak kalir. Sessizce eksik kalmasin: her sey dogrulanir.
+
+hata() { echo "CarotOS HATA: $*" >&2; exit 1; }
+
+# Dosyalarin varligi (includes.chroot)
+for yol in /etc/calamares/settings.conf \
+           /etc/calamares/branding/carotos/branding.desc \
+           /etc/calamares/branding/carotos/show.qml \
+           /etc/calamares/branding/carotos/logo.png \
+           /etc/calamares/branding/carotos/welcome.png \
+           /etc/calamares/modules/users.conf \
+           /etc/calamares/modules/packages.conf \
+           /etc/calamares/modules/bootloader.conf \
+           /etc/calamares/modules/locale.conf \
+           /etc/calamares/modules/partition.conf \
+           /etc/calamares/modules/welcome.conf \
+           /etc/calamares/modules/finished.conf \
+           /etc/calamares/modules/shellprocess_carotos_once.conf \
+           /etc/calamares/modules/shellprocess_carotos_sonra.conf \
+           /usr/bin/carotos-kur /usr/bin/carotos-kur-simge \
+           /usr/share/applications/carotos-kur.desktop \
+           /etc/xdg/autostart/carotos-kur-simge.desktop \
+           /usr/share/icons/hicolor/256x256/apps/carotos-kur.png; do
+    [ -s "$yol" ] || hata "$yol yok (Calamares dosyasi eksik)."
+done
+
+# Izinler: Calamares ayarlari root olarak calisir, yalniz root yazabilmeli
+chown -R -h root:root /etc/calamares
+find /etc/calamares -type d -exec chmod 755 {} +
+find /etc/calamares -type f -exec chmod 644 {} +
+chown root:root /usr/bin/carotos-kur /usr/bin/carotos-kur-simge
+chmod 755 /usr/bin/carotos-kur /usr/bin/carotos-kur-simge
+chmod 644 /usr/share/applications/carotos-kur.desktop /etc/xdg/autostart/carotos-kur-simge.desktop
+chmod 644 /usr/share/icons/hicolor/*/apps/carotos-kur.png
+
+# Debian'in baslaticilari ve markasi (kural 5: "Debian" gorunmesin) kalmasin
+rm -f /etc/xdg/autostart/calamares-desktop-icon.desktop \
+      /usr/share/applications/calamares-install-debian.desktop \
+      /usr/bin/add-calamares-desktop-icon \
+      /usr/bin/calamares-install-debian \
+      /usr/share/pixmaps/install-debian.png
+rm -rf /etc/calamares/branding/debian
+for yol in /etc/xdg/autostart/calamares-desktop-icon.desktop \
+           /usr/share/applications/calamares-install-debian.desktop \
+           /usr/bin/add-calamares-desktop-icon \
+           /usr/bin/calamares-install-debian \
+           /etc/calamares/branding/debian; do
+    [ ! -e "$yol" ] || hata "$yol silinemedi."
+done
+
+# Ayarlar: paket dosyasi bizimkini ezmis olmasin (conffile), yanlis dizi olmasin
+grep -q '^branding: carotos$' /etc/calamares/settings.conf \
+    || hata "settings.conf 'branding: carotos' icermiyor (paket dosyasi ezmis olabilir)."
+if grep -q 'sources-final' /etc/calamares/settings.conf; then
+    hata "settings.conf sources-final iceriyor (CarotOS deb822 kaynaklarini bozar)."
+fi
+grep -q 'shellprocess@carotos_once' /etc/calamares/settings.conf \
+    && grep -q 'shellprocess@carotos_sonra' /etc/calamares/settings.conf \
+    || hata "settings.conf shellprocess@carotos_once/sonra icermiyor."
+grep -q '^efiBootloaderId: "debian"$' /etc/calamares/modules/bootloader.conf \
+    || hata "bootloader.conf efiBootloaderId \"debian\" icermiyor (Secure Boot icin zorunlu)."
+grep -q '^setRootPassword: false$' /etc/calamares/modules/users.conf \
+    || hata "users.conf setRootPassword: false icermiyor (root kilitli olmali)."
+echo "CarotOS: calamares yapilandirmasi yerlestirildi."
+
+# Calamares ikilisi paket listesinden gelir
+command -v calamares >/dev/null 2>&1 || hata "calamares kurulu degil (config/package-lists/calamares.list.chroot)."
+echo "CarotOS: calamares bulundu: $(command -v calamares)"
+
+# Calamares modul betikleri (Debian paketinden): sources-media vb. bulunmali
+[ -d /usr/lib/calamares/modules/sources-media ] \
+    || hata "calamares-settings-debian modulleri (sources-media) yok."
+
+update-desktop-database /usr/share/applications || true
+gtk-update-icon-cache -f -t /usr/share/icons/hicolor || true
+echo "CarotOS: calamares baslaticisi yerlestirildi."

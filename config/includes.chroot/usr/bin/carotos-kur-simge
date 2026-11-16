@@ -1,0 +1,26 @@
+#!/bin/sh
+# CarotOS: canli oturumda masaustune "CarotOS'u Kur" simgesini koyar (Debian'in
+# add-calamares-desktop-icon yontemi). Yalniz /run/live/medium varsa calisir:
+# kurulu sistemde simge cikmaz. skel'e konmaz.
+set -eu
+
+[ -d /run/live/medium ] || exit 0
+
+KAYNAK=/usr/share/applications/carotos-kur.desktop
+[ -f "$KAYNAK" ] || exit 0
+
+MASAUSTU=""
+if command -v xdg-user-dir >/dev/null 2>&1; then
+    MASAUSTU="$(xdg-user-dir DESKTOP 2>/dev/null || true)"
+fi
+[ -n "$MASAUSTU" ] && [ "$MASAUSTU" != "$HOME" ] || MASAUSTU="$HOME/Desktop"
+
+mkdir -p -- "$MASAUSTU"
+HEDEF="$MASAUSTU/carotos-kur.desktop"
+cp -f -- "$KAYNAK" "$HEDEF"
+chmod +x -- "$HEDEF"
+# Xfce/Thunar guvenilir olarak isaretlenmemis baslaticiyi calistirmaz
+if command -v gio >/dev/null 2>&1; then
+    gio set -- "$HEDEF" metadata::trusted true >/dev/null 2>&1 || true
+fi
+exit 0

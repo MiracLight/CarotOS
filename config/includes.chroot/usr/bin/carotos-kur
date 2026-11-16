@@ -1,0 +1,100 @@
+#!/bin/bash
+# CarotOS'u Kur: canli masaustunden Calamares kurulumunu baslatir.
+#
+# Iki kipi vardir:
+#   carotos-kur          (normal kullanici) medium denetimi, xhost, pkexec ile kendini "--root" ile yeniden baslatir
+#   carotos-kur --root   (pkexec, root) canli fstab'i kenara alir, Calamares'i calistirir, fstab'i geri koyar
+# Kurulum yalnizca canli ortamda (/run/live/medium bagliyken) calisir: sources-media modulu
+# medium yoksa yanlis yere yazabilir (docs/CALAMARES_ARASTIRMA.md, tuzak 11).
+set -eu
+
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+
+MEDIUM=/run/live/medium
+FSTAB=/etc/fstab
+FSTAB_YEDEK=/etc/fstab.orig.carotos
+
+hata() {
+    echo "carotos-kur: $*" >&2
+    if [ "$(id -u)" -ne 0 ] && command -v notify-send >/dev/null 2>&1; then
+        notify-send "CarotOS" "$*" 2>/dev/null || true
+    fi
+}
+
+# Yerel ayar degerini dogrula: yalniz dil_ULKE[.kodlama][@degistirici]; aksi halde C.UTF-8
+YEREL_RE='^[A-Za-z_]+(\.[A-Za-z0-9-]+)?(@[a-z]+)?$'
+temiz_yerel() {
+    if [[ "${1-}" =~ $YEREL_RE ]]; then
+        printf '%s' "$1"
+    else
+        printf '%s' "C.UTF-8"
+    fi
+}
+# LANGUAGE iki nokta ile ayrilmis liste olabilir (tr:en); her ogeyi dogrula
+temiz_dil_listesi() {
+    local deger="${1-}" oge sonuc="" eski_ifs="$IFS"
+    [ -n "$deger" ] || { printf '%s' "$2"; return 0; }
+    IFS=':'
+    for oge in $deger; do
+        if [[ "$oge" =~ $YEREL_RE ]]; then
+            sonuc="${sonuc:+$sonuc:}$oge"
+        else
+            IFS="$eski_ifs"
+            printf '%s' "$2"
+            return 0
+        fi
+    done
+    IFS="$eski_ifs"
+    printf '%s' "${sonuc:-$2}"
+}
+
+if [ ! -d "$MEDIUM" ]; then
+    hata "Bu kurulum yalnizca CarotOS canli ortamindan calisir ($MEDIUM bulunamadi). / This installer only runs from the CarotOS live session."
+    exit 1
+fi
+
+if [ "${1-}" = "--root" ]; then
+    # --- root kipi (pkexec) ---
+    [ "$(id -u)" -eq 0 ] || { hata "--root kipi yalnizca root ile calisir."; exit 1; }
+    geri_koy() {
+        if [ -e "$FSTAB_YEDEK" ]; then
+            mv -f -- "$FSTAB_YEDEK" "$FSTAB" || true
+        fi
+    }
+    trap geri_koy EXIT
+    trap 'exit 130' INT TERM HUP
+    # live-build'in biraktigi fstab bolumlemeyi bozuyor (Debian da ayni onlemi alir)
+    if [ -e "$FSTAB" ] && [ ! -e "$FSTAB_YEDEK" ]; then
+        mv -- "$FSTAB" "$FSTAB_YEDEK"
+    fi
+    QT_AUTO_SCREEN_SCALE_FACTOR=1
+    export QT_AUTO_SCREEN_SCALE_FACTOR
+    rc=0
+    /usr/bin/calamares || rc=$?
+    exit "$rc"
+fi
+
+# --- normal kullanici kipi ---
+LANG_T="$(temiz_yerel "${LANG-}")"
+LC_ALL_T="$(temiz_yerel "${LC_ALL:-${LANG-}}")"
+LANGUAGE_T="$(temiz_dil_listesi "${LANGUAGE-}" "$LANG_T")"
+
+xhost_acildi=0
+if command -v xhost >/dev/null 2>&1 && [ -n "${DISPLAY-}" ]; then
+    if xhost +si:localuser:root >/dev/null 2>&1; then
+        xhost_acildi=1
+    fi
+fi
+xhost_geri() {
+    if [ "$xhost_acildi" -eq 1 ]; then
+        xhost -si:localuser:root >/dev/null 2>&1 || true
+    fi
+}
+trap xhost_geri EXIT
+
+rc=0
+/usr/bin/pkexec /usr/bin/env \
+    "LANG=$LANG_T" "LC_ALL=$LC_ALL_T" "LANGUAGE=$LANGUAGE_T" \
+    /usr/bin/carotos-kur --root || rc=$?
+exit "$rc"
