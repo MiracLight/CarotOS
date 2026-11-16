@@ -248,6 +248,16 @@ class KarsilamaDenetimTesti(UygulamaDilTabani):
         self.assertEqual(W.modern_komutlari(ns, False),
                          [["/usr/bin/python3", "-I", "/usr/bin/carotos-modernlestir", "geri-al"]])
 
+    def test_sleek_karti_arka_plan_sayfasinda(self):
+        # CarotOS Sleek anahtari arka plan sayfasinda (gorunum arka planla secilir), Gorunum sayfasinda degil
+        import inspect
+        W = self.m.WelcomeWindow
+        self.assertIn("_sleek_karti_ekle", inspect.getsource(W.build_wallpaper_page))
+        self.assertNotIn("MODERN_ANAHTAR", inspect.getsource(W.build_appearance_page))
+        self.assertEqual(self.m.MODERN_ANAHTAR["baslik"]["tr"], "CarotOS Sleek")
+        self.assertEqual(self.m.MODERN_ANAHTAR["baslik"]["en"], "CarotOS Sleek")
+        self.assertLess(len(self.m.MODERN_ANAHTAR["alt"]["tr"]), 140)       # kisa aciklama
+
     def test_modern_calistir_ilk_hatada_durur(self):
         import types
         W = self.m.WelcomeWindow

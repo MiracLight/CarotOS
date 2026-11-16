@@ -1311,18 +1311,14 @@ def _varsayilan_dil():
 DEFAULTS = {"lang": _varsayilan_dil(), "theme": "dark", "show_on_startup": True,
             "wallpaper": "", "biten_konular": []}
 
-# "Sistem temasini modernlestir" anahtari (Gorunum sayfasi): yetkili anahtar karti metinleri
+# CarotOS Sleek anahtari (Masaustu arka plani sayfasi): yetkili anahtar karti metinleri
 MODERN_ANAHTAR = {
-    "baslik": {"tr": "Sistem temasını modernleştir", "en": "Modernize the system theme"},
+    "baslik": {"tr": "CarotOS Sleek", "en": "CarotOS Sleek"},
     "alt": {
-        "tr": "Koyu modern tema, yuvarlak köşeler, yumuşak gölgeler, alt dock ve kaydırmalı yan panel. "
-              "Paketler internetten indirilir (birkaç yüz MB olabilir) ve bellek kullanımı biraz artar. "
-              "Koyu tema kullanılır; bu durumda Açık/Koyu seçimi uygulanmaz. İstediğin an kapatıp varsayılan "
-              "görünüme dönebilirsin.",
-        "en": "A modern dark theme, rounded corners, soft shadows, a bottom dock and a scrolling side panel. "
-              "Packages are downloaded from the internet (it may be a few hundred MB) and memory use goes up a "
-              "little. It uses the dark theme, so the Light/Dark choice is not applied. You can turn it off at "
-              "any time to return to the default look.",
+        "tr": "Koyu modern görünüm: yuvarlak köşeler, alt dock ve yan panel. Paketler internetten "
+              "indirilir; istediğin an kapatabilirsin.",
+        "en": "A modern dark look: rounded corners, a bottom dock and a side panel. Packages are "
+              "downloaded from the internet; you can turn it off at any time.",
     },
     "acik": {"tr": "Açık: modern görünüm uygulandı.", "en": "On: the modern look is applied."},
     "kapali": {"tr": "Kapalı: varsayılan CarotOS görünümü.", "en": "Off: the default CarotOS look."},
@@ -1662,7 +1658,7 @@ def has_xfwm_variant(name):
 
 
 def sleek_uygulanmis_mi():
-    """"Sistem temasini modernlestir" uygulanmis mi? (carotos-modernlestir yedegi var mi)"""
+    """CarotOS Sleek uygulanmis mi? (carotos-modernlestir yedegi var mi)"""
     return os.path.isfile(os.path.join(os.path.expanduser("~"), ".local", "state", "carotos",
                                        "sleek-yedek.json"))
 
@@ -2076,13 +2072,6 @@ class WelcomeWindow(Gtk.Window):
             self.lang_cards[code] = card
             lang_row.attach(card["event"], sira % sutun, sira // sutun, 1, 1)
 
-        # --- sistem temasini modernlestir (internetten paket indirir; geri alinabilir) ---
-        modern_kart, self.modern_anahtar = self._yetkili_anahtar(
-            MODERN_ANAHTAR, sleek_uygulanmis_mi(),
-            lambda istenen: self.modern_calistir(self.modern_komutlari(istenen)))
-        modern_kart.set_margin_top(30)
-        outer.pack_start(modern_kart, False, False, 0)
-
         # --- aciklama ---
         note = Gtk.Label(label=UI["apply_note"][self.lang], xalign=0.0)
         note.get_style_context().add_class("body-text")
@@ -2276,6 +2265,7 @@ class WelcomeWindow(Gtk.Window):
             bos.set_justify(Gtk.Justification.CENTER)
             bos.set_margin_top(40)
             outer.pack_start(bos, False, False, 0)
+            self._sleek_karti_ekle(outer)
             return scroller
 
         grid = Gtk.Grid()
@@ -2290,6 +2280,8 @@ class WelcomeWindow(Gtk.Window):
             card = self._wallpaper_card(ad, path)
             self.wp_cards[path] = card
             grid.attach(card["event"], i % 3, i // 3, 1, 1)
+
+        self._sleek_karti_ekle(outer)
 
         note = Gtk.Label(label=UI["wp_note"][self.lang], xalign=0.0)
         note.get_style_context().add_class("body-text")
@@ -2310,6 +2302,17 @@ class WelcomeWindow(Gtk.Window):
 
         self._sync_wallpaper_selection()
         return scroller
+
+    def _sleek_karti_ekle(self, outer):
+        """CarotOS Sleek ac/kapa karti (internetten paket indirir; geri alinabilir).
+        Gorunum arka planla birlikte secildigi icin arka plan sayfasindadir."""
+        modern_kart, self.modern_anahtar = self._yetkili_anahtar(
+            MODERN_ANAHTAR, sleek_uygulanmis_mi(),
+            lambda istenen: self.modern_calistir(self.modern_komutlari(istenen)))
+        modern_kart.set_margin_top(28)
+        modern_kart.set_halign(Gtk.Align.CENTER)
+        modern_kart.set_size_request(self.CARD_WIDTH, -1)
+        outer.pack_start(modern_kart, False, False, 0)
 
     def _wallpaper_card(self, name, path):
         event = Gtk.EventBox()

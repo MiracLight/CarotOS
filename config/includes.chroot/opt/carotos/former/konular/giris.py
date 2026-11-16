@@ -48,14 +48,15 @@ def konu():
                   "isolated environment."),
             ]),
         ]),
-        (T("Sistem temasını modernleştir", "Modernize the system theme"), [
-            ("p", T("Karşılama'nın “Görünüm ve dil” sayfasındaki anahtar, masaüstünü tek adımda modern bir "
-                    "görünüme geçirir: koyu tema, yuvarlak köşeler, yumuşak gölgeler, altta sistem dock'u ve "
-                    "solda kaydırmalı bir CarotOS yan paneli (imleci ekranın sol kenarına götürünce çıkar).",
-                    "The switch on the “Appearance and language” page of Welcome turns the desktop into a modern "
-                    "look in one step: a dark theme, rounded corners, soft shadows, a system dock at the bottom "
-                    "and a scrolling CarotOS side panel on the left (move the pointer to the left edge of the "
-                    "screen to show it).")),
+        (T("CarotOS Sleek", "CarotOS Sleek"), [
+            ("p", T("Karşılama'nın “Masaüstü arka planı” sayfasındaki CarotOS Sleek anahtarı, masaüstünü tek "
+                    "adımda modern bir görünüme geçirir: koyu tema, yuvarlak köşeler, yumuşak gölgeler, altta "
+                    "sistem dock'u ve solda kaydırmalı bir CarotOS yan paneli (imleci ekranın sol kenarına "
+                    "götürünce çıkar).",
+                    "The CarotOS Sleek switch on the “Desktop wallpaper” page of Welcome turns the desktop into a "
+                    "modern look in one step: a dark theme, rounded corners, soft shadows, a system dock at the "
+                    "bottom and a scrolling CarotOS side panel on the left (move the pointer to the left edge of "
+                    "the screen to show it).")),
             ("liste", [
                 T("Gereken paketler internetten indirilir (birkaç yüz MB olabilir); bunun için bir kez "
                   "parolanı yazarsın.",
