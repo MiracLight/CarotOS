@@ -75,6 +75,14 @@ echo "CarotOS: calamares bulundu: $(command -v calamares)"
 SM="$(find /usr/lib/calamares /usr/share/calamares /etc/calamares -name 'sources-media*' 2>/dev/null | head -n 1)"
 [ -n "$SM" ] || hata "calamares-settings-debian modulleri (sources-media) yok."
 echo "CarotOS: calamares sources-media modulu: $SM"
+# settings.conf'taki her Debian modulu modules-search yolunda bulunmali (yoksa "Initialization Failed")
+grep -q '^modules-search: \[ local, /usr/lib/calamares/modules \]$' /etc/calamares/settings.conf \
+    || hata "settings.conf modules-search /usr/lib/calamares/modules icermiyor."
+for m in dpkg-unsafe-io dpkg-unsafe-io-undo sources-media sources-media-unmount bootloader-config; do
+    [ -s "/usr/lib/calamares/modules/$m/module.desc" ] \
+        || hata "Calamares modulu yok: /usr/lib/calamares/modules/$m/module.desc"
+done
+echo "CarotOS: calamares Debian modulleri bulundu."
 
 update-desktop-database /usr/share/applications || true
 gtk-update-icon-cache -f -t /usr/share/icons/hicolor || true

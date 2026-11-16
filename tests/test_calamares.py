@@ -226,6 +226,12 @@ class SarmalayiciTesti(unittest.TestCase):
                                    capture_output=True, timeout=30)
                 self.assertEqual(r.stdout.decode(), beklenen)
 
+    def test_debian_modul_yolu(self):
+        # Yolu eksik olunca canlida "Calamares Initialization Failed" (dpkg-unsafe-io vb. yuklenemez)
+        ayar = oku(CALAMARES, "settings.conf")
+        self.assertRegex(ayar, r"(?m)^modules-search: \[ local, /usr/lib/calamares/modules \]$")
+        self.assertIn("/usr/lib/calamares/modules/$m/module.desc", oku(HOOK))
+
     def test_xcb_cursor_paketi(self):
         liste = oku(os.path.dirname(CHROOT), "package-lists", "calamares.list.chroot")
         self.assertRegex(liste, r"(?m)^libxcb-cursor0$")
