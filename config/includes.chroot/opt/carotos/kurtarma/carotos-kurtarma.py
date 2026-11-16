@@ -103,6 +103,7 @@ METIN = {
                           "kendiliğinden bir kurtarma noktası açılır.",
                     "en": "When you install or update packages with apt, a recovery point "
                           "is opened automatically right before the change."},
+    "ozet": {"tr": "{sayi} nokta · toplam {mb} MB", "en": "{sayi} points · {mb} MB total"},
     "ayar_sakla_baslik": {"tr": "Kaç nokta saklansın", "en": "How many points to keep"},
     "ayar_sakla_alt": {"tr": "Bu sayıyı aşan en eski noktalar otomatik silinir.",
                        "en": "The oldest points beyond this number are deleted automatically."},
@@ -212,6 +213,8 @@ class KurtarmaPenceresi(Gtk.Window):
         self.kabuk = tema.Kabuk(logo, bolumler, self._sayfa_secildi)
         self.add(self.kabuk)
         self.kabuk.marka_ayarla(METIN["baslik"][self.lang], "v" + APP_VERSION)
+        for anahtar in ("noktalar", "ayarlar"):
+            self.kabuk.menu_metni(anahtar, METIN["men_" + anahtar][self.lang])
 
         olustur_btn = tema.dugme(METIN["olustur"][self.lang], "ana", self._olustur_dialogu)
         self.kabuk.ust_sag.pack_start(olustur_btn, False, False, 0)
@@ -292,6 +295,12 @@ class KurtarmaPenceresi(Gtk.Window):
             self.noktalar_ic.pack_start(
                 tema.bos_durum("kalkan", METIN["bos_baslik"][self.lang], METIN["bos_alt"][self.lang]),
                 False, False, 10)
+        else:
+            toplam_mb = sum(m.get("boyut_mb") or 0 for m in noktalar)
+            ozet = METIN["ozet"][self.lang].format(sayi=len(noktalar), mb=toplam_mb)
+            ozet_etiketi = tema.etiket(ozet, "kart-alt", x=0.0)
+            ozet_etiketi.set_margin_start(2)
+            self.noktalar_ic.pack_start(ozet_etiketi, False, False, 0)
         for meta in noktalar:
             self.noktalar_ic.pack_start(self._nokta_karti(meta), False, False, 0)
         self.noktalar_ic.show_all()

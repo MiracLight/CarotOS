@@ -4596,6 +4596,7 @@
   "{p} points · {n} solved": "{p}ポイント · {n}人が正解",
   "{ran}/{total} checks produced a result. {n} check(s) could not run or need root; the result is incomplete.": "{total}件中 {ran}件のチェックが結果を出しました。{n}件のチェックは実行できなかったか、rootが必要です。結果は不完全です。",
   "{rapor_komutu}": "{rapor_komutu}",
+  "{sayi} points · {mb} MB total": "{sayi} 件 · 合計 {mb} MB",
   "{sa} h {dk} min": "{sa}時間{dk}分",
   "{seviye} RISK": "{seviye}リスク",
   "{soru_en}": "{soru_en}",

@@ -4596,6 +4596,7 @@
   "{p} points · {n} solved": "{p} 分 · 已解 {n} 题",
   "{ran}/{total} checks produced a result. {n} check(s) could not run or need root; the result is incomplete.": "{total} 项检查中有 {ran} 项产生了结果。有 {n} 项检查无法运行或需要 root，结果不完整。",
   "{rapor_komutu}": "{rapor_komutu}",
+  "{sayi} points · {mb} MB total": "{sayi} 个 · 共 {mb} MB",
   "{sa} h {dk} min": "{sa} 小时 {dk} 分钟",
   "{seviye} RISK": "{seviye}风险",
   "{soru_en}": "{soru_en}",

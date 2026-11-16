@@ -4596,6 +4596,7 @@
   "{p} points · {n} solved": "{p} puntos · {n} resueltos",
   "{ran}/{total} checks produced a result. {n} check(s) could not run or need root; the result is incomplete.": "{ran}/{total} verificaciones produjeron un resultado. {n} verificación(es) no pudieron ejecutarse o necesitan root; el resultado está incompleto.",
   "{rapor_komutu}": "{rapor_komutu}",
+  "{sayi} points · {mb} MB total": "{sayi} puntos · {mb} MB en total",
   "{sa} h {dk} min": "{sa} h {dk} min",
   "{seviye} RISK": "RIESGO {seviye}",
   "{soru_en}": "{soru_en}",

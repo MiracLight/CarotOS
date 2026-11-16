@@ -4596,6 +4596,7 @@
   "{p} points · {n} solved": "{p} баллов · решено: {n}",
   "{ran}/{total} checks produced a result. {n} check(s) could not run or need root; the result is incomplete.": "Проверок с результатом: {ran} из {total}. Не удалось выполнить или нужен root для проверок: {n}; результат неполный.",
   "{rapor_komutu}": "{rapor_komutu}",
+  "{sayi} points · {mb} MB total": "{sayi} точек · всего {mb} МБ",
   "{sa} h {dk} min": "{sa} ч {dk} мин",
   "{seviye} RISK": "{seviye} РИСК",
   "{soru_en}": "{soru_en}",
