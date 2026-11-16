@@ -347,6 +347,21 @@ class MarkaTesti(unittest.TestCase):
         self.assertNotIn("/usr/share/icons", q)
         self.assertIn("toLocaleUpperCase()", q)
 
+    def test_qml_kenar_cubugu(self):
+        # Widget kenar cubugu logoyu 80x80 sabit cizer (orantisiz); kendi QML kenar cubugumuz
+        d = os.path.join(CALAMARES, "branding", "carotos")
+        self.assertRegex(oku(d, "branding.desc"), r"(?m)^sidebar:\s+qml$")
+        k = oku(d, "calamares-sidebar.qml")
+        self.assertIn("import io.calamares.core 1.0", k)
+        self.assertIn("model: ViewManager", k)
+        self.assertIn("ViewManager.currentStepIndex", k)
+        self.assertIn("text: display", k)
+        self.assertIn('source: "logo.png"', k)
+        self.assertIn("debug.about()", k)
+        self.assertNotIn("Branding.", k)                       # enum adlarina baglanmaz
+        self.assertEqual(k.count("{"), k.count("}"))
+        self.assertIn("calamares-sidebar.qml", oku(HOOK))
+
     def test_dil_listesi_yazi_tipleri(self):
         liste = oku(os.path.dirname(CHROOT), "package-lists", "calamares.list.chroot")
         for paket in ("fonts-lohit-deva", "fonts-lohit-mlym", "fonts-lklug-sinhala", "fonts-tlwg-garuda-ttf"):

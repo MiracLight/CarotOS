@@ -34,7 +34,9 @@ images:
 slideshow:     "show.qml"
 slideshowAPI:  2
 
-sidebar:    widget
+# qml: marka dizinindeki calamares-sidebar.qml (kucuk logo + numarali adimlar; widget
+# kenar cubugu logoyu 80x80 sabit cizer, orantisiz durur)
+sidebar:    qml
 navigation: widget
 
 # Calamares 3.3 anahtar adlari buyuk harfle baslar (3.2'deki sidebarText vb. yok sayilir;

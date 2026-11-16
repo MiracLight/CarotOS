@@ -10,6 +10,7 @@ hata() { echo "CarotOS HATA: $*" >&2; exit 1; }
 for yol in /etc/calamares/settings.conf \
            /etc/calamares/branding/carotos/branding.desc \
            /etc/calamares/branding/carotos/show.qml \
+           /etc/calamares/branding/carotos/calamares-sidebar.qml \
            /etc/calamares/branding/carotos/logo.png \
            /etc/calamares/branding/carotos/welcome.png \
            /etc/calamares/modules/users.conf \
