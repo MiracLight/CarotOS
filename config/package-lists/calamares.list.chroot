@@ -8,6 +8,8 @@ calamares-settings-debian
 sudo
 # carotos-kur xhost kullanir (Calamares root olarak X'e baglanir)
 x11-xserver-utils
+# Qt 6.5+ xcb eklentisi bunu ister (yoksa Calamares X'te acilmaz)
+libxcb-cursor0
 # EFI sistem bolumunu bicimlendirmek icin (mkfs.fat)
 dosfstools
 # NTFS bolumu kucultme/okuma (Windows ile cift acilis)

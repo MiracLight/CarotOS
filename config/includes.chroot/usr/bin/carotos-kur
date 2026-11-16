@@ -48,6 +48,20 @@ temiz_dil_listesi() {
     IFS="$eski_ifs"
     printf '%s' "${sonuc:-$2}"
 }
+# pkexec ortami temizler: Calamares'in X'e baglanmasi icin DISPLAY ve XAUTHORITY
+# acikca aktarilir. Yalniz yerel ekran (:0, :0.0) ve var olan duz dosya kabul edilir.
+temiz_ekran() {
+    if [[ "${1-}" =~ ^:[0-9]+(\.[0-9]+)?$ ]]; then
+        printf '%s' "$1"
+    fi
+}
+temiz_xauth() {
+    local yol="${1-}"
+    [ -n "$yol" ] || yol="${HOME-}/.Xauthority"
+    if [[ "$yol" == /* ]] && [[ "$yol" != *$'\n'* ]] && [ -f "$yol" ] && [ ! -L "$yol" ]; then
+        printf '%s' "$yol"
+    fi
+}
 
 if [ ! -d "$MEDIUM" ]; then
     hata "Bu kurulum yalnizca CarotOS canli ortamindan calisir ($MEDIUM bulunamadi). / This installer only runs from the CarotOS live session."
@@ -79,6 +93,15 @@ fi
 LANG_T="$(temiz_yerel "${LANG-}")"
 LC_ALL_T="$(temiz_yerel "${LC_ALL:-${LANG-}}")"
 LANGUAGE_T="$(temiz_dil_listesi "${LANGUAGE-}" "$LANG_T")"
+EKRAN_T="$(temiz_ekran "${DISPLAY-}")"
+XAUTH_T="$(temiz_xauth "${XAUTHORITY-}")"
+if [ -z "$EKRAN_T" ]; then
+    hata "Grafik ekran bulunamadi (DISPLAY). / No graphical display found."
+    exit 1
+fi
+ortam=("LANG=$LANG_T" "LC_ALL=$LC_ALL_T" "LANGUAGE=$LANGUAGE_T"
+       "DISPLAY=$EKRAN_T" "QT_QPA_PLATFORM=xcb")
+[ -z "$XAUTH_T" ] || ortam+=("XAUTHORITY=$XAUTH_T")
 
 xhost_acildi=0
 if command -v xhost >/dev/null 2>&1 && [ -n "${DISPLAY-}" ]; then
@@ -94,7 +117,6 @@ xhost_geri() {
 trap xhost_geri EXIT
 
 rc=0
-/usr/bin/pkexec /usr/bin/env \
-    "LANG=$LANG_T" "LC_ALL=$LC_ALL_T" "LANGUAGE=$LANGUAGE_T" \
+/usr/bin/pkexec /usr/bin/env "${ortam[@]}" \
     /usr/bin/carotos-kur --root || rc=$?
 exit "$rc"

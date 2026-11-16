@@ -208,6 +208,28 @@ class SarmalayiciTesti(unittest.TestCase):
         self.assertIn(r"^[A-Za-z_]+(\.[A-Za-z0-9-]+)?(@[a-z]+)?$", self.k)
         self.assertIn("xhost +si:localuser:root", self.k)
 
+    def test_ekran_aktarilir(self):
+        # pkexec ortami temizler; DISPLAY aktarilmazsa Calamares "could not connect to display" ile coker
+        self.assertIn('"DISPLAY=$EKRAN_T"', self.k)
+        self.assertIn('ortam+=("XAUTHORITY=$XAUTH_T")', self.k)
+        self.assertIn('pkexec /usr/bin/env "${ortam[@]}"', self.k)
+
+    @unittest.skipIf(shutil.which("bash") is None, "bash yok")
+    def test_ekran_temizleme(self):
+        bas = self.k.index("temiz_ekran()")
+        son = self.k.index('if [ ! -d "$MEDIUM" ]')
+        betik = "set -eu\n" + self.k[bas:son] + 'temiz_ekran "$1"\n'
+        for deger, beklenen in ((":0", ":0"), (":1.0", ":1.0"), ("", ""),
+                                ("evil:0", ""), (":0;id", ""), ("localhost:10.0", "")):
+            with self.subTest(deger=deger):
+                r = subprocess.run([shutil.which("bash"), "-c", betik, "x", deger],
+                                   capture_output=True, timeout=30)
+                self.assertEqual(r.stdout.decode(), beklenen)
+
+    def test_xcb_cursor_paketi(self):
+        liste = oku(os.path.dirname(CHROOT), "package-lists", "calamares.list.chroot")
+        self.assertRegex(liste, r"(?m)^libxcb-cursor0$")
+
     @unittest.skipIf(shutil.which("bash") is None, "bash yok")
     def test_bash_sozdizimi(self):
         for ad in ("carotos-kur", "carotos-kur-simge"):
