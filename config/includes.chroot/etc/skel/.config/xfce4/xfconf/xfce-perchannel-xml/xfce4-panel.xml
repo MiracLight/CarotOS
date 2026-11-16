@@ -17,6 +17,7 @@
         <value type="int" value="2"/>
         <value type="int" value="19"/>
         <value type="int" value="22"/>
+        <value type="int" value="33"/>
         <value type="int" value="27"/>
         <value type="int" value="23"/>
         <value type="int" value="24"/>
@@ -168,6 +169,11 @@
     <property name="plugin-32" type="string" value="launcher">
       <property name="items" type="array">
         <value type="string" value="17870033400.desktop"/>
+      </property>
+    </property>
+    <property name="plugin-33" type="string" value="launcher">
+      <property name="items" type="array">
+        <value type="string" value="17870033401.desktop"/>
       </property>
     </property>
     <!-- Carotene (antivirus): ust panelde Sistem Sagligi'nin yaninda -->

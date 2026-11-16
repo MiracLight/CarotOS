@@ -422,7 +422,9 @@ class PanelVeSimgeTesti(unittest.TestCase):
                      panel1.find("./property[@name='plugin-ids']")]
         self.assertIn("27", kimlikler)
         self.assertEqual(kimlikler.count("27"), 1)
-        self.assertEqual(kimlikler.index("27"), kimlikler.index("22") + 1)
+        # Sistem Sagligi (22), Kurtarma (33), Carotene (27) sirasi
+        self.assertEqual(kimlikler.index("27"), kimlikler.index("33") + 1)
+        self.assertEqual(kimlikler.index("33"), kimlikler.index("22") + 1)
         eklenti = kok.find("./property[@name='plugins']/property[@name='plugin-27']")
         self.assertEqual(eklenti.get("value"), "launcher")
         self.assertEqual([v.get("value") for v in eklenti.find("./property[@name='items']")],

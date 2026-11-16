@@ -1,0 +1,18 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=CarotOS Kurtarma
+Name[tr]=CarotOS Kurtarma
+GenericName=System recovery
+GenericName[tr]=Sistem kurtarma
+Comment=Return the system to the last stable recovery point
+Comment[tr]=Sistemi son kararlı kurtarma noktasına döndür
+Exec=/opt/carotos/kurtarma/carotos-kurtarma.py
+Icon=carotos-kurtarma
+Terminal=false
+Categories=System;Security;
+Keywords=recovery;restore;backup;snapshot;rollback;timeshift;
+Keywords[tr]=kurtarma;geri yükleme;yedek;anlık görüntü;geri alma;
+X-XFCE-Source=file:///usr/share/applications/carotos-kurtarma.desktop
+Path=
+StartupNotify=false
