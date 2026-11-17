@@ -263,6 +263,19 @@ class SarmalayiciTesti(unittest.TestCase):
                                    capture_output=True, timeout=30)
                 self.assertNotEqual(r.returncode, 0)
 
+    def test_klavye_adimi(self):
+        # Klavye yalniz Calamares'te secilir; secim canliya ve kurulu sisteme yazilir
+        k = oku(MODULLER, "keyboard.conf")
+        self.assertRegex(k, r"(?m)^writeEtcDefaultKeyboard: true$")
+        self.assertRegex(k, r'(?m)^xOrgConfFileName: "/etc/X11/xorg.conf.d/00-keyboard.conf"$')
+        self.assertRegex(k, r"(?m)^guessLayout: true$")
+        self.assertRegex(k, r"(?m)^useLocale1: false$")
+        self.assertIn("/etc/calamares/modules/keyboard.conf", oku(HOOK))
+        ayar = oku(CALAMARES, "settings.conf")
+        self.assertRegex(ayar, r"(?s)- show:.*?- keyboard.*?- exec:.*?- keyboard")
+        liste = oku(os.path.dirname(CHROOT), "package-lists", "calamares.list.chroot")
+        self.assertRegex(liste, r"(?m)^keyboard-configuration$")      # ckbcomp Debian'da burada
+
     def test_xcb_cursor_paketi(self):
         liste = oku(os.path.dirname(CHROOT), "package-lists", "calamares.list.chroot")
         self.assertRegex(liste, r"(?m)^libxcb-cursor0$")
