@@ -8,8 +8,8 @@ calamares-settings-debian
 sudo
 # carotos-kur xhost kullanir (Calamares root olarak X'e baglanir)
 x11-xserver-utils
-# Klavye adimindaki duzen onizlemesi icin ckbcomp (Debian'da bu pakettedir; keyboard.conf)
-keyboard-configuration
+# Klavye adimindaki duzen onizlemesi icin ckbcomp (trixie: /usr/bin/ckbcomp console-setup paketinde; keyboard.conf)
+console-setup
 # Qt 6.5+ xcb eklentisi bunu ister (yoksa Calamares X'te acilmaz)
 libxcb-cursor0
 # Calamares dil listesindeki alfabeler kare gorunmesin (Hintce/Marathi, Bengalce, Tamilce,

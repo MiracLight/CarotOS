@@ -274,7 +274,7 @@ class SarmalayiciTesti(unittest.TestCase):
         ayar = oku(CALAMARES, "settings.conf")
         self.assertRegex(ayar, r"(?s)- show:.*?- keyboard.*?- exec:.*?- keyboard")
         liste = oku(os.path.dirname(CHROOT), "package-lists", "calamares.list.chroot")
-        self.assertRegex(liste, r"(?m)^keyboard-configuration$")      # ckbcomp Debian'da burada
+        self.assertRegex(liste, r"(?m)^console-setup$")      # /usr/bin/ckbcomp trixie: console-setup
 
     def test_xcb_cursor_paketi(self):
         liste = oku(os.path.dirname(CHROOT), "package-lists", "calamares.list.chroot")

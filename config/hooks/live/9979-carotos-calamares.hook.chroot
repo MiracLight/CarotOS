@@ -76,7 +76,7 @@ echo "CarotOS: calamares yapilandirmasi yerlestirildi."
 
 # Calamares ikilisi paket listesinden gelir
 command -v calamares >/dev/null 2>&1 || hata "calamares kurulu degil (config/package-lists/calamares.list.chroot)."
-command -v ckbcomp >/dev/null 2>&1 || hata "ckbcomp yok (keyboard-configuration): Calamares klavye onizlemesi calismaz."
+command -v ckbcomp >/dev/null 2>&1 || hata "ckbcomp yok (console-setup): Calamares klavye onizlemesi calismaz."
 echo "CarotOS: calamares bulundu: $(command -v calamares)"
 
 # Calamares modul betikleri (Debian paketinden): sources-media vb. bulunmali
