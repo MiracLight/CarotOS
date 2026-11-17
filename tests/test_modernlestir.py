@@ -164,6 +164,31 @@ class TemaKurSahteAptTesti(unittest.TestCase):
         self.assertIn("zaten kurulu", cikti)
         self.assertEqual(self.apt_satirlari(), [])
 
+    def test_paket_bulunamazsa_bir_kez_update_ve_yeniden_dener(self):
+        # canli oturumda depo listesi bos gelir: ilk indirme "Unable to locate" ile duser,
+        # apt-get update sonrasi ayni adim basarili olmali (kullanici ikinci kez denemesin)
+        isaret = os.path.join(self.d, "guncellendi")
+        apt = self.betik("apt-get", 'echo "$*" >> "%s"\n'
+                         'case "$*" in *update*) touch "%s"; exit 0;; esac\n'
+                         'if [ ! -e "%s" ]; then echo "E: Unable to locate package picom"; exit 100; fi\n'
+                         'exit 0\n' % (self.kayit, isaret, isaret))
+        kod, cikti = self.calistir(apt, self.dpkg(False))
+        self.assertEqual(kod, 0)
+        satirlar = self.apt_satirlari()
+        self.assertEqual(sum(1 for x in satirlar if x.split()[-1] == "update"), 1)
+        self.assertIn("@@CAROTOS-TAMAM kuruldu", cikti)
+
+    def test_update_sonrasi_yine_bulunamazsa_tek_update(self):
+        apt = self.betik("apt-get", 'echo "$*" >> "%s"\n'
+                         'case "$*" in *update*) exit 0;; esac\n'
+                         'echo "E: Unable to locate package picom"; exit 100\n' % self.kayit)
+        kod, _ = self.calistir(apt, self.dpkg(False))
+        self.assertEqual(kod, tk.KOD_BULUNAMADI)
+        self.assertEqual(sum(1 for x in self.apt_satirlari() if x.split()[-1] == "update"), 1)
+
+    def test_apt_yeniden_deneme_ayari(self):
+        self.assertIn("Acquire::Retries=3", tk.KILIT)
+
     def test_durum_root_gerektirmez(self):
         akis = io.StringIO()
         kod = tk.main(["durum"], dpkg_query=self.dpkg(True), ortam=self.ortam, root_mu=False, akis=akis)

@@ -2702,16 +2702,36 @@ class WelcomeWindow(Gtk.Window):
         return [[python, "-I", self.MODERNLESTIR, "geri-al"]]
 
     def modern_calistir(self, komutlar):
-        """0: hepsi basarili; aksi halde 1. Paket indirme uzun surebilir (30 dk sinir)."""
-        for komut in komutlar:
-            try:
-                kod = subprocess.run(komut, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                                     stderr=subprocess.DEVNULL, timeout=1800).returncode
-            except (OSError, subprocess.SubprocessError):
-                return 1
-            if kod != 0:
-                return 1
-        return 0
+        """0: hepsi basarili; aksi halde 1. Paket indirme uzun surebilir (30 dk sinir).
+
+        Her komut basarisizsa BIR KEZ yeniden denenir (gecici ag/kilit/ilk acilis hatasi tek
+        tikta kurulumu dusurmesin; komutlar tekrar calistirilabilir). Cikti
+        ~/.local/state/carotos/sleek-kurulum.log dosyasina yazilir (sorun giderme)."""
+        gunluk = None
+        try:
+            klasor = os.path.join(os.path.expanduser("~"), ".local", "state", "carotos")
+            os.makedirs(klasor, mode=0o700, exist_ok=True)
+            gunluk = open(os.path.join(klasor, "sleek-kurulum.log"), "ab")
+        except OSError:
+            gunluk = None
+        hedef = gunluk if gunluk is not None else subprocess.DEVNULL
+        try:
+            for komut in komutlar:
+                kod = 1
+                for deneme in range(2):
+                    try:
+                        kod = subprocess.run(komut, stdin=subprocess.DEVNULL, stdout=hedef,
+                                             stderr=subprocess.STDOUT, timeout=1800).returncode
+                    except (OSError, subprocess.SubprocessError):
+                        kod = 1
+                    if kod == 0 or kod in (126, 127):     # 126/127: yetki verilmedi ya da yok
+                        break
+                if kod != 0:
+                    return 1
+            return 0
+        finally:
+            if gunluk is not None:
+                gunluk.close()
 
     UFW_AYAR = "/usr/sbin/carotos-ufw-ayar"
     UFW_CONF = "/etc/ufw/ufw.conf"

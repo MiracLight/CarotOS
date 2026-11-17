@@ -876,5 +876,88 @@ class M06KomutSatiriTesti(unittest.TestCase):
         self.assertTrue(a.get_flags() & magaza.Gio.ApplicationFlags.HANDLES_COMMAND_LINE)
 
 
+
+
+# --- Sepet: toplu kurulum dusunce tek tek denenir ---------------------------------------
+# Sahte apt-get: ayni komutta birden cok paket varsa ya da "kotu" paketi varsa duser.
+SAHTE_APT_TEKTEK = """#!/bin/sh
+echo "$*" >> "$SAHTE_KAYIT"
+case "$*" in
+  *--download-only*) exit 0 ;;
+esac
+paket_sayisi=0
+for a in "$@"; do
+  case "$a" in
+    -*|install|-y|--|DPkg*|Acquire*|Dpkg*) ;;
+    *) paket_sayisi=$((paket_sayisi+1)) ;;
+  esac
+done
+case "$*" in
+  *kotu*) echo "E: Unable to locate package kotu"; exit 100 ;;
+esac
+[ "$paket_sayisi" -gt 1 ] && exit 100
+exit 0
+"""
+
+
+class SepetTekTekTesti(unittest.TestCase):
+    def setUp(self):
+        self.dizin = tempfile.mkdtemp(prefix="magaza-tektek-")
+        self.apt = os.path.join(self.dizin, "apt-get")
+        with open(self.apt, "w") as f:
+            f.write(SAHTE_APT_TEKTEK)
+        os.chmod(self.apt, 0o755)
+        self.kayit = os.path.join(self.dizin, "kayit")
+
+    def calistir(self, paketler):
+        import io
+        ortam = dict(yardimci.ORTAM, SAHTE_KAYIT=self.kayit)
+        cikti = io.StringIO()
+        with mock.patch.object(sys, "stdout", cikti), \
+                mock.patch.object(yardimci, "DPKG", "/yok/dpkg"):
+            kod = yardimci.main(["install", "--", *paketler], io.StringIO(""), self.apt, ortam)
+        with open(self.kayit) as f:
+            return kod, cikti.getvalue().splitlines(), f.read().splitlines()
+
+    def test_toplu_dusunce_tek_tek_kurar(self):
+        kod, cikti, cagrilar = self.calistir(["nmap", "htop", "tmux"])
+        self.assertEqual(kod, 0)
+        tek = [c for c in cagrilar if "--download-only" not in c and c.endswith(("nmap", "htop", "tmux"))]
+        self.assertEqual(sum(1 for c in tek if c.split()[-1] in ("nmap", "htop", "tmux")
+                             and " -f " in " " + c + " "), 3)
+        self.assertNotIn("@@CAROTOS-BASARISIZ", "\n".join(cikti))
+
+    def test_kurulamayan_bildirilir_digerleri_kurulur(self):
+        kod, cikti, cagrilar = self.calistir(["nmap", "kotu", "htop"])
+        self.assertEqual(kod, yardimci.KISMI_KODU)
+        self.assertIn("@@CAROTOS-BASARISIZ kotu", cikti)
+        self.assertTrue(any(c.endswith("-- nmap") for c in cagrilar))
+        self.assertTrue(any(c.endswith("-- htop") for c in cagrilar))
+
+    def test_tek_paket_dusunce_yedek_yok(self):
+        kod, cikti, cagrilar = self.calistir(["kotu"])
+        self.assertNotEqual(kod, 0)
+        self.assertNotIn("@@CAROTOS-BASARISIZ", "\n".join(cikti))
+
+    def test_kilit_hatasinda_tek_tek_denenmez(self):
+        kilitli = os.path.join(self.dizin, "apt-kilit")
+        with open(kilitli, "w") as f:
+            f.write('#!/bin/sh\necho "$*" >> "$SAHTE_KAYIT"\ncase "$*" in *--download-only*) exit 0;; esac\n'
+                    'echo "E: Could not get lock /var/lib/dpkg/lock-frontend"\nexit 100\n')
+        os.chmod(kilitli, 0o755)
+        import io
+        ortam = dict(yardimci.ORTAM, SAHTE_KAYIT=self.kayit)
+        with mock.patch.object(sys, "stdout", io.StringIO()), \
+                mock.patch.object(yardimci, "DPKG", "/yok/dpkg"):
+            kod = yardimci.main(["install", "--", "nmap", "htop"], io.StringIO(""), kilitli, ortam)
+        self.assertEqual(kod, 100)
+        with open(self.kayit) as f:
+            tek = [c for c in f.read().splitlines() if "--download-only" not in c]
+        self.assertEqual(len(tek), 2)      # toplu + ilk tek paket; kalanlar denenmedi
+
+    def test_apt_yeniden_deneme_ayari(self):
+        self.assertIn("Acquire::Retries=3", yardimci.KILIT)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -196,6 +196,20 @@ METIN = {
     "sepette": {"tr": "Sepette ✓", "en": "In basket ✓"},
     "sepeti_kur": {"tr": "Sepeti kur ({n})", "en": "Install basket ({n})"},
     "sepet_kuruluyor": {"tr": "{n} uygulama kuruluyor", "en": "Installing {n} apps"},
+    "sepeti_gor": {"tr": "Sepet ({n})", "en": "Basket ({n})"},
+    "sepet_baslik": {"tr": "Sepet", "en": "Basket"},
+    "sepet_alt": {"tr": "Kurulmak üzere seçtiğin uygulamalar. Buradan çıkarabilirsin.",
+                  "en": "Apps you picked to install. You can remove them here."},
+    "sepet_bos_baslik": {"tr": "Sepetin boş", "en": "Your basket is empty"},
+    "sepet_bos": {"tr": "Bir uygulamanın sayfasında “Sepete ekle”ye bas; hepsini tek seferde kurarsın.",
+                  "en": "Press “Add to basket” on an app's page to install several apps in one go."},
+    "sepetten_cikar": {"tr": "Çıkar", "en": "Remove"},
+    "sepeti_bosalt": {"tr": "Sepeti boşalt", "en": "Empty basket"},
+    "islem_goster": {"tr": "İşlem sürüyor: göster", "en": "Working: show"},
+    "kismi_basari": {
+        "tr": "Şunlar kurulamadı: {liste}. Kurulabilenler kuruldu; kurulamayanlar sepette kaldı.",
+        "en": "These could not be installed: {liste}. Everything else was installed; the failed "
+              "ones stayed in the basket."},
     "pkexec_yok_baslik": {"tr": "Yetki aracı bulunamadı", "en": "Privilege tool not found"},
     "pkexec_yok": {
         "tr": "pkexec bulunamadı, bu yüzden işlem grafik arayüzden yapılamıyor. "
@@ -519,6 +533,7 @@ YARDIMCI = "/usr/sbin/carotos-magaza-apt"
 FAZ_ISARETI = "@@CAROTOS-FAZ "
 IPTAL_ISARETI = "@@CAROTOS-IPTAL"
 IPTAL_KODU = 75
+BASARISIZ_ISARETI = "@@CAROTOS-BASARISIZ "     # yardimci: tek tek kurulumda kurulamayanlar
 
 
 def yardimci_komutu(eylem, *paketler, yardimci=YARDIMCI):
@@ -662,6 +677,7 @@ class IslemPenceresi(Gtk.Window):
         self.faz = None              # None (parola bekleniyor) | "indirme" | "kurulum"
         self.guvenli_iptal_istendi = False
         self._guvenli_iptal_oldu = False
+        self.basarisiz = []          # yardimci tek tek kurulumda kurulamayan paketler
         self.set_transient_for(ebeveyn)
         # Modal DEGIL: kurulum surerken magaza gezilebilir, sepete urun eklenebilir.
         # Ikinci bir apt islemi MagazaPenceresi.mesgul ile engellenir.
@@ -770,6 +786,10 @@ class IslemPenceresi(Gtk.Window):
                     if isaret == IPTAL_ISARETI:
                         self._guvenli_iptal_oldu = True
                         continue
+                    if isaret.startswith(BASARISIZ_ISARETI):
+                        self.basarisiz = [p for p in isaret[len(BASARISIZ_ISARETI):].split()
+                                          if paket_adi_gecerli(p)]
+                        continue
                 self._ekle(metin_)
         except Exception as exc:  # noqa: BLE001
             self._ekle(f"\n[hata] {exc}\n")
@@ -852,22 +872,24 @@ class IslemPenceresi(Gtk.Window):
             self._bosalt()
             self.spinner.stop()
             neden = None if basarili or guvenli else kilit_iletisi(self._cikti_sonu)
+            kismi = bool(self.basarisiz) and not guvenli
             if guvenli:
                 self.durum.set_text(M("guvenli_iptal_bitti"))
             else:
                 self.durum.get_style_context().add_class(
                     "basari-yazi" if basarili else "hata-yazi")
                 self.durum.set_text(M(neden) if neden else
+                                    M("kismi_basari", liste=", ".join(self.basarisiz)) if kismi else
                                     M("tamamlandi") if basarili else M("hata_olustu"))
-            if neden or guvenli:
+            if neden or guvenli or kismi:
                 self.durum.set_ellipsize(Pango.EllipsizeMode.NONE)
                 self.durum.set_line_wrap(True)
             self.guvenli_dugme.hide()
             self.gizle_dugme.hide()
             self.kapat_dugme.set_label(M("kapat"))
             self.kapat_dugme.show()
-            if not basarili and not self.iptal_edildi and not self.get_visible():
-                self.present()       # gizlenmis islem basarisiz bitti: kullanici gorsun
+            if not self.iptal_edildi and not self.get_visible():
+                self.present()       # gizlenmis islem bitti (basarili ya da degil): kullanici gorsun
         if self.bitince:
             self.bitince(basarili)
         if basarili and self.otomatik_kapan:
@@ -1074,6 +1096,13 @@ class MagazaPenceresi(Gtk.Window):
         self.kabuk.ust_sag.pack_start(self.arama_girisi, False, False, 0)
         self.yenile_dugme = tema.dugme(M("yenile"), None, self.depoyu_yenile)
         self.kabuk.ust_sag.pack_start(self.yenile_dugme, False, False, 0)
+        # Calisan islem gizlenmis olsa da buradan geri getirilir
+        self.islem_dugme = tema.dugme("", None, self._mesgul_uyar)
+        self.islem_dugme.set_no_show_all(True)
+        self.kabuk.ust_sag.pack_start(self.islem_dugme, False, False, 0)
+        self.sepet_gor_dugme = tema.dugme("", None, lambda: self.sayfa_secildi("sepet"))
+        self.sepet_gor_dugme.set_no_show_all(True)
+        self.kabuk.ust_sag.pack_start(self.sepet_gor_dugme, False, False, 0)
         self.sepet_kur_dugme = tema.dugme("", None, self.sepeti_kur)
         self.sepet_kur_dugme.get_style_context().add_class("ana")
         self.sepet_kur_dugme.set_no_show_all(True)
@@ -1174,6 +1203,9 @@ class MagazaPenceresi(Gtk.Window):
         elif anahtar == "guncelleme":
             self.kabuk.baslik_ayarla(M("guncelleme"), M("guncelleme_alt"))
             self.kabuk.icerik(self._guncelleme_sayfasi())
+        elif anahtar == "sepet":
+            self.kabuk.baslik_ayarla(M("sepet_baslik"), M("sepet_alt"))
+            self.kabuk.icerik(self._sepet_sayfasi())
         else:
             self.kabuk.baslik_ayarla(metin(self.kat_ad.get(anahtar, anahtar)), "")
             uyg = [u for u in self.uygulamalar if u.get("kategori") == anahtar]
@@ -1277,6 +1309,55 @@ class MagazaPenceresi(Gtk.Window):
         uyg = [u for u in self.uygulamalar if u.get("paket") in self.kurulu]
         bos = tema.bos_durum("onay", M("kurulu_bos_baslik"), M("kurulu_bos"))
         return self._liste_sayfasi(uyg, bos_parca=bos)
+
+    def _sepet_sayfasi(self):
+        """Sepetin icerigi: her uygulama ayri satirda, tek tek cikarilabilir."""
+        uyg = sorted((u for u in self.uygulamalar if u.get("paket") in self.sepet),
+                     key=lambda u: metin(u.get("ad", "")).lower())
+        kutu = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        if not uyg:
+            kutu.pack_start(tema.bos_durum("arama", M("sepet_bos_baslik"), M("sepet_bos")),
+                            True, True, 0)
+            return kutu
+        ust = Gtk.Box(spacing=8)
+        ust.pack_start(tema.etiket(M("uyg_sayisi", n=len(uyg)), "silik"), True, True, 0)
+        self.sepet_bosalt_dugme = tema.dugme(M("sepeti_bosalt"), "duz", self._sepeti_bosalt)
+        ust.pack_end(self.sepet_bosalt_dugme, False, False, 0)
+        self.sepet_sayfa_kur = tema.dugme(M("sepeti_kur", n=len(uyg)), "ana", self.sepeti_kur)
+        self.sepet_sayfa_kur.set_sensitive(self.mesgul is None)
+        ust.pack_end(self.sepet_sayfa_kur, False, False, 0)
+        kutu.pack_start(ust, False, False, 0)
+        for u in uyg:
+            kutu.pack_start(self._sepet_satiri(u), False, False, 0)
+        return kutu
+
+    def _sepet_satiri(self, u):
+        dis, ic = tema.kart(12, 6)
+        satir = Gtk.Box(spacing=12)
+        satir.pack_start(uygulama_ikonu(u, 40, self.as_harita.get(u.get("paket"))),
+                         False, False, 0)
+        bilgi = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=1)
+        bilgi.set_valign(Gtk.Align.CENTER)
+        bilgi.pack_start(tema.etiket(metin(u["ad"]), "kart-baslik"), False, False, 0)
+        bilgi.pack_start(tema.etiket(metin(self.kat_ad.get(u.get("kategori"), "")), "silik"),
+                         False, False, 0)
+        satir.pack_start(tiklanir(bilgi, lambda a=u: self.detay_goster(a)), True, True, 0)
+        satir.pack_end(tema.dugme(M("sepetten_cikar"), "duz", self._sepetten_cikar,
+                                  u.get("paket")), False, False, 0)
+        ic.pack_start(satir, False, False, 0)
+        return dis
+
+    def _sepetten_cikar(self, paket):
+        self.sepet.discard(paket)
+        self._sepet_guncelle()
+        if self.aktif == "sepet" and self.detay_app is None:
+            self.sayfa_secildi("sepet")
+
+    def _sepeti_bosalt(self):
+        self.sepet.clear()
+        self._sepet_guncelle()
+        if self.aktif == "sepet":
+            self.sayfa_secildi("sepet")
 
     def _guncelleme_sayfasi(self):
         kutu = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
@@ -1406,6 +1487,11 @@ class MagazaPenceresi(Gtk.Window):
         self.mesgul = ad
         for cls in (self.yenile_dugme, self.sepet_kur_dugme):
             cls.set_sensitive(ad is None)
+        self.islem_dugme.set_label(M("islem_goster"))
+        if ad is None:
+            self.islem_dugme.hide()
+        else:
+            self.islem_dugme.show()
         # görünen sayfadaki düğmeler sayfa yeniden kurulunca güncellenir
 
     # -- sepet (toplu kurulum) -----------------------------------------------
@@ -1419,10 +1505,13 @@ class MagazaPenceresi(Gtk.Window):
     def _sepet_guncelle(self):
         n = len(self.sepet)
         self.sepet_kur_dugme.set_label(M("sepeti_kur", n=n))
+        self.sepet_gor_dugme.set_label(M("sepeti_gor", n=n))
         if n:
             self.sepet_kur_dugme.show()
+            self.sepet_gor_dugme.show()
         else:
             self.sepet_kur_dugme.hide()
+            self.sepet_gor_dugme.hide()
 
     def sepeti_kur(self):
         """Sepetteki tum paketleri TEK apt-get cagrisiyla kurar (tek parola istemi)."""

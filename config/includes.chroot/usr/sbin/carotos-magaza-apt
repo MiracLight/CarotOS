@@ -13,6 +13,11 @@ Protokol (stdout, satır satır):
                           "@@CAROTOS-IPTAL" yazılır ve IPTAL_KODU ile çıkılır.
   @@CAROTOS-FAZ kurulum   asıl işlem başladı; stdin artık dinlenmez (iptal yok).
 remove/update doğrudan "kurulum" fazıyla başlar.
+
+Çok paketli install (sepet): toplu indirme/kurulum başarısız olursa (tek bir paketin çakışması,
+bulunamaması ya da ağ hatası hepsini düşürmesin) paketler TEK TEK yeniden denenir; kurulamayanlar
+"@@CAROTOS-BASARISIZ a b" satırıyla bildirilir ve KISMI_KODU ile çıkılır. Kilit hatasında
+tek tek denemeye geçilmez.
 """
 import os
 import re
@@ -28,6 +33,11 @@ EYLEMLER = ("install", "remove", "upgrade", "update")
 PAKET_ADI = re.compile(r"[a-z0-9][a-z0-9+.-]+\Z")
 IPTAL_KODU = 75
 KULLANIM_KODU = 64
+KISMI_KODU = 8
+DPKG = "/usr/bin/dpkg"
+BASARISIZ_ISARETI = "@@CAROTOS-BASARISIZ "
+KILIT_IFADELERI = ("could not get lock", "unable to acquire the dpkg frontend lock", "unable to lock",
+                   "dpkg was interrupted")
 FAZ = "@@CAROTOS-FAZ "
 IPTAL_ISARETI = "@@CAROTOS-IPTAL"
 ORTAM = {
@@ -36,7 +46,7 @@ ORTAM = {
     "LC_ALL": "C",
     "LANGUAGE": "C",
 }
-KILIT = ["-o", "DPkg::Lock::Timeout=60"]
+KILIT = ["-o", "DPkg::Lock::Timeout=60", "-o", "Acquire::Retries=3"]
 CONF = ["-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold"]
 
 
@@ -85,6 +95,45 @@ def yaz(satir):
 
 def calistir(komut, ortam):
     return subprocess.Popen(komut, stdin=subprocess.DEVNULL, env=ortam, close_fds=True)
+
+
+def calistir_kayitli(komut, ortam):
+    """Komutu calistirir, ciktisini aktarir; (kod, son satirlar kucuk harfli metin)."""
+    son = ""
+    try:
+        surec = subprocess.Popen(komut, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                 stderr=subprocess.STDOUT, env=ortam, close_fds=True)
+    except OSError as exc:
+        yaz(str(exc))
+        return 127, ""
+    with surec.stdout:
+        for ham in surec.stdout:
+            satir = ham.decode("utf-8", "replace").rstrip("\r\n")[:400]
+            yaz(satir)
+            son = (son + "\n" + satir.lower())[-4096:]
+    return surec.wait(), son
+
+
+def tek_tek(paketler, ortam, apt_get=APT_GET, dpkg=DPKG):
+    """Toplu islem dustu: her paketi ayri kurar. Donus: cikis kodu (0 hepsi tamam, KISMI_KODU
+    bazilari kurulamadi, kilit/yarim dpkg ise apt'in kodu)."""
+    yaz("== Toplu kurulum basarisiz oldu; paketler tek tek deneniyor ==")
+    if os.path.isabs(dpkg) and os.access(dpkg, os.X_OK):
+        calistir_kayitli([dpkg, "--configure", "-a"], ortam)     # yarim kalan paketler tamamlansin
+    basarisiz = []
+    sonuncu = 1
+    for paket in paketler:
+        yaz("== %s ==" % paket)
+        kod, son = calistir_kayitli([apt_get, *KILIT, *CONF, "install", "-y", "-f", "--", paket], ortam)
+        if kod != 0:
+            if any(k in son for k in KILIT_IFADELERI):
+                return kod                                    # kilit: kalan paketler de dusecek
+            basarisiz.append(paket)
+            sonuncu = kod
+    if not basarisiz:
+        return 0
+    yaz(BASARISIZ_ISARETI + " ".join(basarisiz))
+    return KISMI_KODU if len(basarisiz) < len(paketler) else sonuncu
 
 
 def indir(komut, ortam, girdi):
@@ -138,9 +187,15 @@ def main(argv=None, girdi=None, apt_get=APT_GET, ortam=None):
             yaz(IPTAL_ISARETI)
             return IPTAL_KODU
         if kod != 0:
+            if eylem == "install" and len(paketler) > 1:
+                yaz(FAZ + "kurulum")
+                return tek_tek(paketler, ortam, apt_get)
             return kod
     yaz(FAZ + "kurulum")
-    return calistir(asil, ortam).wait()
+    kod = calistir(asil, ortam).wait()
+    if kod != 0 and eylem == "install" and len(paketler) > 1:
+        return tek_tek(paketler, ortam, apt_get)
+    return kod
 
 
 if __name__ == "__main__":

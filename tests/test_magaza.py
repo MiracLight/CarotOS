@@ -95,6 +95,36 @@ class SepetTesti(unittest.TestCase):
         self.assertIn("{n}", sozluk["sepeti_kur"]["tr"])
         self.assertIn("{n}", sozluk["sepet_kuruluyor"]["en"])
 
+    def test_sepet_icerigi_gorunur_ve_cikarilabilir(self):
+        sozluk = metin_sozlugu()
+        for anahtar in ("sepeti_gor", "sepet_baslik", "sepet_bos_baslik", "sepetten_cikar",
+                        "sepeti_bosalt", "islem_goster", "kismi_basari"):
+            with self.subTest(anahtar=anahtar):
+                self.assertIn(anahtar, sozluk)
+        sinif = next(n for n in kaynak_agaci().body
+                     if isinstance(n, ast.ClassDef) and n.name == "MagazaPenceresi")
+        adlar = {n.name for n in sinif.body if isinstance(n, ast.FunctionDef)}
+        for ad in ("_sepet_sayfasi", "_sepet_satiri", "_sepetten_cikar", "_sepeti_bosalt"):
+            self.assertIn(ad, adlar)
+        sayfa = next(n for n in sinif.body if n.name == "sayfa_secildi")
+        self.assertIn('"sepet"', ast.get_source_segment(self.kaynak, sayfa))
+
+    def test_gizlenen_islem_geri_getirilebilir(self):
+        # Gizle/x ile gizlenen islem: ust bantta "Islem suruyor: goster" dugmesi ve
+        # bitince (basarili da olsa) pencere kendiliginden one gelir
+        sinif = next(n for n in kaynak_agaci().body
+                     if isinstance(n, ast.ClassDef) and n.name == "MagazaPenceresi")
+        ayarla = next(n for n in sinif.body if n.name == "_mesgul_ayarla")
+        govde = ast.get_source_segment(self.kaynak, ayarla)
+        self.assertIn("islem_dugme", govde)
+        self.assertIn("self.present()", self.kaynak.split("def _bitti")[1].split("def calisiyor")[0])
+        self.assertNotIn("if not basarili and not self.iptal_edildi and not self.get_visible()",
+                         self.kaynak)
+
+    def test_kismi_basari_isareti_okunur(self):
+        self.assertIn("BASARISIZ_ISARETI", self.kaynak)
+        self.assertIn('M("kismi_basari"', self.kaynak)
+
     def test_sepet_tek_apt_komutuyla_kurulur(self):
         # Paketler ayri ayri degil, tek apt-get cagrisinda (tek parola istemi)
         sinif = next(n for n in kaynak_agaci().body

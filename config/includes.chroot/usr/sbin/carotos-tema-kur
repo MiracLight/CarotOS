@@ -11,7 +11,8 @@ Kullanim:  carotos-tema-kur [kur | durum]
 
 Hicbir arguman apt-get'e aktarilmaz; paket listesi kodun icindedir. apt-get ve dpkg-query yalnizca tam
 yoluyla, sabit ortamla (PATH sistem dizinleri, LC_ALL=C, DEBIAN_FRONTEND=noninteractive), kabuksuz ve
-stdin kapali calistirilir. "apt-get update" BILEREK yapilmaz (depolar ISO'da ayarli gelir).
+stdin kapali calistirilir. "apt-get update" yalnizca paket bulunamadiysa (canli oturumda depo listesi
+bos gelir) BIR KEZ yapilir ve indirme yeniden denenir; boylece ilk denemede kurulum dusmez.
 Tek dosya, yalnizca standart kutuphane (root olarak calisir; kullanicinin yazabildigi modullere dayanmaz).
 
 Cikis kodlari:
@@ -45,7 +46,7 @@ ORTAM = {
     "LANGUAGE": "C",
 }
 FAZ = "@@CAROTOS-FAZ "
-KILIT = ["-o", "DPkg::Lock::Timeout=60"]
+KILIT = ["-o", "DPkg::Lock::Timeout=60", "-o", "Acquire::Retries=3"]
 CONF = ["-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold"]
 EN_FAZLA_SATIR = 5000            # apt ciktisindan aktarilan en fazla satir
 SATIR_UZUNLUGU = 400             # aktarilan satir bu uzunlukta kesilir
@@ -152,9 +153,17 @@ def main(argv=None, apt_get=APT_GET, dpkg_query=DPKG_QUERY, ortam=None, root_mu=
         return 0
 
     indirme, kurulum = komutlar(apt_get)
+    guncellendi = False
     for faz, komut_listesi in (("indirme", indirme), ("kurulum", kurulum)):
         yaz(FAZ + faz, akis)
         kod, son = calistir(komut_listesi, ortam, akis)
+        if kod != 0 and not guncellendi and hata_turu(son) == KOD_BULUNAMADI:
+            # depo listesi yok/eski (canli oturum): bir kez guncelle, ayni adimi yeniden dene
+            guncellendi = True
+            yaz(FAZ + "guncelleme", akis)
+            calistir([apt_get, "-y", *KILIT, "update"], ortam, akis)
+            yaz(FAZ + faz, akis)
+            kod, son = calistir(komut_listesi, ortam, akis)
         if kod == KOD_APT_YOK:
             sys.stderr.write("carotos-tema-kur: apt-get calistirilamadi\n")
             return KOD_APT_YOK
