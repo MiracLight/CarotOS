@@ -27,7 +27,7 @@ import sys
 KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 UYG = "config/includes.chroot/opt/carotos"
 DIZIN = os.path.join(KOK, UYG, "ortak", "diller")
-KODLAR = ("tr", "en", "de", "ru", "es", "pt", "ja", "zh", "fr")
+KODLAR = ("tr", "en", "de", "ru", "es", "pt", "ja", "zh", "fr", "ar", "hi")
 CEVRILEN = tuple(k for k in KODLAR if k not in ("tr", "en"))
 ATLA = {os.path.join(UYG, "ortak", "dil.py")}      # dil katmaninin kendi ornekleri sayilmaz
 
@@ -151,7 +151,7 @@ def json_dosyalari():
 def dil_dosyasi(kod):
     yol = os.path.join(DIZIN, kod + ".json")
     meta, metinler = {"ad": dict(zip(KODLAR, ("Türkçe", "English", "Deutsch", "Русский", "Español",
-                                              "Português", "日本語", "中文", "Français")))[kod],
+                                              "Português", "日本語", "中文", "Français", "العربية", "हिन्दी")))[kod],
                       "etkin": False, "durum": "taslak"}, {}
     if os.path.exists(yol):
         with open(yol, encoding="utf-8") as f:

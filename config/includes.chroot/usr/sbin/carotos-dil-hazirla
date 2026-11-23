@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """CarotOS: bir sistem dilini kullanima hazirlar (root olarak, pkexec ile cagrilir).
 
-Kullanim:  carotos-dil-hazirla <dil-kodu>      (tr en de ru es pt ja zh fr)
+Kullanim:  carotos-dil-hazirla <dil-kodu>      (tr en de ru es pt ja zh fr ar hi)
 
 Yaptiklari:
   1. /etc/locale.gen'de dilin locale'ini etkinlestirir ve `locale-gen` calistirir
@@ -161,7 +161,7 @@ def main(argv):
         bildir("uyari: depo listesi guncellenemedi (cevrimdisi olabilir), kurulum deneniyor")
     if calistir(["apt-get", "install", "-y", "--no-install-recommends"] + eksik) != 0:
         bildir("paket kurulumu basarisiz (internet baglantisini ve baska bir paket yoneticisinin calismadigini kontrol edin)")
-        return 1
+        return 4                        # locale hazir; yalniz ek paketler eksik
     bildir("3/3 tamam")
     return 0
 

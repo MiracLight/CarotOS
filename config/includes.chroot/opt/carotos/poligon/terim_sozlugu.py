@@ -40,6 +40,8 @@ SOZLUK: dict[str, tuple[str, ...]] = {
     "ru": _EN,
     "ja": _EN,
     "zh": _EN,
+    "ar": _EN,
+    "hi": _EN,
 }
 
 # kanonik ad -> dildeki ad

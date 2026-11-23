@@ -43,8 +43,8 @@ class DilTabani(unittest.TestCase):
 
 class TanimTesti(unittest.TestCase):
     def test_dokuz_dil_dogru_sirada(self):
-        self.assertEqual(dil.KODLAR, ("tr", "en", "de", "ru", "es", "pt", "ja", "zh", "fr"))
-        self.assertEqual(len(set(dil.KODLAR)), 9)
+        self.assertEqual(dil.KODLAR, ("tr", "en", "de", "ru", "es", "pt", "ja", "zh", "fr", "ar", "hi"))
+        self.assertEqual(len(set(dil.KODLAR)), 11)
         self.assertEqual(dict(dil.DILLER)["es"], "Español")
 
     def test_gecerli(self):

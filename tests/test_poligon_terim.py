@@ -26,7 +26,7 @@ import terim_sozlugu as T  # noqa: E402
 import uretilen_gorevler as U  # noqa: E402
 import varyantlar as VY  # noqa: E402
 
-DILLER = ("tr", "en", "de", "es", "fr", "pt", "ru", "ja", "zh")
+DILLER = ("tr", "en", "de", "es", "fr", "pt", "ru", "ja", "zh", "ar", "hi")
 KANONIK_ANAHTAR = ("kaynak", "hizmet", "kullanici", "parola", "hedef_port", "kaynak_port", "ozet", "ayrinti")
 
 

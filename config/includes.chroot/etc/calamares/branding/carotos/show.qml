@@ -1,17 +1,18 @@
 // CarotOS 1.4 kurulum slayt gosterisi (Calamares slideshowAPI 2, QtQuick).
-// Turkce secilirse Turkce, diger tum dillerde Ingilizce gosterilir. Dil, Calamares'in
+// Metinler burada tr/en; diger diller slayt-dilleri.js (yoksa Ingilizce). Dil, Calamares'in
 // Karsilama adiminda sectigi yerel ayardan (QLocale varsayilani) onActivate'te okunur.
 // Simgeler bu dizindeki s-*.png dosyalaridir (sistem simge yoluna baglanmaz).
 // Qt 6 ozellikleri ithal surumune gore acar (2.0'da Image.mipmap yok, dosya hic yuklenmez)
 import QtQuick 2.15;
 import calamares.slideshow 1.0;
+import "slayt-dilleri.js" as Ceviri;
 
 Presentation {
     id: presentation
 
-    property bool turkce: Qt.locale().name.substring(0, 2) === "tr"
-    function t(tr, en) { return turkce ? tr : en; }
-    function diliOku() { turkce = Qt.locale().name.substring(0, 2) === "tr"; }
+    property string dil: Qt.locale().name.substring(0, 2)
+    function t(tr, en) { return dil === "tr" ? tr : Ceviri.bul(dil, en); }
+    function diliOku() { dil = Qt.locale().name.substring(0, 2); }
 
     readonly property int sure: 11000
     readonly property bool canli: presentation.activatedInCalamares

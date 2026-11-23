@@ -105,6 +105,7 @@ class KarsilamaDenetimTesti(UygulamaDilTabani):
 
         class Sahte:
             lang, theme, wallpaper = "ja", "dark", ""
+            _oturum_dili, _dil_yazildi = "ja", False
 
             def set_sensitive(self, _):
                 pass
@@ -113,6 +114,7 @@ class KarsilamaDenetimTesti(UygulamaDilTabani):
                 return hazir
 
             _sistemi_uygula = m.WelcomeWindow._sistemi_uygula
+            _oturum_dilini_yaz = m.WelcomeWindow._oturum_dilini_yaz
 
         return Sahte(), cagrilar
 
@@ -153,6 +155,17 @@ class KarsilamaDenetimTesti(UygulamaDilTabani):
         self._kancala(cagrilar, hata=RuntimeError("deneme"))
         self.m.WelcomeWindow.apply_choices(pencere)
         self.assertEqual(cagrilar, ["tema", "kardes", "oturum", "duvar"])
+
+    def test_bitire_basmadan_kapatinca_da_uygulanir(self):
+        p = self.m.WelcomeWindow(self.m.load_settings())
+        self.addCleanup(p.destroy)
+        uygulama = []
+        p.apply_choices = lambda: uygulama.append(1)
+        self.assertFalse(p.on_delete())
+        self.assertEqual(uygulama, [])          # secim degismedi
+        p.lang = "ar"
+        self.assertFalse(p.on_delete())
+        self.assertEqual(uygulama, [1])
 
     def test_k04_apply_choices_hatasinda_pencere_kapanir(self):
         p = self.m.WelcomeWindow(self.m.load_settings())

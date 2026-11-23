@@ -1335,12 +1335,10 @@ PICK_TEXTS = {
     "theme_light": {"tr": "Açık Tema", "en": "Light Theme"},
     "theme_dark": {"tr": "Koyu Tema", "en": "Dark Theme"},
     "apply_note": {
-        "tr": "Seçimleriniz, sihirbazın sonundaki “Bitir” düğmesine "
-              "bastığınızda uygulanır. Dil değişikliği için oturumu kapatıp "
-              "yeniden açmanız gerekir.",
-        "en": "Your choices are applied when you press “Finish” at the end of "
-              "this tour. A language change takes effect after you log out and "
-              "back in.",
+        "tr": "Tema hemen değişir. Dil, bu pencere kapanırken kaydedilir ve "
+              "oturumu kapatıp yeniden açtığınızda geçerli olur.",
+        "en": "The theme changes right away. The language is saved when this window "
+              "closes and takes effect after you log out and back in.",
     },
     "wp_heading": {"tr": "Arka planlar", "en": "Wallpapers"},
     "wp_none": {
@@ -1382,6 +1380,19 @@ DIL_HAZIRLIK = {
         "en": "If you choose no, CarotOS apps still open in this language and the desktop stays in the "
               "current language. You can try again later from Welcome."},
     "dh_evet": {"tr": "Hazırla", "en": "Prepare"},
+    "dh_kismi": {
+        "tr": "Dil etkinleştirildi; ancak ek dil paketleri indirilemedi. İnternete bağlanınca Karşılama'dan "
+              "yeniden deneyebilirsiniz.",
+        "en": "The language is enabled, but the extra language packages could not be downloaded. Once online, "
+              "you can try again from Welcome."},
+    "oturum_baslik": {"tr": "Dil kaydedildi", "en": "Language saved"},
+    "oturum_soru": {
+        "tr": "Masaüstünün yeni dilde açılması için oturumun kapatılıp açılması gerekir. Önce açık "
+              "çalışmalarınızı kaydedin. Yeniden başlatmanız gerekmez.",
+        "en": "The desktop switches to the new language after you log out and back in. Save your open work "
+              "first. You do not need to restart the computer."},
+    "oturum_kapat": {"tr": "Oturumu kapat", "en": "Log out"},
+    "oturum_sonra": {"tr": "Daha sonra", "en": "Later"},
     "dh_hayir": {"tr": "Şimdi değil", "en": "Not now"},
     "dh_iptal": {"tr": "İptal", "en": "Cancel"},
     "dh_calisiyor": {"tr": "Hazırlanıyor… pencereyi kapatmayın.", "en": "Preparing… please keep this window open."},
@@ -1418,7 +1429,7 @@ LANG_CHANGED_NOTE = dil.zenginlestir(LANG_CHANGED_NOTE)
 # Dil kartlarinin alt yazisi (kartin dilinin Ingilizce adi; tr/en eskisi gibi)
 DIL_ALT_ADI = {"tr": "Turkish", "en": "İngilizce", "de": "German", "ru": "Russian",
                "es": "Spanish", "pt": "Portuguese", "ja": "Japanese", "zh": "Chinese",
-               "fr": "French"}
+               "fr": "French", "ar": "Arabic", "hi": "Hindi"}
 
 
 def atomik_yaz(path, metin, izin=0o600):
@@ -1635,11 +1646,12 @@ def xfconf(channel, prop, value):
     if not shutil.which("xfconf-query"):
         return False
     try:
-        r = subprocess.run(["xfconf-query", "-c", channel, "-p", prop,
-                            "-s", value],
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                           timeout=5)
-        return r.returncode == 0        # K-03: basarisiz komut basarili sayilmaz
+        komut = ["xfconf-query", "-c", channel, "-p", prop]
+        for ek in (["-s", value], ["-n", "-t", "string", "-s", value]):   # ozellik yoksa olusturulur
+            r = subprocess.run(komut + ek, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+            if r.returncode == 0:
+                return True
+        return False                    # K-03: basarisiz komut basarili sayilmaz
     except (OSError, subprocess.SubprocessError):
         return False
 
@@ -1849,8 +1861,8 @@ def apply_session_language(lang):
     if not locale:
         return False
     # Uretilmemis bir locale'i oturuma yazmak terminali/yazi tiplerini bozar (sessizce C'ye duser):
-    # tr/en ISO'da var; digerleri once hazirlanmali (bkz. sistem_dili, carotos-dil-hazirla)
-    if lang not in ("tr", "en") and not sd.locale_var_mi(lang, sd.locale_a()):
+    # tr/en ISO'dadir; digerleri once hazirlanmali (bkz. sistem_dili, carotos-dil-hazirla)
+    if not sd.locale_var_mi(lang, sd.locale_a()):
         return False
     ok = _write_xsessionrc(locale)
     _write_dmrc(locale)
@@ -1891,6 +1903,10 @@ class WelcomeWindow(Gtk.Window):
                 self.set_icon_from_file(logo)
             except GLib.Error:
                 pass
+        self._uygulanan = (self.lang, self.theme, self.wallpaper)
+        self._oturum_dili = dil.varsayilan_dil()
+        self._dil_yazildi = False
+        self.connect("delete-event", self.on_delete)
         self.connect("destroy", self.on_destroy)
 
         # Ortak grafit tema (tema.uygula); asagidaki saglayici yalnizca
@@ -2191,9 +2207,8 @@ class WelcomeWindow(Gtk.Window):
         self.theme = key
         self.settings["theme"] = key
         save_settings(self.settings)
-        # Sihirbazin kendi gorunumu hemen degisir; sisteme uygulama
-        # "Bitir" dugmesinde yapilir.
         self.apply_theme()
+        self._masaustu_temasi()
         self.refresh()
         return True
 
@@ -2966,19 +2981,37 @@ class WelcomeWindow(Gtk.Window):
                 Gtk.main_iteration_do(False)
             t.join(0.03)
         self.set_sensitive(True)
+        self._uygulanan = (self.lang, self.theme, self.wallpaper)
+        if self._dil_yazildi and self.lang != self._oturum_dili:
+            self._oturum_kapat_sor()
+
+    def _oturum_kapat_sor(self):
+        soru = Gtk.MessageDialog(transient_for=self, modal=True, message_type=Gtk.MessageType.QUESTION,
+                                 buttons=Gtk.ButtonsType.NONE, text=UI["oturum_baslik"][self.lang])
+        soru.format_secondary_text(UI["oturum_soru"][self.lang])
+        soru.add_button(UI["oturum_sonra"][self.lang], Gtk.ResponseType.CANCEL)
+        soru.add_button(UI["oturum_kapat"][self.lang], Gtk.ResponseType.OK)
+        yanit = soru.run()
+        soru.destroy()
+        if yanit == Gtk.ResponseType.OK and shutil.which("xfce4-session-logout"):
+            subprocess.Popen(["xfce4-session-logout", "--logout"])
 
     def _sistemi_uygula(self, hazir):
         adimlar = [lambda: apply_desktop_theme(self.theme),
                    lambda: apply_sibling_settings(self.lang, self.theme)]
         # K-02: oturum dili yalnizca hazirlik tamamsa (ya da gerekmiyorsa) yazilir
-        if hazir and not sd.hazirlik_gerekli_mi(self.lang):
-            adimlar.append(lambda: apply_session_language(self.lang))
+        # (locale uretildiyse ek paketlerin eksikligi dili engellemez)
+        if hazir:
+            adimlar.append(self._oturum_dilini_yaz)
         adimlar.append(lambda: apply_wallpaper(self.wallpaper))
         for adim in adimlar:
             try:
                 adim()
             except Exception as exc:
                 print("carotos-welcome: adim hatasi:", exc, file=sys.stderr)
+
+    def _oturum_dilini_yaz(self):
+        self._dil_yazildi = apply_session_language(self.lang)
 
     def prepare_language(self):
         """Secilen dilin locale'i/paketleri eksikse sorar ve hazirlar (ISO kucuk kalsin diye
@@ -3049,13 +3082,14 @@ class WelcomeWindow(Gtk.Window):
                 bilgi.run()
                 bilgi.destroy()
             return False
+        kismi = kayit["kod"] == 4        # locale hazir, ek paketler inmedi
         if kayit["kod"] != 0:
             hata = Gtk.MessageDialog(transient_for=self, modal=True, message_type=Gtk.MessageType.WARNING,
                                      buttons=Gtk.ButtonsType.CLOSE, text=UI["dh_baslik"][self.lang])
-            hata.format_secondary_text(UI["dh_hata"][self.lang])
+            hata.format_secondary_text(UI["dh_kismi" if kismi else "dh_hata"][self.lang])
             hata.run()
             hata.destroy()
-            return False
+            return kismi
         return True
 
     def on_back(self, _button):
@@ -3087,21 +3121,36 @@ class WelcomeWindow(Gtk.Window):
         self.settings["lang"] = chosen
         save_settings(self.settings)
 
-        # Sisteme uygulama "Bitir" dugmesinde yapilir.
+        # Sisteme uygulama "Bitir"de ya da pencere kapanirken yapilir.
         self.rebuild()
+
+    def _masaustu_temasi(self):
+        """Masaustu temasi secilir secilmez degisir (xfconf bloklayabilir: ayri is parcacigi)."""
+        threading.Thread(target=apply_desktop_theme, args=(self.theme,), daemon=True).start()
 
     def on_theme_toggled(self, _button):
         self.theme = "light" if self.theme == "dark" else "dark"
         self.settings["theme"] = self.theme
         save_settings(self.settings)
 
-        # Yalnizca sihirbazin gorunumu; sisteme uygulama "Bitir"de.
         self.apply_theme()
+        self._masaustu_temasi()
         self.refresh()
 
     def on_check_toggled(self, check):
         self.settings["show_on_startup"] = not check.get_active()
         save_settings(self.settings)
+
+    def on_delete(self, *_a):
+        """Bitir'e basilmadan kapatilirsa da secimler kaybolmaz."""
+        if not self.get_sensitive():
+            return True                 # uygulama suruyor
+        if (self.lang, self.theme, self.wallpaper) != self._uygulanan:
+            try:
+                self.apply_choices()
+            except Exception as exc:
+                print("carotos-welcome: secimler uygulanirken hata:", exc, file=sys.stderr)
+        return False
 
     def on_destroy(self, _widget):
         save_settings(self.settings)

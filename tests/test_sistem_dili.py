@@ -177,7 +177,7 @@ class BetikTesti(unittest.TestCase):
             self.komutlar.append(list(komut))
             return 1 if komut[:2] == ["apt-get", "install"] else 0
         self.b.calistir = calistir
-        self.assertEqual(self.calis("de", locales=["de_DE.utf8"], kurulu=set()), 1)
+        self.assertEqual(self.calis("de", locales=["de_DE.utf8"], kurulu=set()), 4)    # locale hazir
 
     def test_varsayilan_sistem_diline_dokunmaz(self):
         # /etc/default/locale hicbir yerde gecmemeli (sistem geneli degistirilmez)

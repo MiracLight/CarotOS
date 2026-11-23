@@ -3,7 +3,7 @@
 
 Uygulamalarin metinleri kodda {"tr": "...", "en": "..."} sozlukleri olarak
 yazilir (kaynak diller: Turkce ve Ingilizce). Diger diller (de, ru, es, pt, ja,
-zh, fr) kodu degistirmeden, `ortak/diller/<kod>.json` dosyalarindan gelir:
+zh, fr, ar, hi) kodu degistirmeden, `ortak/diller/<kod>.json` dosyalarindan gelir:
 
     {
       "_meta": {"ad": "Espanol", "etkin": true, "durum": "taslak"},
@@ -40,6 +40,8 @@ DILLER = (
     ("ja", "日本語"),
     ("zh", "中文"),
     ("fr", "Français"),
+    ("ar", "العربية"),
+    ("hi", "हिन्दी"),
 )
 KODLAR = tuple(k for k, _ in DILLER)
 KAYNAK_DILLER = ("tr", "en")          # kodda yazili; her zaman etkin
@@ -143,7 +145,7 @@ def etkin_diller(dizin=None):
 
 
 # Yazi tipi yoksa kendi yazisiyla (日本語, 中文) yazilan ad kutucuk (tofu) olarak cikar: Latin ad kullanilir.
-LATIN_ADLAR = {"ja": "Japanese", "zh": "Chinese"}
+LATIN_ADLAR = {"ja": "Japanese", "zh": "Chinese", "ar": "Arabic", "hi": "Hindi"}
 _yazi_onbellek = {}
 
 

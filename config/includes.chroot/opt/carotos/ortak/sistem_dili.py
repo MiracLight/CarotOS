@@ -30,6 +30,9 @@ HAZIRLIK = {
     "zh": {"locale": "zh_CN.UTF-8", "firefox": "zh-cn", "ofis": "zh-cn",
            "paketler": ("fonts-noto-cjk", "fcitx5", "fcitx5-chinese-addons", "fcitx5-frontend-gtk3", "im-config")},
     "fr": {"locale": "fr_FR.UTF-8", "paketler": ("hunspell-fr",), "firefox": "fr", "ofis": "fr"},
+    # Yazi tipleri (DejaVu: Arapca, fonts-lohit-deva: Devanagari) ISO'dadir
+    "ar": {"locale": "ar_EG.UTF-8", "paketler": ("hunspell-ar", "fonts-hosny-amiri"), "firefox": "ar", "ofis": "ar"},
+    "hi": {"locale": "hi_IN.UTF-8", "paketler": ("hunspell-hi", "fonts-lohit-deva"), "firefox": "hi-in", "ofis": "hi"},
 }
 # Dil paketi kurulu mu diye bakilacak ana paketler: biri kuruluysa onun dil paketi de eklenir
 FIREFOX_ANA = "firefox-esr"

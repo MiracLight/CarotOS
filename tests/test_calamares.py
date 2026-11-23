@@ -324,7 +324,7 @@ temiz_yerel "$1"; printf '|'; temiz_dil_listesi "$2" "C.UTF-8"
         self.assertIn("Exec=/usr/bin/carotos-kur", d)
         self.assertRegex(d, r"(?m)^Name=Install CarotOS$")
         self.assertRegex(d, r"(?m)^Name\[tr\]=CarotOS'u Kur$")
-        for dil in ("tr", "de", "ru", "es", "pt", "ja", "zh", "fr"):
+        for dil in ("tr", "de", "ru", "es", "pt", "ja", "zh", "fr", "ar", "hi"):
             with self.subTest(dil=dil):
                 self.assertRegex(d, r"(?m)^Name\[%s\]=\S.*$" % dil)
 
@@ -368,7 +368,13 @@ class MarkaTesti(unittest.TestCase):
         # Dil yuklemede degil etkinlestirmede okunur (Karsilama'da secilen dil)
         self.assertRegex(q, r"function onActivate\(\) \{ diliOku\(\);")
         self.assertIn('=== "tr"', q)
-        # Yalniz iki dil: t(tr, en)
+        # Diger diller slayt-dilleri.js'te: her metnin 9 dilde karsiligi var
+        js = oku(CALAMARES, "branding", "carotos", "slayt-dilleri.js")
+        tablo = json.loads(js[js.index("{"):js.index("};") + 1])
+        metinler = set(re.findall(r'\bt\("[^"]*",\s*"([^"]*)"\)', q))
+        self.assertGreater(len(metinler), 25)
+        for kod in ("de", "ru", "es", "pt", "ja", "zh", "fr", "ar", "hi"):
+            self.assertEqual(metinler - set(tablo[kod]), set(), kod)
         self.assertNotRegex(q, r"\b(de|ru|ja|zh|fr|es|pt):\s*\"")
         self.assertEqual(q.count("{"), q.count("}"))
         self.assertEqual(q.count("("), q.count(")"))

@@ -1,7 +1,7 @@
 # CarotOS çeviri sistemi
 
-Dokuz dil: Türkçe, İngilizce (kaynak, kodda yazılı) ve Almanca, Rusça, İspanyolca,
-Portekizce, Japonca, Çince (yalın), Fransızca (dil dosyalarından). Ortak katman:
+On bir dil: Türkçe, İngilizce (kaynak, kodda yazılı) ve Almanca, Rusça, İspanyolca,
+Portekizce, Japonca, Çince (yalın), Fransızca, Arapça, Hintçe (dil dosyalarından). Ortak katman:
 `config/includes.chroot/opt/carotos/ortak/dil.py`, araç: `tools/ceviri.py`.
 
 ## Nasıl çalışır
