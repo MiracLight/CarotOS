@@ -26,7 +26,12 @@ sayılmamıştır.
   puanı düşürmez; 24 denetim. Mağaza 220 uygulama, GSD 197 terim.
 - **Pil göstergesi:** dizüstünde sağ üstte (sistem tepsisi), masaüstünde çıkmaz
   (`xfce4-power-manager`).
-- **Çeviri:** yedi dilde arayüz (de, fr, es, pt, ru, ja, zh), %100 kapsam.
+- **Çeviri:** dokuz dilde arayüz (de, fr, es, pt, ru, ja, zh; 24 Kasım güncellemesiyle
+  ar ve hi, beta), %100 kapsam. Menü adları ve Calamares slaytları da on bir dilde.
+- **24 Kasım 2026 güncellemesi:** Paket Kurucu (.deb; Mağaza "Dosyadan kur");
+  Karşılama'da tema anında uygulanır, dil erken kapatınca da kaydedilir ve oturumu
+  kapatmak önerilir; açık temada panel okunur; Carot Sleek alt kenar bulanıklığı
+  giderildi; canlı oturumda ekran kilidi parola sormaz.
 - **Açılış:** Plymouth teması, GRUB 5/30 sn + os-prober, sessiz açılış,
   `i915.fastboot=1`.
 - **Güvenlik denetimi:** 12 uygulama ve sistem betikleri tek tek gözden

@@ -4,19 +4,19 @@
 #   kullandigi yeni bir ozellik eklendiginde); ortak her yukselince uygulamalar yeniden yayinlanmaz.
 # - keyring bu tabloda degil: kendi DEBIAN/control dosyasindaki surumu kullanir (tarih bicimli).
 ortak           1.4.3  -
-gsd             1.4.2  1.4.2
+gsd             1.4.3  1.4.2
 former          1.4.3  1.4.2
 health          1.4.3  1.4.2
 usb             1.4.3  1.4.2
-security-panel  1.4.2  1.4.2
+security-panel  1.4.3  1.4.2
 magaza          1.4.3  1.4.2
 paket           1.4.3  1.4.2
 kurtarma        1.4.3  1.4.2
-carotene        1.4.2  1.4.2
-filenor         1.4.2  1.4.2
-carotpot        1.4.2  1.4.2
-poligon         1.4.2  1.4.2
-welcome         1.4.3  1.4.2
+carotene        1.4.3  1.4.2
+filenor         1.4.3  1.4.2
+carotpot        1.4.3  1.4.2
+poligon         1.4.3  1.4.2
+welcome         1.4.3  1.4.3
 acikla          1.4.3  1.4.2
 sleek           1.4.3  1.4.2
 yardimci        1.4.3  1.4.2

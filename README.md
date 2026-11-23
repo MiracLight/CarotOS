@@ -4,7 +4,7 @@
 
 **Siber güvenlik eğitimi için hazırlanmış Linux dağıtımı**
 
-Debian 13 "trixie" tabanlı · XFCE · Türkçe ve İngilizce
+Debian 13 "trixie" tabanlı · XFCE · Türkçe, İngilizce ve dokuz dil (beta)
 
 </div>
 
@@ -122,7 +122,7 @@ anlatılmış.**
 nmap, tcpdump ve hydra gibi on güvenlik aracını komut yazmadan kullanabileceğiniz grafik arayüz. Her aracın ne işe yaradığı ekranda anlatılır, sonuçlar canlı olarak izlenir. Her aracın yanındaki “Açıkla” düğmesi komutun parçalarını sade Türkçeyle anlatır; terminalde Alt+E ile aynı Komut Açıklayıcı açılır. Etik koruma, taramadan önce hedef için onay ister ve onayladığınız ağları hatırlar; hatırladıklarını Ayarlar'dan sıfırlayabilirsiniz.
 
 ### CarotOS Karşılama Sihirbazı
-CarotOS'u ilk açtığınızda karşınıza gelen tanıtım rehberi. Linux'un temel kavramlarını, masaüstünü ve CarotOS ile gelen uygulamaları 31 sayfada Türkçe ve İngilizce anlatır. Tema, dil ve masaüstü arka planını da buradan seçebilirsiniz. Konuları siz seçersiniz: ağ ve gizlilik, güvenlik duvarı, disk şifreleme, Windows ile birlikte kurulum, terminal, Komut Açıklayıcı, etik ve indirdiğiniz ISO'nun doğrulanması ayrı kartlardır. İsterseniz Görünüm sayfasından modern masaüstü teması (Carot Sleek) açılır ve kapatınca geri alınır.
+CarotOS'u ilk açtığınızda karşınıza gelen tanıtım rehberi. Linux'un temel kavramlarını, masaüstünü ve CarotOS ile gelen uygulamaları 31 sayfada anlatır; arayüz on bir dilde açılabilir. Tema, dil ve masaüstü arka planını da buradan seçebilirsiniz. Konuları siz seçersiniz: ağ ve gizlilik, güvenlik duvarı, disk şifreleme, Windows ile birlikte kurulum, terminal, Komut Açıklayıcı, etik ve indirdiğiniz ISO'nun doğrulanması ayrı kartlardır. İsterseniz Görünüm sayfasından modern masaüstü teması (Carot Sleek) açılır ve kapatınca geri alınır.
 
 ### CarotOS Sistem Sağlığı
 Bilgisayarınızın genel durumunu kontrol eden araç. Sistem, güncellemeler, ağ ve güvenlik duvarı, koruma katmanları, hesaplar ve disk gibi alanlarda 24 denetim yapar, sonucu bir sağlık puanı olarak gösterir. DHCP ve mDNS gibi beklenen masaüstü dinleyicileri puanı düşürmez; ağ keşfini (mDNS) buradan açıp kapatabilirsiniz. Sorunların çoğu tek tıkla düzeltilebilir, ayrıntılı tarama yapılabilir ve sonuçlar rapor olarak kaydedilir.
@@ -140,7 +140,7 @@ USB belleklerde zararlı yazılım belirtilerini arayan araç. Oturum açıldı�
 Öğretmenlerin sınıfı yönettiği uygulama. Tek tıkla sınıf odası açar, öğrencilerin ilerlemesini izler, görev yönlendirir ve istenen öğrenciye ipucu gönderir. CTF yarışmasını başlatır ve bitirir, canlı skoru izler, sonuçları CSV olarak kaydeder.
 
 ### CarotOS Mağaza
-Debian depolarındaki 220 uygulamayı on kategoride listeleyen yazılım mağazası. Uygulamaları tek tıkla kurup kaldırabilirsiniz. Açık ve koyu tema ile Türkçe ve İngilizce arayüz seçeneği vardır.
+Debian depolarındaki 220 uygulamayı on kategoride listeleyen yazılım mağazası. Uygulamaları tek tıkla kurup kaldırabilirsiniz. İnternetten indirdiğiniz .deb dosyaları için **Paket Kurucu** da vardır: paket bilgilerini ve ek kurulacakları gösterir, kaynak için uyarır, onayınızdan sonra kurar. Açık ve koyu tema ile on bir dilde arayüz seçeneği vardır.
 
 ### Carotene
 ClamAV tabanlı antivirüs uygulaması. Hızlı tarama, ana klasör taraması ve seçtiğiniz klasörün taranması mümkündür. Bulunan dosyalar karantinaya alınır, virüs tanımları uygulamadan güncellenir ve tarama geçmişi saklanır. Arka planda çalışan bir hizmet kurmaz, yalnızca siz başlattığınızda tarar. Temiz sonuç yalnızca tarama sorunsuz bittiyse gösterilir.
@@ -155,7 +155,7 @@ Görsel, ses, video, belge, tablo, sunum ve yazı tipi dosyalarını tek arayüz
 Güvenlik araçlarını animasyonlarla öğreten rehber uygulama. Güvenlik Paneli'ndeki araçların ve CarotPot ile Carotene'in her biri için konu anlatımı, oynatılabilir bir animasyon ve “kendin dene” bölümü bulunur. CTF yarışması, Komut Açıklayıcı, etik, disk şifreleme, ISO doğrulama ve savunmacı görünümü konuları da vardır. Türkçe ve İngilizce çalışır.
 
 ### CarotOS GSD
-Genel Sistem Sözlüğü. Linux, ağ, siber güvenlik, kriptografi ve bilgisayar bilimi alanlarında 197 terim içerir. Terimleri arayabilir, örnek komutları görebilir ve ilgili terimlere geçebilirsiniz. Türkçe ve İngilizce kullanılabilir.
+Genel Sistem Sözlüğü. Linux, ağ, siber güvenlik, kriptografi ve bilgisayar bilimi alanlarında 197 terim içerir. Terimleri arayabilir, örnek komutları görebilir ve ilgili terimlere geçebilirsiniz. On bir dilde kullanılabilir.
 
 ## Güvenlik araçları
 
