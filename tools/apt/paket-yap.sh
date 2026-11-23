@@ -1,10 +1,10 @@
 #!/bin/bash
 # .deb uretir (WSL/Debian'da, kok yetkisiz):  tools/apt/paket-yap.sh <paket> <cikti-dizini>
-# Paketler: ortak keyring gsd former health usb security-panel magaza carotene filenor carotpot poligon welcome acikla sleek yardimci
+# Paketler: ortak keyring gsd former health usb security-panel magaza paket kurtarma carotene filenor carotpot poligon welcome acikla sleek yardimci
 # Kaynak tek yerde: config/includes.chroot. Dosyalar root:root, hook'taki izinlerle ayni.
 # Surum: SURUM ortam degiskeni (varsayilan 1.4.0).
 set -euo pipefail
-TUMU="ortak keyring gsd former health usb security-panel magaza carotene filenor carotpot poligon welcome acikla sleek yardimci"
+TUMU="ortak keyring gsd former health usb security-panel magaza paket kurtarma carotene filenor carotpot poligon welcome acikla sleek yardimci"
 [ $# -eq 2 ] || { echo "Kullanim: $0 <paket> <cikti-dizini>  (paket: $TUMU)" >&2; exit 2; }
 PAKET="$1"; CIKTI="$2"
 AD="$(cd "$(dirname "$0")" && pwd)"
@@ -63,6 +63,16 @@ magaza)
     EK="$HICOLOR/256x256/apps/carotos-magaza.png $HICOLOR/scalable/apps/carotos-magaza.svg usr/share/pixmaps/carotos-magaza.png"
     ACIKLAMA="CarotOS Magaza: secilmis uygulama katalogu
  Aciklamali, secilmis uygulamalari kurmak ve guncellemek icin arac." ;;
+paket)
+    OPT=paket; MASAUSTU=carotos-paket; EXEC=carotos-paket.py; BAGIMLI="$UYG_BAGIMLI, carotos-magaza, carotos-yardimci (>= 1.4.3)"
+    EK="$HICOLOR/scalable/apps/carotos-paket.svg"
+    ACIKLAMA="CarotOS Paket Kurucu: yerel .deb dosyasi kurar
+ Bir .deb dosyasinin icerigini, ek paketlerini ve ozetini gosterir; onaydan sonra kurar." ;;
+kurtarma)
+    OPT=kurtarma; MASAUSTU=carotos-kurtarma; EXEC="carotos-kurtarma.py carotos-kurtarma-yonet"; BAGIMLI="$UYG_BAGIMLI, rsync"; ONERILEN="pkexec"
+    EK="etc/apt/apt.conf.d/50carotos-kurtarma"; for b in 16x16 22x22 24x24 32x32 48x48 64x64 128x128 256x256; do EK="$EK $HICOLOR/$b/apps/carotos-kurtarma.png"; done
+    ACIKLAMA="CarotOS Kurtarma: sistemi kayitli noktaya dondurur
+ rsync ve sabit bag ile artimli kurtarma noktasi alir, gerektiginde sistemi o noktaya dondurur." ;;
 carotene)
     OPT=carotene; MASAUSTU=carotos-carotene; EXEC=carotene.py; BAGIMLI="$UYG_BAGIMLI, clamav"; ONERILEN="clamav-freshclam"
     EK=""; for b in 16x16 22x22 24x24 32x32 48x48 64x64 128x128 256x256; do EK="$EK $HICOLOR/$b/apps/carotene.png"; done
@@ -132,9 +142,9 @@ sleek)
 yardimci)
     ESKI="usr/local/sbin/carotos-dil-hazirla usr/local/sbin/carotos-mac-ayar usr/local/sbin/carotos-magaza-apt usr/local/sbin/carotos-ufw-ayar"
     COMPAT="usr/local/bin/carotos-saat-eslestir:/usr/bin/carotos-saat-eslestir"
-    EXEC_ABS="usr/sbin/carotos-dil-hazirla usr/sbin/carotos-mac-ayar usr/sbin/carotos-magaza-apt usr/sbin/carotos-ufw-ayar usr/bin/carotos-saat-eslestir"
+    EXEC_ABS="usr/sbin/carotos-dil-hazirla usr/sbin/carotos-mac-ayar usr/sbin/carotos-magaza-apt usr/sbin/carotos-deb-kur usr/sbin/carotos-ufw-ayar usr/bin/carotos-saat-eslestir"
     BAGIMLI="python3"; ONERILEN="pkexec"
-    EK="usr/sbin/carotos-dil-hazirla usr/sbin/carotos-mac-ayar usr/sbin/carotos-magaza-apt usr/sbin/carotos-ufw-ayar usr/bin/carotos-saat-eslestir"
+    EK="usr/sbin/carotos-dil-hazirla usr/sbin/carotos-mac-ayar usr/sbin/carotos-magaza-apt usr/sbin/carotos-deb-kur usr/sbin/carotos-ufw-ayar usr/bin/carotos-saat-eslestir"
     ACIKLAMA="CarotOS yardimci betikleri
  Uygulamalarin pkexec ile cagirdigi yetkili yardimcilar (dil hazirlama, MAC, guvenlik duvari, Magaza kurulumu, saat)." ;;
 *) echo "Bilinmeyen paket: $PAKET (paket: $TUMU)" >&2; exit 2 ;;

@@ -33,7 +33,7 @@ ANIMASYON_MS = 170          # kayarak girme/cikma suresi
 KONTROL_MS = 80             # imlec konumu denetim araligi
 # mantik: baslangic/yonetim -> koruma ve denetim -> ogrenme -> yardimci araclar
 SIRA = (
-    "carotos-welcome.desktop", "carotos-magaza.desktop",
+    "carotos-welcome.desktop", "carotos-magaza.desktop", "carotos-paket.desktop",
     "carotos-security-panel.desktop", "carotos-health.desktop", "carotos-usb-check.desktop",
     "carotos-kurtarma.desktop",
     "carotos-carotene.desktop", "carotos-carotpot.desktop",

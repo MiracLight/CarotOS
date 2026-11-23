@@ -77,6 +77,8 @@ DOCK_VARSAYILAN = (
 )
 # SOL yan panel: kendi yazdigimiz kaydirmali panel (5 simge gorunur); plank degil
 YANPANEL = "/opt/carotos/yanpanel/carotos-yanpanel.py"
+# Plank'in saydam penceresi alt kenari boydan boya kaplar: dislanmazsa glx'te kenar komple bulanir
+PLANK_BULANIK = "  \"class_g = 'Plank'\","
 KENDI = "/usr/bin/carotos-modernlestir"          # autostart: oturumda 'picom-baslat'
 PICOM_BEKLE = 2.5          # sn: glx baglami acilamazsa picom bu surede coker
 # xfconf'ta calisan panele ancak panel yeniden baslatilinca yansiyan anahtarlar
@@ -361,6 +363,7 @@ def picom_conf(sanal, yedek=False):
             "blur-background-frame = false;",
             "blur-background-fixed = false;",
             "blur-background-exclude = [",
+            PLANK_BULANIK,
             "  \"window_type = 'desktop'\",",
             "  \"window_type = 'dnd'\",",
             "  \"window_type = 'tooltip'\",",
@@ -393,6 +396,7 @@ def css_blogu():
         "  background-color: rgba(0, 18, 57, 0.75);",
         "  border: none;",
         "}",
+        ".xfce4-panel.panel, .xfce4-panel button, .xfce4-panel label, .xfce4-panel image { color: #e6e9ef; }",
         "/* gorev listesi: sekme gorunumu */",
         ".xfce4-panel button { margin: 3px 2px 0 2px; padding: 0 10px;"
         " background-color: rgba(255, 255, 255, 0.06); border-radius: 8px 8px 0 0; }",
@@ -1106,6 +1110,10 @@ def picom_oturum(o, cikti=print):
     if surec_calisiyor(o, "picom"):
         return 0
     try:
+        # eski surumun urettigi ayarda Plank bulaniklik disi degildi: acilista tamamla
+        metin, bas = oku(conf) or "", "blur-background-exclude = [\n"
+        if bas in metin and bas + PLANK_BULANIK not in metin:
+            atomik_yaz(conf, metin.replace(bas, bas + PLANK_BULANIK + "\n"), 0o600)
         sonuc = picom_baslat(o, conf)
     except (UygulamaHatasi, OSError) as exc:
         try:

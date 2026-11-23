@@ -59,9 +59,10 @@ chmod 755 /usr/sbin/carotos-tema-kur
 chmod 755 /usr/bin/carotos-modernlestir
 chmod 755 /usr/bin/carotos-saat-eslestir
 chmod 755 /usr/bin/carotos-acikla
+chmod 755 /usr/lib/live/config/1990-carotos-kilit /usr/sbin/carotos-deb-kur
 # Yardimci betikler /usr/sbin ve /usr/bin altindadir (paketlerle ayni yer); includes.chroot dosyalarinin kipi ve
 # sahibi derleme klonundan gelir, root'a ait ve yalnizca root'ca yazilabilir olmali.
-for yol in /usr/sbin/carotos-dil-hazirla /usr/sbin/carotos-mac-ayar /usr/sbin/carotos-ufw-ayar /usr/sbin/carotos-magaza-apt            /usr/sbin/carotos-tema-kur /usr/bin/carotos-modernlestir /usr/bin/carotos-saat-eslestir /usr/bin/carotos-acikla; do
+for yol in /usr/sbin/carotos-dil-hazirla /usr/sbin/carotos-mac-ayar /usr/sbin/carotos-ufw-ayar /usr/sbin/carotos-magaza-apt            /usr/sbin/carotos-tema-kur /usr/bin/carotos-modernlestir /usr/bin/carotos-saat-eslestir /usr/bin/carotos-acikla /usr/sbin/carotos-deb-kur /usr/lib/live/config/1990-carotos-kilit; do
     [ -f "$yol" ] || { echo "CarotOS HATA: $yol yok." >&2; exit 1; }
     chown root:root "$yol"
     chmod 755 "$yol"
@@ -102,6 +103,8 @@ echo "CarotOS: simge onbellegi tazelendi."
 # USB Denetimi (otomatik başlatıcısı /etc/xdg/autostart/carotos-usb-check.desktop)
 chmod 755 /opt/carotos/usb/carotos-usb-check.py
 chmod 755 /opt/carotos/yanpanel/carotos-yanpanel.py
+chmod 755 /opt/carotos/paket/carotos-paket.py
+chmod 644 /usr/share/applications/carotos-paket.desktop /etc/xdg/mimeapps.list
 chmod 644 /usr/share/applications/carotos-usb-check.desktop
 chmod 644 /etc/xdg/autostart/carotos-usb-check.desktop
 echo "CarotOS: usb denetimi yerlestirildi."

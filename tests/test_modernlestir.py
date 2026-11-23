@@ -667,6 +667,20 @@ class ModernlestirUygulaTesti(ModernlestirTabani):
         self.assertEqual(self.calistir("picom-baslat"), 0, self.ciktilar)
         self.assertEqual(self.picom_baslatma_sayisi(), once + 2)
 
+    def test_plank_bulaniklik_disi_ve_eski_ayar_acilista_onarilir(self):
+        tam = md.picom_conf(False)
+        dislar = tam.split("blur-background-exclude = [")[1].split("];")[0]
+        self.assertIn("class_g = 'Plank'", dislar)
+        self.assertEqual(self.calistir("uygula"), 0, self.ciktilar)
+        conf = os.path.join(self.config, "picom", "picom.conf")
+        bas, son = tam.split("blur-background-exclude = [")
+        self.yaz(conf, bas + "blur-background-exclude = [" + son.replace("\n" + md.PLANK_BULANIK, "", 1))
+        for _ in range(2):                                  # ikinci acilis yinelemez
+            self.masa.calisan.discard("picom")
+            self.assertEqual(self.calistir("picom-baslat"), 0, self.ciktilar)
+            dislar = self.oku(conf).split("blur-background-exclude = [")[1].split("];")[0]
+            self.assertEqual(dislar.count("Plank"), 1)
+
     # --- ust paneldeki CarotOS baslaticilari (yan panelde oldugu icin) kaldirilir ---
     def test_ust_paneldeki_carotos_baslaticilari_kalkar(self):
         m = self.masa.xfconf

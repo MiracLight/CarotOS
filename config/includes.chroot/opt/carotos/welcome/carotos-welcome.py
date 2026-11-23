@@ -1522,7 +1522,7 @@ LIGHT_THEMES = ["Arc", "Materia", "Greybird", "Adwaita", "Default"]
 
 # Simge temasi adaylari (CarotOS 1.3: Papirus). Sistemde bulunan ilki kullanilir.
 DARK_ICON_THEMES = ["Papirus-Dark", "Papirus", "gnome"]
-LIGHT_ICON_THEMES = ["Papirus-Light", "Papirus", "gnome"]
+LIGHT_ICON_THEMES = ["Papirus", "Papirus-Light", "gnome"]   # panel hep koyu: Papirus'un tepsi simgeleri acik renk
 
 # Fare imleci: koyu temada acik (Breeze_Snow), acik temada koyu imlec.
 DARK_CURSOR_THEMES = ["Breeze_Light", "Breeze_Snow", "DMZ-White", "Adwaita"]
@@ -1672,7 +1672,7 @@ def apply_desktop_theme(theme):
         return False
     ok = xfconf("xsettings", "/Net/ThemeName", name)
 
-    # Simge temasi: kosea gore Papirus-Dark / Papirus-Light (varsa).
+    # Simge temasi: kosea gore Papirus-Dark / Papirus (varsa).
     icons = available_icon_theme(
         DARK_ICON_THEMES if theme == "dark" else LIGHT_ICON_THEMES)
     if icons:

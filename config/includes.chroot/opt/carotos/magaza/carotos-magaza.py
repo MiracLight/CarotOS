@@ -48,6 +48,7 @@ KATALOG_YOLU = os.path.join(BASE_DIR, "katalog.json")
 IKON_YOLU = os.path.join(BASE_DIR, "ikonlar.json")
 GITHUB_URL = "https://github.com/MiracLight/CarotOS"
 WEB_URL = "https://carotos.org"
+PAKET_KURUCU = os.path.join(os.path.dirname(BASE_DIR), "paket", "carotos-paket.py")
 VURGU = "magaza"            # ortak/tema.py'deki pembe vurgu
 
 LOGO_B64 = (
@@ -105,6 +106,7 @@ METIN = {
     "marka_alt": {"tr": "Uygulama mağazası · {s}", "en": "App store · {s}"},
     "ara": {"tr": "Uygulama ara…", "en": "Search apps…"},
     "yenile": {"tr": "Depoyu yenile", "en": "Refresh"},
+    "dosyadan_kur": {"tr": "Dosyadan kur", "en": "Install from file"},
     "gorunum_koyu": {"tr": "Koyu", "en": "Dark"},
     "gorunum_acik": {"tr": "Açık", "en": "Light"},
     "bolum_kesfet": {"tr": "Keşfet", "en": "Discover"},
@@ -203,7 +205,7 @@ METIN = {
     "sepet_bos_baslik": {"tr": "Sepetin boş", "en": "Your basket is empty"},
     "sepet_bos": {"tr": "Bir uygulamanın sayfasında “Sepete ekle”ye bas; hepsini tek seferde kurarsın.",
                   "en": "Press “Add to basket” on an app's page to install several apps in one go."},
-    "sepetten_cikar": {"tr": "Çıkar", "en": "Remove"},
+    "sepetten_cikar": {"tr": "Sepetten çıkar", "en": "Remove from basket"},
     "sepeti_bosalt": {"tr": "Sepeti boşalt", "en": "Empty basket"},
     "islem_goster": {"tr": "İşlem sürüyor: göster", "en": "Working: show"},
     "kismi_basari": {
@@ -1096,6 +1098,10 @@ class MagazaPenceresi(Gtk.Window):
         self.kabuk.ust_sag.pack_start(self.arama_girisi, False, False, 0)
         self.yenile_dugme = tema.dugme(M("yenile"), None, self.depoyu_yenile)
         self.kabuk.ust_sag.pack_start(self.yenile_dugme, False, False, 0)
+        self.dosya_dugme = tema.dugme(M("dosyadan_kur"), None, self.dosyadan_kur)
+        self.dosya_dugme.set_no_show_all(True)
+        self.dosya_dugme.set_visible(os.path.isfile(PAKET_KURUCU))
+        self.kabuk.ust_sag.pack_start(self.dosya_dugme, False, False, 0)
         # Calisan islem gizlenmis olsa da buradan geri getirilir
         self.islem_dugme = tema.dugme("", None, self._mesgul_uyar)
         self.islem_dugme.set_no_show_all(True)
@@ -1141,6 +1147,7 @@ class MagazaPenceresi(Gtk.Window):
         koyu = self.ui["theme"] == "dark"
         self.tema_dugme.set_label("☀" if koyu else "☾")
         self.yenile_dugme.set_label(M("yenile"))
+        self.dosya_dugme.set_label(M("dosyadan_kur"))
         self.arama_girisi.set_placeholder_text(M("ara"))
         self._sepet_guncelle()
         self._guncelleme_rozeti()
@@ -1712,6 +1719,14 @@ class MagazaPenceresi(Gtk.Window):
                 return False
             self._kurulu_oku(oku_bitti)
         self._islem_baslat(baslik, komut, bitince, eylem=islem, paketler=(u["paket"],))
+
+    def dosyadan_kur(self):
+        """Yerel .deb dosyasi icin Paket Kurucu'yu acar."""
+        try:
+            subprocess.Popen(["/usr/bin/python3", PAKET_KURUCU], stdin=subprocess.DEVNULL,
+                             start_new_session=True)
+        except OSError as exc:
+            print(f"Paket Kurucu acilamadi: {exc}", file=sys.stderr)
 
     def depoyu_yenile(self):
         if self.mesgul:

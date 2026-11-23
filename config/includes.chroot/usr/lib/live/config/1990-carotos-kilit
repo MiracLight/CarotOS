@@ -1,0 +1,17 @@
+#!/bin/sh
+# Yalniz canli oturumda calisir (live-config). Canli kullanicinin parolasi sorulmaz: ekran kilidi
+# kapatilir; oturumdan cikilirsa LightDM bos parolayla girer (ssh sunucusu yok, PAM nullok yereldir).
+. /usr/lib/live/config.sh
+
+for _PARAMETER in ${LIVE_CONFIG_CMDLINE}
+do
+	case "${_PARAMETER}" in
+		live-config.username=*|username=*) LIVE_USERNAME="${_PARAMETER#*username=}" ;;
+	esac
+done
+
+component_was_executed "carotos-kilit" && exit 0
+echo -n " carotos-kilit"
+rm -f /etc/xdg/autostart/light-locker.desktop
+passwd -d "${LIVE_USERNAME}" >/dev/null
+touch /var/lib/live/config/carotos-kilit

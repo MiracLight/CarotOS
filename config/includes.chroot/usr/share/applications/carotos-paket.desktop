@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=CarotOS Package Installer
+Name[tr]=CarotOS Paket Kurucu
+Comment=Inspect and install a local .deb package
+Comment[tr]=Bilgisayardaki bir .deb paketini incele ve kur
+Exec=/opt/carotos/paket/carotos-paket.py %f
+Icon=carotos-paket
+Terminal=false
+Categories=System;PackageManager;
+MimeType=application/vnd.debian.binary-package;application/x-deb;application/x-debian-package;
+Keywords=deb;package;install;software;paket;
+Keywords[tr]=deb;paket;kur;yükle;yazılım;

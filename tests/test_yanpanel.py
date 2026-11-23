@@ -62,7 +62,7 @@ class ListeTesti(unittest.TestCase):
         gercek = os.path.join(KOK, "config", "includes.chroot", "usr", "share", "applications")
         mevcut = {a for a in os.listdir(gercek) if a.startswith("carotos-") and a.endswith(".desktop")}
         mevcut -= {"carotos-tarayici.desktop"}
-        self.assertEqual(set(self.mod.SIRA), mevcut)            # her uygulama listede, olmayan ad yok
+        self.assertEqual(set(self.mod.SIRA), mevcut - {"carotos-kur.desktop"})   # kur yalniz canli oturumda;            # her uygulama listede, olmayan ad yok
 
     def test_ayni_anda_5_simge(self):
         self.assertEqual(self.mod.GORUNEN, 5)

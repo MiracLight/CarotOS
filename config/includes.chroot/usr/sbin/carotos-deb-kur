@@ -1,0 +1,66 @@
+#!/usr/bin/python3 -I
+# -*- coding: utf-8 -*-
+"""CarotOS Paket Kurucu'nun root yardımcısı: yerel bir .deb dosyasını apt ile kurar.
+
+  pkexec /usr/sbin/carotos-deb-kur <mutlak-yol.deb> <sha256>
+
+Dosya sembolik bağ izlenmeden açılır, root'a ait özel dizine kopyalanır ve KOPYANIN özeti kullanıcının
+gördüğü paketinkiyle karşılaştırılır: onaydan sonra dosya değiştirilirse kurulmaz. Kabuk yok; yalnızca
+standart kütüphane. Bağımlılıkları apt çözer; paket kaldırmak gerekiyorsa kurulum durur (--no-remove).
+Çıkış: 64 yanlış kullanım, 65 dosya uygun değil/değişmiş, yoksa apt-get'in kodu."""
+import hashlib
+import os
+import re
+import stat
+import subprocess
+import sys
+import tempfile
+
+APT_GET = "/usr/bin/apt-get"
+SINIR = 4 << 30                  # 4 GB
+ORTAM = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "DEBIAN_FRONTEND": "noninteractive",
+         "LC_ALL": "C", "LANGUAGE": "C"}
+SECENEK = ["-o", "DPkg::Lock::Timeout=60", "-o", "Acquire::Retries=3",
+           "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold"]
+
+
+def kopyala(yol, hedef, beklenen):
+    """Dosyayı hedefe kopyalar; düzenli dosya değilse ya da özet tutmuyorsa ValueError."""
+    fd = os.open(yol, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
+    with os.fdopen(fd, "rb") as kaynak:
+        bilgi = os.fstat(kaynak.fileno())
+        if not stat.S_ISREG(bilgi.st_mode) or bilgi.st_size > SINIR:
+            raise ValueError("duzenli dosya degil ya da cok buyuk")
+        ozet, toplam = hashlib.sha256(), 0
+        with open(hedef, "xb") as cikti:
+            while parca := kaynak.read(1 << 20):
+                toplam += len(parca)
+                if toplam > SINIR:
+                    raise ValueError("dosya cok buyuk")
+                ozet.update(parca)
+                cikti.write(parca)
+    if ozet.hexdigest() != beklenen:
+        raise ValueError("dosya onaydan sonra degismis")
+
+
+def main(argv=None, apt_get=APT_GET):
+    argv = sys.argv[1:] if argv is None else argv
+    if (len(argv) != 2 or not os.path.isabs(argv[0]) or not argv[0].endswith(".deb")
+            or not re.fullmatch(r"[0-9a-f]{64}", argv[1])):
+        sys.stderr.write("kullanim: carotos-deb-kur <mutlak-yol.deb> <sha256>\n")
+        return 64
+    with tempfile.TemporaryDirectory(prefix="carotos-deb-") as dizin:
+        os.chmod(dizin, 0o755)               # apt'nin _apt kullanicisi okuyabilsin; yazma yalniz root
+        hedef = os.path.join(dizin, "paket.deb")
+        try:
+            kopyala(argv[0], hedef, argv[1])
+        except (OSError, ValueError) as exc:
+            sys.stderr.write("carotos-deb-kur: %s\n" % exc)
+            return 65
+        os.chmod(hedef, 0o644)
+        return subprocess.run([apt_get, *SECENEK, "install", "-y", "--no-remove", hedef], cwd="/",
+                              stdin=subprocess.DEVNULL, env=ORTAM).returncode
+
+
+if __name__ == "__main__":
+    sys.exit(main())

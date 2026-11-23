@@ -1,0 +1,4 @@
+[Default Applications]
+application/vnd.debian.binary-package=carotos-paket.desktop
+application/x-deb=carotos-paket.desktop
+application/x-debian-package=carotos-paket.desktop

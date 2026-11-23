@@ -101,7 +101,7 @@ class DepoYapilandirmasi(unittest.TestCase):
         self.assertIn('ESKI="usr/local/', p)                  # ISO 1.4'ten gelen sahipsiz eski yollar yalniz silinir
         self.assertIn('rm -f "$S/opt/carotos/$OPT/ikonlar.b64"', p)
         self.assertIn("keyring)", p)
-        for ad in ("ortak", "keyring", "gsd", "former", "health", "usb", "security-panel", "magaza", "carotene",
+        for ad in ("ortak", "keyring", "gsd", "former", "health", "usb", "security-panel", "magaza", "paket", "kurtarma", "carotene",
                    "filenor", "carotpot", "poligon", "welcome", "acikla", "sleek", "yardimci"):
             self.assertRegex(p, r'(?m)^%s\)' % ad, ad)          # her paket tabloda tanimli
         self.assertIn("SOURCE_DATE_EPOCH", p)                  # tekrarlanabilir derleme: ayni surum, ayni ozet
@@ -127,7 +127,7 @@ class DepoYapilandirmasi(unittest.TestCase):
                 ad, sur, ortak_min = s.split()
                 self.assertRegex(sur, r"^\d+\.\d+\.\d+$", ad)
                 tablo[ad] = (sur, ortak_min)
-        self.assertEqual(set(tablo), {"ortak", "gsd", "former", "health", "usb", "security-panel", "magaza",
+        self.assertEqual(set(tablo), {"ortak", "gsd", "former", "health", "usb", "security-panel", "magaza", "paket", "kurtarma",
                                       "carotene", "filenor", "carotpot", "poligon", "welcome", "acikla",
                                       "sleek", "yardimci"})
         for ad, (sur, ortak_min) in tablo.items():

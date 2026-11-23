@@ -7,7 +7,7 @@
 #  - yukseltmede eski dosya kalmiyor, kaldirmada hicbir sey kalmiyor
 set -euo pipefail
 AD="$(cd "$(dirname "$0")" && pwd)"
-UYGULAMALAR="gsd former health usb security-panel magaza carotene filenor carotpot poligon welcome"
+UYGULAMALAR="gsd former health usb security-panel magaza paket kurtarma carotene filenor carotpot poligon welcome"
 EKLER="acikla sleek yardimci"   # masaustu girdisi olmayan paketler
 TUMU="ortak keyring $UYGULAMALAR $EKLER"
 KAYNAK="$(cd "$AD/../.." && pwd)/config/includes.chroot"
@@ -121,7 +121,7 @@ SAHIPSIZ_N=0
 for d in opt/carotos usr/share/applications; do
     while IFS= read -r f; do
         "${GP[@]}" -S "/${f#$G/}" >/dev/null 2>&1 || { echo "sahipsiz: ${f#$G}"; SAHIPSIZ_N=$((SAHIPSIZ_N+1)); }
-    done < <(find "$G/$d" -type f)
+    done < <(find "$G/$d" -type f -not -name carotos-kur.desktop -not -path "*/__pycache__/*")   # kur: yalniz canli ISO
 done
 [ "$SAHIPSIZ_N" -eq 0 ] || hata "gecis: $SAHIPSIZ_N sahipsiz CarotOS dosyasi kaldi"
 for f in carotos-dil-hazirla carotos-mac-ayar carotos-magaza-apt carotos-ufw-ayar carotos-tema-kur; do

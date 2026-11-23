@@ -9,6 +9,16 @@
   border: none;
 }
 
+/* Panel her temada koyu: yazi ve simge (symbolic) rengi de acik olmali; acik temada (Arc)
+ * saat, kullanici adi ve tepsi simgeleri koyu zeminde okunmuyordu. */
+.xfce4-panel.panel,
+#XfcePanelWindow,
+.xfce4-panel button,
+.xfce4-panel label,
+.xfce4-panel image {
+  color: #e6e9ef;
+}
+
 /* Panel dugmeleri: yuvarlak koseli, hafif vurgulu */
 .xfce4-panel button {
   border-radius: 6px;
