@@ -1675,10 +1675,26 @@ def sleek_uygulanmis_mi():
                                        "sleek-yedek.json"))
 
 
+def _sleek_yedegine_yaz(kanal, ozellik, deger):
+    """Sleek acikken secilen tema masaustune degil yedege yazilir: Sleek kapaninca o tema gelir."""
+    yol = os.path.join(os.path.expanduser("~"), ".local", "state", "carotos", "sleek-yedek.json")
+    try:
+        with open(yol, encoding="utf-8") as fh:
+            yedek = json.load(fh)
+        for x in yedek["xfconf"]:
+            if x["kanal"] == kanal and x["ozellik"] == ozellik:
+                x.update(var=True, tur="string", deger=deger)
+                atomik_yaz(yol, json.dumps(yedek, ensure_ascii=False, indent=1))
+                break
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        pass
+    return True                       # yedek bu ayari tutmuyorsa Sleek onu degistirmemistir
+
+
 def apply_desktop_theme(theme):
-    """Masaustu temasini degistirir (kullanici duzeyinde, root gerekmez)."""
-    if sleek_uygulanmis_mi():
-        return True                   # modern gorunum kendi (koyu) temasini, simgelerini ve imlecini yonetir
+    """Masaustu temasini degistirir (kullanici duzeyinde, root gerekmez). Sleek kendi koyu temasini yonetir:
+    acikken secim yedege yazilir."""
+    xfconf = _sleek_yedegine_yaz if sleek_uygulanmis_mi() else globals()["xfconf"]
     name = available_theme(DARK_THEMES if theme == "dark" else LIGHT_THEMES)
     if not name:
         return False
@@ -2203,6 +2219,7 @@ class WelcomeWindow(Gtk.Window):
 
     def _on_theme_pick(self, _widget, _event, key):
         if key == self.theme:
+            self._masaustu_temasi()     # masaustu baska yoldan degismis olabilir (or. Sleek kapatildi)
             return True
         self.theme = key
         self.settings["theme"] = key

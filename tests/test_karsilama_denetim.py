@@ -156,6 +156,32 @@ class KarsilamaDenetimTesti(UygulamaDilTabani):
         self.m.WelcomeWindow.apply_choices(pencere)
         self.assertEqual(cagrilar, ["tema", "kardes", "oturum", "duvar"])
 
+    def test_sleek_acikken_tema_yedege_yazilir(self):
+        ev = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, ev)
+        eski = os.environ.get("HOME")
+        os.environ["HOME"] = ev
+        self.addCleanup(lambda: os.environ.update(HOME=eski or ""))
+        yol = os.path.join(ev, ".local", "state", "carotos", "sleek-yedek.json")
+        os.makedirs(os.path.dirname(yol))
+        with open(yol, "w", encoding="utf-8") as f:
+            json.dump({"xfconf": [{"kanal": "xsettings", "ozellik": "/Net/ThemeName", "tur": "string",
+                                   "var": True, "deger": "Arc-Dark"}]}, f)
+        m, eski_tema = self.m, self.m.available_theme
+        m.available_theme = lambda adaylar: adaylar[0]
+        self.addCleanup(setattr, m, "available_theme", eski_tema)
+        self.assertTrue(m.apply_desktop_theme("light"))
+        with open(yol, encoding="utf-8") as f:
+            self.assertEqual(json.load(f)["xfconf"][0]["deger"], "Arc")
+
+    def test_ayni_karta_basinca_masaustu_yine_uygulanir(self):
+        p = self.m.WelcomeWindow(self.m.load_settings())
+        self.addCleanup(p.destroy)
+        sayac = []
+        p._masaustu_temasi = lambda: sayac.append(1)
+        p._on_theme_pick(None, None, p.theme)
+        self.assertEqual(sayac, [1])
+
     def test_bitire_basmadan_kapatinca_da_uygulanir(self):
         p = self.m.WelcomeWindow(self.m.load_settings())
         self.addCleanup(p.destroy)
