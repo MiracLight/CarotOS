@@ -91,6 +91,33 @@ class SafMantik(Gecici):
             self.assertEqual(paket.durum_belirle(kurulu, yeni, mim, "amd64", k), bek)
 
 
+    def test_desktop_coz(self):
+        m, d = paket.magaza_yukle(), "/usr/share/applications/"
+        self.assertEqual(m.desktop_coz(
+            "vlc-bin: %(d)svlc.desktop\naa, bb:amd64, aa:i386: %(d)sx y.desktop\n"
+            "diversion by aa from: %(d)sz.desktop\ndiversion by aa to: %(d)sz.desktop\n"
+            "local diversion from: %(d)sz.desktop\n-o: %(d)sz.desktop\n"
+            "cc: %(d)smimeinfo.cache\ncc: %(d)skde4/z.desktop\ncc: /opt/z.desktop\nbozuk\n" % {"d": d}),
+            {"vlc-bin": [d + "vlc.desktop"], "aa": [d + "x y.desktop"], "bb": [d + "x y.desktop"]})
+        self.assertEqual(m.desktop_coz(""), {})
+
+    def test_uygulama_bul(self):
+        m, yollar = paket.magaza_yukle(), []
+        for ad, ek in (("gizli", "NoDisplay=true\n"), ("acik", "")):
+            yollar.append(os.path.join(self.d, ad + ".desktop"))
+            with open(yollar[-1], "w", encoding="utf-8") as f:
+                f.write("[Desktop Entry]\nType=Application\nName=%s\nExec=/bin/true\n%s" % (ad, ek))
+        self.assertIsNone(m.uygulama_bul(["/yok.desktop", yollar[0]]))
+        self.assertEqual(m.uygulama_bul(yollar).get_name(), "acik")
+
+    def test_kurulu_bilgi(self):
+        m = paket.magaza_yukle()
+        if shutil.which("dpkg-query"):
+            self.assertTrue(m.kurulu_bilgi("dpkg")[1].isdigit())
+        for ad in ("-o", "carotos-olmayan-paket", None):
+            self.assertIsNone(m.kurulu_bilgi(ad))
+
+
 @unittest.skipUnless(paket and EKRAN and shutil.which("dpkg-deb"), "ekran + dpkg gerekir")
 class Pencere(Gecici):
     def don(self, kosul, sure=60):
@@ -167,6 +194,7 @@ class Pencere(Gecici):
             self.don(lambda: p.bilgi)
             self.assertEqual(p.bilgi["neden"], neden, ad)
             self.assertFalse(p.kur_dugme.get_sensitive())
+        self.assertFalse(p.ac_dugme.get_visible())       # dpkg kurulu ama .desktop'u yok
         p.ac(self.deb)                       # .deb uzantili ama paket degil
         self.don(lambda: p._sira and p.bilgi is None and not p.kur_dugme.get_sensitive())
         self.assertIsNone(paket.incele(self.deb))

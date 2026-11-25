@@ -40,7 +40,13 @@
       <property name="autohide-behavior" type="uint" value="0"/>
       <property name="nrows" type="uint" value="1"/>
       <property name="border-width" type="uint" value="1"/>
-      <property name="background-style" type="uint" value="0"/>
+      <property name="background-style" type="uint" value="1"/>
+      <property name="background-rgba" type="array">
+        <value type="double" value="0.118"/>
+        <value type="double" value="0.129"/>
+        <value type="double" value="0.161"/>
+        <value type="double" value="0.90"/>
+      </property>
       <property name="enter-opacity" type="uint" value="98"/>
       <property name="leave-opacity" type="uint" value="100"/>
     </property>

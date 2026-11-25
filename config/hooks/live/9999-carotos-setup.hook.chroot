@@ -96,6 +96,15 @@ echo "CarotOS: sistem sagligi yerlestirildi."
 locale -a | grep -qi '^tr_TR\.utf-\{0,1\}8$' || { echo "CarotOS HATA: tr_TR.UTF-8 yerel ayari uretilmedi." >&2; exit 1; }
 echo "CarotOS: yerel ayarlar uretildi."
 
+# Panel baslaticilari her dilde: ad satirlari sistemdeki asil .desktop'tan; xfdesktop'un eksik cevirileri
+chmod 755 /usr/bin/carotos-panel-eslestir /usr/sbin/carotos-ceviri-ek
+chmod 644 /etc/xdg/autostart/carotos-panel-eslestir.desktop /usr/share/carotos/ceviri-ek/xfdesktop.json
+/usr/bin/carotos-panel-eslestir --skel /etc/skel
+/usr/sbin/carotos-ceviri-ek
+grep -q '^Name[[]de[]]=' /etc/skel/.config/xfce4/panel/launcher-14/*.desktop || { echo "CarotOS HATA: panel baslaticilari cevrilmedi." >&2; exit 1; }
+LANGUAGE=tr python3 -c 'import gettext,sys; t=gettext.translation("xfdesktop","/usr/share/locale",["tr"]); sys.exit(t.gettext("Select _All")=="Select _All")' || { echo "CarotOS HATA: xfdesktop cevirisi eklenmedi." >&2; exit 1; }
+echo "CarotOS: panel adlari ve masaustu menusu cevirileri hazir."
+
 # Simge önbelleğini tazele (isteğe bağlı: başarısızlık yalnızca bellek kullanımını artırır)
 gtk-update-icon-cache -f /usr/share/icons/hicolor 2>/dev/null || true
 echo "CarotOS: simge onbellegi tazelendi."
@@ -104,6 +113,8 @@ echo "CarotOS: simge onbellegi tazelendi."
 chmod 755 /opt/carotos/usb/carotos-usb-check.py
 chmod 755 /opt/carotos/yanpanel/carotos-yanpanel.py
 chmod 755 /opt/carotos/paket/carotos-paket.py
+chmod 755 /opt/carotos/sleek-ayar/carotos-sleek-ayar.py
+chmod 644 /usr/share/applications/carotos-sleek-ayar.desktop
 chmod 644 /usr/share/applications/carotos-paket.desktop /etc/xdg/mimeapps.list
 chmod 644 /usr/share/applications/carotos-usb-check.desktop
 chmod 644 /etc/xdg/autostart/carotos-usb-check.desktop

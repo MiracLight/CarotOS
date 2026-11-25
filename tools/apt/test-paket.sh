@@ -39,7 +39,7 @@ for p in $EKLER; do
 done
 for x in usr/bin/carotos-acikla usr/bin/carotos-modernlestir usr/sbin/carotos-tema-kur usr/bin/carotos-saat-eslestir \
          usr/sbin/carotos-dil-hazirla usr/sbin/carotos-mac-ayar usr/sbin/carotos-magaza-apt usr/sbin/carotos-ufw-ayar \
-         opt/carotos/yanpanel/carotos-yanpanel.py opt/carotos/poligon/ogrenci_uygulama.py opt/carotos/welcome/carotos-welcome.py; do
+         opt/carotos/yanpanel/carotos-yanpanel.py opt/carotos/sleek-ayar/carotos-sleek-ayar.py opt/carotos/poligon/ogrenci_uygulama.py opt/carotos/welcome/carotos-welcome.py; do
     [ -x "$R/$x" ] || hata "calistirilabilir olmali: $x"
 done
 [ -f "$R/etc/systemd/system/carotpot.service" ] && [ -f "$R/etc/carotpot/ayarlar.json" ] || hata "carotpot servis/ayar dosyalari"

@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=CarotOS panel labels
+Name[tr]=CarotOS panel adları
+Exec=/usr/bin/carotos-panel-eslestir
+OnlyShowIn=XFCE;
+NoDisplay=true

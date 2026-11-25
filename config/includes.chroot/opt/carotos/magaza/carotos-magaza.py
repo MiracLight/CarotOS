@@ -125,6 +125,13 @@ METIN = {
     "kur": {"tr": "Kur", "en": "Install"},
     "kaldir": {"tr": "Kaldır", "en": "Remove"},
     "ac": {"tr": "Aç", "en": "Open"},
+    "ac_hata": {"tr": "Uygulama açılamadı", "en": "The app could not be opened"},
+    "komut_kopyala": {"tr": "Komutu kopyala", "en": "Copy command"},
+    "kopyalandi": {"tr": "Kopyalandı", "en": "Copied"},
+    "bilgi_kurulu_surum": {"tr": "Kurulu sürüm", "en": "Installed version"},
+    "bilgi_kurulu_boyut": {"tr": "Kurulu boyut", "en": "Installed size"},
+    "sirala_ad": {"tr": "Ada göre", "en": "By name"},
+    "sirala_kurulu": {"tr": "Önce kurulu", "en": "Installed apps first"},
     "kurulu_rozet": {"tr": "Kurulu", "en": "Installed"},
     "kuruluyor": {"tr": "Kuruluyor…", "en": "Installing…"},
     "kaldiriliyor": {"tr": "Kaldırılıyor…", "en": "Removing…"},
@@ -526,6 +533,68 @@ def apt_komutu(eylem, *paketler, izinli=None):
     if eylem == "upgrade":
         return [pkexec, *ortam, apt_get, *kilit, *conf, "upgrade", "-y"]
     return [pkexec, *ortam, apt_get, *kilit, *conf, eylem, "-y", "--", *paketler]
+
+
+# --- Kurulu uygulamayi acma -------------------------------------------------
+def desktop_coz(cikti):
+    """`dpkg-query -S` ciktisi -> {paket: [.desktop yollari]}; diversion satirlari atlanir."""
+    harita = {}
+    for satir in cikti.splitlines():
+        m = re.fullmatch(r"(.+?): (/usr/share/applications/[^/]+\.desktop)", satir)
+        for ad in m[1].split(", ") if m else ():
+            ad = ad.split(":", 1)[0]
+            if paket_adi_gecerli(ad) and m[2] not in harita.setdefault(ad, []):
+                harita[ad].append(m[2])
+    return harita
+
+
+def _dpkg_query(*arg):
+    dpkg_query = sistem_yolu("dpkg-query")
+    if not dpkg_query:
+        return ""
+    try:
+        return subprocess.run([dpkg_query, *arg], capture_output=True, text=True, errors="replace",
+                              timeout=20, stdin=subprocess.DEVNULL, env=temiz_ortam()).stdout
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def desktop_haritasi():
+    return desktop_coz(_dpkg_query("-S", "/usr/share/applications/*.desktop"))
+
+
+def kurulu_bilgi(paket):
+    """(surum, KiB boyut metni); kurulu degilse None."""
+    if paket_adi_gecerli(paket):
+        for satir in _dpkg_query("-W", "-f=${db:Status-Status}\t${Version}\t${Installed-Size}\n",
+                                 "--", paket).splitlines():
+            durum, surum, boyut = satir.split("\t")
+            if durum == "installed":
+                return surum, boyut
+    return None
+
+
+def uygulama_bul(yollar):
+    """Menude gorunen ilk .desktop; yoksa None (terminal araclari)."""
+    for yol in yollar:
+        try:
+            bilgi = Gio.DesktopAppInfo.new_from_filename(yol)
+        except TypeError:                # dosya yok ya da gecersiz
+            continue
+        if bilgi is not None and bilgi.should_show():
+            return bilgi
+    return None
+
+
+def uygulama_ac(bilgi, pencere):
+    try:
+        bilgi.launch([], pencere.get_display().get_app_launch_context())
+    except GLib.Error as exc:
+        d = Gtk.MessageDialog(transient_for=pencere, modal=True, message_type=Gtk.MessageType.ERROR,
+                              buttons=Gtk.ButtonsType.CLOSE, text=M("ac_hata"))
+        d.format_secondary_text(exc.message)
+        d.run()
+        d.destroy()
 
 
 # --- Root yardimcisi (M-02: guvenli iptal) -----------------------------------
@@ -1001,6 +1070,9 @@ class UygulamaSatiri(Gtk.Box):
         self.sepet_dugme = tema.dugme("", None, self._sepet)
         self.sepet_dugme.set_no_show_all(True)
         islem.pack_start(self.sepet_dugme, False, False, 0)
+        self.ac_dugme = tema.dugme(M("ac"), "ana", lambda: self.p.ac(self.uygulama))
+        self.ac_dugme.set_no_show_all(True)
+        islem.pack_start(self.ac_dugme, False, False, 0)
         self.dugme = tema.dugme("", None, self._eylem)
         islem.pack_start(self.dugme, False, False, 0)
         self.sag.pack_start(islem, False, False, 0)
@@ -1015,6 +1087,7 @@ class UygulamaSatiri(Gtk.Box):
         sepet_ctx = self.sepet_dugme.get_style_context()
         sepet_ctx.remove_class("ana")
         sepet_ctx.remove_class("duz")
+        self.ac_dugme.set_visible(kurulu and self.p.acilacak(self.uygulama) is not None)
         if kurulu:
             self.rozet.show()
             self.dugme.set_label(M("kaldir"))
@@ -1059,6 +1132,8 @@ class MagazaPenceresi(Gtk.Window):
         self.kat_ad = {k["id"]: k["ad"] for k in self.kategoriler}
         self.kurulu = kurulu_paketler()
         self.as_harita = {}
+        self.desktop = {}       # paket -> .desktop yollari; her islemden sonra yeniden okunur
+        self.sirala = "ad"
         self.guncellenebilir = set()
         self.guncelleme_denetlendi = False
         self.mesgul = None
@@ -1132,6 +1207,8 @@ class MagazaPenceresi(Gtk.Window):
         self.kabuk.sec("anasayfa")
 
         threading.Thread(target=self._as_yukle, daemon=True).start()
+        threading.Thread(target=lambda: GLib.idle_add(self._desktop_hazir, desktop_haritasi()),
+                         daemon=True).start()
         self._guncelleme_denetle()
 
     # -- metinler ------------------------------------------------------------
@@ -1242,8 +1319,19 @@ class MagazaPenceresi(Gtk.Window):
                 kutu.pack_start(tema.bos_durum("arama", M("sonuc_yok")), True, True, 0)
             return kutu
         sayac = tema.etiket(M("uyg_sayisi", n=len(uygulamalar)), "silik")
-        kutu.pack_start(sayac, False, False, 0)
-        for u in sorted(uygulamalar, key=lambda u: metin(u.get("ad", "")).lower()):
+        ust = Gtk.Box(spacing=8)
+        ust.pack_start(sayac, True, True, 0)
+        kutu.pack_start(ust, False, False, 0)
+        if len({u.get("paket") in self.kurulu for u in uygulamalar}) > 1:
+            secim = tema.AcilirSecim()
+            for kimlik in ("ad", "kurulu"):
+                secim.append(kimlik, M("sirala_" + kimlik))
+            secim.set_active_id(self.sirala)
+            secim.connect("changed", self._sirala_degisti)
+            ust.pack_end(secim, False, False, 0)
+        for u in sorted(uygulamalar, key=lambda u: (
+                self.sirala == "kurulu" and u.get("paket") not in self.kurulu,
+                metin(u.get("ad", "")).lower())):
             satir = UygulamaSatiri(self, u)
             kutu.pack_start(tiklanir(satir, lambda a=u: self.detay_goster(a)), False, False, 0)
         return kutu
@@ -1311,6 +1399,19 @@ class MagazaPenceresi(Gtk.Window):
         satir.pack_start(bilgi, True, True, 0)
         ic.pack_start(satir, False, False, 0)
         return tiklanir(dis, lambda i=k["id"]: self.kategoriye_git(i))
+
+    def _sirala_degisti(self, secim):
+        self.sirala = secim.get_active_id()
+        GLib.idle_add(self._listeyi_yenile)
+
+    def _listeyi_yenile(self):
+        if self.detay_app is not None:
+            self._detay_dugme_guncelle()
+        elif self.arama:
+            self._arama_uygula(self.arama_girisi)
+        else:
+            self.sayfa_secildi(self.aktif)
+        return False
 
     def _kurulu_sayfasi(self):
         uyg = [u for u in self.uygulamalar if u.get("paket") in self.kurulu]
@@ -1434,7 +1535,14 @@ class MagazaPenceresi(Gtk.Window):
         eylem = Gtk.Box(spacing=8)
         self.detay_dugme = tema.dugme("", None, lambda: self.eylem(
             u, "remove" if u.get("paket") in self.kurulu else "install"))
+        self.detay_ac = tema.dugme(M("ac"), "ana", lambda: self.ac(u))
+        self.detay_ac.set_no_show_all(True)
+        eylem.pack_start(self.detay_ac, False, False, 0)
         eylem.pack_start(self.detay_dugme, False, False, 0)
+        if paket_adi_gecerli(u.get("paket")):
+            kopya = tema.dugme(M("komut_kopyala"), "duz")
+            kopya.connect("clicked", self._komut_kopyala, u["paket"])
+            eylem.pack_start(kopya, False, False, 0)
         if u.get("site"):
             eylem.pack_start(tema.dugme(M("siteyi_ac"), "duz", self._site_ac, u["site"]),
                              False, False, 0)
@@ -1450,14 +1558,29 @@ class MagazaPenceresi(Gtk.Window):
         bilgi_izgara.set_column_spacing(12)
         bilgi_izgara.set_row_spacing(12)
         bilgi_izgara.set_homogeneous(True)
-        for etk, deger in ((M("bilgi_kategori"), metin(self.kat_ad.get(u.get("kategori"), ""))),
-                           (M("bilgi_boyut"), u.get("boyut", "—")),
-                           (M("bilgi_lisans"), u.get("lisans", "—")),
-                           (M("bilgi_paket"), u.get("paket", "—"))):
+
+        def kart_ekle(etk, deger):
             d2, i2 = tema.kart(14, 2)
             i2.pack_start(tema.etiket(etk, "silik"), False, False, 0)
             i2.pack_start(tema.etiket(deger, "kart-baslik"), False, False, 0)
             bilgi_izgara.add(d2)
+        for etk, deger in ((M("bilgi_kategori"), metin(self.kat_ad.get(u.get("kategori"), ""))),
+                           (M("bilgi_boyut"), u.get("boyut", "—")),
+                           (M("bilgi_lisans"), u.get("lisans", "—")),
+                           (M("bilgi_paket"), u.get("paket", "—"))):
+            kart_ekle(etk, deger)
+
+        def kurulu_ekle(sonuc):
+            if sonuc and self._detay_izgara is bilgi_izgara:
+                kart_ekle(M("bilgi_kurulu_surum"), sonuc[0])
+                if sonuc[1].isdigit():
+                    kart_ekle(M("bilgi_kurulu_boyut"), GLib.format_size(int(sonuc[1]) * 1024))
+                bilgi_izgara.show_all()
+            return False
+        self._detay_izgara = bilgi_izgara
+        if u.get("paket") in self.kurulu:
+            threading.Thread(target=lambda: GLib.idle_add(kurulu_ekle, kurulu_bilgi(u["paket"])),
+                             daemon=True).start()
         kutu.pack_start(bilgi_izgara, False, False, 0)
 
         dis2, ic2 = tema.kart()
@@ -1478,10 +1601,29 @@ class MagazaPenceresi(Gtk.Window):
         self.detay_dugme.set_label(M("kaldir") if kurulu else M("kur"))
         ctx.add_class("tehlike" if kurulu else "ana")
         self.detay_dugme.set_sensitive(self.mesgul is None)
+        self.detay_ac.set_visible(kurulu and self.acilacak(u) is not None)
         if kurulu:
             self.detay_rozet.show()
         else:
             self.detay_rozet.hide()
+
+    def acilacak(self, u):
+        return uygulama_bul(self.desktop.get(u.get("paket"), ()))
+
+    def ac(self, u):
+        bilgi = self.acilacak(u)
+        if bilgi is not None:
+            uygulama_ac(bilgi, self)
+
+    def _komut_kopyala(self, dugme, paket):
+        pano = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+        pano.set_text("sudo apt install " + paket, -1)
+        pano.store()
+        dugme.set_label(M("kopyalandi"))
+
+    def _desktop_hazir(self, harita):
+        self.desktop = harita
+        return self._listeyi_yenile()
 
     def _site_ac(self, url):
         try:
@@ -1592,7 +1734,12 @@ class MagazaPenceresi(Gtk.Window):
     def _kurulu_oku(self, sonra):
         """dpkg'den kurulu paketleri arka planda okur; sonuc ana is parcaciginda sonra(kume) ile verilir."""
         def is_():
-            GLib.idle_add(sonra, kurulu_paketler())
+            kurulu, harita = kurulu_paketler(), desktop_haritasi()
+            GLib.idle_add(uygula, kurulu, harita)
+
+        def uygula(kurulu, harita):
+            self.desktop = harita
+            return sonra(kurulu)
         threading.Thread(target=is_, daemon=True).start()
 
     def eylem(self, u, islem):

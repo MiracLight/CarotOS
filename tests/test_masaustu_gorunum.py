@@ -49,9 +49,9 @@ class XfconfTesti(unittest.TestCase):
         self.assertEqual(ozellik("xfwm4.xml", "general/vblank_mode"), "xpresent")
         self.assertEqual(ozellik("xfwm4.xml", "general/theme"), "Arc-Dark")
 
-    def test_ust_panel_tema_arka_planini_kullanir(self):
-        # background-style 1 renk ister ama renk tanimli degil; 0 = GTK temasi + gtk.css
-        self.assertEqual(ozellik("xfce4-panel.xml", "panels/panel-1/background-style"), "0")
+    def test_ust_panel_zemini_xfce_ayarindan(self):
+        # 1 = duz renk (background-rgba): kullanici Xfce panel ayarlarindan degistirebilir; gtk.css zorlamaz
+        self.assertEqual(ozellik("xfce4-panel.xml", "panels/panel-1/background-style"), "1")
 
     def test_thunar_ayarlari(self):
         self.assertEqual(ozellik("thunar.xml", "last-location-bar"), "ThunarLocationButtons")

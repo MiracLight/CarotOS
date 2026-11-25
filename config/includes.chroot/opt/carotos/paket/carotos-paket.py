@@ -50,6 +50,7 @@ METIN = dil.zenginlestir({
     "ekler": {"tr": "Ek kurulacak paketler", "en": "Additional packages to install"},
     "yok": {"tr": "Yok", "en": "None"},
     "kur": {"tr": "Kur", "en": "Install"},
+    "ac": {"tr": "Aç", "en": "Open"},
     "vazgec": {"tr": "Vazgeç", "en": "Cancel"},
     "goster": {"tr": "İşlemi göster", "en": "Show operation"},
     "guven": {"tr": "Kaynağa güveniyorum", "en": "I trust the source"},
@@ -212,6 +213,9 @@ class PaketPenceresi(Gtk.Window):
         self.kur_dugme = tema.dugme(M("kur"), "ana", self._kur)
         alt.pack_start(self.sec_dugme, False, False, 0)
         alt.pack_end(self.kur_dugme, False, False, 0)
+        self.ac_dugme = tema.dugme(M("ac"), None, self._uygulama_ac)
+        self.ac_dugme.set_no_show_all(True)
+        alt.pack_end(self.ac_dugme, False, False, 0)
         self._bos("bos", "bos_alt")
 
     def _icerik(self, parcalar):
@@ -224,6 +228,21 @@ class PaketPenceresi(Gtk.Window):
         self.kaydir.add(kutu)
         self.kaydir.show_all()
         self.kur_dugme.set_sensitive(bool(self.bilgi and not self.bilgi["neden"]))
+        self.ac_dugme.set_visible(self._acilacak() is not None)
+
+    def _acilacak(self):
+        return self.magaza.uygulama_bul(self.bilgi["desktop"]) if self.bilgi else None
+
+    def _uygulama_ac(self):
+        bilgi = self._acilacak()
+        if bilgi is not None:
+            self.magaza.uygulama_ac(bilgi, self)
+
+    def _incele(self, yol):
+        b = incele(yol)
+        if b:
+            b["desktop"] = self.magaza.desktop_haritasi().get(b["Package"], []) if b["kurulu"] else []
+        return b
 
     def _bos(self, baslik, alt=None):
         self.bilgi = None
@@ -255,7 +274,7 @@ class PaketPenceresi(Gtk.Window):
             self._bos("gecersiz")
             return
         self._bos("inceleniyor")
-        threading.Thread(target=lambda: GLib.idle_add(self._goster, sira, incele(yol)), daemon=True).start()
+        threading.Thread(target=lambda: GLib.idle_add(self._goster, sira, self._incele(yol)), daemon=True).start()
 
     def _goster(self, sira, b):
         if sira != self._sira:               # bu arada başka dosya seçildi

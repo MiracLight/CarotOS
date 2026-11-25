@@ -67,6 +67,17 @@ class ListeTesti(unittest.TestCase):
     def test_ayni_anda_5_simge(self):
         self.assertEqual(self.mod.GORUNEN, 5)
 
+    def test_yan_dogrula(self):
+        varsayilan = {"renk": "#001239", "opaklik": 88, "gorunen": 5, "simge": 40, "uygulamalar": None}
+        for bozuk in (None, [], {"renk": "red", "opaklik": 19, "gorunen": 10, "simge": True, "uygulamalar": "x"},
+                      {"uygulamalar": []}, {"uygulamalar": ["../x.desktop", "a b.desktop", 3, "x"]}):
+            self.assertEqual(self.mod.yan_dogrula(bozuk), varsayilan, bozuk)
+        iyi = {"renk": "#FFFFFF", "opaklik": 20, "gorunen": 9, "simge": 24, "uygulamalar": ["b.desktop", "a.desktop"]}
+        self.assertEqual(self.mod.yan_dogrula(dict(iyi, uygulamalar=["b.desktop", "a.desktop", "b.desktop"])), iyi)
+        css = self.mod.css(iyi)
+        self.assertIn("rgba(255, 255, 255, 0.20)", css)
+        self.assertNotIn("YAZI", css)
+
 
 class BetikTesti(unittest.TestCase):
     def test_kaynak_kurallari(self):
@@ -86,6 +97,12 @@ class BetikTesti(unittest.TestCase):
                            text=True, timeout=20, stdin=subprocess.DEVNULL)
         self.assertEqual(s.returncode, 0, s.stderr)
         self.assertEqual(s.stdout.split(), ["carotos-magaza.desktop"])
+        os.makedirs(os.path.join(kok, "carotos"))
+        with open(os.path.join(kok, "carotos", "sleek.json"), "w") as f:
+            f.write('{"yan": {"uygulamalar": ["z.desktop", "a.desktop"]}}')
+        s = subprocess.run([sys.executable, "-I", BETIK, "--liste", "--dizin", kok], capture_output=True, text=True,
+                           timeout=20, stdin=subprocess.DEVNULL, env=dict(os.environ, XDG_CONFIG_HOME=kok))
+        self.assertEqual(s.stdout.split(), ["z.desktop", "a.desktop"])
 
 
 @unittest.skipUnless(os.environ.get("DISPLAY"), "ekran yok (xvfb-run ile calistirin)")

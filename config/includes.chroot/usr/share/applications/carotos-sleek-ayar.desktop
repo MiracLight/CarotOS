@@ -1,0 +1,20 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=CarotOS Sleek Theme
+Comment=Panel, side panel and performance settings of the Sleek look
+Comment[tr]=Sleek görünümünün panel, yan panel ve performans ayarları
+Comment[de]=Panel-, Seitenleisten- und Leistungseinstellungen für Sleek
+Comment[ru]=Настройки панели, боковой панели и производительности Sleek
+Comment[es]=Ajustes de panel, panel lateral y rendimiento de Sleek
+Comment[pt]=Configurações de painel, painel lateral e desempenho do Sleek
+Comment[ja]=Sleek のパネル、サイドパネル、パフォーマンスの設定
+Comment[zh]=Sleek 的面板、侧边面板和性能设置
+Comment[fr]=Réglages du panneau, du panneau latéral et des performances de Sleek
+Comment[ar]=إعدادات اللوحة واللوحة الجانبية والأداء في Sleek
+Comment[hi]=Sleek के पैनल, साइड पैनल और प्रदर्शन की सेटिंग
+Exec=/opt/carotos/sleek-ayar/carotos-sleek-ayar.py
+Icon=preferences-desktop-theme
+Terminal=false
+Categories=XFCE;GTK;Settings;DesktopSettings;X-XFCE-SettingsDialog;X-XFCE-PersonalSettings;
+Keywords=sleek;theme;panel;dock;tema;

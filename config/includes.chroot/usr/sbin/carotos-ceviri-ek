@@ -1,0 +1,63 @@
+#!/usr/bin/python3 -I
+# -*- coding: utf-8 -*-
+"""Debian'in eksik xfdesktop cevirilerini tamamlar (masaustu sag tik menusu Ingilizce kaliyordu).
+
+/usr/share/carotos/ceviri-ek/xfdesktop.json: {dil: {ingilizce: ceviri}}. Yalniz EKSIK metinler eklenir; Debian'in
+kendi cevirisi degismez. Asil dosya dpkg-divert ile <dosya>.debian'a tasinir, paket guncellenince oradan yenilenir.
+Derlemede (kanca) ve carotos-yardimci kurulurken root olarak calisir; tekrar calistirmak zararsizdir."""
+import gettext
+import json
+import os
+import struct
+import subprocess
+import sys
+
+VERI = "/usr/share/carotos/ceviri-ek/xfdesktop.json"
+HEDEF = "/usr/share/locale/%s/LC_MESSAGES/xfdesktop.mo"
+
+
+def mo_oku(yol):
+    """{msgid: msgstr} (bas kaydi "" dahil; cogullar {(id, n): metin})."""
+    try:
+        with open(yol, "rb") as f:
+            return dict(gettext.GNUTranslations(f)._catalog)
+    except OSError:
+        return {}
+
+
+def mo_yaz(sozluk, baslik):
+    """Yalniz tekil metinler (xfdesktop'ta cogul yok)."""
+    d = {k: v for k, v in sozluk.items() if isinstance(k, str) and k}
+    d[""] = baslik
+    ciftler = sorted((k.encode(), v.encode()) for k, v in d.items())
+    n, ofs, govde, kt, vt = len(ciftler), 28 + 16 * len(ciftler), b"", b"", b""
+    for tablo in (0, 1):
+        for c in ciftler:
+            t = struct.pack("<II", len(c[tablo]), ofs + len(govde))
+            kt, vt = (kt + t, vt) if tablo == 0 else (kt, vt + t)
+            govde += c[tablo] + b"\0"
+    return struct.pack("<7I", 0x950412DE, 0, n, 28, 28 + 8 * n, 0, 28 + 16 * n) + kt + vt + govde
+
+
+def main():
+    with open(VERI, encoding="utf-8") as f:
+        veri = json.load(f)
+    for dil, ek in veri.items():
+        if not dil.replace("_", "").isalpha():
+            continue
+        yol = HEDEF % dil
+        asil = yol + ".debian"
+        subprocess.run(["dpkg-divert", "--local", "--rename", "--divert", asil, "--add", yol],
+                       check=True, stdout=subprocess.DEVNULL)
+        eski = mo_oku(asil)
+        baslik = eski.get("") or "Content-Type: text/plain; charset=UTF-8\n"
+        os.makedirs(os.path.dirname(yol), exist_ok=True)
+        with open(yol + ".yeni", "wb") as f:
+            f.write(mo_yaz({**ek, **{k: v for k, v in eski.items() if v}}, baslik))
+        os.chmod(yol + ".yeni", 0o644)
+        os.replace(yol + ".yeni", yol)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

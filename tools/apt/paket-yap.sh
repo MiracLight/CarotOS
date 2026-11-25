@@ -132,19 +132,20 @@ if { [ "$1" = remove ] || [ "$1" = purge ]; } && [ -f "$B" ]; then
     sed -i "/CarotOS Komut Aciklayici (Alt+E)/d;/carotos\/acikla.bash/d" "$B"
 fi' ;;
 sleek)
-    OPT=yanpanel; EXEC=carotos-yanpanel.py
+    OPT=yanpanel; MASAUSTU=carotos-sleek-ayar; EXEC=carotos-yanpanel.py
     ESKI="usr/local/sbin/carotos-tema-kur"; COMPAT="usr/local/bin/carotos-modernlestir:/usr/bin/carotos-modernlestir"
-    EXEC_ABS="usr/bin/carotos-modernlestir usr/sbin/carotos-tema-kur"
+    EXEC_ABS="usr/bin/carotos-modernlestir usr/sbin/carotos-tema-kur opt/carotos/sleek-ayar/carotos-sleek-ayar.py"
     BAGIMLI="python3, python3-gi, gir1.2-gtk-3.0, python3-gi-cairo, carotos-ortak (>= $ORTAK_MIN)"
-    EK="usr/bin/carotos-modernlestir usr/sbin/carotos-tema-kur"
+    EK="usr/bin/carotos-modernlestir usr/sbin/carotos-tema-kur opt/carotos/sleek-ayar"
     ACIKLAMA="CarotOS Carot Sleek: modern masaustu temasi ve yan panel
  Isteze bagli koyu tema, yuvarlak koseler, dock ve kenardan kayan CarotOS yan paneli; geri alinabilir." ;;
 yardimci)
     ESKI="usr/local/sbin/carotos-dil-hazirla usr/local/sbin/carotos-mac-ayar usr/local/sbin/carotos-magaza-apt usr/local/sbin/carotos-ufw-ayar"
     COMPAT="usr/local/bin/carotos-saat-eslestir:/usr/bin/carotos-saat-eslestir"
-    EXEC_ABS="usr/sbin/carotos-dil-hazirla usr/sbin/carotos-mac-ayar usr/sbin/carotos-magaza-apt usr/sbin/carotos-deb-kur usr/sbin/carotos-ufw-ayar usr/bin/carotos-saat-eslestir"
+    EXEC_ABS="usr/sbin/carotos-dil-hazirla usr/sbin/carotos-mac-ayar usr/sbin/carotos-magaza-apt usr/sbin/carotos-deb-kur usr/sbin/carotos-ufw-ayar usr/bin/carotos-saat-eslestir usr/bin/carotos-panel-eslestir usr/sbin/carotos-ceviri-ek"
     BAGIMLI="python3"; ONERILEN="pkexec"
-    EK="usr/sbin/carotos-dil-hazirla usr/sbin/carotos-mac-ayar usr/sbin/carotos-magaza-apt usr/sbin/carotos-deb-kur usr/sbin/carotos-ufw-ayar usr/bin/carotos-saat-eslestir"
+    POSTINST='[ -n "${DPKG_ROOT:-}" ] || ! [ -e /usr/share/doc/xfdesktop4-data ] || /usr/sbin/carotos-ceviri-ek || true'
+    EK="usr/sbin/carotos-dil-hazirla usr/sbin/carotos-mac-ayar usr/sbin/carotos-magaza-apt usr/sbin/carotos-deb-kur usr/sbin/carotos-ufw-ayar usr/bin/carotos-saat-eslestir usr/bin/carotos-panel-eslestir usr/sbin/carotos-ceviri-ek usr/share/carotos/ceviri-ek/xfdesktop.json etc/xdg/autostart/carotos-panel-eslestir.desktop"
     ACIKLAMA="CarotOS yardimci betikleri
  Uygulamalarin pkexec ile cagirdigi yetkili yardimcilar (dil hazirlama, MAC, guvenlik duvari, Magaza kurulumu, saat)." ;;
 *) echo "Bilinmeyen paket: $PAKET (paket: $TUMU)" >&2; exit 2 ;;

@@ -368,8 +368,22 @@ class ModernlestirTabani(unittest.TestCase):
         self.masa = SahteMasaustu(BASLANGIC_XFCONF, sanal=self.sanal)
         self.o = md.Ortam(self.ev, uygulamalar=self.uyg, temalar=self.temalar, simgeler=self.simgeler,
                           calistir=self.masa.calistir, baslat=self.masa.baslat,
-                          program_var=lambda ad: True, bekle=lambda s: None, dil="tr")
+                          program_var=lambda ad: True, bekle=lambda s: None, dil="tr",
+                          cekirdek=8, drm=os.path.join(self.kok, "drm"))
+        self.surucu("i915")
         self.ciktilar = []
+
+    def surucu(self, *adlar):
+        shutil.rmtree(self.o.drm, True)
+        for i, ad in enumerate(adlar):
+            os.makedirs(os.path.join(self.o.drm, "card%d" % i, "device"))
+            os.symlink("/sys/bus/pci/drivers/" + ad, os.path.join(self.o.drm, "card%d" % i, "device", "driver"))
+
+    def ayar(self, metin):
+        self.yaz(os.path.join(self.config, "carotos", "sleek.json"), metin)
+
+    def picom(self):
+        return self.oku(os.path.join(self.config, "picom", "picom.conf"))
 
     def yaz(self, yol, metin):
         os.makedirs(os.path.dirname(yol), exist_ok=True)
@@ -407,7 +421,9 @@ class ModernlestirUygulaTesti(ModernlestirTabani):
         self.assertEqual(self.x("xfwm4", "/general/title_alignment"), "center")
         self.assertEqual(self.x("xfwm4", "/general/use_compositing"), "false")
         self.assertEqual(self.x("xfce4-panel", "/panels/panel-1/size"), "30")
-        self.assertEqual(self.x("xfce4-panel", "/panels/panel-1/background-style"), "0")
+        self.assertEqual(self.x("xfce4-panel", "/panels/panel-1/background-style"), "1")
+        self.assertEqual(self.x("xfce4-panel", "/panels/panel-1/background-rgba"),
+                         ["0.000000", "0.070588", "0.223529", "0.750000"])
         self.assertEqual(self.x("xfce4-panel", "/plugins/plugin-8/digital-time-format"), "%a %d %b  %H:%M")
         # eklenti yerlesimi degismedi; yalniz baslaticidan olusan alt panel listeden cikti
         self.assertEqual(self.x("xfce4-panel", "/panels/panel-1/plugin-ids"), ["1", "8"])
@@ -710,6 +726,109 @@ class ModernlestirUygulaTesti(ModernlestirTabani):
         self.assertEqual(self.x("xfce4-panel", "/panels/panel-1/plugin-ids"), ["1", "8"])
         yedek = json.loads(self.oku(self.o.yedek_yolu))
         self.assertFalse([x for x in yedek["xfconf"] if x["ozellik"].endswith("/plugin-ids")])
+
+
+class SleekAyariTesti(ModernlestirTabani):
+    def test_dogrulama(self):
+        varsayilan = ("otomatik", "#001239", 75)
+        self.assertEqual(md.sleek_ayari(self.o), varsayilan)
+        for bozuk in ("{", "[]", "null", '{"performans": [], "panel": 3}', "[" * 60000,
+                      '{"performans": "hizli", "panel": {"renk": "#12", "opaklik": 101}}',
+                      '{"panel": {"renk": "#001239;}", "opaklik": true}}'):
+            self.ayar(bozuk)
+            self.assertEqual(md.sleek_ayari(self.o), varsayilan, bozuk[:60])
+        self.ayar('{"performans": "hafif", "panel": {"renk": "#ff0000", "opaklik": 0}}')
+        self.assertEqual(md.sleek_ayari(self.o), ("hafif", "#ff0000", 0))
+        self.assertEqual(self.calistir("uygula"), 0, self.ciktilar)
+        self.assertEqual(self.x("xfce4-panel", "/panels/panel-1/background-rgba"),
+                         ["1.000000", "0.000000", "0.000000", "0.000000"])
+        self.assertEqual(self.calistir("geri-al"), 0, self.ciktilar)
+        self.assertEqual(self.masa.xfconf, BASLANGIC_XFCONF)
+
+    def test_kip_secimi(self):
+        for suruculer, cekirdek, beklenen in ((("i915",), 8, False), (("i915",), 2, True), ((), 8, True),
+                                              (("nouveau",), 8, True), (("radeon", "nouveau"), 8, True),
+                                              (("nouveau", "i915"), 8, False), (("amdgpu",), 4, False)):
+            self.surucu(*suruculer)
+            self.o.cekirdek = cekirdek
+            self.assertEqual(md.hafif_mi(self.o, False), beklenen, (suruculer, cekirdek))
+            self.assertFalse(md.hafif_mi(self.o, True))          # sanal makine: bugunku davranis
+        self.ayar('{"performans": "tam"}')
+        self.surucu("nouveau")
+        self.assertFalse(md.hafif_mi(self.o, False))
+        self.ayar('{"performans": "hafif"}')
+        self.assertTrue(md.hafif_mi(self.o, True))
+
+    def test_var_olan_kullanici_giriste_hafife_gecer(self):
+        self.assertEqual(self.calistir("uygula"), 0, self.ciktilar)
+        self.assertIn('backend = "glx";', self.picom())
+        self.surucu("nouveau")
+        self.masa.calisan.discard("picom")
+        self.assertEqual(self.calistir("picom-baslat"), 0, self.ciktilar)
+        self.assertEqual(self.picom(), md.picom_conf(False, hafif=True))
+        self.assertEqual(self.masa.gsettings["zoom-enabled"], "false")
+        # kip ayniysa kullanicinin duzenlemesi ezilmez
+        self.yaz(os.path.join(self.config, "picom", "picom.conf"), self.picom() + "# benim\n")
+        self.masa.calisan.discard("picom")
+        self.assertEqual(self.calistir("picom-baslat"), 0)
+        self.assertIn("# benim", self.picom())
+
+    def test_glx_acilamayan_makinede_giriste_yeniden_denenmez(self):
+        self.masa.picom_coker = {"glx"}
+        self.assertEqual(self.calistir("uygula"), 0, self.ciktilar)
+        self.masa.calisan.discard("picom")
+        self.ciktilar.clear()
+        self.assertEqual(self.calistir("picom-baslat"), 0)
+        self.assertEqual(self.ciktilar, ["birlestirici picom"])
+        self.assertEqual(self.picom(), md.picom_conf(False, yedek=True))
+
+    def test_yeniden(self):
+        self.assertEqual(self.calistir("yeniden"), 0)
+        self.assertEqual((self.ciktilar, self.masa.baslatilan), ([], []))      # uygulanmamis: sessiz
+        self.assertEqual(self.calistir("uygula"), 0, self.ciktilar)
+        once = len(self.masa.baslatilan)
+        self.ayar('{"performans": "hafif"}')
+        self.masa.komutlar.clear()
+        self.assertEqual(self.calistir("yeniden"), 0, self.ciktilar)
+        self.assertEqual(self.picom(), md.picom_conf(False, hafif=True))
+        self.assertEqual([a[0] for a in self.masa.baslatilan[once:]], ["/usr/bin/picom"])
+        self.assertIn([self.o.prog("pkill"), "-u", str(self.o.uid), "-x", "picom"], self.masa.komutlar)
+
+    def test_eski_css_blogu_bir_kez_yenilenir(self):
+        self.assertEqual(self.calistir("uygula"), 0, self.ciktilar)
+        css = os.path.join(self.config, "gtk-3.0", "gtk.css")
+        self.yaz(css, GTK_CSS + "\n" + md.CSS_BAS + "\n#XfcePanelWindow {\n  " + md.ESKI_CSS + "\n}\n"
+                 + md.CSS_SON + "\n")
+        stil = ("xfce4-panel", "/panels/panel-1/background-style")
+        self.masa.xfconf[stil] = "0"
+        self.masa.xfconf.pop(("xfce4-panel", "/panels/panel-1/background-rgba"))
+        yedek = json.loads(self.oku(self.o.yedek_yolu))      # eski surumun yedegi: rgba kaydi yok
+        yedek["xfconf"] = [x for x in yedek["xfconf"] if not x["ozellik"].endswith("rgba")]
+        self.yaz(self.o.yedek_yolu, json.dumps(yedek))
+        self.assertEqual(self.calistir("picom-baslat"), 0, self.ciktilar)
+        self.assertNotIn(md.ESKI_CSS, self.oku(css))
+        self.assertTrue(self.oku(css).startswith(GTK_CSS))
+        self.assertEqual(self.masa.xfconf[stil], "1")
+        self.masa.xfconf[stil] = "2"                         # kullanici sonra degistirirse dokunulmaz
+        self.assertEqual(self.calistir("picom-baslat"), 0, self.ciktilar)
+        self.assertEqual(self.masa.xfconf[stil], "2")
+        self.assertEqual(self.calistir("geri-al"), 0, self.ciktilar)
+        self.assertEqual(self.masa.xfconf, BASLANGIC_XFCONF)
+
+    def test_css_panel_zeminini_zorlamaz(self):
+        blok = md.css_blogu()
+        self.assertNotIn(md.ESKI_CSS, blok)
+        for kural in blok.split("}"):
+            if ".xfce4-panel.panel" in kural or "#XfcePanelWindow" in kural:
+                self.assertNotIn("background", kural)
+        self.assertIn(".xfce4-panel menu label, .xfce4-panel menu image { color: inherit; }", blok)
+
+    def test_hafif_metin(self):
+        metin = md.picom_conf(False, hafif=True)
+        for satir in ('backend = "xrender";', "vsync = false;", "shadow = false;", "fading = false;",
+                      "blur-background = false;", "corner-radius = 0;"):
+            self.assertIn(satir, metin.splitlines())
+        self.assertNotIn("glx", metin)
 
 
 class ModernlestirSanalMakineTesti(ModernlestirTabani):

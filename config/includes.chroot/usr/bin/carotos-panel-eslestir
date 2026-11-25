@@ -1,0 +1,124 @@
+#!/usr/bin/python3 -I
+# -*- coding: utf-8 -*-
+"""Oturum acilisinda bir kez calisir ve cikar (kullanici yetkisiyle, yalniz kendi ayarlari).
+
+1. Panel baslaticilarinin ad/aciklama satirlarini sistemdeki asil .desktop dosyasindan yeniler: panel kopyalari
+   yalniz tr/en tasiyordu, secilen dilde Ingilizce gorunuyordu. Kullanicinin degistirdigi baslaticiya (Exec farkli)
+   dokunulmaz.
+2. Eski gtk.css blogunu onarir: panel zemini CSS'ten kalkar (Xfce panel ayarlari calissin), panel menuleri okunur olur.
+
+  carotos-panel-eslestir            oturum
+  carotos-panel-eslestir --skel D   derlemede /etc/skel gibi bir ev dizini icin yalniz 1. adim
+"""
+import glob
+import os
+import re
+import subprocess
+import sys
+import tempfile
+
+ADLAR = re.compile(r"(Name|GenericName|Comment|Keywords)(\[[^\]]+\])?=")
+KAYNAK = re.compile(r"^X-XFCE-Source=file://(/usr/share/applications/[A-Za-z0-9._-]+\.desktop)$", re.M)
+ESKI_ZEMIN = re.compile(
+    r"/\* Paneller: yari saydam[^\n]*\n\.xfce4-panel\.panel,\n#XfcePanelWindow \{\n"
+    r"  background-color: rgba\(30, 33, 41, 0\.90\);\n  border: none;\n\}\n\n?")
+MENU = """
+/* Panele bagli menuler: renkleri temaya dondur */
+.xfce4-panel menu, .xfce4-panel menu menuitem, .xfce4-panel menu label, .xfce4-panel menu image {
+  color: @theme_text_color;
+}
+.xfce4-panel menu { background-color: @theme_base_color; }
+.xfce4-panel menu menuitem:hover, .xfce4-panel menu menuitem:hover > * {
+  color: @theme_selected_fg_color;
+  background-color: @theme_selected_bg_color;
+}
+"""
+
+
+def oku(yol):
+    try:
+        with open(yol, encoding="utf-8") as f:
+            return f.read(1 << 18)
+    except (OSError, ValueError):
+        return None
+
+
+def yaz(yol, metin):
+    izin = os.stat(yol).st_mode & 0o777
+    fd, gecici = tempfile.mkstemp(prefix=".carotos-", dir=os.path.dirname(yol))
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(metin)
+    os.chmod(gecici, izin)
+    os.replace(gecici, yol)
+
+
+def ana_grup(metin):
+    """[Desktop Entry] grubunun satirlari (eylem gruplari haric)."""
+    return re.split(r"^\[(?!Desktop Entry\])", metin, maxsplit=1, flags=re.M)[0].splitlines()
+
+
+def yeni_metin(kopya, asil):
+    """Kopyanin ad satirlari asilinkilerle degisir; degisiklik gerekmiyorsa None."""
+    def deger(satirlar, anahtar):
+        s = next((s for s in satirlar if s.startswith(anahtar + "=")), None)
+        return s and re.sub(r" *%[a-zA-Z]", "", s)
+    ks, as_ = ana_grup(kopya), ana_grup(asil)
+    if deger(ks, "Exec") != deger(as_, "Exec"):
+        return None
+    ad = [s for s in as_ if ADLAR.match(s)]
+    if not deger(ad, "Name") or sorted(s for s in ks if ADLAR.match(s)) == sorted(ad):
+        return None
+    return "\n".join([ks[0]] + ad + [s for s in ks[1:] if not ADLAR.match(s)]).rstrip("\n") + "\n"
+
+
+def baslaticilar(config):
+    for yol in glob.glob(os.path.join(glob.escape(config), "xfce4", "panel", "launcher-*", "*.desktop")):
+        kopya = None if os.path.islink(yol) else oku(yol)
+        m = KAYNAK.search(kopya) if kopya else None
+        asil = oku(m.group(1)) if m else None
+        yeni = yeni_metin(kopya, asil) if asil else None
+        if yeni:
+            yaz(yol, yeni)
+
+
+def css_onar(metin):
+    """Eski panel zemini kurali varsa kaldirilmis, menu kurallari eklenmis metin; yoksa None."""
+    yeni, n = ESKI_ZEMIN.subn("", metin)
+    if not n:
+        return None
+    return yeni if ".xfce4-panel menu" in yeni else yeni.rstrip("\n") + "\n" + MENU
+
+
+def panel_zemini():
+    """CSS'in verdigi koyu zemini Xfce ayarina tasir (kullanici bir zemin secmisse dokunmaz)."""
+    def xq(*a):
+        return subprocess.run(["/usr/bin/xfconf-query", "-c", "xfce4-panel", "-p", *a], text=True, timeout=10,
+                              stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    if xq("/panels/panel-1/background-style").stdout.strip() not in ("", "0"):
+        return
+    renk = [x for v in ("0.118", "0.129", "0.161", "0.90") for x in ("-t", "double", "-s", v)]
+    xq("/panels/panel-1/background-rgba", "-n", "-a", *renk)
+    xq("/panels/panel-1/background-style", "-n", "-t", "uint", "-s", "1")
+
+
+def main(argv):
+    if argv[1:2] == ["--skel"]:
+        baslaticilar(os.path.join(argv[2], ".config"))
+        return 0
+    config = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
+    baslaticilar(config)
+    css = os.path.join(config, "gtk-3.0", "gtk.css")
+    eski = None if os.path.islink(css) else oku(css)
+    yeni = css_onar(eski) if eski else None
+    if yeni is not None:
+        panel_zemini()
+        yaz(css, yeni)
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main(sys.argv))
+    except (OSError, ValueError, subprocess.SubprocessError) as hata:
+        print("carotos-panel-eslestir:", hata, file=sys.stderr)
+        sys.exit(1)
