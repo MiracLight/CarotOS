@@ -1533,7 +1533,7 @@ LIGHT_THEMES = ["Arc", "Materia", "Greybird", "Adwaita", "Default"]
 
 # Simge temasi adaylari (CarotOS 1.3: Papirus). Sistemde bulunan ilki kullanilir.
 DARK_ICON_THEMES = ["Papirus-Dark", "Papirus", "gnome"]
-LIGHT_ICON_THEMES = ["Papirus", "Papirus-Light", "gnome"]   # panel hep koyu: Papirus'un tepsi simgeleri acik renk
+LIGHT_ICON_THEMES = ["Papirus-Light", "Papirus", "gnome"]   # acik temada panel de acik: koyu tepsi simgeleri
 
 # Fare imleci: koyu temada acik (Breeze_Snow), acik temada koyu imlec.
 DARK_CURSOR_THEMES = ["Breeze_Light", "Breeze_Snow", "DMZ-White", "Adwaita"]
@@ -1715,6 +1715,12 @@ def apply_desktop_theme(theme):
     # Pencere temasi ayri bir bilesendir; yalnizca varsa degistirilir.
     if has_xfwm_variant(name):
         xfconf("xfwm4", "/general/theme", name)
+    # Paneller, panel menuleri ve GTK4 uygulamalari (Sleek acikken betik kendisi dokunmaz)
+    try:
+        subprocess.run(["/usr/bin/carotos-panel-eslestir", "--tema", "dark" if theme == "dark" else "light"],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=20)
+    except (OSError, subprocess.SubprocessError):
+        pass
     return ok
 
 

@@ -80,6 +80,7 @@ DOCK_VARSAYILAN = (
     ("xfce4-settings-manager.desktop",),
 )
 # SOL yan panel: kendi yazdigimiz kaydirmali panel (5 simge gorunur); plank degil
+PANEL_ESLESTIR = "/usr/bin/carotos-panel-eslestir"
 YANPANEL = "/opt/carotos/yanpanel/carotos-yanpanel.py"
 # Plank'in saydam penceresi alt kenari boydan boya kaplar: dislanmazsa glx'te kenar komple bulanir
 PLANK_BULANIK = "  \"class_g = 'Plank'\","
@@ -1246,6 +1247,8 @@ def geri_al(o, cikti=print):
         os.unlink(o.yedek_yolu)
     except OSError:
         pass
+    if os.path.isfile(PANEL_ESLESTIR):                  # Sleek acikken baska tema secildiyse panel de ona uysun
+        o.calistir([PANEL_ESLESTIR, "--esle"])
     cikti("geri alindi")
     return 0
 

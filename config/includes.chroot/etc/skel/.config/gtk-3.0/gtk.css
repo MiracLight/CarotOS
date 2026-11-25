@@ -3,13 +3,14 @@
  * Gecersiz bir kural GTK tarafindan yok sayilir; temayi bozmaz. */
 
 /* Panelin ZEMINI burada yazilmaz (Xfce panel ayarlarindan degistirilebilsin): varsayilani
- * xfce4-panel.xml'deki background-rgba. Yazi/simge acik renk (zemin varsayilan olarak koyu). */
+ * xfce4-panel.xml'deki background-rgba. Yazi/simge rengi temadan gelir (acik temada koyu yazi). */
 .xfce4-panel.panel,
 #XfcePanelWindow,
+.xfce4-panel.panel widget,
 .xfce4-panel button,
 .xfce4-panel label,
 .xfce4-panel image {
-  color: #e6e9ef;
+  color: @theme_fg_color;
 }
 
 /* Panele bagli menuler (baslatici sag tik menusu) CSS'te panelin altinda sayilir: renkleri temaya dondur */
@@ -41,11 +42,11 @@
   transition: background-color 120ms ease;
 }
 .xfce4-panel button:hover {
-  background-color: rgba(255, 255, 255, 0.10);
+  background-color: alpha(currentColor, 0.10);
 }
 .xfce4-panel button:active,
 .xfce4-panel button:checked {
-  background-color: rgba(255, 255, 255, 0.18);
+  background-color: alpha(currentColor, 0.18);
 }
 
 /* Acik pencereler listesinde etkin pencere altta ince vurgu cizgisi alir */

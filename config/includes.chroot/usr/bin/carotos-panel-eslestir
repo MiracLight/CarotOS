@@ -5,10 +5,15 @@
 1. Panel baslaticilarinin ad/aciklama satirlarini sistemdeki asil .desktop dosyasindan yeniler: panel kopyalari
    yalniz tr/en tasiyordu, secilen dilde Ingilizce gorunuyordu. Kullanicinin degistirdigi baslaticiya (Exec farkli)
    dokunulmaz.
-2. Eski gtk.css blogunu onarir: panel zemini CSS'ten kalkar (Xfce panel ayarlari calissin), panel menuleri okunur olur.
+2. Eski gtk.css blogunu onarir: panel zemini CSS'ten kalkar (Xfce panel ayarlari calissin), panel menuleri okunur olur,
+   yazi rengi temadan gelir.
+3. Paneller, panel menuleri ve pencere cercevesi masaustu temasiyla (acik/koyu) ayni kipe getirilir.
+4. Pil simgesi yalniz pilli bilgisayarda gosterilir.
 
   carotos-panel-eslestir            oturum
   carotos-panel-eslestir --skel D   derlemede /etc/skel gibi bir ev dizini icin yalniz 1. adim
+  carotos-panel-eslestir --tema dark|light   Karsilama'da tema secilince (3)
+  carotos-panel-eslestir --esle              Sleek kapaninca (3)
 """
 import glob
 import os
@@ -19,6 +24,14 @@ import tempfile
 
 ADLAR = re.compile(r"(Name|GenericName|Comment|Keywords)(\[[^\]]+\])?=")
 KAYNAK = re.compile(r"^X-XFCE-Source=file://(/usr/share/applications/[A-Za-z0-9._-]+\.desktop)$", re.M)
+KOYU, ACIK = (0.118, 0.129, 0.161, 0.90), (0.961, 0.965, 0.969, 0.95)      # ust panelin varsayilan zeminleri
+# Eski gtk.css panel yazisini hep acik renk yapiyordu: renk temadan gelsin (Sleek blogu bu bicimde yazmaz)
+ESKI_RENK = (("\n.xfce4-panel button,\n.xfce4-panel label,\n.xfce4-panel image {\n  color: #e6e9ef;",
+              "\n.xfce4-panel.panel widget,\n.xfce4-panel button,\n.xfce4-panel label,\n.xfce4-panel image {"
+              "\n  color: @theme_fg_color;"),
+             ("\n  color: #e6e9ef;", "\n  color: @theme_fg_color;"),
+             ("\n  background-color: rgba(255, 255, 255, 0.10);", "\n  background-color: alpha(currentColor, 0.10);"),
+             ("\n  background-color: rgba(255, 255, 255, 0.18);", "\n  background-color: alpha(currentColor, 0.18);"))
 ESKI_ZEMIN = re.compile(
     r"/\* Paneller: yari saydam[^\n]*\n\.xfce4-panel\.panel,\n#XfcePanelWindow \{\n"
     r"  background-color: rgba\(30, 33, 41, 0\.90\);\n  border: none;\n\}\n\n?")
@@ -82,28 +95,120 @@ def baslaticilar(config):
 
 
 def css_onar(metin):
-    """Eski panel zemini kurali varsa kaldirilmis, menu kurallari eklenmis metin; yoksa None."""
+    """Eski panel zemini kurali varsa kaldirilmis, menu kurallari eklenmis, yazi rengi temaya donmus metin; gerekmiyorsa None."""
     yeni, n = ESKI_ZEMIN.subn("", metin)
-    if not n:
+    for eski, rengi in ESKI_RENK:
+        yeni = yeni.replace(eski, rengi)
+    if yeni == metin:
         return None
+    if not n:
+        return yeni
     return yeni if ".xfce4-panel menu" in yeni else yeni.rstrip("\n") + "\n" + MENU
 
 
-def panel_zemini():
-    """CSS'in verdigi koyu zemini Xfce ayarina tasir (kullanici bir zemin secmisse dokunmaz)."""
-    def xq(*a):
-        return subprocess.run(["/usr/bin/xfconf-query", "-c", "xfce4-panel", "-p", *a], text=True, timeout=10,
-                              stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-    if xq("/panels/panel-1/background-style").stdout.strip() not in ("", "0"):
+def xq(kanal, ozellik, *yazilan):
+    """xfconf oku (yoksa "") ya da yaz."""
+    return subprocess.run(["/usr/bin/xfconf-query", "-c", kanal, "-p", ozellik, *yazilan], text=True, timeout=10,
+                          stdout=subprocess.PIPE, stderr=subprocess.DEVNULL).stdout.strip()
+
+
+def sleek_acik():
+    return os.path.isfile(os.path.expanduser("~/.local/state/carotos/sleek-yedek.json"))
+
+
+def rgba_coz(metin):
+    """xfconf-query dizi ciktisi -> [r, g, b, a]; dizi degilse None."""
+    try:
+        d = [float(s.replace(",", ".")) for s in metin.splitlines() if re.fullmatch(r"[0-9.,eE+-]+", s.strip())]
+    except ValueError:
+        return None
+    return d if len(d) == 4 else None
+
+
+def ayni(a, b):
+    return all(abs(x - y) < 0.006 for x, y in zip(a, b))
+
+
+def panel_karari(stil, rgba, koyu, acikca):
+    """(yazilacak zemin ya da None, panel koyu kipte mi ya da None).
+
+    Zemin yalniz bizim varsayilanlarimizdan biriyse tema ile degisir; kullanicinin rengi korunur ve yazilar o rengin
+    ustunde okunacak kipe alinir. acikca=False (oturum acilisi): bos zemine dokunulmaz."""
+    if stil == "1" and rgba and not (ayni(rgba, KOYU) or ayni(rgba, ACIK)):
+        return None, 0.299 * rgba[0] + 0.587 * rgba[1] + 0.114 * rgba[2] < 0.5
+    if stil == "2" or (stil != "1" and not acikca):
+        return None, None
+    hedef = KOYU if koyu else ACIK
+    return (None if stil == "1" and rgba and ayni(rgba, hedef) else hedef), koyu
+
+
+def panel_temasi(koyu, acikca):
+    """Panelleri, panel menulerini ve GTK4 uygulamalarini masaustu temasiyla ayni kipe getirir."""
+    if sleek_acik():                                  # Sleek kendi koyu panelini yonetir; kapaninca --esle cagirir
         return
-    renk = [x for v in ("0.118", "0.129", "0.161", "0.90") for x in ("-t", "double", "-s", v)]
-    xq("/panels/panel-1/background-rgba", "-n", "-a", *renk)
-    xq("/panels/panel-1/background-style", "-n", "-t", "uint", "-s", "1")
+    for no in "12":
+        if not xq("xfce4-panel", "/panels/panel-%s/plugin-ids" % no):
+            continue                                  # kullanici paneli kaldirmis
+        kok = "/panels/panel-%s/background-" % no
+        stil = xq("xfce4-panel", kok + "style")
+        # Alt panelin zemini eskiden hic yazilmiyordu; Arc'in acik temasi da paneli koyu boyar
+        zemin, kip = panel_karari(stil or "0", rgba_coz(xq("xfce4-panel", kok + "rgba")), koyu,
+                                  acikca or (no == "2" and not stil))
+        if no == "1" and kip is not None and xq("xfce4-panel", "/panels/dark-mode") != str(kip).lower():
+            xq("xfce4-panel", "/panels/dark-mode", "-n", "-t", "bool", "-s", str(kip).lower())
+        if zemin:
+            xq("xfce4-panel", kok + "rgba", "-n", "-a", *[x for v in zemin for x in ("-t", "double", "-s", str(v))])
+            xq("xfce4-panel", kok + "style", "-n", "-t", "uint", "-s", "1")
+    if acikca:
+        try:                                          # GTK4/libadwaita uygulamalari ve tarayicilar
+            subprocess.run(["/usr/bin/gsettings", "set", "org.gnome.desktop.interface", "color-scheme",
+                            "prefer-dark" if koyu else "default"], timeout=10,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except (OSError, subprocess.SubprocessError):
+            pass
+
+
+def tema_esle():
+    """Oturum acilisi: tema baska yoldan (Xfce Gorunum, guncelleme) degistiyse cerceve ve panel de uyar."""
+    tema = xq("xsettings", "/Net/ThemeName")
+    if not tema:
+        return
+    if {tema, xq("xfwm4", "/general/theme")} == {"Arc", "Arc-Dark"} and not sleek_acik():
+        xq("xfwm4", "/general/theme", "-s", tema)
+    panel_temasi("dark" in tema.lower(), False)
+
+
+def pil_var(kok="/sys/class/power_supply"):
+    """Bilgisayarin kendi pili (fare/klavye pilleri scope=Device sayilmaz)."""
+    for d in glob.glob(os.path.join(kok, "*")):
+        def deger(ad, d=d):
+            return (oku(os.path.join(d, ad)) or "").strip()
+        if deger("type") == "Battery" and deger("scope") != "Device" and deger("present") != "0":
+            return True
+    return False
+
+
+def pil_simgesi():
+    """Tepsi simgesi yalniz pilli bilgisayarda. Pilli bilgisayarda bir kez acilir; kullanici kapatirsa kapali kalir."""
+    kanal, kok = "xfce4-power-manager", "/xfce4-power-manager/"
+    if not pil_var():
+        xq(kanal, kok + "show-tray-icon", "-n", "-t", "bool", "-s", "false")
+        if xq(kanal, kok + "carotos-pil-acildi"):      # disk pilli bir bilgisayara takilirsa yeniden acilsin
+            xq(kanal, kok + "carotos-pil-acildi", "-r")
+    elif xq(kanal, kok + "carotos-pil-acildi") != "true":
+        for ad in ("show-tray-icon", "carotos-pil-acildi"):
+            xq(kanal, kok + ad, "-n", "-t", "bool", "-s", "true")
 
 
 def main(argv):
     if argv[1:2] == ["--skel"]:
         baslaticilar(os.path.join(argv[2], ".config"))
+        return 0
+    if argv[1:2] == ["--tema"]:
+        panel_temasi(argv[2:3] == ["dark"], True)
+        return 0
+    if argv[1:2] == ["--esle"]:
+        tema_esle()
         return 0
     config = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
     baslaticilar(config)
@@ -111,8 +216,11 @@ def main(argv):
     eski = None if os.path.islink(css) else oku(css)
     yeni = css_onar(eski) if eski else None
     if yeni is not None:
-        panel_zemini()
         yaz(css, yeni)
+        if ESKI_ZEMIN.search(eski) and xq("xfce4-panel", "/panels/panel-1/background-style") in ("", "0"):
+            panel_temasi("dark" in xq("xsettings", "/Net/ThemeName").lower(), True)
+    tema_esle()
+    pil_simgesi()
     return 0
 
 
