@@ -32,6 +32,12 @@ sayılmamıştır.
   Karşılama'da tema anında uygulanır, dil erken kapatınca da kaydedilir ve oturumu
   kapatmak önerilir; açık temada panel okunur; Carot Sleek alt kenar bulanıklığı
   giderildi; canlı oturumda ekran kilidi parola sormaz.
+- **25 Kasım 2026 güncellemesi:** tema bütün masaüstüne uygulanır (paneller, panel
+  menüleri, pencere çerçevesi); panel rengi Xfce ayarlarından değişir ve kalır;
+  panel sağ tık menüsü okunur; panel adları ve masaüstü sağ tık menüsü seçilen dilde;
+  Mağaza ve Paket Kurucu'da "Aç"; CarotOS Sleek Theme ayarları, eski donanımda hafif
+  kip ve yan panelde tekerlek; pil simgesi yalnız pilli bilgisayarda; giriş ekranı
+  arka planı yazısız. Boşta bellek yaklaşık 550 MB (apt 1.4.4).
 - **Açılış:** Plymouth teması, GRUB 5/30 sn + os-prober, sessiz açılış,
   `i915.fastboot=1`.
 - **Güvenlik denetimi:** 12 uygulama ve sistem betikleri tek tek gözden
