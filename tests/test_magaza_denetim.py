@@ -38,7 +38,7 @@ AGAC = ast.parse(KAYNAK)
 _ISLEVLER = {"paket_adi_gecerli", "apt_komutu", "kilit_iletisi", "_arac_etkisi",
              "kaldirma_simulasyonu_coz", "kaldirma_simulasyonu", "korunan_etkiler",
              "yardimci_komutu", "paket_argumani"}
-_DEGISKENLER = {"PAKET_ADI", "APT_EYLEMLERI", "_ARAC_ETKI", "KORUNAN", "YARDIMCI",
+_DEGISKENLER = {"PAKET_ADI", "APT_EYLEMLERI", "EK_PAKETLER", "_ARAC_ETKI", "KORUNAN", "YARDIMCI",
                 "FAZ_ISARETI", "IPTAL_ISARETI", "IPTAL_KODU"}
 
 

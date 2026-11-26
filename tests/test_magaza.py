@@ -52,7 +52,7 @@ class AptKomutuTesti(unittest.TestCase):
         secilen = [n for n in agac.body
                    if (isinstance(n, ast.FunctionDef) and n.name in ("apt_komutu", "paket_adi_gecerli"))
                    or (isinstance(n, ast.Assign)
-                       and any(getattr(t, "id", "") in ("PAKET_ADI", "APT_EYLEMLERI") for t in n.targets))]
+                       and any(getattr(t, "id", "") in ("PAKET_ADI", "APT_EYLEMLERI", "EK_PAKETLER") for t in n.targets))]
         self.ad_alani = {"re": re, "sistem_yolu": lambda ad: "/usr/bin/" + ad}
         exec(compile(ast.Module(body=secilen, type_ignores=[]), KOD, "exec"), self.ad_alani)
 
@@ -63,6 +63,13 @@ class AptKomutuTesti(unittest.TestCase):
                 komut = self.ad_alani["apt_komutu"](eylem, "rkhunter")
                 self.assertIn("LC_ALL=C", komut)
                 self.assertIn("DEBIAN_FRONTEND=noninteractive", komut)
+
+    def test_libreoffice_gtk_eklentisiyle_kurulur(self):
+        # eklentisiz LibreOffice eski X11 gorunumuyle acilir, masaustu temasini izlemez
+        k = self.ad_alani["apt_komutu"]
+        self.assertEqual(k("install", "libreoffice")[-2:], ["libreoffice", "libreoffice-gtk3"])
+        self.assertNotIn("libreoffice-gtk3", k("remove", "libreoffice"))
+        self.assertEqual(k("install", "nmap")[-1], "nmap")
 
     def test_komut_pkexec_ile_baslar_ve_apt_get_cagirir(self):
         komut = self.ad_alani["apt_komutu"]("install", "nmap")

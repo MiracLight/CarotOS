@@ -489,6 +489,9 @@ def guncellenebilir_paketler():
 # '-o', './x.deb', 'paket=surum', 'paket/depo' gibi apt'in baska anlam verdigi yazimlar reddedilir.
 PAKET_ADI = re.compile(r"[a-z0-9][a-z0-9+.-]+\Z")
 APT_EYLEMLERI = ("install", "remove", "upgrade", "update")
+# Kurulurken yanina eklenenler. libreoffice ust paketi GTK arayuz eklentisini cekmez: eklentisiz LibreOffice
+# eski X11 gorunumuyle acilir, masaustu temasini ve koyu/acik secimi izlemez.
+EK_PAKETLER = {"libreoffice": ("libreoffice-gtk3",)}
 
 
 def paket_adi_gecerli(ad):
@@ -532,6 +535,8 @@ def apt_komutu(eylem, *paketler, izinli=None):
     conf = ["-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold"]
     if eylem == "upgrade":
         return [pkexec, *ortam, apt_get, *kilit, *conf, "upgrade", "-y"]
+    if eylem == "install":
+        paketler += tuple(e for p in paketler for e in EK_PAKETLER.get(p, ()) if e not in paketler)
     return [pkexec, *ortam, apt_get, *kilit, *conf, eylem, "-y", "--", *paketler]
 
 

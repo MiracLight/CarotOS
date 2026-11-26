@@ -159,6 +159,7 @@ def panel_temasi(koyu, acikca):
         if zemin:
             xq("xfce4-panel", kok + "rgba", "-n", "-a", *[x for v in zemin for x in ("-t", "double", "-s", str(v))])
             xq("xfce4-panel", kok + "style", "-n", "-t", "uint", "-s", "1")
+    simge_temasi(xq("xfce4-panel", "/panels/dark-mode") == "true", koyu)
     if acikca:
         try:                                          # GTK4/libadwaita uygulamalari ve tarayicilar
             subprocess.run(["/usr/bin/gsettings", "set", "org.gnome.desktop.interface", "color-scheme",
@@ -166,6 +167,20 @@ def panel_temasi(koyu, acikca):
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except (OSError, subprocess.SubprocessError):
             pass
+
+
+def simge_adi(mevcut, panel_koyu, koyu):
+    """Papirus ailesinde panel zeminine uyan tur (tepsi ve eklenti simgeleri okunsun); baska simge temasina dokunulmaz."""
+    if mevcut not in ("Papirus", "Papirus-Dark", "Papirus-Light"):
+        return None
+    hedef = ("Papirus-Dark" if koyu else "Papirus") if panel_koyu else "Papirus-Light"
+    return None if hedef == mevcut else hedef
+
+
+def simge_temasi(panel_koyu, koyu):
+    hedef = simge_adi(xq("xsettings", "/Net/IconThemeName"), panel_koyu, koyu)
+    if hedef and os.path.isfile("/usr/share/icons/%s/index.theme" % hedef):
+        xq("xsettings", "/Net/IconThemeName", "-s", hedef)
 
 
 def tema_esle():

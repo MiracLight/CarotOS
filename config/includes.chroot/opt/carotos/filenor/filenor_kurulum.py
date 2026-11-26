@@ -55,7 +55,7 @@ APT = {
     "heif": ["python3-pillow-heif"],
     "pypdf": ["python3-pypdf"],
     "gs": ["ghostscript"],
-    "libreoffice": ["libreoffice-writer", "libreoffice-calc", "libreoffice-impress"],
+    "libreoffice": ["libreoffice-writer", "libreoffice-calc", "libreoffice-impress", "libreoffice-gtk3"],
 }
 
 # Arac anahtari -> winget paket kimligi (Windows)

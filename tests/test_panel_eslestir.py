@@ -74,6 +74,13 @@ class Tema(unittest.TestCase):
         self.assertEqual(P.panel_karari("0", None, False, False), (None, None))
         self.assertEqual(P.panel_karari("0", None, False, True), (P.ACIK, False))
 
+    def test_simge_paneli_izler(self):
+        self.assertEqual(P.simge_adi("Papirus-Dark", False, False), "Papirus-Light")    # acik panel: koyu simgeler
+        self.assertEqual(P.simge_adi("Papirus-Light", True, True), "Papirus-Dark")
+        self.assertEqual(P.simge_adi("Papirus-Light", True, False), "Papirus")          # acik tema, koyu panel
+        self.assertIsNone(P.simge_adi("Papirus-Dark", True, True))
+        self.assertIsNone(P.simge_adi("elementary", False, False))
+
     def test_rgba(self):
         self.assertEqual(P.rgba_coz("Value is an array with 4 items:\n\n0.118000\n0,1\n0.2\n1"), [0.118, 0.1, 0.2, 1])
         self.assertIsNone(P.rgba_coz(""))
